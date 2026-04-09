@@ -1,93 +1,33 @@
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
-const PROMPT = `너는 대학 전공 강의자료를 '시험 대비용'으로 정리하는 조교이다.
-목표는 문서의 전체 흐름을 파악하게 하면서도, 시험에 나올 가능성이 높은 세부 항목을 빠뜨리지 않고 정리하는 것이다.
+/**
+ * Markdown 텍스트를 받아 GPT로 요약 (백엔드 경유 — API 키는 서버에서 관리)
+ */
+export async function summarizeWithGPT(markdown) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 130_000);
 
-반드시 지켜라.
-1. 문서의 대단원/소단원 순서를 유지하라.
-2. 원문에 등장하는 열거형 항목(예: n가지 특성, n계층 구조, n가지 구축 방식, n가지 투명성, 종류, 연산, 장단점)은 개수와 항목 이름을 보존하라.
-3. 정의, 특징, 구성요소, 종류, 장단점, 비교 항목은 서로 섞지 말고 분리해서 정리하라.
-4. 원문에 없는 내용을 추측해서 추가하지 마라.
-5. 너무 추상적으로 뭉뚱그리지 말고, 원문에 있는 구체 용어를 유지하라.
-6. 한국어 용어 뒤에 영어 용어가 함께 제시된 경우 가능하면 괄호로 함께 적어라.
-7. "다양한", "여러 가지" 같은 표현만 쓰고 구체 항목을 생략하지 마라.
-8. 시험 직전 복습에 바로 쓸 수 있도록 정리하라.
+  try {
+    const response = await fetch(`${BACKEND_URL}/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'GPT', markdown }),
+      signal: controller.signal,
+    });
 
-[출력 형식]
-# 전체 흐름
-- 문서가 어떤 순서로 전개되는지 4~8개 bullet
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `API 오류 (${response.status})`);
+    }
 
-# 섹션별 핵심 정리
-## 1. [원문 대제목]
-- 핵심 정의
-- 핵심 설명 3~6개
-- 반드시 기억할 세부 항목
-- 장점/단점 또는 특징(있으면)
-- 비교 대상(있으면)
-
-## 2. [원문 대제목]
-- 위와 동일 형식 반복
-
-# 열거형 암기 포인트
-- 개수와 항목명을 보존하여 정리
-
-# 비교 포인트
-- 비교 대상별 차이점을 표 또는 bullet로 정리
-- 비교가 없으면 "없음"
-
-# 시험 직전 체크리스트
-- 단답형/서술형으로 나올 수 있는 키워드 10~15개
-- 각 키워드는 한 줄 설명 포함
-
-# 한 줄 요약
-- 문서 전체를 1~2문장으로 정리`;
-
-export async function summarizeWithGPT(file) {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API 키가 없습니다. .env.local 파일에 VITE_OPENAI_API_KEY를 설정해주세요.');
+    const data = await response.json();
+    return data.result;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('요약 요청 시간 초과. 다시 시도해주세요.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  // PDF → base64 변환
-  const arrayBuffer = await file.arrayBuffer();
-  const base64 = btoa(
-    new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-  );
-
-  // OpenAI Responses API (PDF 파일 직접 지원)
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      input: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_file',
-              filename: file.name,
-              file_data: `data:application/pdf;base64,${base64}`,
-            },
-            {
-              type: 'input_text',
-              text: PROMPT,
-            },
-          ],
-        },
-      ],
-      max_output_tokens: 2048,
-      temperature: 0.3,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error?.message || `API 오류 (${response.status})`);
-  }
-
-  const data = await response.json();
-  return data.output[0].content[0].text;
 }
