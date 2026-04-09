@@ -239,7 +239,11 @@ export default function Dashboard() {
                         <span style={{ fontSize: 15, fontWeight: 500, color: "#333" }}>{c}</span>
                         <div style={{ display: "flex", gap: 8 }}>
                           {["요약", "퀴즈", "커뮤니티"].map(btn => (
-                            <button key={btn} style={{
+                            <button key={btn} onClick={() => {
+                              if (btn === "요약") navigate(pageRoutes["자료 요약"]);
+                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈"]);
+                              else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
+                            }} style={{
                               padding: "6px 14px", borderRadius: 8,
                               border: btn === "커뮤니티" ? "1px solid #e0e0e0" : "none",
                               background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",

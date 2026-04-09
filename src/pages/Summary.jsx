@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { summarizeWithGemini } from "../services/gemini";
 
 const FileIcon = ({ type }) => {
   const colors = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60" };
@@ -97,8 +98,10 @@ const ModelSelectView = ({ tokens, onSelect, onBack }) => {
 };
 
 /* ── 요약 결과 뷰 ── */
-const SummaryResultView = ({ modelKey, onBack }) => {
-  const data = summaryData[modelKey];
+const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error }) => {
+  const data = summaryData[modelKey] || summaryData["GPT"];
+  const displayContent = realContent || data.content;
+
   return (
     <div>
       <button onClick={onBack} style={{
@@ -111,24 +114,57 @@ const SummaryResultView = ({ modelKey, onBack }) => {
             background: modelKey === "GPT" ? "#E8FAFE" : modelKey === "Gemini" ? "#FFF0F6" : "#F0F0FF",
             color: modelKey === "GPT" ? CYAN : modelKey === "Gemini" ? PINK : "#7C3AED"
           }}>{modelKey}</span>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#222" }}>{data.title}</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#222" }}>
+            {modelKey} 요약
+          </h2>
+          {isLoading && (
+            <span style={{ fontSize: 13, color: "#aaa", marginLeft: 8 }}>AI가 요약 중...</span>
+          )}
         </div>
-        <div style={{
-          background: "#fafafa", borderRadius: 12, padding: 24,
-          fontSize: 14, color: "#444", lineHeight: 1.8, whiteSpace: "pre-wrap"
-        }}>
-          {data.content}
-        </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-          <button style={{
-            padding: "10px 24px", borderRadius: 10, border: "none",
-            background: CYAN, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer"
-          }}>공유하기</button>
-          <button style={{
-            padding: "10px 24px", borderRadius: 10, border: "1px solid #e0e0e0",
-            background: "#fff", color: "#555", fontSize: 14, cursor: "pointer"
-          }}>다운로드</button>
-        </div>
+
+        {isLoading ? (
+          <div style={{
+            background: "#fafafa", borderRadius: 12, padding: 48,
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 16
+          }}>
+            <div style={{
+              width: 36, height: 36,
+              border: `3px solid ${PINK}`, borderTop: "3px solid transparent",
+              borderRadius: "50%", animation: "spin 0.8s linear infinite"
+            }}/>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+            <p style={{ margin: 0, fontSize: 14, color: "#888" }}>
+              PDF 텍스트를 추출하고 Gemini가 요약하고 있어요...
+            </p>
+          </div>
+        ) : error ? (
+          <div style={{
+            background: "#FFF5F5", borderRadius: 12, padding: 24,
+            fontSize: 14, color: "#E53E3E", lineHeight: 1.6
+          }}>
+            <strong>요약 실패:</strong> {error}
+          </div>
+        ) : (
+          <div style={{
+            background: "#fafafa", borderRadius: 12, padding: 24,
+            fontSize: 14, color: "#444", lineHeight: 1.8, whiteSpace: "pre-wrap"
+          }}>
+            {displayContent}
+          </div>
+        )}
+
+        {!isLoading && (
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button style={{
+              padding: "10px 24px", borderRadius: 10, border: "none",
+              background: CYAN, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer"
+            }}>공유하기</button>
+            <button style={{
+              padding: "10px 24px", borderRadius: 10, border: "1px solid #e0e0e0",
+              background: "#fff", color: "#555", fontSize: 14, cursor: "pointer"
+            }}>다운로드</button>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -244,6 +280,9 @@ export default function Summary() {
   // 뷰 상태: "upload" | "models" | "summaryResult" | "quizCreate"
   const [view, setView] = useState("upload");
   const [selectedModel, setSelectedModel] = useState(null);
+  const [summaryText, setSummaryText] = useState("");
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
 
   const handleFiles = (fileList) => {
     const arr = Array.from(fileList).filter(f =>
@@ -257,6 +296,7 @@ export default function Summary() {
         name: f.name, size: f.size, type: getFileType(f.name),
         pages: f.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
         slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
+        rawFile: f,
       }));
       setFiles(prev => [...prev, ...nf]);
       setUploading(false);
@@ -270,10 +310,27 @@ export default function Summary() {
     { title: "중간고사 예상문제 모음", type: "요약" },
   ];
 
-  const handleModelSelect = (key, cost) => {
+  const handleModelSelect = async (key, cost) => {
     if (cost > 0) setTokens(prev => prev - cost);
     setSelectedModel(key);
-    setView("summaryResult");
+    setSummaryError("");
+
+    if (key === "Gemini" && files[0]?.rawFile) {
+      setIsSummarizing(true);
+      setView("summaryResult");
+      try {
+        const result = await summarizeWithGemini(files[0].rawFile);
+        setSummaryText(result);
+      } catch (err) {
+        setSummaryError(err.message);
+        setSummaryText("");
+      } finally {
+        setIsSummarizing(false);
+      }
+    } else {
+      setSummaryText("");
+      setView("summaryResult");
+    }
   };
 
   return (
@@ -319,7 +376,13 @@ export default function Summary() {
 
         {/* 요약 결과 뷰 */}
         {view === "summaryResult" && selectedModel && (
-          <SummaryResultView modelKey={selectedModel} onBack={() => setView("models")} />
+          <SummaryResultView
+            modelKey={selectedModel}
+            onBack={() => setView("models")}
+            realContent={summaryText}
+            isLoading={isSummarizing}
+            error={summaryError}
+          />
         )}
 
         {/* 퀴즈 생성 뷰 */}
