@@ -1,0 +1,690 @@
+[
+  {
+    "section_index": 1,
+    "chunk_index": 1,
+    "global_chunk_index": 1,
+    "header": "**467206 데이터베이스 <전공> 2025-2학기 |**",
+    "text": "**Professor: 김경민 | Ph.D. Gyeongmin Kim Email: gmkim@jejunu.ac.kr Lecture: 화 15:00-16:15, 목 15:00-16:15 장소: 공과 3호 C206**",
+    "rough_tokens": 30
+  },
+  {
+    "section_index": 2,
+    "chunk_index": 1,
+    "global_chunk_index": 2,
+    "header": "**데이터웨어하우스와 데이터베이스 응용**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 3,
+    "chunk_index": 1,
+    "global_chunk_index": 3,
+    "header": "**■목차**",
+    "text": "- 데이터웨어하우스 개념 \n\n- 데이터웨어하우스 설계 \n\n- OLAP \n\n- 데이터베이스 응용 \n\n**==> picture [541 x 415] intentionally omitted <==**",
+    "rough_tokens": 27
+  },
+  {
+    "section_index": 4,
+    "chunk_index": 1,
+    "global_chunk_index": 4,
+    "header": "**1.1 데이터웨어하우스 개념**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 5,
+    "chunk_index": 1,
+    "global_chunk_index": 5,
+    "header": "⚫ 데이터웨어하우스의 출현 배경",
+    "text": "▪ 정보의 위기(information crisis) \n\n- 저장된 방대한 양에 비해 실제 의사 결정에 활용할 수 있는 정보는 매우 제한적임 \n\n- ‘풍요속의 빈곤’처럼 데이터는 넘쳐나는데 정작 필요한 정보는 얻을 수 없음 \n\n- 예) 거미줄(spider web) 구조 \n\n**==> picture [451 x 279] intentionally omitted <==**",
+    "rough_tokens": 52
+  },
+  {
+    "section_index": 6,
+    "chunk_index": 1,
+    "global_chunk_index": 6,
+    "header": "**정보 시스템의 문제점**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 7,
+    "chunk_index": 1,
+    "global_chunk_index": 7,
+    "header": "⚫ 기존 정보 시스템이 의사 결정에 도움을 주지 못하는 구조적인 문제점",
+    "text": "**==> picture [397 x 216] intentionally omitted <==**\n\n- 데이터의 비통합성: 여러 업체에 의해 서로 다른 시기에 개발됨으로써 관련된 데이터들이 통합되어 있지 않은 경우가 많음. 데이터 통 합에 많은 시간 및 비용 투자 필요 \n\n- 데이터의 비일관성: 각 업무 프로그램 중심 개발로 데이터 중복이 많음. 중복 데이터 간 표현 및 의미상 차이로 인한 혼란 발생 \n\n- 데이터의 비신뢰성: 데이터의 생성 주기나 추출 알고리즘 등에 따라 연관된 데이터가 서로 일치하지 않아 의사 결정에 어려움이 있음. 서로 다른 결과값 도출로 인한 분석 결과 신뢰성 손상 \n\n- 데이터의 단기성: 대량의 데이터가 저장되어 있으나 주로 현 시점 위주의 단기간 데이터가 대부분이며, 과거부터 현재까지의 이력 데이 터 부족으로 장기적 추이 분석 등이 어려움",
+    "rough_tokens": 108
+  },
+  {
+    "section_index": 8,
+    "chunk_index": 1,
+    "global_chunk_index": 8,
+    "header": "**1.2 데이터웨어하우스의 정의 및 특성**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 9,
+    "chunk_index": 1,
+    "global_chunk_index": 9,
+    "header": "⚫ 데이터웨어하우스(data warehouse) 정의",
+    "text": "- 의사결정을 위한 효율적인 분석 기반을 제공하는 통합 데이터 저장소 \n\n- 이질적인 데이터들의 추출, 변환, 통합 과정을 통해 구축된 거대한 분석전용 데이터 창고",
+    "rough_tokens": 23
+  },
+  {
+    "section_index": 10,
+    "chunk_index": 1,
+    "global_chunk_index": 10,
+    "header": "⚫ 데이터웨어하우스의 특성",
+    "text": "- 1) 주제 지향성(subject-oriented) \n\n- 분석 프로그램 중심의 데이터 구조 \n\n- 분석 주제 중심으로 구성, 주제별로 요약 \n\n- 대학의 예) 학생별, 교수별, 과목별로 다양한 분석 가능 \n\n**==> picture [368 x 150] intentionally omitted <==**",
+    "rough_tokens": 43
+  },
+  {
+    "section_index": 11,
+    "chunk_index": 1,
+    "global_chunk_index": 11,
+    "header": "**1.2 데이터웨어하우스의 정의 및 특성**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 12,
+    "chunk_index": 1,
+    "global_chunk_index": 12,
+    "header": "2) 통합성(integrated)",
+    "text": "- 데이터베이스뿐만 아니라 외부 문서(웹 문서, 엑셀 문서, 텍스트 문서 등) 간의 통합을 고려해야 함 \n\n- 분석을 위해서는 하나의 통일된 형식으로 변환이 필요 \n\n- 통합 과정에서 데이터 유형과 측정 단위, 데이터의 불일치 문제 등을 해결 \n\n- 데이터웨어하우스의 핵심이 되는 가장 중요한 특성으로 많은 시간과 노력이 필요함 \n\n**==> picture [373 x 249] intentionally omitted <==**",
+    "rough_tokens": 60
+  },
+  {
+    "section_index": 13,
+    "chunk_index": 1,
+    "global_chunk_index": 13,
+    "header": "**1.2 데이터웨어하우스의 정의 및 특성**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 14,
+    "chunk_index": 1,
+    "global_chunk_index": 14,
+    "header": "3) 시계열성(time-variant)",
+    "text": "- 데이터베이스 - 주로 현 시점까지의 업무 결과를 반영 \n\n- 분석 과정 - 과거부터 현재까지 여러 시점의 데이터가 모두 의미가 있음 \n\n- 추이 분석을 위해서는 각 시점에서의 데이터 버전 즉, 스냅샷(snapshot)을 저장하는 것 이 중요함 \n\n- 데이터웨어하우스 - 스냅샷 데이터들이 축적되는 대규모 저장소 \n\n- 시간 흐름에 따라 원시 데이터 혹은 요약 데이터 형태로 다양하게 중복 저장 \n\n**==> picture [306 x 97] intentionally omitted <==**",
+    "rough_tokens": 69
+  },
+  {
+    "section_index": 15,
+    "chunk_index": 1,
+    "global_chunk_index": 15,
+    "header": "**1.2 데이터웨어하우스의 정의 및 특성**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 16,
+    "chunk_index": 1,
+    "global_chunk_index": 16,
+    "header": "4) 비휘발성(nonvolatile)",
+    "text": "- 데이터웨어하우스 - 수정이나 삭제가 거의 없는 일종의 검색 전용 데이터베이스 \n\n- ▪ 데이터가 일단 저장되면 검색이나 추가적 적재만 발생, 갱신과 삭제는 거의 발생하지 않 음 \n\n**==> picture [261 x 181] intentionally omitted <==**",
+    "rough_tokens": 39
+  },
+  {
+    "section_index": 17,
+    "chunk_index": 1,
+    "global_chunk_index": 17,
+    "header": "**데이터베이스와 데이터웨어하우스의 비교**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 18,
+    "chunk_index": 1,
+    "global_chunk_index": 18,
+    "header": "▪ 데이터베이스와 데이터웨어하우스의 차이점",
+    "text": "**==> picture [566 x 377] intentionally omitted <==**",
+    "rough_tokens": 14
+  },
+  {
+    "section_index": 19,
+    "chunk_index": 1,
+    "global_chunk_index": 19,
+    "header": "**1.3 데이터웨어하우스 시스템**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 20,
+    "chunk_index": 1,
+    "global_chunk_index": 20,
+    "header": "⚫ 데이터웨어하우스 시스템의 구조 : 3-계층 구조(3-tier architecture)",
+    "text": "**==> picture [456 x 275] intentionally omitted <==**\n\n▪ 원본(source) 데이터 계층: 기존DB 내 운영 데이터와 비정형 데이터, 외부데이터를 포함한 다양한 데이터 원본들을 포함. 분석용 데이터는 원본 데이터로부터 추출되어 변환 및 표준화 과정을 거쳐 데이터웨어하우스로 적재(추출 및 변환은 보통 자동화된 전문 도구(프로그램) 활용)",
+    "rough_tokens": 54
+  },
+  {
+    "section_index": 21,
+    "chunk_index": 1,
+    "global_chunk_index": 21,
+    "header": "**1.3 데이터웨어하우스 시스템**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 22,
+    "chunk_index": 1,
+    "global_chunk_index": 22,
+    "header": "⚫ 데이터웨어하우스 시스템의 구조 : 3-계층 구조(3-tier architecture)",
+    "text": "**==> picture [455 x 275] intentionally omitted <==**\n\n2차원 이상의 다차원 데이터 구조 분석 시 활용 \n\n- 데이터 저장소 계층: 가장 핵심적인 계층으로, 관계형 DB 또는 다차원 DB의 2가지 유형이 가능. 저장소는 OLAP (On Line Analytical Processing) 서버와 밀접하게 관련. \n\n   - ➢ 메타데이터 저장소: 데이터 모델, 업무 요소의 정의, 변환 규칙, 원본 및 대상 DB에 대한 설명 등을 저장 (데이터웨어하우스 안에있는 데이터를 설명해주는 데이터)",
+    "rough_tokens": 75
+  },
+  {
+    "section_index": 23,
+    "chunk_index": 1,
+    "global_chunk_index": 23,
+    "header": "**1.3 데이터웨어하우스 시스템**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 24,
+    "chunk_index": 1,
+    "global_chunk_index": 24,
+    "header": "⚫ 데이터웨어하우스 시스템의 구조 : 3-계층 구조(3-tier architecture)",
+    "text": "**==> picture [456 x 275] intentionally omitted <==**\n\n- 클라이언트계층: 다양한 유형의 도구가 포함 \n\n   - 보고서 도구: 정형 및 비정형 분석 보고서 생성 \n\n   - OLAP 도구: 동적인 차원 분석(다양한 관점의 조합으로 분석 화면 구성, 관심 영역에 따른 데이터 요약 수준을 확대 or 축소) \n\n   - 데이터 마이닝 도구: 숨겨져 있는 데이터 간 상관관계 분석을 통해 유의미한 규칙 및 의미 파악",
+    "rough_tokens": 64
+  },
+  {
+    "section_index": 25,
+    "chunk_index": 1,
+    "global_chunk_index": 25,
+    "header": "**데이터웨어하우스 구축 방식 3가지**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 26,
+    "chunk_index": 1,
+    "global_chunk_index": 26,
+    "header": "⚫ 상향식",
+    "text": "- 소규모의 데이터 마트(data mart)들을 순차적으로 먼저 구축한 후 나중에 이를 통합하여 전사적 데이터웨어하우스 (enterprise data warehouse)를 완성하는 방식",
+    "rough_tokens": 26
+  },
+  {
+    "section_index": 27,
+    "chunk_index": 1,
+    "global_chunk_index": 27,
+    "header": "⚫ 하향식",
+    "text": "- 먼저 전사적 데이터웨어하우스를 구축한 뒤, 필요할 경우 순차적으로 데이터 마트를 하나씩 추가하여 전체 시스템 을 완성하는 방식",
+    "rough_tokens": 18
+  },
+  {
+    "section_index": 28,
+    "chunk_index": 1,
+    "global_chunk_index": 28,
+    "header": "⚫ 절충식",
+    "text": "- 기획과 설계는 하향식 구축 방식으로 하고 실제 구축은 상향식 구축 방식처럼 가장 우선시 되는 중요한 분야부터 진행하는 방법 \n\n- ▪ 전사적 관점에서 하나의 전체 데이터웨어하우스를 슈퍼 마트(super mart)라고 하는 핵심 저장 단위들로 분할하여 설계한 후, 각 슈퍼 마트들을 우선순위에 따라 독자적으로 구축해감으로써 최종적으로 전사적 데이터웨어하우스를 완성해가는 방식",
+    "rough_tokens": 53
+  },
+  {
+    "section_index": 29,
+    "chunk_index": 1,
+    "global_chunk_index": 29,
+    "header": "▪ 데이터 마트(data mart)",
+    "text": "- 조직의 일부 사용자(ex: 비즈니스 부서)만 사용할 목적으로 주제 범위를 제한하여 구축한 데이터 저장소 \n\n- 데이터웨어하우스의 부분 집합으로 규모가 작아 ‘미니 데이터웨어하우스’로 불림 \n\n- 분석 대상이 특정 주제로 집중되기 때문에 부서 단위의 분석 업무에 적합",
+    "rough_tokens": 38
+  },
+  {
+    "section_index": 30,
+    "chunk_index": 1,
+    "global_chunk_index": 30,
+    "header": "**2 데이터웨어하우스 설계**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 31,
+    "chunk_index": 1,
+    "global_chunk_index": 31,
+    "header": "⚫ 다차원성",
+    "text": "- 다차원적인 분석을 위해서 데이터웨어하우스는 다차원 구조로 구성 \n\n- 다차원 구조는 각 분석 관점 간의 다양한 조합에 의해 데이터에 대한 상호 연관성 분석이 가능하도록 함",
+    "rough_tokens": 25
+  },
+  {
+    "section_index": 32,
+    "chunk_index": 1,
+    "global_chunk_index": 32,
+    "header": "⚫ 다차원 모델링(multi-dimensional modeling)",
+    "text": "- 높은 연관성을 갖는 데이터들을 데이터웨어하우스 안에서 다차원성을 유지하도록 구조화 하는 것 \n\n- 데이터웨어하우스는 데이터베이스와는 다르게 개체와 관계가 아닌 차원 중심으로 모델링 \n\n- ▪ 다차원 모델링 방법 \n\n   - 다차원 데이터베이스 : 데이터 큐브(data cube) 개념을 이용 \n\n   - 관계형 데이터베이스 : 스타 스키마(star schema) 개념을 이용",
+    "rough_tokens": 53
+  },
+  {
+    "section_index": 33,
+    "chunk_index": 1,
+    "global_chunk_index": 33,
+    "header": "**2.1 다차원 모델링**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 34,
+    "chunk_index": 1,
+    "global_chunk_index": 34,
+    "header": "⚫ 다차원 데이터베이스(MDD; Multi-Dimensional Database)",
+    "text": "- 관계형 데이터베이스의 한계점을 극복하기 위해 개발된 분석 전용 데이터베이스 \n\n- 다차원 큐브 구조로 모델링 -> 저장소 구조 자체가 다차원 분석에 적합하도록 생성되기 때문에 복잡한 모델링이 필요 없음",
+    "rough_tokens": 29
+  },
+  {
+    "section_index": 35,
+    "chunk_index": 1,
+    "global_chunk_index": 35,
+    "header": "[구조]",
+    "text": "- 큐브(cube): 셀(cell) 형태의 데이터 저장소. 큐브 셀은 모든 큐브 좌표의 교차점 개수만큼, 즉 차원 멤버(dimension member) 들의 모든 가능한 조합 수 만큼 존재 \n\n- MDB는 검색 속도가 매우 빠르지만, 구조 변경 시 재구성되어야 한다는 단점 존재 \n\n**수강생 수를 나타내는 MDB** \n\n**==> picture [268 x 271] intentionally omitted <==**",
+    "rough_tokens": 59
+  },
+  {
+    "section_index": 36,
+    "chunk_index": 1,
+    "global_chunk_index": 36,
+    "header": "**다차원 질의(multi-dimensional query)**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**\n\n- ⚫ 다차원 데이터베이스의 어느 영역을 분석하고자 하는지를 명세 \n\n   - 큐브를 자신이 원하는 모양으로 절단하여 살펴보는 것 \n\n   - 슬라이싱(slicing) : 큐브의 일부분을 둘로 쪼개어 자신이 원하는 큐브 단면을 분석하는 것을 의미 \n\n   - 다이싱(dicing) : 큐브 중에서 보고자 하는 부분만을 선별함으로써 작은 부분 큐브 형태 의 영역을 분석하는 것 \n\n   - 피보팅(pivoting) : 큐브의 축 위치를 바꾸어 같은 분석 결과를 확인 \n\n- ⚫ 다차원 질의의 기본 유형 \n\n**==> picture [321 x 243] intentionally omitted <==**\n\n**==> picture [268 x 303] intentionally omitted <==**",
+    "rough_tokens": 111
+  },
+  {
+    "section_index": 37,
+    "chunk_index": 1,
+    "global_chunk_index": 37,
+    "header": "**다차원 모델**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 38,
+    "chunk_index": 1,
+    "global_chunk_index": 38,
+    "header": "1) 데이터 큐브(data cube)",
+    "text": "- 다차원 모델의 기본 구조, 보통 2차원 면들로 조합된 다면체 도형으로 표현 \n\n- 차원(dimension) : 데이터 큐브의 각 축 \n\n- 차원 멤버(dimension member) : 축 좌표 \n\n- 축 좌표들의 조합으로 큐브 안의 특정 셀(cell)을 지정하고큐브 셀 안에는 하나의 측정값 (measure)이 저장됨 \n\n- 데이터 큐브는 n개의 차원성을 갖는 데이터들을 n-차원의 큐브 구조로 모델링 \n\n- N차원 큐브의 예 \n\n**==> picture [422 x 78] intentionally omitted <==**\n\nEx: 전국 규모의 대형 학원 데이터웨어하우스(분원, 시간, 강좌)",
+    "rough_tokens": 84
+  },
+  {
+    "section_index": 39,
+    "chunk_index": 1,
+    "global_chunk_index": 39,
+    "header": "**다차원 모델**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 40,
+    "chunk_index": 1,
+    "global_chunk_index": 40,
+    "header": "2) 차원(dimension)",
+    "text": "- 데이터에 대한 하나의 분석 관점 또는 분석 시각을 표현 \n\n- 분석 관점이 다양하고 데이터 간의 상호 연관성이 높을수록 차원의 개수는 증가 \n\n- 각 차원은 하나의 축으로 표현되기 때문에 차원의 개수에 따라 큐브의 구조가 결정 \n\n- 같은 축을 구성하는 차원 멤버들은 유사한 일련의 항목들이거나 유사하지만 수준이 다른 항목들임",
+    "rough_tokens": 46
+  },
+  {
+    "section_index": 41,
+    "chunk_index": 1,
+    "global_chunk_index": 41,
+    "header": "3) 개념 계층(concept hierarchy)",
+    "text": "- 같은 차원 안의 수준들 간의 수직적 상하 관계 \n\n- 상위 수준의 개념으로부터 하위 수준의 개념으로 차원 멤버들을 계층적으로 조직화 \n\n**==> picture [289 x 202] intentionally omitted <==**\n\n**==> picture [228 x 211] intentionally omitted <==**",
+    "rough_tokens": 47
+  },
+  {
+    "section_index": 42,
+    "chunk_index": 1,
+    "global_chunk_index": 42,
+    "header": "**2.2 관계형 모델링**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 43,
+    "chunk_index": 1,
+    "global_chunk_index": 43,
+    "header": "⚫ 차원 모델링(dimensional modeling)",
+    "text": "- 관계형 스키마 구조에 차원성을 부여하는 설계 방법 \n\n- 테이블들이 입체적인 다양한 연관성을 가질 수 있도록 주제 중심의 스키마 구조로 변환 \n\n- ▪ 오직 분석을 빠르고 효과적으로 지원하기 위한 스키마 구조를 정의하는데 중점 \n\n- ▪ 차원 모델링에 사용되는 대표적인 모델은 스타 스키마",
+    "rough_tokens": 41
+  },
+  {
+    "section_index": 44,
+    "chunk_index": 1,
+    "global_chunk_index": 44,
+    "header": "⚫ 스타 스키마(star schema)",
+    "text": "- 관계형 데이터베이스에 가상의 데이터 큐브를 만들기 위한 차원 모델링의 대표적 모델 \n\n- 비정규화된 관계형 스키마의 특수한 형태 \n\n- 스타 조인 스키마(star join schema), 별 스키마 또는 성형 스키마라고도 함 \n\n- ▪ 하나의 사실 테이블(fact table)을 중심으로 주위에 여러 개의 차원 테이블(dimension table)들이 연결되는 방사성 구조 \n\n- 장점 : 구조가 단순하고 속도가 빠름",
+    "rough_tokens": 59
+  },
+  {
+    "section_index": 45,
+    "chunk_index": 1,
+    "global_chunk_index": 45,
+    "header": "**2.2 관계형 모델링 – 스타 스키마**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 46,
+    "chunk_index": 1,
+    "global_chunk_index": 46,
+    "header": "⚫ 사실(fact)",
+    "text": "- 사실 테이블(fact table)에 저장되는 매 순간 조직에서 발생하는 측정값(measure) 또는 집계값 \n\n- ▪ 대부분 수치 데이터이며 분석 대상이 되는 실제 값(판매량, 매출액, 구매자수, 수익률) \n\n- ⚫ 차원(dimension) \n\n   - 차원 테이블(dimension table)에 저장되는 사실을 바라보는 특정 관점을 의미 \n\n   - 사실 테이블의 측정값 의미를 설명하는 데이터(대리점명, 분기명, 제품명, 고객 연령) \n\n- 사실 테이블은 측정값들의 이력을 저장하거나 집계 결과를 저장하므로, 차원 테이블에 비해 데이터양이 많음 \n\n- ▪ 작은 크기의 여러 차원 테이블이 거대한 하나의 사실 테이블을 1:N 참조 관계로 연결하고, 이때 사용하는 조인 연산이 star join \n\n- ⚫ 스타 조인(star join) \n\n      - 일대다 참조 관계를 이용하여 하나의 사실 테이블과 작은 크기의 여러 차원 테이블들을 일대다 참조 관계를 이용하여 하나로 결합하는데 사용하는 조인 연산",
+    "rough_tokens": 127
+  },
+  {
+    "section_index": 47,
+    "chunk_index": 1,
+    "global_chunk_index": 47,
+    "header": "**2.2 관계형 모델링 – 스타 스키마**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 48,
+    "chunk_index": 1,
+    "global_chunk_index": 48,
+    "header": "▪ 대학 장학 스타 스키마 예",
+    "text": "- ‘시간’,’조직’ 차원 테이블과 ‘장학’ 사실 테이블에 기반한 스타 스키마 \n\n- 장점:모든 분석 질의를 위해 3개의 테이블만 조인하면 되므로조인 수가 적음 \n\n- ▪ 단점: 차원 테이블이 정규화되어 있지 않아 중복이 많음 ex: 시간{연도, 학기} 중복,  조직{대학교, 단과대학} \n\nSQL 구문 표현 \n\n**==> picture [401 x 77] intentionally omitted <==**\n\n시간별, 조직별 장학 현황 \n\n**==> picture [302 x 183] intentionally omitted <==**",
+    "rough_tokens": 75
+  },
+  {
+    "section_index": 49,
+    "chunk_index": 1,
+    "global_chunk_index": 49,
+    "header": "**2.3 스노우플레이크 스키마**",
+    "text": "- ⚫ 스노우플레이크 스키마(snowflake schema) \n\n   - 데이터 중복을 줄이기 위해 차원 테이블을 정규화한 구조 \n\n   - ▪ 스타 스키마의 변형된 형태로 눈송이 스키마라고도 함 \n\n- ⚫ 대학 장학 스노우플레이크 스키마 예 \n\n**==> picture [80 x 80] intentionally omitted <==**\n\n**==> picture [228 x 72] intentionally omitted <==**\n\n**==> picture [560 x 202] intentionally omitted <==**\n\n차원 테이블이 2개에서 6개로 분리되므로 SQL문 또한 좀 더 복잡해짐 \n\n**==> picture [540 x 94] intentionally omitted <==**",
+    "rough_tokens": 99
+  },
+  {
+    "section_index": 50,
+    "chunk_index": 1,
+    "global_chunk_index": 50,
+    "header": "**스타 스키마와 스노우플레이크 스키마 비교**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 51,
+    "chunk_index": 1,
+    "global_chunk_index": 51,
+    "header": "⚫ 관계형 데이터베이스 기반의 차원 모델링 비교",
+    "text": "**==> picture [565 x 185] intentionally omitted <==**\n\n- 보통 응답 시간이 빠르고 구조가 단순하여 이해하기 쉽기 때문에 스타 스키마를 많이 사 용",
+    "rough_tokens": 27
+  },
+  {
+    "section_index": 52,
+    "chunk_index": 1,
+    "global_chunk_index": 52,
+    "header": "**은하수 스키마**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 53,
+    "chunk_index": 1,
+    "global_chunk_index": 53,
+    "header": "⚫ 은하수 스키마(galaxy schema)",
+    "text": "▪ 같은 차원 테이블을 공유하는 여러 사실 테이블들을 포함하는 관계형 스키마 구조 ▪ 여러 스타 스키마들이 모여서 구성되므로 스타 패밀리 또는 성운 스키마라고도 함 \n\n**==> picture [407 x 301] intentionally omitted <==**",
+    "rough_tokens": 37
+  },
+  {
+    "section_index": 54,
+    "chunk_index": 1,
+    "global_chunk_index": 54,
+    "header": "**다차원 모델링 예**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 55,
+    "chunk_index": 1,
+    "global_chunk_index": 55,
+    "header": "▪ 지난 12개월간 2개 학과에서 개설한 3개 과목의 수강 실적을 분석",
+    "text": "**==> picture [470 x 269] intentionally omitted <==**\n\n**==> picture [394 x 156] intentionally omitted <==**",
+    "rough_tokens": 27
+  },
+  {
+    "section_index": 56,
+    "chunk_index": 1,
+    "global_chunk_index": 56,
+    "header": "**3.1 OLAP 정의 및 특성**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 57,
+    "chunk_index": 1,
+    "global_chunk_index": 57,
+    "header": "⚫ OLAP의 정의",
+    "text": "- 최종 사용자가 직접 다양한 분석 관점의 흐름에 따라 대규모의 다차원 데이터를 온라인에서 동적으로 분석하고 보고서를 만드는 모든 과정 \n\n- 다차원 공유 정보에 대한 신속한 분석(FASMI; Fast Analysis of Shared Multi-dimensional Information) 이라고도 함 \n\n- 데이터웨어하우스와 분석자 사이의 중개자로서 데이터를 다차원으로 분석할 수 있도록 지 원하는 프로그래밍 기술 \n\n- 데이터웨어하우스의 OLAP(온라인 분석 처리; On Line Analytical Processing)은 데이터베 이스의 OLTP(On Line Transaction Processing)에 대응하는 개념 \n\n- 코드(Codd)에 의해 처음으로 OLAP 개념이 사용 \n\n- OLAP 분석 과정은 질의가 꼬리를 물고 진행되면서 최종적으로는 중요한 의사 결정에 필요 한 분석 정보를 모두 얻게 됨 \n\n- 데이터베이스(DBMS 엔진과 질의 도구) <-> 데이터웨어하우스(OLAP 엔진과 OLAP 도구)",
+    "rough_tokens": 129
+  },
+  {
+    "section_index": 58,
+    "chunk_index": 1,
+    "global_chunk_index": 58,
+    "header": "**OLAP 특성**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 59,
+    "chunk_index": 1,
+    "global_chunk_index": 59,
+    "header": "▪ 다차원성",
+    "text": "- OLAP은 다차원 구조로 조직화함으로써 사용자들이 관심 주제별로 다양한 관점에서 접근 가능하도록 함. OLAP의 가장 중요한 특징 \n\n- 직접성 \n\n   - OLAP은 의사결정자가 개발자의 도움 없이도 스스로 직접 분석하도록 지원함 \n\n- 대화성 \n\n   - OLAP은 사용자의 반복적인 질문을 통해 의사 결정에 필요한 정보들을 발견해내도록 대화식 인터페이스를 지원함",
+    "rough_tokens": 52
+  },
+  {
+    "section_index": 60,
+    "chunk_index": 1,
+    "global_chunk_index": 60,
+    "header": "▪ 비정형성",
+    "text": "- OLAP은 사용자가 즉각적으로 보고서를 자유롭게 만들 수 있도록 함",
+    "rough_tokens": 10
+  },
+  {
+    "section_index": 61,
+    "chunk_index": 1,
+    "global_chunk_index": 61,
+    "header": "▪ 자동성",
+    "text": "- OLAP은 메타 데이터를 활용하여 몇 번의 조작만으로도 원하는 분석 보고서를 생성 \n\n**==> picture [185 x 157] intentionally omitted <==**",
+    "rough_tokens": 26
+  },
+  {
+    "section_index": 62,
+    "chunk_index": 1,
+    "global_chunk_index": 62,
+    "header": "**3.2 OLAP 종류**",
+    "text": "**==> picture [584 x 188] intentionally omitted <==**\n\n**==> picture [574 x 127] intentionally omitted <==**\n\n**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 41
+  },
+  {
+    "section_index": 63,
+    "chunk_index": 1,
+    "global_chunk_index": 63,
+    "header": "**3.3 OLAP 인터페이스**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**\n\n- OLAP 도구의 인터페이스는 사용자가 원하는 분석 결과를 손쉽고 빠르게 생성하도록 지원",
+    "rough_tokens": 26
+  },
+  {
+    "section_index": 64,
+    "chunk_index": 1,
+    "global_chunk_index": 64,
+    "header": "1) 드릴-다운(drill-down) 연산",
+    "text": "- 요약된 현재 수준보다 보다 상세한 하위 수준으로 단계적으로 데이터를 분석해가는 연산 이다. 은 차원의 개념 계층을 따라 진행한다.",
+    "rough_tokens": 19
+  },
+  {
+    "section_index": 65,
+    "chunk_index": 1,
+    "global_chunk_index": 65,
+    "header": "2) 롤-업(roll-up) 연산",
+    "text": "- 상세한 현재 수준보다 요약된 상위 수준 방향으로 단계적으로 집계된 데이터를 분석해가 는 연산이다. 드릴-업(drill-up)이라고도 한다. 드릴-다운과는 반대 방향으로 진행 \n\n- 3) 슬라이스와 다이스(slice & dice) 연산 \n\n- 큐브의 일부분을 원하는 형태로 잘라서 작은 부분 큐브를 만드는 연산 \n\n- 4) 피봇(pivot) 연산 \n\n   - 최종 결과 화면에서 현재 분석 중인 데이터의 축을 변경하기 위한 연산 \n\n- 5) 드릴-쓰루(drill-through) 연산 \n\n   - 큐브 안의 요약된 데이터 수준에서 연관된 상세 데이터로 이동하여 분석하는 연산",
+    "rough_tokens": 81
+  },
+  {
+    "section_index": 66,
+    "chunk_index": 1,
+    "global_chunk_index": 66,
+    "header": "**4.1 데이터베이스 응용**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 67,
+    "chunk_index": 1,
+    "global_chunk_index": 67,
+    "header": "⚫ 분산 데이터베이스",
+    "text": "- 물리적으로는 분산된 데이터베이스를 컴퓨터 네트워크로 연결하여 하나의 데이터베이스처럼 사용할 수 있도록 저장·관리하는 데이터베이스 \n\n   - 지리적으로 분산된 여러 데이터베이스를 마치 하나의 중앙 집중형 데이터베이스처럼 논리적으로 통합하 여 사용자가 사용할 수 있도록 지원 \n\n- 데이터의 분산을 사용자에게 숨기고 모든 복잡한 분산 처리 과정을 관리하는 분산 DBMS가 필요 \n\n- ⚫ 분산 데이터 독립성(distributed data independency) \n\n   - 5가지 데이터의 분산 투명성을 보장",
+    "rough_tokens": 72
+  },
+  {
+    "section_index": 68,
+    "chunk_index": 1,
+    "global_chunk_index": 68,
+    "header": "▪ 위치 투명성(location transparency)",
+    "text": "- 사용자는 데이터의 물리적 저장 위치를 알 필요가 없음. DBMS가 위치 정보를 시스템 카탈로그에 유지하여 내부적으로 해결",
+    "rough_tokens": 18
+  },
+  {
+    "section_index": 69,
+    "chunk_index": 1,
+    "global_chunk_index": 69,
+    "header": "▪ 중복 투명성(replication transparency)",
+    "text": "- 사용자는 데이터의 사본(copy) 존재 여부에 신경쓰지 않아도, DBMS가 중복 데이터의 일관성을 유지 및 관리",
+    "rough_tokens": 16
+  },
+  {
+    "section_index": 70,
+    "chunk_index": 1,
+    "global_chunk_index": 70,
+    "header": "▪ 단편화 투명성(fragmentation transparency)",
+    "text": "- DBMS는 릴레이션을 분산이나 중복을 위한 더 작은 최적의 단위인 단편(fragment)들로 분할해 관리. 사용자가 단편에 대해 알 필요 없음",
+    "rough_tokens": 21
+  },
+  {
+    "section_index": 71,
+    "chunk_index": 1,
+    "global_chunk_index": 71,
+    "header": "▪ 병행 투명성(concurrency transparency)",
+    "text": "- 여러 트랜잭션이 분산된 데이터를 동시에 실행되더라도 사용자에게 이를 굳이 알리지 않고 정상적인 완료 결과 보장",
+    "rough_tokens": 16
+  },
+  {
+    "section_index": 72,
+    "chunk_index": 1,
+    "global_chunk_index": 72,
+    "header": "▪ 장애 투명성(failure transparency)",
+    "text": "- 일부 시스템 및 통신망이 손상되어도 사용자에게 굳이 알리지 않으면서 정상적인 처리가 이루어지도록 함",
+    "rough_tokens": 15
+  },
+  {
+    "section_index": 73,
+    "chunk_index": 1,
+    "global_chunk_index": 73,
+    "header": "**분산 데이터베이스의 스키마 구조**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**\n\n- ⚫ 데이터 투명성을 제공하기 위한 전역, 단편화, 할당 스키마를 포함한 분산 데이터 베이스의 구조 \n\n▪ 전역 스키마 : 분산 데이터베이스의 모든 데이터 구조와 제약 조건을 정의 ▪ 단편 스키마 : 전역 스키마를 논리적으로 분할한 단편들을 정의 ▪ 할당 스키마 : 각 단편들을 물리적으로 저장할 지역 위치를 정의 ▪ 지역 스키마 : 지역별로 저장하는 데이터의 구조와 제약조건을 정의 \n\n**==> picture [441 x 282] intentionally omitted <==**",
+    "rough_tokens": 82
+  },
+  {
+    "section_index": 74,
+    "chunk_index": 1,
+    "global_chunk_index": 74,
+    "header": "**4.2 객체지향 데이터베이스**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 75,
+    "chunk_index": 1,
+    "global_chunk_index": 75,
+    "header": "⚫ 객체지향 데이터베이스(object-oriented database)",
+    "text": "- 객체, 속성, 메소드, 클래스 계층과 상속, 복합 객체 등의 핵심 객체지향 개념을 지원함으 로써 객체 단위로 데이터를 저장·관리하는 데이터베이스 \n\n- 객체지향(object oriented) 개념은 본래 확장성이 있어 새로운 요구사항을 지원하고 데 이터의 의미 관계를 표현하기 쉬워 데이터베이스 모델로 적합함 \n\n- ‘객체’라는 같은 개념으로 응용 프로그램 개발과 데이터 저장을 일관되게 할 수 있어 데 이터 유형 불일치(data type mismatch) 문제를 해결",
+    "rough_tokens": 66
+  },
+  {
+    "section_index": 76,
+    "chunk_index": 1,
+    "global_chunk_index": 76,
+    "header": "⚫ 객체지향 데이터 모델",
+    "text": "**==> picture [392 x 244] intentionally omitted <==**",
+    "rough_tokens": 14
+  },
+  {
+    "section_index": 77,
+    "chunk_index": 1,
+    "global_chunk_index": 77,
+    "header": "**클래스 계층과 단일/다중 상속**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**\n\n**==> picture [500 x 433] intentionally omitted <==**",
+    "rough_tokens": 27
+  },
+  {
+    "section_index": 78,
+    "chunk_index": 1,
+    "global_chunk_index": 78,
+    "header": "**4.3 객체-관계 데이터베이스**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 79,
+    "chunk_index": 1,
+    "global_chunk_index": 79,
+    "header": "⚫ 객체-관계 데이터베이스",
+    "text": "▪ 관계 데이터베이스에 객체지향 데이터 모델의 장점을 접목한 이종(hybrid) 데이터베이스 ▪ 관계 데이터 모델의 단순성과 편의성, 객체지향 데이터 모델의 확장성을 모두 제공 ▪ 객체-관계 데이터 모델 : 객체 지향 개념과 관계 개념을 통합한 모델 \n\n▪ 릴레이션 개념에 객체지향의 객체, 객체 식별자, 사용자 정의 유형, 참조 유형, 메소드 등 의 개념을 추가적으로 지원한다. 관계 데이터 모델의 테이블이 투플 또는 객체들의 집합 으로 선택적으로 정의된다. \n\n▪ SQL3 : 객체-관계 데이터베이스의 질의어 \n\n      - 관계 데이터베이스의 질의어 SQL3 표준에 질의어를 확장하여 객체지향 개념을 지원 \n\n- ⚫ 객체-관계 데이터베이스와 객체 지향 데이터베이스 \n\n   - 개념적으로나 기능적으로는 매우 유사 \n\n▪ 모델링 기능과 효율성 측면에서는 상이 \n\n- 객체지향 데이터베이스가 객체지향 프로그래밍에 데이터베이스 기능을 갖도록 확장했다 면 객체-관계 데이터베이스는 관계 데이터베이스에 객체 개념을 갖도록 확장한 것 \n\n- ⚫ 객체-관계 DBMS(ORDBMS; Object Relational DBMS) \n\n▪ Universal Server, Oracle, DB2 Universal DB 등",
+    "rough_tokens": 155
+  },
+  {
+    "section_index": 80,
+    "chunk_index": 1,
+    "global_chunk_index": 80,
+    "header": "**4.4 멀티미디어 데이터베이스**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 81,
+    "chunk_index": 1,
+    "global_chunk_index": 81,
+    "header": "⚫ 멀티미디어 데이터베이스",
+    "text": "- 텍스트, 그래픽, 이미지, 비디오, 오디오 등이 복합적으로 구성된 다양한 미디어를 효율 적으로 저장·관리하기 위한 데이터베이스 \n\n- 문자와 숫자 등 정형 데이터 이외에 사진, 동영상, 음성 등과 같은 다양한 비정형 데이터 를 효과적으로 저장하고 질의하는 기능을 제공 \n\n**==> picture [226 x 224] intentionally omitted <==**",
+    "rough_tokens": 52
+  },
+  {
+    "section_index": 82,
+    "chunk_index": 1,
+    "global_chunk_index": 82,
+    "header": "**4.4 멀티미디어 데이터베이스**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 83,
+    "chunk_index": 1,
+    "global_chunk_index": 83,
+    "header": "⚫ 저장과 검색",
+    "text": "- 다양한 유형의 멀티미디어 데이터는 기본적으로 대용량이고 정형화된 데이터가 아니므 로 미디어별로 별도의 저장과 검색 방법이 필요함 \n\n- 저장 : 음성, 영상 등 압축을 필요로 하는 메가바이트 단위의 원시 데이터(raw data)뿐만 아니라 해상도, 용량, 형식 등의 멀티미디어 관련 특성 데이터와 미디어 내용을 설명하는 키워드 등의 명세 데이터 등이 함께 저장 \n\n- 검색 : 멀티미디어 데이터의 특성이나 내용에 관한 키워드 검색이 기본 제공되며사진이 나 동영상 속의 내용과 의미를 직접 추출하여 질의할 수 있는 다양한 검색 기법이 필요",
+    "rough_tokens": 76
+  },
+  {
+    "section_index": 84,
+    "chunk_index": 1,
+    "global_chunk_index": 84,
+    "header": "⚫ 시스템 유형",
+    "text": "- 파일 시스템 활용 방식 \n\n- 관계 데이터베이스 활용 \n\n- 관계 데이터베이스의 확장 기능(BLOB(Binary Large OBject)) 활용 방식 \n\n- 객체지향 데이터베이스 활용",
+    "rough_tokens": 26
+  },
+  {
+    "section_index": 85,
+    "chunk_index": 1,
+    "global_chunk_index": 85,
+    "header": "**4.5 공간 데이터베이스**",
+    "text": "**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 13
+  },
+  {
+    "section_index": 86,
+    "chunk_index": 1,
+    "global_chunk_index": 86,
+    "header": "⚫ 공간 데이터베이스",
+    "text": "- 다차원 공간 안의 객체와 객체간의 공간 관계를 공간적 특성과 함께 저장하고 관리하는 데이터베이스 \n\n- 위치에 기반한 공간 데이터의 저장, 공간 색인, 공간 질의, 공간 분석 등의 기능을 제공 \n\n- ▪ 일반적으로 3가지 부류의 공간 데이터 유형을 관리 \n\n   - 지리 데이터(geographic data) : 도로, 지형, 행정 경계, 토지 특성, 지역 기후 등 위도 와 경도, 고도를 갖는 좌표 기반 데이터 \n\n   - 기하학 데이터(geometric data) : 빌딩, 항공기, 다리 등과 같은 구조 객체의 공간 구 성 정보를 2, 3차원 공간 좌표로 표현한 데이터 \n\n   - 공간 속성 데이터(spatial attribute data) : 지도 및 위성 이미지와 각 공간 객체 그리 고 위치에 관련한 각종 특성, 통계 자료 등을 표현한 데이터 \n\n**==> picture [412 x 175] intentionally omitted <==**\n\n**QA** \n\n**==> picture [228 x 72] intentionally omitted <==**",
+    "rough_tokens": 136
+  }
+]
