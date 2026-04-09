@@ -1,18 +1,7 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
 
-export async function summarizeWithGemini(file) {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API 키가 없습니다. .env.local 파일에 VITE_GEMINI_API_KEY를 설정해주세요.');
-  }
-
-  // PDF를 base64로 변환
-  const arrayBuffer = await file.arrayBuffer();
-  const base64 = btoa(
-    new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-  );
-
-  const prompt = `너는 대학 전공 강의자료를 '시험 대비용'으로 정리하는 조교이다.
+const PROMPT = `너는 대학 전공 강의자료를 '시험 대비용'으로 정리하는 조교이다.
 목표는 문서의 전체 흐름을 파악하게 하면서도, 시험에 나올 가능성이 높은 세부 항목을 빠뜨리지 않고 정리하는 것이다.
 
 반드시 지켜라.
@@ -30,21 +19,18 @@ export async function summarizeWithGemini(file) {
 - 문서가 어떤 순서로 전개되는지 4~8개 bullet
 
 # 섹션별 핵심 정리
-1. [원문 대제목]
+## 1. [원문 대제목]
 - 핵심 정의
 - 핵심 설명 3~6개
 - 반드시 기억할 세부 항목
 - 장점/단점 또는 특징(있으면)
 - 비교 대상(있으면)
 
-2. [원문 대제목]
+## 2. [원문 대제목]
 - 위와 동일 형식 반복
 
 # 열거형 암기 포인트
 - 개수와 항목명을 보존하여 정리
-- 예: "데이터웨어하우스의 특성 4가지: ..."
-- 예: "3계층 구조: ..."
-- 예: "주요 연산 5가지: ..."
 
 # 비교 포인트
 - 비교 대상별 차이점을 표 또는 bullet로 정리
@@ -57,6 +43,14 @@ export async function summarizeWithGemini(file) {
 # 한 줄 요약
 - 문서 전체를 1~2문장으로 정리`;
 
+/**
+ * Markdown 텍스트를 받아 Gemini로 요약
+ */
+export async function summarizeWithGemini(markdown) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API 키가 없습니다. .env.local 파일에 VITE_GEMINI_API_KEY를 설정해주세요.');
+  }
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
     {
@@ -64,15 +58,9 @@ export async function summarizeWithGemini(file) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
-          parts: [
-            {
-              inlineData: {
-                mimeType: 'application/pdf',
-                data: base64,
-              },
-            },
-            { text: prompt },
-          ],
+          parts: [{
+            text: `${PROMPT}\n\n[강의자료 원문 - Markdown]\n${markdown}`,
+          }],
         }],
         generationConfig: {
           temperature: 0.3,

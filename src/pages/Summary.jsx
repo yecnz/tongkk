@@ -4,6 +4,7 @@ import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithGemini } from "../services/gemini";
 import { summarizeWithGPT } from "../services/gpt";
+import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 
 const FileIcon = ({ type }) => {
   const colors = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60" };
@@ -135,7 +136,7 @@ const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error }) 
             }}/>
             <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
             <p style={{ margin: 0, fontSize: 14, color: "#888" }}>
-              PDF 텍스트를 추출하고 Gemini가 요약하고 있어요...
+              {loadingStep || "처리 중..."}
             </p>
           </div>
         ) : error ? (
@@ -284,6 +285,7 @@ export default function Summary() {
   const [summaryText, setSummaryText] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState("");
+  const [loadingStep, setLoadingStep] = useState("");
 
   const handleFiles = (fileList) => {
     const arr = Array.from(fileList).filter(f =>
@@ -319,16 +321,24 @@ export default function Summary() {
     if ((key === "Gemini" || key === "GPT") && files[0]?.rawFile) {
       setIsSummarizing(true);
       setView("summaryResult");
+      setSummaryText("");
+      setSummaryError("");
       try {
+        // 1단계: PDF → Markdown 전처리
+        setLoadingStep("📄 PDF를 Markdown으로 변환 중...");
+        const markdown = await extractMarkdownFromPDF(files[0].rawFile);
+
+        // 2단계: Markdown → 요약
+        setLoadingStep("🤖 AI가 요약 중...");
         const result = key === "Gemini"
-          ? await summarizeWithGemini(files[0].rawFile)
-          : await summarizeWithGPT(files[0].rawFile);
+          ? await summarizeWithGemini(markdown)
+          : await summarizeWithGPT(markdown);
         setSummaryText(result);
       } catch (err) {
         setSummaryError(err.message);
-        setSummaryText("");
       } finally {
         setIsSummarizing(false);
+        setLoadingStep("");
       }
     } else {
       setSummaryText("");
