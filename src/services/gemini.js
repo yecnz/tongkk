@@ -1,5 +1,7 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
 
 const PROMPT = `너는 대학 전공 강의자료를 '시험 대비용'으로 정리하는 조교이다.
 목표는 문서의 전체 흐름을 파악하게 하면서도, 시험에 나올 가능성이 높은 세부 항목을 빠뜨리지 않고 정리하는 것이다.
@@ -51,24 +53,37 @@ export async function summarizeWithGemini(markdown) {
     throw new Error('Gemini API 키가 없습니다. .env.local 파일에 VITE_GEMINI_API_KEY를 설정해주세요.');
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const body = {
+    contents: [{
+      parts: [{
+        text: `${PROMPT}\n\n[강의자료 원문 - Markdown]\n${markdown}`,
+      }],
+    }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 2048,
+    },
+  };
+
+  let response;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `${PROMPT}\n\n[강의자료 원문 - Markdown]\n${markdown}`,
-          }],
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 2048,
-        },
-      }),
+      body: JSON.stringify(body),
+    });
+
+    if (response.status === 503) {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[Gemini] 503 오류 - ${attempt}/${MAX_RETRIES} 재시도 중...`);
+        await new Promise(res => setTimeout(res, RETRY_DELAY_MS * attempt));
+        continue;
+      }
+      throw new Error('Gemini 서버 과부하 (503). 잠시 후 다시 시도해주세요.');
     }
-  );
+    break;
+  }
 
   if (!response.ok) {
     const err = await response.json();

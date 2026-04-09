@@ -100,7 +100,7 @@ const ModelSelectView = ({ tokens, onSelect, onBack }) => {
 };
 
 /* ── 요약 결과 뷰 ── */
-const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error }) => {
+const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, loadingStep, elapsedTime }) => {
   const data = summaryData[modelKey] || summaryData["GPT"];
   const displayContent = realContent || data.content;
 
@@ -121,6 +121,9 @@ const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error }) 
           </h2>
           {isLoading && (
             <span style={{ fontSize: 13, color: "#aaa", marginLeft: 8 }}>AI가 요약 중...</span>
+          )}
+          {!isLoading && elapsedTime && (
+            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>⏱ {elapsedTime}초</span>
           )}
         </div>
 
@@ -286,25 +289,46 @@ export default function Summary() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const [loadingStep, setLoadingStep] = useState("");
+  const [elapsedTime, setElapsedTime] = useState(null);
+  const [extractedMarkdown, setExtractedMarkdown] = useState("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState("");
 
-  const handleFiles = (fileList) => {
+  const handleFiles = async (fileList) => {
     const arr = Array.from(fileList).filter(f =>
       f.type === "application/pdf" || f.type.startsWith("image/") ||
       f.name.endsWith(".ppt") || f.name.endsWith(".pptx")
     );
     if (arr.length === 0) return;
     setUploading(true);
-    setTimeout(() => {
-      const nf = arr.map(f => ({
-        name: f.name, size: f.size, type: getFileType(f.name),
-        pages: f.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
-        slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
-        rawFile: f,
-      }));
-      setFiles(prev => [...prev, ...nf]);
-      setUploading(false);
-      setSearched(true);
-    }, 1200);
+
+    await new Promise(res => setTimeout(res, 1200));
+
+    const nf = arr.map(f => ({
+      name: f.name, size: f.size, type: getFileType(f.name),
+      pages: f.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
+      slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
+      rawFile: f,
+    }));
+    setFiles(prev => [...prev, ...nf]);
+    setUploading(false);
+    setSearched(true);
+
+    // PDF면 바로 마크다운 변환 시작
+    const pdfFile = arr.find(f => f.type === "application/pdf");
+    if (pdfFile) {
+      setIsExtracting(true);
+      setExtractError("");
+      setExtractedMarkdown("");
+      try {
+        const markdown = await extractMarkdownFromPDF(pdfFile);
+        setExtractedMarkdown(markdown);
+      } catch (err) {
+        setExtractError(err.message);
+      } finally {
+        setIsExtracting(false);
+      }
+    }
   };
 
   const communityResults = [
@@ -318,24 +342,24 @@ export default function Summary() {
     setSelectedModel(key);
     setSummaryError("");
 
-    if ((key === "Gemini" || key === "GPT") && files[0]?.rawFile) {
+    if ((key === "Gemini" || key === "GPT") && extractedMarkdown) {
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
       setSummaryError("");
+      setElapsedTime(null);
+      const startTime = Date.now();
       try {
-        // 1단계: PDF → Markdown 전처리
-        setLoadingStep("📄 PDF를 Markdown으로 변환 중...");
-        const markdown = await extractMarkdownFromPDF(files[0].rawFile);
-
-        // 2단계: Markdown → 요약
+        // 마크다운은 업로드 시 이미 변환 완료 → 요약만 실행
         setLoadingStep("🤖 AI가 요약 중...");
         const result = key === "Gemini"
-          ? await summarizeWithGemini(markdown)
-          : await summarizeWithGPT(markdown);
+          ? await summarizeWithGemini(extractedMarkdown)
+          : await summarizeWithGPT(extractedMarkdown);
         setSummaryText(result);
+        setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
         setSummaryError(err.message);
+        setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } finally {
         setIsSummarizing(false);
         setLoadingStep("");
@@ -395,6 +419,8 @@ export default function Summary() {
             realContent={summaryText}
             isLoading={isSummarizing}
             error={summaryError}
+            loadingStep={loadingStep}
+            elapsedTime={elapsedTime}
           />
         )}
 
@@ -430,6 +456,7 @@ export default function Summary() {
                   }}>파일 선택</button>
                 </div>
 
+                <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
                 {uploading && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
                     <div style={{
@@ -437,7 +464,26 @@ export default function Summary() {
                       borderRadius: "50%", animation: "spin 0.8s linear infinite"
                     }}/>
                     <span style={{ fontSize: 13, color: CYAN, fontWeight: 500 }}>업로드 중...</span>
-                    <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+                  </div>
+                )}
+                {isExtracting && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
+                    <div style={{
+                      width: 18, height: 18, border: `2px solid ${PINK}`, borderTop: "2px solid transparent",
+                      borderRadius: "50%", animation: "spin 0.8s linear infinite"
+                    }}/>
+                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>📄 PDF 분석 중...</span>
+                  </div>
+                )}
+                {!isExtracting && extractedMarkdown && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
+                    <span style={{ fontSize: 13 }}>✅</span>
+                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 준비됨</span>
+                  </div>
+                )}
+                {extractError && (
+                  <div style={{ padding: "8px 0", fontSize: 12, color: "#E53E3E" }}>
+                    ⚠️ 분석 실패: {extractError}
                   </div>
                 )}
 
