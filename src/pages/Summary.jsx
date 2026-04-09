@@ -343,16 +343,22 @@ export default function Summary() {
   ];
 
   const handleModelSelect = async (key, cost) => {
-    if (cost > 0) setTokens(prev => prev - cost);
     setSelectedModel(key);
     setSummaryError("");
+    setSummaryText("");
+    setElapsedTime(null);
 
-    if ((key === "Gemini" || key === "GPT") && extractedMarkdown) {
+    const needsMarkdown = key === "Gemini" || key === "GPT";
+    if (needsMarkdown && !extractedMarkdown) {
+      setView("summaryResult");
+      setSummaryError("실제 요약을 위해서는 PDF 업로드 후 분석 완료가 필요합니다.");
+      return;
+    }
+
+    if (needsMarkdown) {
       setIsSummarizing(true);
       setView("summaryResult");
-      setSummaryText("");
       setSummaryError("");
-      setElapsedTime(null);
       const startTime = Date.now();
       try {
         // 마크다운은 업로드 시 이미 변환 완료 → 요약만 실행
@@ -361,6 +367,9 @@ export default function Summary() {
           ? await summarizeWithGemini(extractedMarkdown)
           : await summarizeWithGPT(extractedMarkdown);
         setSummaryText(result);
+        if (cost > 0) {
+          setTokens(prev => Math.max(0, prev - cost));
+        }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
         setSummaryError(err.message);
@@ -369,10 +378,10 @@ export default function Summary() {
         setIsSummarizing(false);
         setLoadingStep("");
       }
-    } else {
-      setSummaryText("");
-      setView("summaryResult");
+      return;
     }
+
+    setView("summaryResult");
   };
 
   return (
