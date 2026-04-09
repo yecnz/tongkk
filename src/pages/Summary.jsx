@@ -45,8 +45,8 @@ const summaryData = {
 /* ── 모델 선택 카드 뷰 ── */
 const ModelSelectView = ({ tokens, onSelect, onBack }) => {
   const models = [
-    { key: "GPT", name: "GPT", cost: 0, desc: "기본\n요약 제공", free: true },
-    { key: "Gemini", name: "Gemini", cost: 100, desc: "열기\n(토큰 -100)", free: false },
+    { key: "Gemini", name: "Gemini", cost: 0, desc: "기본\n요약 제공", free: true },
+    { key: "GPT", name: "GPT", cost: 100, desc: "열기\n(토큰 -100)", free: false },
     { key: "Claude", name: "Claude", cost: 100, desc: "열기\n(토큰 -100)", free: false },
   ];
 
