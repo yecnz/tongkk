@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithGemini } from "../services/gemini";
+import { summarizeWithGPT } from "../services/gpt";
 
 const FileIcon = ({ type }) => {
   const colors = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60" };
@@ -315,11 +316,13 @@ export default function Summary() {
     setSelectedModel(key);
     setSummaryError("");
 
-    if (key === "Gemini" && files[0]?.rawFile) {
+    if ((key === "Gemini" || key === "GPT") && files[0]?.rawFile) {
       setIsSummarizing(true);
       setView("summaryResult");
       try {
-        const result = await summarizeWithGemini(files[0].rawFile);
+        const result = key === "Gemini"
+          ? await summarizeWithGemini(files[0].rawFile)
+          : await summarizeWithGPT(files[0].rawFile);
         setSummaryText(result);
       } catch (err) {
         setSummaryError(err.message);
