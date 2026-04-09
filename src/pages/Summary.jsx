@@ -299,41 +299,71 @@ export default function Summary() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
 
+  const handleRemoveFile = (index) => {
+    setFiles(files.filter((_, j) => j !== index));
+    setExtractedMarkdown("");
+    setExtractError("");
+    setSummaryText("");
+    setSummaryError("");
+  };
+
   const handleFiles = async (fileList) => {
-    const arr = Array.from(fileList).filter(f =>
-      f.type === "application/pdf" || f.type.startsWith("image/") ||
-      f.name.endsWith(".ppt") || f.name.endsWith(".pptx")
-    );
-    if (arr.length === 0) return;
+    const supported = Array.from(fileList).filter((f) => {
+      const lowerName = f.name.toLowerCase();
+      return (
+        f.type === "application/pdf" ||
+        f.type.startsWith("image/") ||
+        lowerName.endsWith(".ppt") ||
+        lowerName.endsWith(".pptx")
+      );
+    });
+    if (supported.length === 0) return;
+
+    const [targetFile] = supported;
     setUploading(true);
 
     await new Promise(res => setTimeout(res, 1200));
 
-    const nf = arr.map(f => ({
-      name: f.name, size: f.size, type: getFileType(f.name),
-      pages: f.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
-      slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
-      rawFile: f,
-    }));
-    setFiles(prev => [...prev, ...nf]);
+    const lowerName = targetFile.name.toLowerCase();
+    const nextFile = {
+      name: targetFile.name,
+      size: targetFile.size,
+      type: getFileType(targetFile.name),
+      pages: targetFile.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
+      slides: lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
+      rawFile: targetFile,
+    };
+    setFiles([nextFile]);
     setUploading(false);
     setSearched(true);
+    setExtractedMarkdown("");
+    setSummaryText("");
+    setSummaryError("");
+    setExtractError(
+      supported.length > 1
+        ? "한 번에 파일 1개만 처리합니다. 첫 번째 파일만 반영되었습니다."
+        : ""
+    );
 
-    // PDF면 바로 마크다운 변환 시작
-    const pdfFile = arr.find(f => f.type === "application/pdf");
-    if (pdfFile) {
+    // PDF만 서버 변환 후 실제 요약 가능
+    if (targetFile.type === "application/pdf") {
       setIsExtracting(true);
-      setExtractError("");
-      setExtractedMarkdown("");
       try {
-        const markdown = await extractMarkdownFromPDF(pdfFile);
+        const markdown = await extractMarkdownFromPDF(targetFile);
         setExtractedMarkdown(markdown);
       } catch (err) {
         setExtractError(err.message);
       } finally {
         setIsExtracting(false);
       }
+      return;
     }
+
+    setExtractError((prev) =>
+      prev
+        ? `${prev} 실제 요약은 현재 PDF만 지원합니다.`
+        : "실제 요약은 현재 PDF만 지원합니다."
+    );
   };
 
   const communityResults = [
@@ -460,10 +490,10 @@ export default function Summary() {
                     transition: "all 0.2s", marginBottom: 20
                   }}
                 >
-                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,image/*"
+                  <input ref={fileRef} type="file" accept=".pdf,.ppt,.pptx,image/*"
                     onChange={e => handleFiles(e.target.files)} style={{ display: "none" }} />
                   <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>📄</div>
-                  <p style={{ margin: 0, fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
+                  <p style={{ margin: 0, fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일 1개를 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
                     background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
@@ -514,7 +544,7 @@ export default function Summary() {
                         <span style={{ fontSize: 12, color: "#aaa" }}>
                           {f.pages ? `${f.pages}p` : f.slides ? `${f.slides}s` : ""}
                         </span>
-                        <button onClick={() => setFiles(files.filter((_, j) => j !== i))} style={{
+                        <button onClick={() => handleRemoveFile(i)} style={{
                           background: "none", border: "none", color: "#ccc", cursor: "pointer", fontSize: 16
                         }}>✕</button>
                       </div>
