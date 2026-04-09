@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithGemini } from "../services/gemini";
@@ -156,10 +157,25 @@ const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, lo
           </div>
         ) : (
           <div style={{
-            background: "#fafafa", borderRadius: 12, padding: 24,
-            fontSize: 14, color: "#444", lineHeight: 1.8, whiteSpace: "pre-wrap"
+            background: "#fafafa", borderRadius: 12, padding: "16px 24px",
+            fontSize: 14, color: "#444", lineHeight: 1.8,
           }}>
-            {displayContent}
+            <style>{`
+              .md-body h1 { font-size: 18px; font-weight: 700; color: #222; margin: 16px 0 8px; }
+              .md-body h2 { font-size: 16px; font-weight: 700; color: #333; margin: 14px 0 6px; }
+              .md-body h3 { font-size: 14px; font-weight: 700; color: #444; margin: 12px 0 4px; }
+              .md-body p  { margin: 6px 0; }
+              .md-body ul, .md-body ol { padding-left: 20px; margin: 6px 0; }
+              .md-body li { margin: 3px 0; }
+              .md-body strong { font-weight: 700; color: #222; }
+              .md-body code { background: #eee; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+              .md-body table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+              .md-body th, .md-body td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
+              .md-body th { background: #f0f0f0; font-weight: 600; }
+            `}</style>
+            <div className="md-body">
+              <ReactMarkdown>{displayContent}</ReactMarkdown>
+            </div>
           </div>
         )}
 

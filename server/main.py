@@ -3,7 +3,10 @@ import os
 import tempfile
 
 from dotenv import load_dotenv
-load_dotenv()
+from pathlib import Path
+
+# 어느 디렉토리에서 실행해도 server/.env를 찾도록
+load_dotenv(Path(__file__).parent / ".env")
 
 import httpx
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -29,7 +32,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
-SUMMARY_PROMPT = """다음 [내용]을 입력받아 아래 작업을 순서대로 수행해.
+SUMMARY_PROMPT = """이제 나한테 [내용]을 입력받아서 다음 작업을 수행해.
 
 1) 제목
 콘텐츠 제목
