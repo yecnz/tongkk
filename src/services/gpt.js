@@ -1,5 +1,3 @@
-import { fileToBase64, checkFileSize } from './fileToBase64';
-
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
 const PROMPT = `너는 대학 전공 강의자료를 '시험 대비용'으로 정리하는 조교이다.
