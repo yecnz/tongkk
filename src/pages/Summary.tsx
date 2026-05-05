@@ -5,6 +5,7 @@ import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
+import { MindmapView, parseMindmapJson } from "../components/MindmapView";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
@@ -191,6 +192,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
 const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
+  const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
   const [agentInput, setAgentInput] = useState("");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
@@ -262,6 +264,10 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             fontSize: 14, color: "#E53E3E", lineHeight: 1.6
           }}>
             <strong>요약 실패:</strong> {error}
+          </div>
+        ) : mindmapData ? (
+          <div style={{ background: "#fafafa", borderRadius: 12, padding: 24, overflowX: "auto" }}>
+            <MindmapView data={mindmapData} />
           </div>
         ) : (
           <div style={{

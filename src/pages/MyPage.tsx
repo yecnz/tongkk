@@ -210,7 +210,7 @@ export default function MyPage() {
   const [nickname, setNickname] = useState("학생닉네임");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const handleProfileSave = (newName, newAvatar) => {
+  const handleProfileSave = (newName: string, newAvatar: string | null) => {
     setNickname(newName);
     setAvatarUrl(newAvatar);
   };
@@ -275,10 +275,10 @@ export default function MyPage() {
       </div>
 
       <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
-        {view !== "main" && postViews[view] ? (
+        {view !== "main" && postViews[view as keyof typeof postViews] ? (
           <PostListView
-            title={postViews[view].title}
-            posts={postViews[view].posts}
+            title={postViews[view as keyof typeof postViews].title}
+            posts={postViews[view as keyof typeof postViews].posts}
             onBack={() => setView("main")}
             onSelect={(post) => navigate("/community", { state: { post, from: "/mypage", view } })}
           />
