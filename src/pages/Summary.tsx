@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -55,6 +55,86 @@ const summaryData: Record<ModelKey, SummarySample> = {
     title: "(예정)Gemma4 요약",
     content: "동적 프로그래밍(DP)은 하위 문제의 결과를 재사용하여 전체 문제를 효율적으로 해결하는 알고리즘 패러다임입니다.\n\n주요 특징:\n• 하위 문제 중복(Overlapping Subproblems)과 최적 부분 구조(Optimal Substructure)를 활용\n• 시간 복잡도를 지수에서 다항식으로 줄이는 것이 핵심\n\n접근 전략:\n→ 메모이제이션: 재귀 호출 결과를 캐시에 저장\n→ 타뷸레이션: 반복적으로 테이블을 하향식으로 채움\n\n주요 응용: 최단 경로, 문자열 편집 거리, 최장 증가 부분 수열(LIS), 행렬 연쇄 곱셈",
   },
+};
+
+
+const renderInlineText = (text: string): ReactNode[] => {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index} style={{ fontWeight: 700, color: "#222" }}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+};
+
+const FormattedAiText = ({ content }: { content: string }) => {
+  const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {lines.map((rawLine, index) => {
+        const line = rawLine.trim();
+        if (!line) return <div key={index} style={{ height: 8 }} />;
+
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+          const level = heading[1].length;
+          return (
+            <div key={index} style={{
+              fontSize: level <= 2 ? 18 : 16,
+              fontWeight: 800,
+              color: "#222",
+              marginTop: index === 0 ? 0 : 10,
+              lineHeight: 1.45,
+            }}>
+              {renderInlineText(heading[2])}
+            </div>
+          );
+        }
+
+        const boldHeading = line.match(/^\*\*(.+)\*\*$/);
+        if (boldHeading) {
+          return (
+            <div key={index} style={{
+              fontSize: 15,
+              fontWeight: 800,
+              color: "#222",
+              marginTop: index === 0 ? 0 : 8,
+              lineHeight: 1.45,
+            }}>
+              {renderInlineText(boldHeading[1])}
+            </div>
+          );
+        }
+
+        const bullet = line.match(/^[-*]\s+(.+)$/);
+        if (bullet) {
+          return (
+            <div key={index} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: PINK, marginTop: 10, flexShrink: 0 }} />
+              <span>{renderInlineText(bullet[1])}</span>
+            </div>
+          );
+        }
+
+        const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
+        if (numbered) {
+          return (
+            <div key={index} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
+              <span style={{ color: PINK, fontWeight: 800, minWidth: 18 }}>{numbered[1]}.</span>
+              <span>{renderInlineText(numbered[2])}</span>
+            </div>
+          );
+        }
+
+        return (
+          <div key={index} style={{ lineHeight: 1.75 }}>
+            {renderInlineText(line)}
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 /* ── 모델 선택 카드 뷰 ── */
@@ -195,9 +275,9 @@ const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, lo
         ) : (
           <div style={{
             background: "#fafafa", borderRadius: 12, padding: 24,
-            fontSize: 14, color: "#444", lineHeight: 1.8, whiteSpace: "pre-wrap"
+            fontSize: 14, color: "#444", lineHeight: 1.8
           }}>
-            {displayContent}
+            <FormattedAiText content={displayContent} />
           </div>
         )}
 
@@ -228,10 +308,9 @@ const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, lo
                     background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
                     color: "#444",
                     fontSize: 13,
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap"
+                    lineHeight: 1.6
                   }}>
-                    {msg.content}
+                    <FormattedAiText content={msg.content} />
                   </div>
                 ))}
               </div>
