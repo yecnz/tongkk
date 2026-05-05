@@ -1,15 +1,18 @@
-import asyncio
 import os
 import tempfile
+from typing import Literal
 
 from dotenv import load_dotenv
 load_dotenv()
 
-import httpx
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from markitdown import MarkItDown
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from agent import run_study_agent
+
 
 app = FastAPI()
 
@@ -25,40 +28,41 @@ app.add_middleware(
 
 md_converter = MarkItDown()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
+SUMMARY_USER_PROMPT = """업로드한 강의자료를 시험 대비용으로 요약해줘.
 
-SUMMARY_PROMPT = """다음 [내용]을 입력받아 아래 작업을 순서대로 수행해.
+다음 기준을 지켜줘.
+1. 문서의 대단원/소단원 순서를 유지해.
+2. 열거형 항목은 개수와 항목명을 보존해.
+3. 정의, 특징, 구성요소, 종류, 장단점, 비교 항목을 분리해.
+4. 원문에 없는 내용을 추가하지 마.
+5. 시험 직전 복습에 바로 쓸 수 있게 정리해.
 
-1) 제목
-콘텐츠 제목
+[강의자료]
+{markdown}
+"""
 
-2) 키워드
-핵심 키워드를 추출
 
-3) 브리프
-50자 이내로 브리프 작성
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
 
-4) 구성
-내용 흐름을 분석해서 구성 목차를 간결하게 리스트업
 
-5) 전체 요약
-전체글을 요약
-  - 중요 내용을 빠짐없이 포함
-  - 250자 이내로 정리
+class SummarizeRequest(BaseModel):
+    model: Literal["GPT", "Gemini"]
+    markdown: str = Field(min_length=1)
+    thread_id: str | None = None
 
-6) 용어설명
-새로운 용어가 있으면 볼드체로 표기하고 요약문 끝에 용어 설명 추가
 
-전문용어 외에는 한국어로 답변해줘. 입력된 내용에 없는 것은 추가하지 말 것.
-
-[내용]"""
+class AgentRequest(BaseModel):
+    model: Literal["GPT", "Gemini"]
+    messages: list[ChatMessage] = Field(min_length=1)
+    thread_id: str | None = None
+    markdown: str | None = None
 
 
 @app.post("/convert")
 async def convert_pdf_to_markdown(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF 파일만 지원합니다.")
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
@@ -69,78 +73,45 @@ async def convert_pdf_to_markdown(file: UploadFile = File(...)):
         result = md_converter.convert(tmp_path)
         return {"markdown": result.text_content}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
     finally:
         os.unlink(tmp_path)
 
 
-class SummarizeRequest(BaseModel):
-    model: str  # "GPT" | "Gemini"
-    markdown: str
-
-
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest):
-    prompt_text = f"{SUMMARY_PROMPT}\n{req.markdown}"
+    messages = [
+        {
+            "role": "user",
+            "content": SUMMARY_USER_PROMPT.format(markdown=req.markdown),
+        }
+    ]
+    try:
+        return await run_in_threadpool(run_study_agent, req.model, messages, req.thread_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Agent 실행 실패: {str(e)}") from e
 
-    if req.model == "GPT":
-        if not OPENAI_API_KEY:
-            raise HTTPException(status_code=500, detail="서버에 OPENAI_API_KEY가 설정되지 않았습니다.")
-        async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
-                },
-                json={
-                    "model": "gpt-4o-mini",
-                    "messages": [{"role": "user", "content": prompt_text}],
-                    "max_tokens": 2048,
-                    "temperature": 0.3,
-                },
-            )
-        if not response.is_success:
-            detail = response.json().get("error", {}).get("message", f"OpenAI API 오류 ({response.status_code})")
-            raise HTTPException(status_code=502, detail=detail)
-        data = response.json()
-        choices = data.get("choices") or []
-        if not choices:
-            raise HTTPException(status_code=502, detail="OpenAI가 빈 응답을 반환했습니다.")
-        return {"result": choices[0]["message"]["content"]}
 
-    elif req.model == "Gemini":
-        if not GEMINI_API_KEY:
-            raise HTTPException(status_code=500, detail="서버에 GEMINI_API_KEY가 설정되지 않았습니다.")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-        max_retries = 3
-        response = None
-        async with httpx.AsyncClient(timeout=120) as client:
-            for attempt in range(1, max_retries + 1):
-                response = await client.post(
-                    url,
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "contents": [{"parts": [{"text": prompt_text}]}],
-                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 2048},
-                    },
-                )
-                if response.status_code == 503 and attempt < max_retries:
-                    await asyncio.sleep(2 * attempt)
-                    continue
-                break
+@app.post("/agent")
+async def agent(req: AgentRequest):
+    messages = [message.model_dump() for message in req.messages]
+    if req.markdown:
+        messages.insert(
+            0,
+            {
+                "role": "user",
+                "content": f"다음 강의자료를 현재 대화의 참고 자료로 사용해.\n\n[강의자료]\n{req.markdown}",
+            },
+        )
 
-        if not response.is_success:
-            detail = response.json().get("error", {}).get("message", f"Gemini API 오류 ({response.status_code})")
-            raise HTTPException(status_code=502, detail=detail)
-        data = response.json()
-        candidates = data.get("candidates") or []
-        if not candidates or not candidates[0].get("content", {}).get("parts"):
-            raise HTTPException(status_code=502, detail="Gemini가 빈 응답을 반환했습니다. (안전 필터 차단 가능성)")
-        return {"result": candidates[0]["content"]["parts"][0]["text"]}
-
-    else:
-        raise HTTPException(status_code=400, detail=f"지원하지 않는 모델입니다: {req.model}")
+    try:
+        return await run_in_threadpool(run_study_agent, req.model, messages, req.thread_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Agent 실행 실패: {str(e)}") from e
 
 
 @app.get("/health")

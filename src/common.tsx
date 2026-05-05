@@ -1,3 +1,5 @@
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+
 export const PINK = "#F070AE";
 export const CYAN = "#00C0E8";
 
@@ -7,6 +9,19 @@ export const pageRoutes = {
   "퀴즈 생성": "/quiz",
   "커뮤니티": "/community",
   "마이페이지": "/mypage",
+} as const;
+
+export type PageRouteLabel = keyof typeof pageRoutes;
+
+type SidebarProps = {
+  active: PageRouteLabel | string;
+  onNav: (item: PageRouteLabel) => void;
+  onClose: () => void;
+};
+
+type CardProps = HTMLAttributes<HTMLDivElement> & {
+  children: ReactNode;
+  style?: CSSProperties;
 };
 
 export const SidebarIcon = () => (
@@ -16,7 +31,7 @@ export const SidebarIcon = () => (
   </svg>
 );
 
-export const Sidebar = ({ active, onNav, onClose }) => (
+export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
   <div style={{
     position: "fixed", top: 0, left: 0, width: 240, height: "100vh",
     background: "#fff", borderRight: "1px solid #eee", zIndex: 100,
@@ -27,7 +42,7 @@ export const Sidebar = ({ active, onNav, onClose }) => (
       <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
       <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#999" }}>✕</button>
     </div>
-    {Object.keys(pageRoutes).map(item => (
+    {(Object.keys(pageRoutes) as PageRouteLabel[]).map(item => (
       <button key={item} onClick={() => { onNav(item); onClose(); }} style={{
         padding: "14px 24px", border: "none", background: active === item ? "#FFF0F6" : "transparent",
         textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
@@ -37,7 +52,7 @@ export const Sidebar = ({ active, onNav, onClose }) => (
   </div>
 );
 
-export const Card = ({ children, style, ...props }) => (
+export const Card = ({ children, style, ...props }: CardProps) => (
   <div style={{
     background: "#fff", borderRadius: 14, border: "1px solid #f0f0f0",
     boxShadow: "0 1px 4px rgba(0,0,0,0.04)", ...style

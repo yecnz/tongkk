@@ -1,10 +1,14 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
+type ConvertApiResponse = {
+  markdown: string;
+};
+
 /**
  * PDF 파일을 Markdown 문자열로 변환 (전처리 단계)
  * FastAPI 서버의 markitdown 사용
  */
-export async function extractMarkdownFromPDF(file) {
+export async function extractMarkdownFromPDF(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -23,10 +27,10 @@ export async function extractMarkdownFromPDF(file) {
       throw new Error(err.detail || `변환 실패 (${response.status})`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as ConvertApiResponse;
     return data.markdown;
   } catch (err) {
-    if (err.name === 'AbortError') {
+    if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error('PDF 변환 시간 초과. 파일 크기를 확인하거나 다시 시도해주세요.');
     }
     throw err;

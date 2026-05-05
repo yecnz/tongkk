@@ -1,4 +1,14 @@
-export const samplePosts = [
+export type Post = {
+  id: number;
+  author: string;
+  title: string;
+  likes: number;
+  comments: number;
+  saves: number;
+  time: string;
+};
+
+export const samplePosts: Post[] = [
   { id: 1, author: "YJ", title: "3주차 요약 공유합니다", likes: 12, comments: 5, saves: 8, time: "2시간 전" },
   { id: 2, author: "HN", title: "2주차 퀴즈 20문제 만들었어요", likes: 22, comments: 17, saves: 20, time: "4시간 전" },
   { id: 3, author: "SJ", title: "중간고사 내용 정리 + 예상문제", likes: 15, comments: 7, saves: 12, time: "6시간 전" },

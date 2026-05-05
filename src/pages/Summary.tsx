@@ -5,10 +5,21 @@ import { useCourses } from "../CourseContext";
 import { summarizeWithGemini } from "../services/gemini";
 import { summarizeWithGPT } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
+import { sendAgentMessage, type AgentMessage } from "../services/agent";
 
-const FileIcon = ({ type }) => {
-  const colors = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60" };
-  const labels = { pdf: "PDF", ppt: "PPT", img: "IMG" };
+type FileKind = "pdf" | "ppt" | "img" | "file";
+type ModelKey = "Gemini" | "GPT" | "Claude" | "Gemma4";
+type SummaryView = "upload" | "models" | "summaryResult" | "quizCreate";
+type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
+type SummarySample = { title: string; content: string };
+type FileIconProps = { type: FileKind };
+type ModelSelectViewProps = { tokens: number; onSelect: (key: ModelKey, cost: number) => void; onBack: () => void };
+type SummaryResultViewProps = { modelKey: ModelKey; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string };
+type QuizCreateViewProps = { fileName?: string; onBack: () => void };
+
+const FileIcon = ({ type }: FileIconProps) => {
+  const colors: Record<FileKind, string> = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60", file: "#999" };
+  const labels: Record<FileKind, string> = { pdf: "PDF", ppt: "PPT", img: "IMG", file: "FILE" };
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -18,8 +29,8 @@ const FileIcon = ({ type }) => {
   );
 };
 
-const getFileType = (name) => {
-  const ext = name.split(".").pop().toLowerCase();
+const getFileType = (name: string): FileKind => {
+  const ext = (name.split(".").pop() || "").toLowerCase();
   if (ext === "pdf") return "pdf";
   if (["ppt", "pptx"].includes(ext)) return "ppt";
   if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "img";
@@ -27,7 +38,7 @@ const getFileType = (name) => {
 };
 
 /* ── 모델별 요약 샘플 데이터 ── */
-const summaryData = {
+const summaryData: Record<ModelKey, SummarySample> = {
   Gemini: {
     title: "Gemini 요약",
     content: "동적 프로그래밍(Dynamic Programming)은 복잡한 문제를 더 간단한 하위 문제의 모음으로 분해하여 각 하위 문제를 한 번만 풀고 그 결과를 저장하는 최적화 기법입니다.\n\n핵심 원리:\n• 최적 부분 구조: 문제의 최적 해가 하위 문제의 최적 해로 구성\n• 중복 부분 문제: 동일한 하위 문제가 반복적으로 등장\n\n구현 방식:\n1. Top-down (메모이제이션): 재귀 + 캐싱\n2. Bottom-up (타뷸레이션): 반복문으로 테이블 채우기\n\n대표 문제: 피보나치, 0/1 배낭, LCS, 편집 거리, 행렬 체인 곱셈",
@@ -47,8 +58,8 @@ const summaryData = {
 };
 
 /* ── 모델 선택 카드 뷰 ── */
-const ModelSelectView = ({ tokens, onSelect, onBack }) => {
-  const models = [
+const ModelSelectView = ({ tokens, onSelect, onBack }: ModelSelectViewProps) => {
+  const models: Array<{ key: ModelKey; name: string; cost: number; desc: string; free: boolean; coming: boolean }> = [
     { key: "Gemini", name: "Gemini", cost: 0,   desc: "기본\n요약 제공", free: true,  coming: false },
     { key: "GPT",    name: "GPT",    cost: 100,  desc: "열기\n(토큰 -100)", free: false, coming: false },
     { key: "Claude", name: "Claude", cost: 100,  desc: "열기\n(토큰 -100)", free: false, coming: false },
@@ -105,9 +116,36 @@ const ModelSelectView = ({ tokens, onSelect, onBack }) => {
 };
 
 /* ── 요약 결과 뷰 ── */
-const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, loadingStep, elapsedTime }) => {
+const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId }: SummaryResultViewProps) => {
   const data = summaryData[modelKey] || summaryData["GPT"];
   const displayContent = realContent || data.content;
+  const [agentInput, setAgentInput] = useState("");
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState("");
+  const agentModel = modelKey === "GPT" || modelKey === "Gemini" ? modelKey : null;
+  const canUseAgent = Boolean(threadId) && Boolean(agentModel);
+
+  const handleAgentSubmit = async () => {
+    const content = agentInput.trim();
+    if (!content || !agentModel || !canUseAgent || agentLoading) return;
+
+    const userMessage: AgentMessage = { role: "user", content };
+    setAgentMessages(prev => [...prev, userMessage]);
+    setAgentInput("");
+    setAgentError("");
+    setAgentLoading(true);
+
+    try {
+      const response = await sendAgentMessage(agentModel, threadId, [userMessage]);
+      setAgentMessages(prev => [...prev, { role: "assistant", content: response.result }]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Agent 요청 실패";
+      setAgentError(message);
+    } finally {
+      setAgentLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -175,18 +213,69 @@ const SummaryResultView = ({ modelKey, onBack, realContent, isLoading, error, lo
             }}>다운로드</button>
           </div>
         )}
+
+        {canUseAgent && !isLoading && !error && (
+          <div style={{ marginTop: 24, paddingTop: 22, borderTop: "1px solid #f0f0f0" }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#222" }}>추가 질문</h3>
+            {agentMessages.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                {agentMessages.map((msg, i) => (
+                  <div key={`${msg.role}-${i}`} style={{
+                    alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                    maxWidth: "78%",
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
+                    color: "#444",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap"
+                  }}>
+                    {msg.content}
+                  </div>
+                ))}
+              </div>
+            )}
+            {agentError && (
+              <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <input
+                value={agentInput}
+                onChange={e => setAgentInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleAgentSubmit(); }}
+                placeholder="요약본에 대해 이어서 질문하기"
+                style={{
+                  flex: 1, padding: "11px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+                  fontSize: 14, outline: "none"
+                }}
+              />
+              <button
+                onClick={handleAgentSubmit}
+                disabled={!agentInput.trim() || agentLoading}
+                style={{
+                  padding: "0 18px", borderRadius: 10, border: "none",
+                  background: agentLoading ? "#ddd" : PINK, color: "#fff",
+                  fontSize: 14, fontWeight: 700, cursor: agentLoading ? "default" : "pointer"
+                }}
+              >
+                {agentLoading ? "응답 중" : "전송"}
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
 };
 
 /* ── 퀴즈 생성 뷰 ── */
-const QuizCreateView = ({ fileName, onBack }) => {
+const QuizCreateView = ({ fileName, onBack }: QuizCreateViewProps) => {
   const [difficulty, setDifficulty] = useState("보통");
   const [count, setCount] = useState(10);
-  const [types, setTypes] = useState(["객관식"]);
+  const [types, setTypes] = useState<string[]>(["객관식"]);
 
-  const toggleType = (t) => {
+  const toggleType = (t: string) => {
     setTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   };
 
@@ -279,27 +368,29 @@ export default function Summary() {
   const navigate = useNavigate();
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [tokens, setTokens] = useState(500);
   const [selectedCourse, setSelectedCourse] = useState("");
-  const fileRef = useRef(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   // 뷰 상태: "upload" | "models" | "summaryResult" | "quizCreate"
-  const [view, setView] = useState("upload");
-  const [selectedModel, setSelectedModel] = useState(null);
+  const [view, setView] = useState<SummaryView>("upload");
+  const [selectedModel, setSelectedModel] = useState<ModelKey | null>(null);
   const [summaryText, setSummaryText] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const [loadingStep, setLoadingStep] = useState("");
-  const [elapsedTime, setElapsedTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState<string | null>(null);
   const [extractedMarkdown, setExtractedMarkdown] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
+  const [agentThreadId, setAgentThreadId] = useState("");
 
-  const handleFiles = async (fileList) => {
+  const handleFiles = async (fileList: FileList | null) => {
+    if (!fileList) return;
     const arr = Array.from(fileList).filter(f =>
       f.type === "application/pdf" || f.type.startsWith("image/") ||
       f.name.endsWith(".ppt") || f.name.endsWith(".pptx")
@@ -329,7 +420,7 @@ export default function Summary() {
         const markdown = await extractMarkdownFromPDF(pdfFile);
         setExtractedMarkdown(markdown);
       } catch (err) {
-        setExtractError(err.message);
+        setExtractError(err instanceof Error ? err.message : "PDF 분석 실패");
       } finally {
         setIsExtracting(false);
       }
@@ -342,7 +433,7 @@ export default function Summary() {
     { title: "중간고사 예상문제 모음", type: "요약" },
   ];
 
-  const handleModelSelect = async (key, cost) => {
+  const handleModelSelect = async (key: ModelKey, cost: number) => {
     if (cost > 0) setTokens(prev => prev - cost);
     setSelectedModel(key);
     setSummaryError("");
@@ -353,17 +444,19 @@ export default function Summary() {
       setSummaryText("");
       setSummaryError("");
       setElapsedTime(null);
+      setAgentThreadId("");
       const startTime = Date.now();
       try {
         // 마크다운은 업로드 시 이미 변환 완료 → 요약만 실행
         setLoadingStep("🤖 AI가 요약 중...");
-        const result = key === "Gemini"
+        const response = key === "Gemini"
           ? await summarizeWithGemini(extractedMarkdown)
           : await summarizeWithGPT(extractedMarkdown);
-        setSummaryText(result);
+        setSummaryText(response.result);
+        setAgentThreadId(response.threadId);
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
-        setSummaryError(err.message);
+        setSummaryError(err instanceof Error ? err.message : "요약 실패");
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } finally {
         setIsSummarizing(false);
@@ -426,6 +519,7 @@ export default function Summary() {
             error={summaryError}
             loadingStep={loadingStep}
             elapsedTime={elapsedTime}
+            threadId={agentThreadId}
           />
         )}
 

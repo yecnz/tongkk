@@ -2,8 +2,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import type { PageRouteLabel } from "../common";
 
-const AddCourseModal = ({ onClose, onAdd }) => {
+type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
+type JoinCommunityModalProps = { onClose: () => void; onJoin: (univ: string, dept: string) => void };
+type CustomCalendarProps = { value: string; onChange: (value: string) => void };
+type AddDdayModalProps = { onClose: () => void; onAdd: (subject: string, date: string) => void };
+type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
+type CommunityInfo = { univ: string; dept: string };
+type Dday = { subj: string; date: string };
+type Plan = { text: string; done: boolean };
+
+const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
   const [name, setName] = useState("");
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -24,7 +34,7 @@ const AddCourseModal = ({ onClose, onAdd }) => {
   );
 };
 
-const JoinCommunityModal = ({ onClose, onJoin }) => {
+const JoinCommunityModal = ({ onClose, onJoin }: JoinCommunityModalProps) => {
   const [univ, setUniv] = useState("");
   const [dept, setDept] = useState("");
   return (
@@ -53,7 +63,7 @@ const JoinCommunityModal = ({ onClose, onJoin }) => {
 const MONTH_NAMES = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 
-const CustomCalendar = ({ value, onChange }) => {
+const CustomCalendar = ({ value, onChange }: CustomCalendarProps) => {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -71,7 +81,7 @@ const CustomCalendar = ({ value, onChange }) => {
     else setViewMonth(m => m + 1);
   };
 
-  const cells = [];
+  const cells: Array<number | null> = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
@@ -115,7 +125,7 @@ const CustomCalendar = ({ value, onChange }) => {
   );
 };
 
-const AddDdayModal = ({ onClose, onAdd }) => {
+const AddDdayModal = ({ onClose, onAdd }: AddDdayModalProps) => {
   const [subj, setSubj] = useState("");
   const [date, setDate] = useState("");
   return (
@@ -144,7 +154,7 @@ const AddDdayModal = ({ onClose, onAdd }) => {
   );
 };
 
-const AddPlanModal = ({ onClose, onAdd }) => {
+const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   const [txt, setTxt] = useState("");
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -169,20 +179,20 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
-  const [page, setPage] = useState("대시보드");
-  const [community, setCommunity] = useState(null);
-  const [ddays, setDdays] = useState([]);
-  const [plans, setPlans] = useState([]);
+  const page: PageRouteLabel = "대시보드";
+  const [community, setCommunity] = useState<CommunityInfo | null>(null);
+  const [ddays, setDdays] = useState<Dday[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showAddDday, setShowAddDday] = useState(false);
   const [showAllDdays, setShowAllDdays] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
 
-  const getDaysLeft = (dateStr) => {
+  const getDaysLeft = (dateStr: string) => {
     const t = new Date(dateStr); const n = new Date();
     t.setHours(0,0,0,0); n.setHours(0,0,0,0);
-    return Math.ceil((t - n) / 86400000);
+    return Math.ceil((t.getTime() - n.getTime()) / 86400000);
   };
 
   // 날짜 가까운 순 자동 정렬

@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
-import { samplePosts } from "../data/posts";
+import { samplePosts, type Post } from "../data/posts";
 
-const PostDetail = ({ post, onBack }) => {
+type Comment = { author: string; text: string; time: string };
+type PostDetailProps = { post: Post; onBack: () => void };
+
+const PostDetail = ({ post, onBack }: PostDetailProps) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [comment, setComment] = useState("");
-  const [comments, setComments] = useState([
+  const [comments, setComments] = useState<Comment[]>([
     { author: "JH", text: "좋은 자료 감사합니다!", time: "1시간 전" },
     { author: "DY", text: "이해하기 쉽게 정리해주셨네요", time: "3시간 전" },
   ]);
@@ -85,7 +88,7 @@ export default function Community() {
   const location = useLocation();
   const [sidebar, setSidebar] = useState(false);
   const [search, setSearch] = useState("");
-  const [selectedPost, setSelectedPost] = useState(location.state?.post || null);
+  const [selectedPost, setSelectedPost] = useState<Post | null>((location.state as { post?: Post } | null)?.post || null);
 
   const filtered = samplePosts.filter(p =>
     p.title.toLowerCase().includes(search.toLowerCase())
@@ -109,8 +112,9 @@ export default function Community() {
           <PostDetail
             post={selectedPost}
             onBack={() => {
-              if (location.state?.from === "/mypage")
-                navigate("/mypage", { state: { view: location.state.view } });
+              const state = location.state as { from?: string; view?: string } | null;
+              if (state?.from === "/mypage")
+                navigate("/mypage", { state: { view: state.view } });
               else setSelectedPost(null);
             }}
           />

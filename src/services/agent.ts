@@ -1,0 +1,58 @@
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
+export type AgentRole = 'user' | 'assistant';
+
+export type AgentMessage = {
+  role: AgentRole;
+  content: string;
+};
+
+export type AgentResponse = {
+  result: string;
+  threadId: string;
+  messages: AgentMessage[];
+};
+
+type AgentApiResponse = {
+  result: string;
+  thread_id?: string;
+  threadId?: string;
+  messages?: AgentMessage[];
+};
+
+export async function sendAgentMessage(
+  model: 'GPT' | 'Gemini',
+  threadId: string,
+  messages: AgentMessage[],
+): Promise<AgentResponse> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 130_000);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/agent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, thread_id: threadId, messages }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `API 오류 (${response.status})`);
+    }
+
+    const data = await response.json() as AgentApiResponse;
+    return {
+      result: data.result,
+      threadId: data.thread_id || data.threadId || threadId,
+      messages: data.messages || [],
+    };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Agent 요청 시간 초과. 다시 시도해주세요.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}

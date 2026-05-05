@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 
-const sampleQuizzes = [
+type QuizQuestion = { id: number; question: string; options: string[]; answer: number; explanation: string };
+type HeaderProps = { label: string; onOpenSidebar: () => void; extra?: ReactNode };
+
+const sampleQuizzes: QuizQuestion[] = [
   { id: 1, question: "시간 복잡도 O(n log n)을 가지는 정렬 알고리즘은?", options: ["버블 정렬", "퀵 정렬", "선택 정렬", "삽입 정렬"], answer: 1, explanation: "퀵 정렬의 평균 시간 복잡도는 O(n log n)입니다." },
   { id: 2, question: "스택(Stack)의 특징으로 올바른 것은?", options: ["FIFO 구조", "LIFO 구조", "랜덤 접근 가능", "정렬된 순서 유지"], answer: 1, explanation: "스택은 Last In First Out(LIFO) 구조입니다." },
   { id: 3, question: "이진 탐색의 전제 조건은?", options: ["데이터가 정렬되어 있어야 한다", "데이터가 연결 리스트여야 한다", "데이터가 트리 구조여야 한다", "데이터가 해시 테이블이어야 한다"], answer: 0, explanation: "이진 탐색은 정렬된 배열에서만 사용할 수 있습니다." },
@@ -11,7 +14,7 @@ const sampleQuizzes = [
   { id: 5, question: "해시 충돌 해결 방법이 아닌 것은?", options: ["체이닝", "개방 주소법", "이중 해싱", "깊이 우선 탐색"], answer: 3, explanation: "깊이 우선 탐색(DFS)은 그래프 탐색 알고리즘으로, 해시 충돌 해결과 무관합니다." }
 ];
 
-const Header = ({ label, onOpenSidebar, extra }) => (
+const Header = ({ label, onOpenSidebar, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <button onClick={onOpenSidebar} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -31,9 +34,9 @@ export default function Quiz() {
   const [step, setStep] = useState("select");
   const [subject, setSubject] = useState("");
   const [count, setCount] = useState(5);
-  const [quizzes, setQuizzes] = useState([]);
+  const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState<Record<number, number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
 
   const generate = () => {
@@ -45,7 +48,7 @@ export default function Quiz() {
     }, 2000);
   };
 
-  const selectAnswer = (idx) => {
+  const selectAnswer = (idx: number) => {
     if (answers[current] !== undefined) return;
     setAnswers({ ...answers, [current]: idx });
     setShowExplanation(true);

@@ -1,10 +1,16 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ChangeEvent, type CSSProperties } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
-import { samplePosts } from "../data/posts";
+import { samplePosts, type Post } from "../data/posts";
 
-const Toggle = ({ on, onToggle }) => (
+type ToggleProps = { on: boolean; onToggle: () => void };
+type PostListViewProps = { title: string; posts: Post[]; onBack: () => void; onSelect: (post: Post) => void };
+type LoginModalProps = { onClose: () => void; onLogin: () => void };
+type ProfileEditModalProps = { nickname: string; avatarUrl: string | null; onSave: (nickname: string, avatarUrl: string | null) => void; onClose: () => void };
+type LocationState = { view?: string } | null;
+
+const Toggle = ({ on, onToggle }: ToggleProps) => (
   <button onClick={onToggle} style={{
     width: 46, height: 26, borderRadius: 13, border: "none", padding: 2,
     background: on ? CYAN : "#ddd", cursor: "pointer", transition: "background 0.2s",
@@ -18,7 +24,7 @@ const Toggle = ({ on, onToggle }) => (
   </button>
 );
 
-const PostListView = ({ title, posts, onBack, onSelect }) => (
+const PostListView = ({ title, posts, onBack, onSelect }: PostListViewProps) => (
   <div>
     <button onClick={onBack} style={{
       background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 16, padding: 0
@@ -47,13 +53,13 @@ const PostListView = ({ title, posts, onBack, onSelect }) => (
 );
 
 /* 로그인 모달 */
-const LoginModal = ({ onClose, onLogin }) => {
+const LoginModal = ({ onClose, onLogin }: LoginModalProps) => {
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [idFocus, setIdFocus] = useState(false);
   const [pwFocus, setPwFocus] = useState(false);
 
-  const inputStyle = (focused) => ({
+  const inputStyle = (focused: boolean): CSSProperties => ({
     width: "100%", padding: "13px 16px", borderRadius: 12,
     border: `1.5px solid ${focused ? CYAN : "#e8e8e8"}`,
     fontSize: 14, outline: "none", boxSizing: "border-box",
@@ -131,16 +137,16 @@ const LoginModal = ({ onClose, onLogin }) => {
 };
 
 /* 프로필 편집 모달 */
-const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }) => {
+const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditModalProps) => {
   const [name, setName] = useState(nickname);
-  const [preview, setPreview] = useState(avatarUrl);
-  const fileRef = useRef(null);
+  const [preview, setPreview] = useState<string | null>(avatarUrl);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFile = (e) => {
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target.result);
+    reader.onload = () => setPreview(typeof reader.result === 'string' ? reader.result : null);
     reader.readAsDataURL(f);
   };
 
@@ -197,19 +203,19 @@ export default function MyPage() {
   const [sidebar, setSidebar] = useState(false);
   const [dark, setDark] = useState(false);
   const [notif, setNotif] = useState(true);
-  const [view, setView] = useState(location.state?.view || "main");
+  const [view, setView] = useState(((location.state as LocationState)?.view) || "main");
   const [loggedIn, setLoggedIn] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [nickname, setNickname] = useState("학생닉네임");
-  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const handleProfileSave = (newName, newAvatar) => {
     setNickname(newName);
     setAvatarUrl(newAvatar);
   };
 
-  const getPostsById = (ids) => ids.map(id => samplePosts.find(p => p.id === id)).filter(Boolean);
+  const getPostsById = (ids: number[]) => ids.map(id => samplePosts.find(p => p.id === id)).filter((post): post is Post => Boolean(post));
   const myPosts = getPostsById([1, 3]);
   const likedPosts = getPostsById([2, 4]);
   const commentedPosts = getPostsById([5]);
