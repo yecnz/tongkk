@@ -123,7 +123,7 @@ export default function Quiz() {
                 <button key={d} onClick={() => setDifficulty(d)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
                   border: difficulty === d ? "none" : "1px solid #e0e0e0",
-                  background: difficulty === d ? "#7B5EA7" : "#fff",
+                  background: difficulty === d ? PINK : "#fff",
                   color: difficulty === d ? "#fff" : "#666", fontSize: 14, fontWeight: 600, cursor: "pointer"
                 }}>{d}</button>
               ))}
@@ -131,7 +131,7 @@ export default function Quiz() {
 
             <button onClick={generate} disabled={!subject.trim()} style={{
               width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-              background: subject.trim() ? PINK : "#e0e0e0",
+              background: "#e0e0e0",
               color: "#fff", fontSize: 16, fontWeight: 700,
               cursor: subject.trim() ? "pointer" : "not-allowed"
             }}>퀴즈 생성하기</button>
