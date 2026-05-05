@@ -544,19 +544,61 @@ export default function Summary() {
 
       <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
         {courses.length > 0 && view === "upload" && (
-          <div style={{ marginBottom: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#555", marginRight: 12 }}>과목 선택</span>
-            <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 12 }}>
+              <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
+              <p style={{ margin: 0, fontSize: 13, color: "#999" }}>자료를 정리할 과목을 선택하세요</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
               {courses.map((c, i) => (
-                <button key={i} onClick={() => setSelectedCourse(selectedCourse === c ? "" : c)} style={{
-                  padding: "7px 16px", borderRadius: 20,
-                  border: selectedCourse === c ? "none" : "1px solid #e0e0e0",
-                  background: selectedCourse === c ? PINK : "#fafafa",
-                  color: selectedCourse === c ? "#fff" : "#555",
-                  fontSize: 13, fontWeight: selectedCourse === c ? 600 : 400, cursor: "pointer"
-                }}>{c}</button>
+                <button
+                  key={i}
+                  onClick={() => setSelectedCourse(selectedCourse === c ? "" : c)}
+                  style={{
+                    minHeight: 92,
+                    padding: 18,
+                    borderRadius: 14,
+                    border: selectedCourse === c ? `1.5px solid ${PINK}` : "1px solid #eeeeee",
+                    background: selectedCourse === c ? "#FFF0F6" : "#fff",
+                    boxShadow: selectedCourse === c ? "0 4px 18px rgba(240,112,174,0.16)" : "0 1px 4px rgba(0,0,0,0.04)",
+                    color: "#222",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
+                    <span style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      background: selectedCourse === c ? PINK : "#f2f2f2",
+                      color: selectedCourse === c ? "#fff" : "#bbb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}>
+                      {selectedCourse === c ? "✓" : ""}
+                    </span>
+                  </div>
+                  <span style={{
+                    marginTop: 14,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: selectedCourse === c ? PINK : "#aaa",
+                  }}>
+                    {selectedCourse === c ? "선택됨" : "선택하기"}
+                  </span>
+                </button>
               ))}
-            </span>
+            </div>
           </div>
         )}
 
