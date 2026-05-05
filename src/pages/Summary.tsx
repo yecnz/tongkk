@@ -2,6 +2,7 @@ import { useState, useRef, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { CourseSelectGate } from "../components/CourseSelectGate";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
@@ -734,13 +735,12 @@ const QuizCreateView = ({ fileName, onBack }: QuizCreateViewProps) => {
 
 export default function Summary() {
   const navigate = useNavigate();
-  const { courses } = useCourses();
+  const { courses, addCourse, selectedCourse, setSelectedCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [view, setView] = useState<SummaryView>("upload");
@@ -843,22 +843,45 @@ export default function Summary() {
       </div>
 
       <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-        {courses.length > 0 && view === "upload" && (
-          <div style={{ marginBottom: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#555", marginRight: 12 }}>과목 선택</span>
-            <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 8 }}>
-              {courses.map((c, i) => (
-                <button key={i} onClick={() => setSelectedCourse(selectedCourse === c ? "" : c)} style={{
-                  padding: "7px 16px", borderRadius: 20,
-                  border: selectedCourse === c ? "none" : "1px solid #e0e0e0",
-                  background: selectedCourse === c ? PINK : "#fafafa",
-                  color: selectedCourse === c ? "#fff" : "#555",
-                  fontSize: 13, fontWeight: selectedCourse === c ? 600 : 400, cursor: "pointer"
-                }}>{c}</button>
-              ))}
-            </span>
-          </div>
-        )}
+        {!selectedCourse ? (
+          <CourseSelectGate
+            courses={courses}
+            actionLabel="자료 요약"
+            onSelect={setSelectedCourse}
+            onAddCourse={addCourse}
+          />
+        ) : (
+          <>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              padding: "12px 16px",
+              borderRadius: 12,
+              border: "1px solid #F0F0F0",
+              background: "#FAFAFA",
+              marginBottom: 20,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>선택된 과목</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#222" }}>{selectedCourse}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setSelectedCourse(""); setView("upload"); setSelectedTemplate(null); }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #E0E0E0",
+                  background: "#fff",
+                  color: "#555",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >과목 변경</button>
+            </div>
 
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView("upload")} />
@@ -1009,6 +1032,8 @@ export default function Summary() {
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

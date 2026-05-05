@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { CourseSelectGate } from "../components/CourseSelectGate";
 
 type QuizQuestion = { id: number; question: string; options: string[]; answer: number; explanation: string };
 type HeaderProps = { label: string; onOpenSidebar: () => void; extra?: ReactNode };
@@ -29,10 +30,9 @@ const Header = ({ label, onOpenSidebar, extra }: HeaderProps) => (
 
 export default function Quiz() {
   const navigate = useNavigate();
-  const { courses } = useCourses();
+  const { courses, addCourse, selectedCourse, setSelectedCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [step, setStep] = useState("select");
-  const [subject, setSubject] = useState("");
   const [count, setCount] = useState(5);
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
@@ -40,7 +40,7 @@ export default function Quiz() {
   const [showExplanation, setShowExplanation] = useState(false);
 
   const generate = () => {
-    if (!subject.trim()) return;
+    if (!selectedCourse) return;
     setStep("generating");
     setTimeout(() => {
       setQuizzes(sampleQuizzes.slice(0, count));
@@ -68,6 +68,23 @@ export default function Quiz() {
     </>
   );
 
+  if (step === "select" && !selectedCourse) {
+    return (
+      <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+        {sidebarEl}
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} />
+        <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+          <CourseSelectGate
+            courses={courses}
+            actionLabel="퀴즈 생성"
+            onSelect={setSelectedCourse}
+            onAddCourse={addCourse}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (step === "select") {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -77,25 +94,36 @@ export default function Quiz() {
           <Card style={{ padding: 32 }}>
             <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700, color: "#222", textAlign: "center" }}>퀴즈 생성</h2>
             <p style={{ margin: "0 0 28px", fontSize: 14, color: "#999", textAlign: "center" }}>과목과 문제 수를 선택하세요</p>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>과목명</label>
-            {courses.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-                {courses.map((c, i) => (
-                  <button key={i} onClick={() => setSubject(c)} style={{
-                    padding: "9px 18px", borderRadius: 10,
-                    border: subject === c ? "none" : "1px solid #e0e0e0",
-                    background: subject === c ? PINK : "#fafafa",
-                    color: subject === c ? "#fff" : "#444",
-                    fontSize: 14, fontWeight: subject === c ? 600 : 400, cursor: "pointer"
-                  }}>{c}</button>
-                ))}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "#FAFAFA",
+              border: "1px solid #F0F0F0",
+              marginBottom: 20,
+            }}>
+              <div>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#999", marginBottom: 4 }}>선택된 과목</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: "#222" }}>{selectedCourse}</span>
               </div>
-            ) : (
-              <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="예: 알고리즘" style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid #e0e0e0",
-                fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 20
-              }}/>
-            )}
+              <button
+                type="button"
+                onClick={() => setSelectedCourse("")}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #E0E0E0",
+                  background: "#fff",
+                  color: "#555",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >과목 변경</button>
+            </div>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>문제 수</label>
             <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
               {[5, 10, 15, 20].map(n => (
@@ -123,7 +151,7 @@ export default function Quiz() {
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 48, height: 48, border: "3px solid #f0f0f0", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
           <p style={{ fontSize: 16, fontWeight: 600, color: "#333" }}>AI가 퀴즈를 생성하고 있습니다...</p>
-          <p style={{ fontSize: 13, color: "#999" }}>{subject} · {count}문제</p>
+          <p style={{ fontSize: 13, color: "#999" }}>{selectedCourse} · {count}문제</p>
           <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
         </div>
       </div>
@@ -149,7 +177,7 @@ export default function Quiz() {
             </h2>
             <p style={{ fontSize: 15, color: "#666", margin: "0 0 28px" }}>{quizzes.length}문제 중 {correctCount}문제 정답</p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={() => { setStep("select"); setSubject(""); }} style={{
+              <button onClick={() => setStep("select")} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid #e0e0e0",
                 background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#555"
               }}>새 퀴즈</button>
@@ -169,7 +197,7 @@ export default function Quiz() {
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
-      <Header label={`${subject} 퀴즈`} onOpenSidebar={() => setSidebar(true)}
+      <Header label={`${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)}
         extra={<span style={{ fontSize: 14, fontWeight: 600, color: "#999" }}>{current + 1} / {quizzes.length}</span>} />
       <div style={{ height: 3, background: "#f0f0f0" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
