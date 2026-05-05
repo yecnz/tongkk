@@ -39,7 +39,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
     boxShadow: "2px 0 12px rgba(0,0,0,0.06)"
   }}>
     <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+      <button onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#999" }}>✕</button>
     </div>
     {(Object.keys(pageRoutes) as PageRouteLabel[]).map(item => (
