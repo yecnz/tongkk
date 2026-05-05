@@ -58,6 +58,7 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - 최대 2단계 깊이 (root → children → children)
 - label은 15자 이내로 간결하게
 - JSON 외 텍스트·마크다운·코드 블록 절대 금지""",
+
     "CHEAT_SHEET": """치트시트 형식으로 작성해.
 - 시험 직전 빠르게 훑을 수 있는 압축 암기표로 구성해.
 - 핵심 공식, 정의, 비교, 조건, 예외, 암기 포인트를 짧은 bullet point로 정리해.

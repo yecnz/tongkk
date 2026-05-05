@@ -2,6 +2,8 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 
 type CourseContextValue = {
   courses: string[];
+  selectedCourse: string;
+  setSelectedCourse: (course: string) => void;
   addCourse: (name: string) => void;
 };
 
@@ -9,8 +11,16 @@ const CourseContext = createContext<CourseContextValue | null>(null);
 
 export function CourseProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<string[]>([]);
-  const addCourse = (name: string) => setCourses(prev => [...prev, name]);
-  const value = useMemo(() => ({ courses, addCourse }), [courses]);
+  const [selectedCourse, setSelectedCourse] = useState("");
+
+  const addCourse = (name: string) => {
+    setCourses(prev => prev.includes(name) ? prev : [...prev, name]);
+  };
+
+  const value = useMemo(
+    () => ({ courses, selectedCourse, setSelectedCourse, addCourse }),
+    [courses, selectedCourse],
+  );
 
   return (
     <CourseContext.Provider value={value}>

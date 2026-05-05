@@ -177,7 +177,7 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { courses, addCourse } = useCourses();
+  const { courses, addCourse, setSelectedCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [community, setCommunity] = useState<CommunityInfo | null>(null);
@@ -250,8 +250,8 @@ export default function Dashboard() {
                         <div style={{ display: "flex", gap: 8 }}>
                           {["요약", "퀴즈", "커뮤니티"].map(btn => (
                             <button key={btn} onClick={() => {
-                              if (btn === "요약") navigate(pageRoutes["자료 요약"]);
-                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈"]);
+                              if (btn === "요약") { setSelectedCourse(c); navigate(pageRoutes["자료 요약"]); }
+                              else if (btn === "퀴즈") { setSelectedCourse(c); navigate(pageRoutes["퀴즈"]); }
                               else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
                             }} style={{
                               padding: "6px 14px", borderRadius: 8,
