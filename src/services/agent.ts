@@ -21,7 +21,6 @@ type AgentApiResponse = {
 };
 
 export async function sendAgentMessage(
-  model: 'GPT' | 'Gemini',
   threadId: string,
   messages: AgentMessage[],
 ): Promise<AgentResponse> {
@@ -32,7 +31,7 @@ export async function sendAgentMessage(
     const response = await fetch(`${BACKEND_URL}/agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, thread_id: threadId, messages }),
+      body: JSON.stringify({ thread_id: threadId, messages }),
       signal: controller.signal,
     });
 

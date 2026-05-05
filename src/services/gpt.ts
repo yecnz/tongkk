@@ -1,5 +1,7 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
+export type SummaryTemplate = 'GENERAL' | 'LECTURE_NOTE' | 'MINDMAP';
+
 export type SummaryResponse = {
   result: string;
   threadId: string;
@@ -12,9 +14,12 @@ type SummaryApiResponse = {
 };
 
 /**
- * Markdown 텍스트를 받아 GPT Agent로 요약 (백엔드 경유 — API 키는 서버에서 관리)
+ * Markdown 텍스트를 받아 고정 GPT Agent로 템플릿 요약
  */
-export async function summarizeWithGPT(markdown: string): Promise<SummaryResponse> {
+export async function summarizeWithTemplate(
+  markdown: string,
+  template: SummaryTemplate,
+): Promise<SummaryResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
 
@@ -22,7 +27,7 @@ export async function summarizeWithGPT(markdown: string): Promise<SummaryRespons
     const response = await fetch(`${BACKEND_URL}/summarize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'GPT', markdown }),
+      body: JSON.stringify({ markdown, template }),
       signal: controller.signal,
     });
 
