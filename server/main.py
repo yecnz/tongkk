@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from typing import Literal
@@ -11,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
-from agent import run_study_agent
+from agent import run_study_agent, build_llm
 
 
 app = FastAPI()
@@ -103,6 +104,33 @@ class AgentRequest(BaseModel):
     markdown: str | None = None
 
 
+class QuizRequest(BaseModel):
+    subject: str = Field(min_length=1)
+    count: int = Field(default=10, ge=1, le=30)
+    difficulty: Literal["쉬움", "보통", "어려움"] = "보통"
+    model: Literal["GPT", "Gemini"] = "GPT"
+    markdown: str | None = None
+
+
+QUIZ_SYSTEM_PROMPT = """너는 대학 강의자료 기반 퀴즈 출제 전문가다.
+반드시 순수 JSON 배열만 출력해. 설명, 코드 블록, 마크다운, 기타 텍스트 없이 JSON 배열만 출력해.
+
+출력 형식 (정확히 이 구조):
+[{"question":"문제","options":["선택지1","선택지2","선택지3","선택지4"],"answer":0,"explanation":"해설"}]
+
+규칙:
+- answer는 정답 선택지의 인덱스 (0~3 정수)
+- 각 문항은 반드시 선택지 4개
+- 해설은 한 문장으로 간결하게
+- JSON 외 어떤 텍스트도 출력 금지"""
+
+QUIZ_USER_PROMPT = """과목: {subject}
+문항 수: {count}
+난이도: {difficulty}
+{markdown_section}
+위 조건에 맞는 4지선다 문제 {count}개를 JSON 배열로만 출력해."""
+
+
 @app.post("/convert")
 async def convert_pdf_to_markdown(file: UploadFile = File(...)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -159,6 +187,40 @@ async def agent(req: AgentRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Agent 실행 실패: {str(e)}") from e
+
+
+@app.post("/quiz")
+async def generate_quiz(req: QuizRequest):
+    markdown_section = f"\n강의자료:\n{req.markdown}\n" if req.markdown else ""
+    prompt = QUIZ_USER_PROMPT.format(
+        subject=req.subject,
+        count=req.count,
+        difficulty=req.difficulty,
+        markdown_section=markdown_section,
+    )
+
+    def _call_llm():
+        llm = build_llm(req.model)
+        from langchain_core.messages import HumanMessage, SystemMessage
+        response = llm.invoke([SystemMessage(content=QUIZ_SYSTEM_PROMPT), HumanMessage(content=prompt)])
+        text = response.content if isinstance(response.content, str) else str(response.content)
+        # strip markdown code fences if present
+        text = text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        return json.loads(text.strip())
+
+    try:
+        questions = await run_in_threadpool(_call_llm)
+        return {"questions": questions}
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"퀴즈 파싱 실패: {str(e)}") from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"퀴즈 생성 실패: {str(e)}") from e
 
 
 @app.get("/health")

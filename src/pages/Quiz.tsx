@@ -2,17 +2,9 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { generateQuiz, type QuizQuestion, type QuizDifficulty } from "../services/gpt";
 
-type QuizQuestion = { id: number; question: string; options: string[]; answer: number; explanation: string };
 type HeaderProps = { label: string; onOpenSidebar: () => void; extra?: ReactNode };
-
-const sampleQuizzes: QuizQuestion[] = [
-  { id: 1, question: "시간 복잡도 O(n log n)을 가지는 정렬 알고리즘은?", options: ["버블 정렬", "퀵 정렬", "선택 정렬", "삽입 정렬"], answer: 1, explanation: "퀵 정렬의 평균 시간 복잡도는 O(n log n)입니다." },
-  { id: 2, question: "스택(Stack)의 특징으로 올바른 것은?", options: ["FIFO 구조", "LIFO 구조", "랜덤 접근 가능", "정렬된 순서 유지"], answer: 1, explanation: "스택은 Last In First Out(LIFO) 구조입니다." },
-  { id: 3, question: "이진 탐색의 전제 조건은?", options: ["데이터가 정렬되어 있어야 한다", "데이터가 연결 리스트여야 한다", "데이터가 트리 구조여야 한다", "데이터가 해시 테이블이어야 한다"], answer: 0, explanation: "이진 탐색은 정렬된 배열에서만 사용할 수 있습니다." },
-  { id: 4, question: "다익스트라 알고리즘의 주요 용도는?", options: ["문자열 매칭", "최소 신장 트리", "최단 경로 탐색", "위상 정렬"], answer: 2, explanation: "다익스트라 알고리즘은 가중치가 있는 그래프에서 최단 경로를 찾습니다." },
-  { id: 5, question: "해시 충돌 해결 방법이 아닌 것은?", options: ["체이닝", "개방 주소법", "이중 해싱", "깊이 우선 탐색"], answer: 3, explanation: "깊이 우선 탐색(DFS)은 그래프 탐색 알고리즘으로, 해시 충돌 해결과 무관합니다." }
-];
 
 const Header = ({ label, onOpenSidebar, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -34,18 +26,27 @@ export default function Quiz() {
   const [step, setStep] = useState("select");
   const [subject, setSubject] = useState("");
   const [count, setCount] = useState(5);
+  const [difficulty, setDifficulty] = useState<QuizDifficulty>("보통");
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const generate = () => {
+  const generate = async () => {
     if (!subject.trim()) return;
     setStep("generating");
-    setTimeout(() => {
-      setQuizzes(sampleQuizzes.slice(0, count));
-      setCurrent(0); setAnswers({}); setStep("quiz");
-    }, 2000);
+    setError(null);
+    try {
+      const questions = await generateQuiz(subject, count, difficulty);
+      setQuizzes(questions);
+      setCurrent(0);
+      setAnswers({});
+      setStep("quiz");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "퀴즈 생성에 실패했습니다.");
+      setStep("select");
+    }
   };
 
   const selectAnswer = (idx: number) => {
@@ -77,6 +78,13 @@ export default function Quiz() {
           <Card style={{ padding: 32 }}>
             <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700, color: "#222", textAlign: "center" }}>퀴즈 생성</h2>
             <p style={{ margin: "0 0 28px", fontSize: 14, color: "#999", textAlign: "center" }}>과목과 문제 수를 선택하세요</p>
+
+            {error && (
+              <div style={{ marginBottom: 20, padding: "12px 16px", borderRadius: 10, background: "#FFF0F6", border: `1px solid ${PINK}`, fontSize: 13, color: PINK }}>
+                {error}
+              </div>
+            )}
+
             <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>과목명</label>
             {courses.length > 0 ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
@@ -96,8 +104,9 @@ export default function Quiz() {
                 fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 20
               }}/>
             )}
+
             <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>문제 수</label>
-            <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[5, 10, 15, 20].map(n => (
                 <button key={n} onClick={() => setCount(n)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
@@ -107,9 +116,24 @@ export default function Quiz() {
                 }}>{n}문제</button>
               ))}
             </div>
-            <button onClick={generate} style={{
+
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>난이도</label>
+            <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+              {(["쉬움", "보통", "어려움"] as QuizDifficulty[]).map(d => (
+                <button key={d} onClick={() => setDifficulty(d)} style={{
+                  flex: 1, padding: "10px 0", borderRadius: 10,
+                  border: difficulty === d ? "none" : "1px solid #e0e0e0",
+                  background: difficulty === d ? "#7B5EA7" : "#fff",
+                  color: difficulty === d ? "#fff" : "#666", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                }}>{d}</button>
+              ))}
+            </div>
+
+            <button onClick={generate} disabled={!subject.trim()} style={{
               width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-              background: PINK, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer"
+              background: subject.trim() ? PINK : "#e0e0e0",
+              color: "#fff", fontSize: 16, fontWeight: 700,
+              cursor: subject.trim() ? "pointer" : "not-allowed"
             }}>퀴즈 생성하기</button>
           </Card>
         </div>
@@ -123,7 +147,7 @@ export default function Quiz() {
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 48, height: 48, border: "3px solid #f0f0f0", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
           <p style={{ fontSize: 16, fontWeight: 600, color: "#333" }}>AI가 퀴즈를 생성하고 있습니다...</p>
-          <p style={{ fontSize: 13, color: "#999" }}>{subject} · {count}문제</p>
+          <p style={{ fontSize: 13, color: "#999" }}>{subject} · {count}문제 · {difficulty}</p>
           <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
         </div>
       </div>

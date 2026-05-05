@@ -1,5 +1,48 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
+export type QuizQuestion = {
+  question: string;
+  options: string[];
+  answer: number;
+  explanation: string;
+};
+
+export type QuizDifficulty = '쉬움' | '보통' | '어려움';
+
+export async function generateQuiz(
+  subject: string,
+  count: number,
+  difficulty: QuizDifficulty,
+  markdown?: string,
+): Promise<QuizQuestion[]> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/quiz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject, count, difficulty, markdown }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({})) as { detail?: string };
+      throw new Error(err.detail || `API 오류 (${response.status})`);
+    }
+
+    const data = await response.json() as { questions: QuizQuestion[] };
+    return data.questions;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('퀴즈 생성 시간 초과. 다시 시도해주세요.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export type SummaryTemplate = 'GENERAL' | 'LECTURE_NOTE' | 'MINDMAP' | 'CHEAT_SHEET';
 
 export type SummaryResponse = {

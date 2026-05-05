@@ -70,6 +70,10 @@ class StudyAgentState(TypedDict):
     model: AgentModel
 
 
+def build_llm(model: AgentModel):
+    return _build_model(model)
+
+
 def _build_model(model: AgentModel):
     if model == "GPT":
         api_key = os.getenv("OPENAI_API_KEY")
