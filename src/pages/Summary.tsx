@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -10,6 +10,8 @@ type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type SummarySample = { title: string; content: string };
+type MindMapBranch = { title: string; children: string[] };
+type ParsedMindMap = { root: string; branches: MindMapBranch[] };
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string };
@@ -136,6 +138,310 @@ const FormattedAiText = ({ content }: { content: string }) => {
           </div>
         );
       })}
+    </div>
+  );
+};
+
+
+const stripInlineMarkdown = (text: string) => (
+  text
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/^[-*•]\s+/, "")
+    .trim()
+);
+
+const parseMindMap = (content: string): ParsedMindMap => {
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  let root = "";
+  let currentBranch: MindMapBranch | null = null;
+  let readingRoot = false;
+  let readingConnection = false;
+  const branches: MindMapBranch[] = [];
+
+  lines.forEach(rawLine => {
+    const trimmed = rawLine.trim();
+    if (!trimmed) return;
+
+    const rootWithValue = trimmed.match(/^중심\s*주제\s*[:：]\s*(.+)$/);
+    if (rootWithValue) {
+      root = stripInlineMarkdown(rootWithValue[1]);
+      readingRoot = false;
+      return;
+    }
+
+    if (/^중심\s*주제$/.test(stripInlineMarkdown(trimmed))) {
+      readingRoot = true;
+      readingConnection = false;
+      return;
+    }
+
+    if (readingRoot) {
+      root = stripInlineMarkdown(trimmed);
+      readingRoot = false;
+      return;
+    }
+
+    if (/^주요\s*가지$/.test(stripInlineMarkdown(trimmed))) {
+      readingConnection = false;
+      return;
+    }
+
+    if (/^핵심\s*연결$/.test(stripInlineMarkdown(trimmed))) {
+      currentBranch = { title: "핵심 연결", children: [] };
+      branches.push(currentBranch);
+      readingConnection = true;
+      return;
+    }
+
+    const bullet = rawLine.match(/^(\s*)[-*•]\s+(.+)$/);
+    const numbered = rawLine.match(/^(\s*)\d+[.)]\s+(.+)$/);
+    const item = bullet || numbered;
+
+    if (item) {
+      const indent = item[1].replace(/\t/g, "  ").length;
+      const value = stripInlineMarkdown(item[2]);
+      if (!value) return;
+
+      if (indent >= 2 || readingConnection) {
+        if (!currentBranch) {
+          currentBranch = { title: "세부 내용", children: [] };
+          branches.push(currentBranch);
+        }
+        currentBranch.children.push(value);
+        return;
+      }
+
+      currentBranch = { title: value, children: [] };
+      branches.push(currentBranch);
+      return;
+    }
+
+    if (!root && !/^(마인드맵|요약|주요\s*가지|핵심\s*연결)$/.test(stripInlineMarkdown(trimmed))) {
+      root = stripInlineMarkdown(trimmed);
+    }
+  });
+
+  const fallbackLines = lines
+    .map(line => stripInlineMarkdown(line))
+    .filter(line => line && line !== root && !/^(중심\s*주제|주요\s*가지|핵심\s*연결)$/.test(line));
+
+  const cleanedBranches = branches
+    .filter(branch => branch.title && branch.title !== root)
+    .map(branch => ({
+      title: branch.title,
+      children: branch.children.filter(Boolean).slice(0, 4),
+    }))
+    .slice(0, 8);
+
+  if (cleanedBranches.length === 0) {
+    cleanedBranches.push(
+      ...fallbackLines.slice(0, 6).map(line => ({ title: line, children: [] })),
+    );
+  }
+
+  return {
+    root: root || "핵심 주제",
+    branches: cleanedBranches.length > 0 ? cleanedBranches : [{ title: "핵심 내용", children: [] }],
+  };
+};
+
+const MindMapView = ({ content }: { content: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [showChildren, setShowChildren] = useState(true);
+  const mindMap = parseMindMap(content);
+  const branches = mindMap.branches;
+  const childSpacing = 56;
+  const branchGap = 30;
+  const rootNode = { x: 18, w: 150, h: 44 };
+  const mainNode = { x: 288, w: 192, h: 46 };
+  const childNode = { x: 654, w: 250, h: 42 };
+  const blockHeights = branches.map(branch => {
+    const childCount = showChildren ? Math.max(branch.children.length, 1) : 1;
+    return Math.max(58, childCount * childSpacing);
+  });
+  const canvasHeight = Math.max(500, blockHeights.reduce((sum, height) => sum + height + branchGap, 92));
+  const canvasWidth = 950;
+  const rootY = canvasHeight / 2 - rootNode.h / 2;
+  const branchOffsets = blockHeights.map((_, index) => (
+    70 + blockHeights.slice(0, index).reduce((sum, height) => sum + height + branchGap, 0)
+  ));
+
+  const rows = branches.map((branch, index) => {
+    const blockHeight = blockHeights[index];
+    const cursorY = branchOffsets[index];
+    const mainY = cursorY + blockHeight / 2 - mainNode.h / 2;
+    const children = showChildren ? branch.children : [];
+    const childStartY = cursorY + (blockHeight - Math.max(children.length, 1) * childSpacing) / 2;
+    const childRows = children.map((child, childIndex) => ({
+      title: child,
+      y: childStartY + childIndex * childSpacing + (childSpacing - childNode.h) / 2,
+    }));
+    return { branch, mainY, childRows };
+  });
+
+  const nodeStyle = (tone: "root" | "branch" | "child", x: number, y: number, w: number, h: number): CSSProperties => {
+    const tones = {
+      root: { background: "#EFE8FF", border: "#D6C9FF", color: "#5B49A1" },
+      branch: { background: "#F0F0F0", border: "#D9D9D9", color: "#333333" },
+      child: { background: "#BFE4E2", border: "#A7D4D1", color: "#285A58" },
+    };
+    const selected = tones[tone];
+    return {
+      position: "absolute",
+      left: x,
+      top: y,
+      width: w,
+      minHeight: h,
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: `1px solid ${selected.border}`,
+      background: selected.background,
+      color: selected.color,
+      boxSizing: "border-box",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      textAlign: "center",
+      fontSize: 13,
+      fontWeight: 800,
+      lineHeight: 1.35,
+      boxShadow: "0 1px 3px rgba(15, 23, 42, 0.12)",
+      wordBreak: "keep-all",
+      overflowWrap: "break-word",
+      zIndex: 2,
+    };
+  };
+
+  const dotStyle = (x: number, y: number, tone: "root" | "branch"): CSSProperties => ({
+    position: "absolute",
+    left: x,
+    top: y,
+    width: 24,
+    height: 24,
+    borderRadius: "50%",
+    border: tone === "root" ? "1px solid #D6C9FF" : "1px solid #D7DEE6",
+    background: tone === "root" ? "#EFE8FF" : "#EFF3F6",
+    color: tone === "root" ? "#6A55B5" : "#52606D",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 14,
+    fontWeight: 800,
+    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.12)",
+    zIndex: 3,
+  });
+
+  const toolButtonStyle: CSSProperties = {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    border: "1px solid #E5E7EB",
+    background: "#fff",
+    color: "#333",
+    fontSize: 22,
+    fontWeight: 800,
+    lineHeight: 1,
+    cursor: "pointer",
+    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.12)",
+  };
+
+  const downloadMindMap = () => {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "mindmap-summary.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{
+      position: "relative",
+      minHeight: expanded ? 660 : 520,
+      maxHeight: expanded ? "none" : 560,
+      overflow: "auto",
+      borderRadius: 12,
+      border: "1px solid #ECECEC",
+      background: "#fff",
+    }}>
+      <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 10, zIndex: 5 }}>
+        <button type="button" title={expanded ? "작게 보기" : "크게 보기"} onClick={() => setExpanded(value => !value)} style={toolButtonStyle}>
+          {expanded ? "↙" : "↗"}
+        </button>
+        <button type="button" title="마인드맵 텍스트 다운로드" onClick={downloadMindMap} style={toolButtonStyle}>
+          ↓
+        </button>
+      </div>
+
+      <button
+        type="button"
+        title={showChildren ? "하위 노드 접기" : "하위 노드 펼치기"}
+        onClick={() => setShowChildren(value => !value)}
+        style={{ ...toolButtonStyle, position: "absolute", right: 16, bottom: 16, zIndex: 5 }}
+      >
+        {showChildren ? "⌃" : "⌄"}
+      </button>
+
+      <div style={{ position: "relative", width: canvasWidth, height: canvasHeight, margin: "0 auto" }}>
+        <svg width={canvasWidth} height={canvasHeight} style={{ position: "absolute", inset: 0, zIndex: 1 }}>
+          {rows.map((row, index) => {
+            const startX = rootNode.x + rootNode.w;
+            const startY = rootY + rootNode.h / 2;
+            const endX = mainNode.x;
+            const endY = row.mainY + mainNode.h / 2;
+            return (
+              <path
+                key={`root-${index}`}
+                d={`M ${startX} ${startY} C ${startX + 70} ${startY}, ${endX - 120} ${endY}, ${endX} ${endY}`}
+                fill="none"
+                stroke="#BFC8D4"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+              />
+            );
+          })}
+          {rows.flatMap((row, branchIndex) => row.childRows.map((child, childIndex) => {
+            const startX = mainNode.x + mainNode.w;
+            const startY = row.mainY + mainNode.h / 2;
+            const endX = childNode.x;
+            const endY = child.y + childNode.h / 2;
+            return (
+              <path
+                key={`child-${branchIndex}-${childIndex}`}
+                d={`M ${startX} ${startY} C ${startX + 80} ${startY}, ${endX - 120} ${endY}, ${endX} ${endY}`}
+                fill="none"
+                stroke="#BFC8D4"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+              />
+            );
+          }))}
+        </svg>
+
+        <div style={nodeStyle("root", rootNode.x, rootY, rootNode.w, rootNode.h)}>
+          {mindMap.root}
+        </div>
+        <span style={dotStyle(rootNode.x + rootNode.w + 8, rootY + 10)}>‹</span>
+
+        {rows.map((row, index) => (
+          <div key={`branch-node-${index}`}>
+            <div style={nodeStyle("branch", mainNode.x, row.mainY, mainNode.w, mainNode.h)}>
+              {row.branch.title}
+            </div>
+            {row.branch.children.length > 0 && (
+              <span style={dotStyle(mainNode.x + mainNode.w + 8, row.mainY + 11)}>{showChildren ? "‹" : "›"}</span>
+            )}
+            {row.childRows.map((child, childIndex) => (
+              <div key={`child-node-${index}-${childIndex}`} style={nodeStyle("child", childNode.x, child.y, childNode.w, childNode.h)}>
+                {child.title}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -268,7 +574,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             background: "#fafafa", borderRadius: 12, padding: 24,
             fontSize: 14, color: "#444", lineHeight: 1.8
           }}>
-            <FormattedAiText content={displayContent} />
+            {template === "MINDMAP" ? <MindMapView content={displayContent} /> : <FormattedAiText content={displayContent} />}
           </div>
         )}
 
