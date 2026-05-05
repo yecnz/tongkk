@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -239,7 +239,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             <span style={{ fontSize: 13, color: "#aaa", marginLeft: 8 }}>AI가 요약 중...</span>
           )}
           {!isLoading && elapsedTime && (
-            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>⏱ {elapsedTime}초</span>
+            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>{elapsedTime}초</span>
           )}
         </div>
 
@@ -454,6 +454,17 @@ export default function Summary() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [agentThreadId, setAgentThreadId] = useState("");
+  const [markdownSaved, setMarkdownSaved] = useState(false);
+
+  // 과목 선택 + 마크다운 둘 다 있으면 localStorage에 저장
+  useEffect(() => {
+    if (selectedCourse && extractedMarkdown) {
+      localStorage.setItem(`tongkk:markdown:${selectedCourse}`, extractedMarkdown);
+      setMarkdownSaved(true);
+    } else {
+      setMarkdownSaved(false);
+    }
+  }, [selectedCourse, extractedMarkdown]);
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList) return;
@@ -599,7 +610,7 @@ export default function Summary() {
                 >
                   <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,image/*"
                     onChange={e => handleFiles(e.target.files)} style={{ display: "none" }} />
-                  <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>📄</div>
+                  <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>—</div>
                   <p style={{ margin: 0, fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
@@ -623,18 +634,24 @@ export default function Summary() {
                       width: 18, height: 18, border: `2px solid ${PINK}`, borderTop: "2px solid transparent",
                       borderRadius: "50%", animation: "spin 0.8s linear infinite"
                     }}/>
-                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>📄 PDF 분석 중...</span>
+                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>PDF 분석 중...</span>
                   </div>
                 )}
                 {!isExtracting && extractedMarkdown && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
-                    <span style={{ fontSize: 13 }}>✅</span>
-                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 생성 가능</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "8px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 생성 가능</span>
+                    </div>
+                    {markdownSaved ? (
+                      <span style={{ fontSize: 12, color: CYAN, marginLeft: 2 }}>{selectedCourse}에 자료 저장됨</span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#aaa", marginLeft: 2 }}>위에서 과목을 선택하면 자료가 저장됩니다</span>
+                    )}
                   </div>
                 )}
                 {extractError && (
                   <div style={{ padding: "8px 0", fontSize: 12, color: "#E53E3E" }}>
-                    ⚠️ 분석 실패: {extractError}
+                    분석 실패: {extractError}
                   </div>
                 )}
 

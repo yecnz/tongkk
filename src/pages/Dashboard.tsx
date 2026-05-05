@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -180,14 +180,27 @@ export default function Dashboard() {
   const { courses, addCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
-  const [community, setCommunity] = useState<CommunityInfo | null>(null);
-  const [ddays, setDdays] = useState<Dday[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [community, setCommunity] = useState<CommunityInfo | null>(() => {
+    try { const v = localStorage.getItem("tongkk:community"); return v ? JSON.parse(v) as CommunityInfo : null; } catch { return null; }
+  });
+  const [ddays, setDdays] = useState<Dday[]>(() => {
+    try { return JSON.parse(localStorage.getItem("tongkk:ddays") || "[]") as Dday[]; } catch { return []; }
+  });
+  const [plans, setPlans] = useState<Plan[]>(() => {
+    try { return JSON.parse(localStorage.getItem("tongkk:plans") || "[]") as Plan[]; } catch { return []; }
+  });
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showAddDday, setShowAddDday] = useState(false);
   const [showAllDdays, setShowAllDdays] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
+
+  useEffect(() => { localStorage.setItem("tongkk:ddays", JSON.stringify(ddays)); }, [ddays]);
+  useEffect(() => { localStorage.setItem("tongkk:plans", JSON.stringify(plans)); }, [plans]);
+  useEffect(() => {
+    if (community) localStorage.setItem("tongkk:community", JSON.stringify(community));
+    else localStorage.removeItem("tongkk:community");
+  }, [community]);
 
   const getDaysLeft = (dateStr: string) => {
     const t = new Date(dateStr); const n = new Date();
@@ -366,7 +379,7 @@ export default function Dashboard() {
                       background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
                       alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
                     }}>
-                      {p.done && <span style={{ color: "#fff", fontSize: 12 }}>✓</span>}
+                      {p.done && <span style={{ color: "#fff", fontSize: 12 }}>v</span>}
                     </button>
                     <span style={{
                       fontSize: 14, color: p.done ? "#bbb" : "#444",

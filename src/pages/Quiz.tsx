@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -32,13 +32,24 @@ export default function Quiz() {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cachedMarkdown, setCachedMarkdown] = useState<string | undefined>(undefined);
+
+  // 과목 선택 시 localStorage에서 마크다운 자동 로드
+  useEffect(() => {
+    if (subject) {
+      const stored = localStorage.getItem(`tongkk:markdown:${subject}`);
+      setCachedMarkdown(stored ?? undefined);
+    } else {
+      setCachedMarkdown(undefined);
+    }
+  }, [subject]);
 
   const generate = async () => {
     if (!subject.trim()) return;
     setStep("generating");
     setError(null);
     try {
-      const questions = await generateQuiz(subject, count, difficulty);
+      const questions = await generateQuiz(subject, count, difficulty, cachedMarkdown);
       setQuizzes(questions);
       setCurrent(0);
       setAnswers({});
@@ -88,15 +99,27 @@ export default function Quiz() {
             <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>과목명</label>
             {courses.length > 0 ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-                {courses.map((c, i) => (
-                  <button key={i} onClick={() => setSubject(c)} style={{
-                    padding: "9px 18px", borderRadius: 10,
-                    border: subject === c ? "none" : "1px solid #e0e0e0",
-                    background: subject === c ? PINK : "#fafafa",
-                    color: subject === c ? "#fff" : "#444",
-                    fontSize: 14, fontWeight: subject === c ? 600 : 400, cursor: "pointer"
-                  }}>{c}</button>
-                ))}
+                {courses.map((c, i) => {
+                  const hasMarkdown = !!localStorage.getItem(`tongkk:markdown:${c}`);
+                  return (
+                    <button key={i} onClick={() => setSubject(c)} style={{
+                      padding: "9px 18px", borderRadius: 10, position: "relative",
+                      border: subject === c ? "none" : "1px solid #e0e0e0",
+                      background: subject === c ? PINK : "#fafafa",
+                      color: subject === c ? "#fff" : "#444",
+                      fontSize: 14, fontWeight: subject === c ? 600 : 400, cursor: "pointer"
+                    }}>
+                      {c}
+                      {hasMarkdown && (
+                        <span style={{
+                          position: "absolute", top: -5, right: -5,
+                          width: 10, height: 10, borderRadius: "50%",
+                          background: CYAN, border: "2px solid #fff"
+                        }} title="강의자료 있음" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="예: 알고리즘" style={{
@@ -147,7 +170,7 @@ export default function Quiz() {
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 48, height: 48, border: "3px solid #f0f0f0", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
           <p style={{ fontSize: 16, fontWeight: 600, color: "#333" }}>AI가 퀴즈를 생성하고 있습니다...</p>
-          <p style={{ fontSize: 13, color: "#999" }}>{subject} · {count}문제 · {difficulty}</p>
+          <p style={{ fontSize: 13, color: "#999" }}>{subject} · {count}문제 · {difficulty}{cachedMarkdown ? " · 강의자료 반영" : ""}</p>
           <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
         </div>
       </div>
@@ -220,8 +243,8 @@ export default function Quiz() {
                 }}>
                   <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
                   {opt}
-                  {answered && isCorrect && <span style={{ float: "right" }}>✓</span>}
-                  {answered && isSelected && !isCorrect && <span style={{ float: "right" }}>✗</span>}
+                  {answered && isCorrect && <span style={{ float: "right" }}>O</span>}
+                  {answered && isSelected && !isCorrect && <span style={{ float: "right" }}>X</span>}
                 </button>
               );
             })}
