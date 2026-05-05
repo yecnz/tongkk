@@ -28,12 +28,13 @@ app.add_middleware(
 
 md_converter = MarkItDown()
 
-SummaryTemplate = Literal["GENERAL", "LECTURE_NOTE", "MINDMAP"]
+SummaryTemplate = Literal["GENERAL", "LECTURE_NOTE", "MINDMAP", "CHEAT_SHEET"]
 
 TEMPLATE_LABELS: dict[str, str] = {
     "GENERAL": "일반 요약",
     "LECTURE_NOTE": "강의 노트",
     "MINDMAP": "마인드맵",
+    "CHEAT_SHEET": "치트시트",
 }
 
 TEMPLATE_INSTRUCTIONS: dict[str, str] = {
@@ -50,6 +51,12 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - 주요 가지, 하위 가지, 연결 관계 순서로 구조화해.
 - 각 가지는 짧은 bullet point로 작성하고, 핵심 개념 간 관계가 보이게 정리해.
 - 실제 시각적 마인드맵으로 옮기기 쉽게 계층 구조를 명확히 해.""",
+    "CHEAT_SHEET": """치트시트 형식으로 작성해.
+- 시험 직전 빠르게 훑을 수 있는 압축 암기표로 구성해.
+- 핵심 공식, 정의, 비교, 조건, 예외, 암기 포인트를 짧은 bullet point로 정리해.
+- 중요한 용어는 반드시 **굵게** 표시해.
+- 긴 문단보다 한 줄 설명과 비교형 bullet을 우선해.
+- 원문에 있는 열거형 항목은 빠뜨리지 말고 개수와 항목명을 보존해.""",
 }
 
 SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿으로 요약해줘.

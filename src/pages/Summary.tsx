@@ -19,6 +19,7 @@ const templateLabels: Record<SummaryTemplate, string> = {
   GENERAL: "일반 요약",
   LECTURE_NOTE: "강의 노트",
   MINDMAP: "마인드맵",
+  CHEAT_SHEET: "치트시트",
 };
 
 const FileIcon = ({ type }: FileIconProps) => {
@@ -53,6 +54,10 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
   MINDMAP: {
     title: "마인드맵",
     content: "중심 주제\n**동적 프로그래밍**\n\n주요 가지\n- **적용 조건**\n  - 최적 부분 구조\n  - 중복 부분 문제\n- **구현 방식**\n  - 메모이제이션\n  - 타뷸레이션\n- **대표 문제**\n  - 피보나치\n  - 배낭 문제\n  - LCS\n\n핵심 연결\n- 반복 계산을 줄이면 시간 복잡도를 개선할 수 있습니다.",
+  },
+  CHEAT_SHEET: {
+    title: "치트시트",
+    content: "빠른 암기표\n- **DP 적용 조건**: 최적 부분 구조, 중복 부분 문제\n- **Top-down**: 재귀 + 메모이제이션\n- **Bottom-up**: 반복문 + 테이블\n\n자주 나오는 비교\n- **메모이제이션**: 필요한 값만 계산, 재귀 호출 사용\n- **타뷸레이션**: 작은 문제부터 순서대로 계산, 반복문 사용\n\n시험 직전 체크\n- DP 조건 2가지를 말할 수 있는가?\n- 대표 문제와 구현 방식을 연결할 수 있는가?",
   },
 };
 
@@ -140,6 +145,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
     { key: "GENERAL", name: "일반 요약", desc: "핵심 내용과 결론을 빠르게 정리", accent: "#555" },
     { key: "LECTURE_NOTE", name: "강의 노트", desc: "개념, 흐름, 시험 포인트를 구조화", accent: PINK },
     { key: "MINDMAP", name: "마인드맵", desc: "중심 주제와 하위 개념의 관계를 구조화", accent: CYAN },
+    { key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 빠르게 보는 암기표", accent: "#7C3AED" },
   ];
 
   return (
@@ -153,7 +159,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
         <p style={{ margin: 0, fontSize: 13, color: "#999" }}>요약 결과를 어떤 형식으로 만들지 선택하세요</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {templates.map(t => (
           <Card key={t.key} style={{ padding: 0, overflow: "hidden" }}>
             <button onClick={() => onSelect(t.key)} style={{
@@ -221,8 +227,8 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <span style={{
             padding: "4px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-            background: template === "GENERAL" ? "#f5f5f5" : template === "LECTURE_NOTE" ? "#FFF0F6" : "#E8FAFE",
-            color: template === "GENERAL" ? "#555" : template === "LECTURE_NOTE" ? PINK : CYAN
+            background: template === "GENERAL" ? "#f5f5f5" : template === "LECTURE_NOTE" ? "#FFF0F6" : template === "MINDMAP" ? "#E8FAFE" : "#F2EEFF",
+            color: template === "GENERAL" ? "#555" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "#7C3AED"
           }}>{templateLabels[template]}</span>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#222" }}>
             {templateLabels[template]} 요약
