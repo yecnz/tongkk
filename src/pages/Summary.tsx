@@ -1,5 +1,5 @@
 import { useState, useRef, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
@@ -11,6 +11,7 @@ type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type SummarySample = { title: string; content: string };
+type LocationState = { selectedCourse?: string } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string };
@@ -434,13 +435,15 @@ const QuizCreateView = ({ fileName, onBack }: QuizCreateViewProps) => {
 
 export default function Summary() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialCourse = ((location.state as LocationState)?.selectedCourse || "").trim();
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState("");
+  const [searched, setSearched] = useState(Boolean(initialCourse));
+  const [selectedCourse, setSelectedCourse] = useState(initialCourse);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [view, setView] = useState<SummaryView>("upload");
@@ -454,6 +457,29 @@ export default function Summary() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [agentThreadId, setAgentThreadId] = useState("");
+
+  const resetCourseSelection = () => {
+    setSelectedCourse("");
+    setFiles([]);
+    setDragOver(false);
+    setUploading(false);
+    setSearched(false);
+    setExtractedMarkdown("");
+    setIsExtracting(false);
+    setExtractError("");
+    navigate(pageRoutes["자료 요약"], { replace: true, state: null });
+  };
+
+  const handleCourseSelect = (course: string) => {
+    setSelectedCourse(course);
+    setFiles([]);
+    setDragOver(false);
+    setUploading(false);
+    setSearched(true);
+    setExtractedMarkdown("");
+    setIsExtracting(false);
+    setExtractError("");
+  };
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList) return;
@@ -538,29 +564,29 @@ export default function Summary() {
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "#bbb", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
       <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-        {courses.length > 0 && view === "upload" && (
+        {courses.length > 0 && view === "upload" && !selectedCourse && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ marginBottom: 12 }}>
               <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
               <p style={{ margin: 0, fontSize: 13, color: "#999" }}>자료를 정리할 과목을 선택하세요</p>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
               {courses.map((c, i) => (
                 <button
                   key={i}
-                  onClick={() => setSelectedCourse(selectedCourse === c ? "" : c)}
+                  onClick={() => handleCourseSelect(c)}
                   style={{
-                    minHeight: 92,
-                    padding: 18,
+                    minHeight: 170,
+                    padding: 22,
                     borderRadius: 14,
-                    border: selectedCourse === c ? `1.5px solid ${PINK}` : "1px solid #eeeeee",
-                    background: selectedCourse === c ? "#FFF0F6" : "#fff",
-                    boxShadow: selectedCourse === c ? "0 4px 18px rgba(240,112,174,0.16)" : "0 1px 4px rgba(0,0,0,0.04)",
+                    border: "1px solid #eeeeee",
+                    background: "#fff",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                     color: "#222",
                     cursor: "pointer",
                     textAlign: "left",
@@ -576,8 +602,8 @@ export default function Summary() {
                       width: 22,
                       height: 22,
                       borderRadius: "50%",
-                      background: selectedCourse === c ? PINK : "#f2f2f2",
-                      color: selectedCourse === c ? "#fff" : "#bbb",
+                      background: "#f2f2f2",
+                      color: "#bbb",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -585,16 +611,15 @@ export default function Summary() {
                       fontWeight: 800,
                       flexShrink: 0,
                     }}>
-                      {selectedCourse === c ? "✓" : ""}
                     </span>
                   </div>
                   <span style={{
                     marginTop: 14,
                     fontSize: 12,
                     fontWeight: 600,
-                    color: selectedCourse === c ? PINK : "#aaa",
+                    color: "#aaa",
                   }}>
-                    {selectedCourse === c ? "선택됨" : "선택하기"}
+                    선택하기
                   </span>
                 </button>
               ))}
@@ -623,8 +648,12 @@ export default function Summary() {
           <QuizCreateView fileName={files[0]?.name} onBack={() => setView("upload")} />
         )}
 
-        {view === "upload" && (
-          <div style={{ display: "grid", gridTemplateColumns: files.length > 0 && searched ? "380px 1fr" : "1fr", gap: 28 }}>
+        {view === "upload" && selectedCourse && (
+          <div>
+            <button onClick={resetCourseSelection} style={{
+              background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+            }}>← 과목 선택으로</button>
+            <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>
                 <div
@@ -703,7 +732,7 @@ export default function Summary() {
               </Card>
             </div>
 
-            {files.length > 0 && searched && (
+            {searched && (
               <div>
                 <Card style={{ padding: 24 }}>
                   <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 700, color: "#222", textAlign: "center" }}>
@@ -750,6 +779,7 @@ export default function Summary() {
                 </Card>
               </div>
             )}
+            </div>
           </div>
         )}
       </div>

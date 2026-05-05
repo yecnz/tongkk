@@ -4,7 +4,7 @@ import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 
 type QuizQuestion = { id: number; question: string; options: string[]; answer: number; explanation: string };
-type HeaderProps = { label: string; onOpenSidebar: () => void; extra?: ReactNode };
+type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
 const sampleQuizzes: QuizQuestion[] = [
   { id: 1, question: "시간 복잡도 O(n log n)을 가지는 정렬 알고리즘은?", options: ["버블 정렬", "퀵 정렬", "선택 정렬", "삽입 정렬"], answer: 1, explanation: "퀵 정렬의 평균 시간 복잡도는 O(n log n)입니다." },
@@ -14,13 +14,13 @@ const sampleQuizzes: QuizQuestion[] = [
   { id: 5, question: "해시 충돌 해결 방법이 아닌 것은?", options: ["체이닝", "개방 주소법", "이중 해싱", "깊이 우선 탐색"], answer: 3, explanation: "깊이 우선 탐색(DFS)은 그래프 탐색 알고리즘으로, 해시 충돌 해결과 무관합니다." }
 ];
 
-const Header = ({ label, onOpenSidebar, extra }: HeaderProps) => (
+const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <button onClick={onOpenSidebar} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
-      <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+      <button onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       <span style={{ color: "#bbb", fontSize: 14 }}>/ {label}</span>
     </div>
     {extra}
@@ -72,7 +72,7 @@ export default function Quiz() {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 500, margin: "40px auto" }}>
           <Card style={{ padding: 32 }}>
             <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700, color: "#222", textAlign: "center" }}>퀴즈 생성</h2>
@@ -135,7 +135,7 @@ export default function Quiz() {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} />
+        <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 500, margin: "40px auto", textAlign: "center" }}>
           <Card style={{ padding: 40 }}>
             <div style={{
@@ -169,7 +169,7 @@ export default function Quiz() {
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
-      <Header label={`${subject} 퀴즈`} onOpenSidebar={() => setSidebar(true)}
+      <Header label={`${subject} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={<span style={{ fontSize: 14, fontWeight: 600, color: "#999" }}>{current + 1} / {quizzes.length}</span>} />
       <div style={{ height: 3, background: "#f0f0f0" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
