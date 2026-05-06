@@ -11,10 +11,11 @@ type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type SummarySample = { title: string; content: string };
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
 type LocationState = { selectedCourse?: string } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; onGoToQuiz?: () => void };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void };
 
 const templateLabels: Record<SummaryTemplate, string> = {
@@ -190,7 +191,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -289,6 +290,12 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
               padding: "10px 24px", borderRadius: 10, border: "1px solid #e0e0e0",
               background: "#fff", color: "#555", fontSize: 14, cursor: "pointer"
             }}>다운로드</button>
+            {realContent && !error && onGoToQuiz && (
+              <button onClick={onGoToQuiz} style={{
+                padding: "10px 24px", borderRadius: 10, border: "none",
+                background: PINK, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer"
+              }}>퀴즈 생성하기</button>
+            )}
           </div>
         )}
 
@@ -548,6 +555,12 @@ export default function Summary() {
         const response = await summarizeWithTemplate(extractedMarkdown, template);
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
+        if (selectedCourse) {
+          const key = `tongkk:summary:${selectedCourse}`;
+          const prev: SavedSummary[] = JSON.parse(localStorage.getItem(key) || '[]');
+          const updated = [...prev.filter(s => s.template !== template), { template, content: response.result, createdAt: Date.now() }];
+          localStorage.setItem(key, JSON.stringify(updated));
+        }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
         setSummaryError(err instanceof Error ? err.message : "요약 실패");
@@ -560,6 +573,10 @@ export default function Summary() {
       setSummaryText("");
       setView("summaryResult");
     }
+  };
+
+  const handleGoToQuiz = () => {
+    navigate(pageRoutes["퀴즈 생성"], { state: { course: selectedCourse, template: selectedTemplate } });
   };
 
   return (
@@ -645,6 +662,7 @@ export default function Summary() {
             loadingStep={loadingStep}
             elapsedTime={elapsedTime}
             threadId={agentThreadId}
+            onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
           />
         )}
 

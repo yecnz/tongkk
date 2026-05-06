@@ -1,10 +1,16 @@
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-load_dotenv()
+
+SERVER_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SERVER_DIR.parent
+
+load_dotenv(SERVER_DIR / ".env")
+load_dotenv(PROJECT_ROOT / ".env.local")
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
@@ -108,6 +114,7 @@ class QuizRequest(BaseModel):
     subject: str = Field(min_length=1)
     count: int = Field(default=10, ge=1, le=30)
     difficulty: Literal["쉬움", "보통", "어려움"] = "보통"
+    question_type: Literal["객관식", "OX", "단답형"] = "객관식"
     model: Literal["GPT", "Gemini"] = "GPT"
     markdown: str | None = None
 
@@ -115,20 +122,45 @@ class QuizRequest(BaseModel):
 QUIZ_SYSTEM_PROMPT = """너는 대학 강의자료 기반 퀴즈 출제 전문가다.
 반드시 순수 JSON 배열만 출력해. 설명, 코드 블록, 마크다운, 기타 텍스트 없이 JSON 배열만 출력해.
 
-출력 형식 (정확히 이 구조):
-[{"question":"문제","options":["선택지1","선택지2","선택지3","선택지4"],"answer":0,"explanation":"해설"}]
-
-규칙:
-- answer는 정답 선택지의 인덱스 (0~3 정수)
-- 각 문항은 반드시 선택지 4개
-- 해설은 한 문장으로 간결하게
+공통 규칙:
+- 각 문항은 question, type, explanation을 포함한다.
+- explanation은 한 문장으로 간결하게 작성한다.
+- 자료가 있으면 자료에 나온 정의, 비교, 열거형 항목, 장단점을 우선 출제한다.
+- 자료에 없는 사실을 정답 근거로 쓰지 않는다.
 - JSON 외 어떤 텍스트도 출력 금지"""
 
 QUIZ_USER_PROMPT = """과목: {subject}
 문항 수: {count}
 난이도: {difficulty}
+문항 유형: {question_type}
 {markdown_section}
-위 조건에 맞는 4지선다 문제 {count}개를 JSON 배열로만 출력해."""
+위 조건에 맞는 문제 {count}개를 JSON 배열로만 출력해."""
+
+
+def quiz_format_instruction(question_type: str) -> str:
+    if question_type == "OX":
+        return """출력 형식 (정확히 이 구조):
+[{"type":"OX","question":"문제","options":["O","X"],"answer":0,"explanation":"해설"}]
+
+OX 규칙:
+- options는 반드시 ["O","X"]로 고정한다.
+- answer는 정답 선택지의 인덱스다. O가 정답이면 0, X가 정답이면 1."""
+
+    if question_type == "단답형":
+        return """출력 형식 (정확히 이 구조):
+[{"type":"단답형","question":"문제","answerText":"정답","explanation":"해설"}]
+
+단답형 규칙:
+- options와 answer 필드는 넣지 않는다.
+- answerText는 사용자가 직접 입력할 짧은 정답이다.
+- answerText는 핵심 용어 또는 짧은 구문으로 작성한다."""
+
+    return """출력 형식 (정확히 이 구조):
+[{"type":"객관식","question":"문제","options":["선택지1","선택지2","선택지3","선택지4"],"answer":0,"explanation":"해설"}]
+
+객관식 규칙:
+- options는 반드시 선택지 4개다.
+- answer는 정답 선택지의 인덱스다. 0~3 정수로 작성한다."""
 
 
 @app.post("/convert")
@@ -196,13 +228,17 @@ async def generate_quiz(req: QuizRequest):
         subject=req.subject,
         count=req.count,
         difficulty=req.difficulty,
+        question_type=req.question_type,
         markdown_section=markdown_section,
     )
 
     def _call_llm():
         llm = build_llm(req.model)
         from langchain_core.messages import HumanMessage, SystemMessage
-        response = llm.invoke([SystemMessage(content=QUIZ_SYSTEM_PROMPT), HumanMessage(content=prompt)])
+        response = llm.invoke([
+            SystemMessage(content=f"{QUIZ_SYSTEM_PROMPT}\n\n{quiz_format_instruction(req.question_type)}"),
+            HumanMessage(content=prompt),
+        ])
         text = response.content if isinstance(response.content, str) else str(response.content)
         # strip markdown code fences if present
         text = text.strip()
