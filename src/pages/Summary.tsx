@@ -19,7 +19,7 @@ type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
 type LocationState = { selectedCourse?: string } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
@@ -54,6 +54,8 @@ const getFileType = (name: string): FileKind => {
 };
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
+const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -652,7 +654,10 @@ export default function Summary() {
         if (selectedCourse) {
           const key = `tongkk:summary:${selectedCourse}`;
           const prev: SavedSummary[] = JSON.parse(localStorage.getItem(key) || '[]');
-          const updated = [...prev.filter(s => s.template !== template), { template, content: response.result, createdAt: Date.now() }];
+          const updated = [
+            ...prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds))),
+            { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds },
+          ];
           localStorage.setItem(key, JSON.stringify(updated));
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));

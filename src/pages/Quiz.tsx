@@ -13,7 +13,7 @@ import {
 } from "../services/materials";
 
 type QuizView = "courseList" | "courseDetail" | "generating" | "quiz" | "result";
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
 type QuizSource = "raw" | SummaryTemplate;
 
 const sourceLabels: Record<string, string> = {
@@ -23,6 +23,9 @@ const sourceLabels: Record<string, string> = {
   MINDMAP: "마인드맵",
   CHEAT_SHEET: "치트시트",
 };
+
+const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
@@ -111,19 +114,25 @@ export default function Quiz() {
     const usable = summaries.filter(s => s.template !== "MINDMAP");
     setSavedSummaries(usable);
 
-    // 소스 기본값: pendingTemplate 우선, 없으면 LECTURE_NOTE > CHEAT_SHEET > GENERAL > raw
+    const pendingMaterialIds = pendingMaterialIdsRef.current;
+    pendingMaterialIdsRef.current = null;
+    const validPendingIds = pendingMaterialIds?.filter(id => courseMaterials.some(material => material.id === id)) || [];
+    const initialMaterialIds = validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id);
+    setSelectedMaterialIds(initialMaterialIds);
+
+    // 소스 기본값: 현재 선택 자료와 같은 요약만 사용. 예전 저장 데이터는 전체 자료 선택일 때만 호환.
+    const matchingSummaries = usable.filter(s =>
+      sameMaterialIds(s.materialIds, initialMaterialIds) ||
+      (!s.materialIds && sameMaterialIds(initialMaterialIds, courseMaterials.map(material => material.id)))
+    );
     const pt = pendingTemplateRef.current;
     pendingTemplateRef.current = null;
     const preferred: SummaryTemplate[] = ["LECTURE_NOTE", "CHEAT_SHEET", "GENERAL"];
     const defaultSrc: QuizSource =
-      pt && usable.some(s => s.template === pt)
+      pt && matchingSummaries.some(s => s.template === pt)
         ? pt
-        : (preferred.find(t => usable.some(s => s.template === t)) ?? "raw");
+        : (preferred.find(t => matchingSummaries.some(s => s.template === t)) ?? "raw");
     setSelectedSource(defaultSrc);
-    const pendingMaterialIds = pendingMaterialIdsRef.current;
-    pendingMaterialIdsRef.current = null;
-    const validPendingIds = pendingMaterialIds?.filter(id => courseMaterials.some(material => material.id === id)) || [];
-    setSelectedMaterialIds(validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id));
     setShowPreview(false);
     setUploadedFileName("");
     setExtractError("");
@@ -278,9 +287,20 @@ export default function Quiz() {
   }).length;
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const activeMarkdown = combineMaterialsMarkdown(selectedMaterials);
+  const matchingSummaries = savedSummaries.filter(s =>
+    sameMaterialIds(s.materialIds, selectedMaterialIds) ||
+    (!s.materialIds && sameMaterialIds(selectedMaterialIds, materials.map(material => material.id)))
+  );
   const sourceContent = selectedSource === "raw"
     ? activeMarkdown
-    : savedSummaries.find(s => s.template === selectedSource)?.content;
+    : matchingSummaries.find(s => s.template === selectedSource)?.content;
+
+  useEffect(() => {
+    if (selectedSource === "raw") return;
+    if (!matchingSummaries.some(s => s.template === selectedSource)) {
+      setSelectedSource("raw");
+    }
+  }, [matchingSummaries, selectedSource]);
 
   const handleNav = (item: PageRouteLabel) => {
     if (view === "quiz") {
@@ -480,12 +500,12 @@ export default function Quiz() {
             <Card style={{ padding: 24, marginBottom: 16 }}>
               <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#222" }}>퀴즈 생성 소스</h3>
 
-              {savedSummaries.length > 0 && (
+              {matchingSummaries.length > 0 && (
                 <>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-                    {savedSummaries.map(s => (
+                    {matchingSummaries.map(s => (
                       <button
-                        key={s.template}
+                        key={`${s.template}:${s.materialIds?.join("|") || "legacy"}`}
                         onClick={() => setSelectedSource(s.template)}
                         style={{
                           padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
