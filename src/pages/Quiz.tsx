@@ -4,6 +4,7 @@ import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel
 import { useCourses } from "../CourseContext";
 import { generateQuiz, type QuizQuestion, type QuizDifficulty, type QuizQuestionType, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
+import { getPdfPageCount } from "../services/pdfPageCount";
 import {
   combineMaterialsMarkdown,
   getCourseMaterials,
@@ -212,13 +213,16 @@ export default function Quiz() {
     setExtractError("");
     setMaterialNotice("");
     try {
-      const markdown = await extractMarkdownFromPDF(file);
+      const [markdown, pageCount] = await Promise.all([
+        extractMarkdownFromPDF(file),
+        getPdfPageCount(file),
+      ]);
       const material: CourseMaterial = {
         id: fileId,
         name: file.name,
         size: file.size,
         type: "pdf",
-        pages: null,
+        pages: pageCount,
         slides: null,
         markdown,
         updatedAt: Date.now(),

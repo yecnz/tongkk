@@ -4,6 +4,7 @@ import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
+import { getPdfPageCount } from "../services/pdfPageCount";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import { MindmapView, parseMindmapJson } from "../components/MindmapView";
 import {
@@ -573,12 +574,12 @@ export default function Summary() {
 
     await new Promise(res => setTimeout(res, 1200));
 
-    const nf = newFiles.map(f => ({
+    const nf = await Promise.all(newFiles.map(async f => ({
       name: f.name, size: f.size, type: getFileType(f.name),
-      pages: f.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
+      pages: f.type === "application/pdf" ? await getPdfPageCount(f) : null,
       slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
       rawFile: f,
-    }));
+    })));
     filesRef.current = [...filesRef.current, ...nf];
     setFiles(filesRef.current);
     setUploading(false);
