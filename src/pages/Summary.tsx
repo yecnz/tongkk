@@ -19,8 +19,8 @@ type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
-type LocationState = { selectedCourse?: string } | null;
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
+type LocationState = { selectedCourse?: string; fromDashboard?: boolean } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; onGoToQuiz?: () => void };
@@ -54,6 +54,8 @@ const getFileType = (name: string): FileKind => {
 };
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
+const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -454,6 +456,7 @@ export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
   const initialCourse = ((location.state as LocationState)?.selectedCourse || "").trim();
+  const fromDashboardRef = useRef(Boolean(initialCourse && (location.state as LocationState)?.fromDashboard));
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -507,6 +510,14 @@ export default function Summary() {
     setExtractError("");
     setDuplicateNotice(null);
     navigate(pageRoutes["자료 요약"], { replace: true, state: null });
+  };
+
+  const handleCourseBack = () => {
+    if (fromDashboardRef.current) {
+      navigate(pageRoutes["대시보드"]);
+      return;
+    }
+    resetCourseSelection();
   };
 
   const handleCourseSelect = (course: string) => {
@@ -652,7 +663,10 @@ export default function Summary() {
         if (selectedCourse) {
           const key = `tongkk:summary:${selectedCourse}`;
           const prev: SavedSummary[] = JSON.parse(localStorage.getItem(key) || '[]');
-          const updated = [...prev.filter(s => s.template !== template), { template, content: response.result, createdAt: Date.now() }];
+          const updated = [
+            ...prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds))),
+            { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds },
+          ];
           localStorage.setItem(key, JSON.stringify(updated));
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
@@ -672,8 +686,8 @@ export default function Summary() {
   const handleGoToQuiz = () => {
     navigate(pageRoutes["퀴즈 생성"], {
       state: selectedTemplate
-        ? { course: selectedCourse, template: selectedTemplate, materialIds: selectedMaterialIds }
-        : { course: selectedCourse, materialIds: selectedMaterialIds },
+        ? { course: selectedCourse, template: selectedTemplate, materialIds: selectedMaterialIds, fromDashboard: fromDashboardRef.current }
+        : { course: selectedCourse, materialIds: selectedMaterialIds, fromDashboard: fromDashboardRef.current },
     });
   };
 
@@ -835,9 +849,9 @@ export default function Summary() {
 
         {view === "upload" && selectedCourse && (
           <div>
-            <button onClick={resetCourseSelection} style={{
+            <button onClick={handleCourseBack} style={{
               background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-            }}>← 과목 선택으로</button>
+            }}>← 돌아가기</button>
             <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>
