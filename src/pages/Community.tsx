@@ -103,7 +103,7 @@ export default function Community() {
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "#bbb", fontSize: 14 }}>/ 커뮤니티</span>
       </div>
 

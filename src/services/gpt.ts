@@ -14,9 +14,13 @@ export async function generateQuiz(
   count: number,
   difficulty: QuizDifficulty,
   markdown?: string,
+  signal?: AbortSignal,
 ): Promise<QuizQuestion[]> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener('abort', onExternalAbort);
 
   try {
     const response = await fetch(`${BACKEND_URL}/quiz`, {
@@ -31,15 +35,37 @@ export async function generateQuiz(
       throw new Error(err.detail || `API 오류 (${response.status})`);
     }
 
-    const data = await response.json() as { questions: QuizQuestion[] };
-    return data.questions;
+    const data = await response.json() as { questions: unknown };
+
+    if (!Array.isArray(data.questions) || data.questions.length === 0) {
+      throw new Error('유효한 퀴즈 데이터를 받지 못했습니다.');
+    }
+
+    for (const q of data.questions) {
+      if (
+        !q.question ||
+        !Array.isArray(q.options) ||
+        q.options.length === 0 ||
+        typeof q.answer !== 'number' ||
+        q.answer < 0 ||
+        q.answer >= q.options.length
+      ) {
+        throw new Error('퀴즈 데이터 형식이 올바르지 않습니다.');
+      }
+    }
+
+    return data.questions as QuizQuestion[];
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
+      if (signal?.aborted) {
+        throw new Error('퀴즈 생성이 취소되었습니다.');
+      }
       throw new Error('퀴즈 생성 시간 초과. 다시 시도해주세요.');
     }
     throw err;
   } finally {
     clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onExternalAbort);
   }
 }
 

@@ -232,7 +232,7 @@ export default function Dashboard() {
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       </div>
 
       {/* Content */}
@@ -263,7 +263,7 @@ export default function Dashboard() {
                         <div style={{ display: "flex", gap: 8 }}>
                           {["요약", "퀴즈", "커뮤니티"].map(btn => (
                             <button key={btn} onClick={() => {
-                              if (btn === "요약") navigate(pageRoutes["자료 요약"]);
+                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c } });
                               else if (btn === "퀴즈") navigate(pageRoutes["퀴즈"]);
                               else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
                             }} style={{

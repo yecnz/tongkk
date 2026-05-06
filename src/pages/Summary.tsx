@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
@@ -11,6 +11,7 @@ type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type SummarySample = { title: string; content: string };
+type LocationState = { selectedCourse?: string } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string };
@@ -434,13 +435,15 @@ const QuizCreateView = ({ fileName, onBack }: QuizCreateViewProps) => {
 
 export default function Summary() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialCourse = ((location.state as LocationState)?.selectedCourse || "").trim();
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState("");
+  const [searched, setSearched] = useState(Boolean(initialCourse));
+  const [selectedCourse, setSelectedCourse] = useState(initialCourse);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [view, setView] = useState<SummaryView>("upload");
@@ -454,17 +457,36 @@ export default function Summary() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [agentThreadId, setAgentThreadId] = useState("");
-  const [markdownSaved, setMarkdownSaved] = useState(false);
 
-  // 과목 선택 + 마크다운 둘 다 있으면 localStorage에 저장
+  // 과목 + 마크다운이 모두 있으면 localStorage에 자동 저장
   useEffect(() => {
     if (selectedCourse && extractedMarkdown) {
       localStorage.setItem(`tongkk:markdown:${selectedCourse}`, extractedMarkdown);
-      setMarkdownSaved(true);
-    } else {
-      setMarkdownSaved(false);
     }
   }, [selectedCourse, extractedMarkdown]);
+
+  const resetCourseSelection = () => {
+    setSelectedCourse("");
+    setFiles([]);
+    setDragOver(false);
+    setUploading(false);
+    setSearched(false);
+    setExtractedMarkdown("");
+    setIsExtracting(false);
+    setExtractError("");
+    navigate(pageRoutes["자료 요약"], { replace: true, state: null });
+  };
+
+  const handleCourseSelect = (course: string) => {
+    setSelectedCourse(course);
+    setFiles([]);
+    setDragOver(false);
+    setUploading(false);
+    setSearched(true);
+    setExtractedMarkdown("");
+    setIsExtracting(false);
+    setExtractError("");
+  };
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList) return;
@@ -549,25 +571,63 @@ export default function Summary() {
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "#bbb", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
       <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-        {courses.length > 0 && view === "upload" && (
-          <div style={{ marginBottom: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#555", marginRight: 12 }}>과목 선택</span>
-            <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 8 }}>
-              {courses.map((c, i) => (
-                <button key={i} onClick={() => setSelectedCourse(selectedCourse === c ? "" : c)} style={{
-                  padding: "7px 16px", borderRadius: 20,
-                  border: selectedCourse === c ? "none" : "1px solid #e0e0e0",
-                  background: selectedCourse === c ? PINK : "#fafafa",
-                  color: selectedCourse === c ? "#fff" : "#555",
-                  fontSize: 13, fontWeight: selectedCourse === c ? 600 : 400, cursor: "pointer"
-                }}>{c}</button>
-              ))}
-            </span>
+        {courses.length > 0 && view === "upload" && !selectedCourse && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 12 }}>
+              <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
+              <p style={{ margin: 0, fontSize: 13, color: "#999" }}>자료를 정리할 과목을 선택하세요</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+              {courses.map((c, i) => {
+                const hasMarkdown = !!localStorage.getItem(`tongkk:markdown:${c}`);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleCourseSelect(c)}
+                    style={{
+                      minHeight: 170,
+                      padding: 22,
+                      borderRadius: 14,
+                      border: "1px solid #eeeeee",
+                      background: "#fff",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                      color: "#222",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                        background: hasMarkdown ? "#E8FAFE" : "#f0f0f0",
+                        color: hasMarkdown ? CYAN : "#aaa",
+                        flexShrink: 0,
+                      }}>
+                        {hasMarkdown ? "자료 있음" : "자료 없음"}
+                      </span>
+                    </div>
+                    <span style={{
+                      marginTop: 14,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#aaa",
+                    }}>
+                      선택하기
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -592,8 +652,12 @@ export default function Summary() {
           <QuizCreateView fileName={files[0]?.name} onBack={() => setView("upload")} />
         )}
 
-        {view === "upload" && (
-          <div style={{ display: "grid", gridTemplateColumns: files.length > 0 && searched ? "380px 1fr" : "1fr", gap: 28 }}>
+        {view === "upload" && selectedCourse && (
+          <div>
+            <button onClick={resetCourseSelection} style={{
+              background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+            }}>← 과목 선택으로</button>
+            <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>
                 <div
@@ -610,8 +674,7 @@ export default function Summary() {
                 >
                   <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,image/*"
                     onChange={e => handleFiles(e.target.files)} style={{ display: "none" }} />
-                  <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>—</div>
-                  <p style={{ margin: 0, fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
+                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
                     background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
@@ -638,15 +701,8 @@ export default function Summary() {
                   </div>
                 )}
                 {!isExtracting && extractedMarkdown && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "8px 0" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 생성 가능</span>
-                    </div>
-                    {markdownSaved ? (
-                      <span style={{ fontSize: 12, color: CYAN, marginLeft: 2 }}>{selectedCourse}에 자료 저장됨</span>
-                    ) : (
-                      <span style={{ fontSize: 12, color: "#aaa", marginLeft: 2 }}>위에서 과목을 선택하면 자료가 저장됩니다</span>
-                    )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
+                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 생성 가능</span>
                   </div>
                 )}
                 {extractError && (
@@ -678,7 +734,7 @@ export default function Summary() {
               </Card>
             </div>
 
-            {files.length > 0 && searched && (
+            {searched && (
               <div>
                 <Card style={{ padding: 24 }}>
                   <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 700, color: "#222", textAlign: "center" }}>
@@ -725,6 +781,7 @@ export default function Summary() {
                 </Card>
               </div>
             )}
+            </div>
           </div>
         )}
       </div>
