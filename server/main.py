@@ -7,10 +7,8 @@ from typing import Literal
 from dotenv import load_dotenv
 
 SERVER_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SERVER_DIR.parent
 
 load_dotenv(SERVER_DIR / ".env")
-load_dotenv(PROJECT_ROOT / ".env.local")
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool

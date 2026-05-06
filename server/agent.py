@@ -76,7 +76,7 @@ def build_llm(model: AgentModel):
 
 def _build_model(model: AgentModel):
     if model == "GPT":
-        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("VITE_OPENAI_API_KEY")
+        api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("서버에 OPENAI_API_KEY가 설정되지 않았습니다.")
         return ChatOpenAI(
@@ -86,7 +86,7 @@ def _build_model(model: AgentModel):
             api_key=api_key,
         )
 
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("서버에 GEMINI_API_KEY가 설정되지 않았습니다.")
     return ChatGoogleGenerativeAI(
