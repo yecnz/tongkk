@@ -4,6 +4,13 @@ import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel
 import { useCourses } from "../CourseContext";
 import { generateQuiz, type QuizQuestion, type QuizDifficulty, type QuizQuestionType, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
+import {
+  combineMaterialsMarkdown,
+  getCourseMaterials,
+  getFileMaterialId,
+  saveCourseMaterials,
+  type CourseMaterial,
+} from "../services/materials";
 
 type QuizView = "courseList" | "courseDetail" | "generating" | "quiz" | "result";
 type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
@@ -17,15 +24,15 @@ const sourceLabels: Record<string, string> = {
   CHEAT_SHEET: "치트시트",
 };
 
-type HeaderProps = { label: string; onOpenSidebar: () => void; extra?: ReactNode };
+type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
-const Header = ({ label, onOpenSidebar, extra }: HeaderProps) => (
+const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <button onClick={onOpenSidebar} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
-      <span style={{ fontWeight: 700, fontSize: 20, color: PINK }}>Tongkk</span>
+      <button onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       <span style={{ color: "#bbb", fontSize: 14 }}>/ {label}</span>
     </div>
     {extra}
@@ -38,7 +45,6 @@ export default function Quiz() {
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [view, setView] = useState<QuizView>("courseList");
-  const [fromSummary, setFromSummary] = useState(false);
 
   // 과목 및 설정
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -47,12 +53,13 @@ export default function Quiz() {
   const [questionType, setQuestionType] = useState<QuizQuestionType>("객관식");
 
   // 자료 관련
-  const [cachedMarkdown, setCachedMarkdown] = useState<string | undefined>(undefined);
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
-  const [newMarkdown, setNewMarkdown] = useState<string | undefined>(undefined);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
+  const [materialNotice, setMaterialNotice] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -61,6 +68,7 @@ export default function Quiz() {
   const [selectedSource, setSelectedSource] = useState<QuizSource>("raw");
   const [showPreview, setShowPreview] = useState(false);
   const pendingTemplateRef = useRef<SummaryTemplate | null>(null);
+  const pendingMaterialIdsRef = useRef<string[] | null>(null);
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -72,29 +80,30 @@ export default function Quiz() {
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
-    const state = location.state as { course?: string; template?: SummaryTemplate } | null;
+    const state = location.state as { course?: string; template?: SummaryTemplate; materialIds?: string[] } | null;
     if (state?.course) {
       if (state.template) pendingTemplateRef.current = state.template;
+      if (state.materialIds) pendingMaterialIdsRef.current = state.materialIds;
       setSelectedCourse(state.course);
       setView("courseDetail");
-      setFromSummary(Boolean(state.template));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 과목 선택 시 localStorage에서 마크다운 + 요약본 로드
   useEffect(() => {
     if (!selectedCourse) {
-      setCachedMarkdown(undefined);
+      setMaterials([]);
+      setSelectedMaterialIds([]);
       setSavedSummaries([]);
       setSelectedSource("raw");
-      setNewMarkdown(undefined);
       setUploadedFileName("");
       setExtractError("");
+      setMaterialNotice("");
       return;
     }
 
-    const stored = localStorage.getItem(`tongkk:markdown:${selectedCourse}`);
-    setCachedMarkdown(stored ?? undefined);
+    const courseMaterials = getCourseMaterials(selectedCourse);
+    setMaterials(courseMaterials);
 
     const summaryRaw = localStorage.getItem(`tongkk:summary:${selectedCourse}`);
     const summaries: SavedSummary[] = summaryRaw ? (JSON.parse(summaryRaw) as SavedSummary[]) : [];
@@ -111,13 +120,15 @@ export default function Quiz() {
         ? pt
         : (preferred.find(t => usable.some(s => s.template === t)) ?? "raw");
     setSelectedSource(defaultSrc);
+    const pendingMaterialIds = pendingMaterialIdsRef.current;
+    pendingMaterialIdsRef.current = null;
+    const validPendingIds = pendingMaterialIds?.filter(id => courseMaterials.some(material => material.id === id)) || [];
+    setSelectedMaterialIds(validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id));
     setShowPreview(false);
-
-    setNewMarkdown(undefined);
     setUploadedFileName("");
     setExtractError("");
+    setMaterialNotice("");
   }, [selectedCourse]);
-
   // spin 애니메이션 CSS 한 번만 주입
   useEffect(() => {
     const id = "tongkk-spin";
@@ -141,30 +152,46 @@ export default function Quiz() {
   const handleCourseSelect = (course: string) => {
     setSelectedCourse(course);
     setView("courseDetail");
-    setFromSummary(false);
   };
 
   const resetCourseSelection = () => {
     setSelectedCourse("");
     setView("courseList");
     setError(null);
-    setFromSummary(false);
   };
 
   const handleFile = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf") || isExtracting) return;
+    if (!selectedCourse) return;
+
+    const fileId = getFileMaterialId(file);
+    const fileNameKey = file.name.trim().toLowerCase();
+    if (materials.some(material => material.id === fileId || material.name.trim().toLowerCase() === fileNameKey)) {
+      setMaterialNotice(`이미 등록된 파일입니다: ${file.name}`);
+      setUploadedFileName("");
+      return;
+    }
+
     setUploadedFileName(file.name);
     setIsExtracting(true);
     setExtractError("");
-    setNewMarkdown(undefined);
+    setMaterialNotice("");
     try {
       const markdown = await extractMarkdownFromPDF(file);
-      setNewMarkdown(markdown);
-      if (selectedCourse) {
-        localStorage.setItem(`tongkk:markdown:${selectedCourse}`, markdown);
-        setCachedMarkdown(markdown);
-      }
-      // 새 PDF로 교체했다면 퀴즈는 원본(raw) 기준으로 생성되도록 전환
+      const material: CourseMaterial = {
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        type: "pdf",
+        pages: null,
+        slides: null,
+        markdown,
+        updatedAt: Date.now(),
+      };
+      const nextMaterials = [...materials, material];
+      saveCourseMaterials(selectedCourse, nextMaterials);
+      setMaterials(nextMaterials);
+      setSelectedMaterialIds(prev => Array.from(new Set([...prev, material.id])));
       setSelectedSource("raw");
     } catch (err) {
       setExtractError(err instanceof Error ? err.message : "PDF 변환 실패");
@@ -186,8 +213,9 @@ export default function Quiz() {
     abortRef.current = controller;
     setView("generating");
     setError(null);
+    const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
     const markdownToUse = selectedSource === "raw"
-      ? (newMarkdown || cachedMarkdown)
+      ? combineMaterialsMarkdown(selectedMaterials)
       : savedSummaries.find(s => s.template === selectedSource)?.content;
     if (selectedSource !== "raw" && !markdownToUse) {
       setError("선택한 요약본을 찾을 수 없습니다. 다른 소스를 선택해주세요.");
@@ -248,7 +276,8 @@ export default function Quiz() {
     }
     return typeof v === "number" && quiz.answer === v;
   }).length;
-  const activeMarkdown = newMarkdown || cachedMarkdown;
+  const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
+  const activeMarkdown = combineMaterialsMarkdown(selectedMaterials);
   const sourceContent = selectedSource === "raw"
     ? activeMarkdown
     : savedSummaries.find(s => s.template === selectedSource)?.content;
@@ -275,7 +304,7 @@ export default function Quiz() {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
@@ -285,7 +314,8 @@ export default function Quiz() {
           {courses.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
               {courses.map((c, i) => {
-                const hasMarkdown = !!localStorage.getItem(`tongkk:markdown:${c}`);
+                const courseMaterials = getCourseMaterials(c);
+                const hasMarkdown = courseMaterials.length > 0;
                 const summaryRaw = localStorage.getItem(`tongkk:summary:${c}`);
                 const summaryCount = summaryRaw ? (JSON.parse(summaryRaw) as SavedSummary[]).filter(s => s.template !== "MINDMAP").length : 0;
                 return (
@@ -319,7 +349,9 @@ export default function Quiz() {
                         )}
                       </div>
                     </div>
-                    <span style={{ marginTop: 14, fontSize: 12, fontWeight: 600, color: "#aaa" }}>선택하기</span>
+                    <span style={{ marginTop: 14, fontSize: 12, fontWeight: 600, color: "#aaa" }}>
+                      {hasMarkdown ? `${courseMaterials.length}개 자료` : "선택하기"}
+                    </span>
                   </button>
                 );
               })}
@@ -340,7 +372,7 @@ export default function Quiz() {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
           <button onClick={resetCourseSelection} style={{
             background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
@@ -362,15 +394,15 @@ export default function Quiz() {
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
               style={{ display: "none" }} />
 
-            {cachedMarkdown && !newMarkdown && (
+            {materials.length > 0 && (
               <div style={{
                 padding: "12px 16px", borderRadius: 10, background: "#E8FAFE",
                 fontSize: 13, color: CYAN, marginBottom: 14, fontWeight: 500
               }}>
-                저장된 강의자료가 있습니다 — 퀴즈에 반영됩니다
+                저장된 강의자료 {materials.length}개 중 {selectedMaterials.length}개가 퀴즈에 반영됩니다
               </div>
             )}
-            {!cachedMarkdown && !newMarkdown && (
+            {materials.length === 0 && (
               <div style={{
                 padding: "12px 16px", borderRadius: 10, background: "#fafafa",
                 fontSize: 13, color: "#aaa", marginBottom: 14
@@ -379,50 +411,52 @@ export default function Quiz() {
               </div>
             )}
 
-            {fromSummary && cachedMarkdown && !newMarkdown ? (
+            {materials.length > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    borderRadius: 12,
-                    border: "1px solid #e0e0e0",
-                    background: "#fff",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    color: "#555",
-                  }}
-                >
-                  새로운 PDF로 퀴즈 만들기
-                </button>
-                <div style={{ marginTop: 10, fontSize: 12, color: "#aaa", lineHeight: 1.5 }}>
-                  선택한 새 PDF로 강의자료를 교체하고 퀴즈를 생성할 수 있어요.
-                </div>
-              </div>
-            ) : (
-              <div
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  border: `2px dashed ${dragOver ? CYAN : "#ddd"}`,
-                  borderRadius: 12, padding: "28px 20px", textAlign: "center",
-                  cursor: "pointer", background: dragOver ? "#F0FDFF" : "#fafafa",
-                  transition: "all 0.2s", marginBottom: 12
-                }}
-              >
-                <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
-                  PDF 파일을 드래그하거나
-                </p>
-                <button style={{
-                  padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
-                  background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
-                }}>파일 선택</button>
+                {materials.map(material => (
+                  <label key={material.id} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    borderRadius: 10, marginBottom: 8, cursor: "pointer",
+                    background: selectedMaterialIds.includes(material.id) ? "#F0FDFF" : "#fafafa",
+                    border: selectedMaterialIds.includes(material.id) ? `1px solid ${CYAN}` : "1px solid transparent",
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedMaterialIds.includes(material.id)}
+                      onChange={e => {
+                        setSelectedMaterialIds(prev =>
+                          e.target.checked
+                            ? [...prev, material.id]
+                            : prev.filter(id => id !== material.id)
+                        );
+                      }}
+                    />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#333" }}>{material.name}</span>
+                  </label>
+                ))}
               </div>
             )}
+
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+              style={{
+                border: `2px dashed ${dragOver ? CYAN : "#ddd"}`,
+                borderRadius: 12, padding: "28px 20px", textAlign: "center",
+                cursor: "pointer", background: dragOver ? "#F0FDFF" : "#fafafa",
+                transition: "all 0.2s", marginBottom: 12
+              }}
+            >
+              <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
+                PDF 파일을 드래그하거나
+              </p>
+              <button style={{
+                padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
+                background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
+              }}>파일 선택</button>
+            </div>
 
             {isExtracting && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -430,8 +464,11 @@ export default function Quiz() {
                 <span style={{ fontSize: 13, color: PINK }}>PDF 분석 중... ({uploadedFileName})</span>
               </div>
             )}
-            {!isExtracting && newMarkdown && (
+            {!isExtracting && uploadedFileName && !extractError && (
               <span style={{ fontSize: 13, color: "#4CAF50" }}>{uploadedFileName} 분석 완료 — 퀴즈에 반영됩니다</span>
+            )}
+            {!isExtracting && materialNotice && (
+              <span style={{ display: "block", marginTop: 8, fontSize: 13, color: CYAN }}>{materialNotice}</span>
             )}
             {!isExtracting && extractError && (
               <span style={{ fontSize: 13, color: "#E53E3E" }}>분석 실패: {extractError}</span>
@@ -589,7 +626,7 @@ export default function Quiz() {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} />
+        <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 500, margin: "40px auto", textAlign: "center" }}>
           <Card style={{ padding: 40 }}>
             <div style={{
@@ -627,7 +664,7 @@ export default function Quiz() {
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 600, margin: "40px auto" }}>
           <Card style={{ padding: 28, textAlign: "center" }}>
             <p style={{ margin: "0 0 16px", fontSize: 14, color: "#666" }}>표시할 퀴즈가 없습니다.</p>
@@ -643,7 +680,7 @@ export default function Quiz() {
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
-      <Header label={`${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)}
+      <Header label={`${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={<span style={{ fontSize: 14, fontWeight: 600, color: "#999" }}>{current + 1} / {quizzes.length}</span>} />
       <div style={{ height: 3, background: "#f0f0f0" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
