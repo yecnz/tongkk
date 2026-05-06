@@ -240,7 +240,7 @@ export default function MyPage() {
         )}
         <div style={{ textAlign: "center" }}>
           <div style={{ marginBottom: 32 }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: PINK, letterSpacing: -1 }}>Tongkk</span>
+            <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontSize: 36, fontWeight: 800, color: PINK, letterSpacing: -1, cursor: "pointer" }}>Tongkk</button>
           </div>
           <div style={{
             background: "#ffffff", borderRadius: 24, padding: "40px 36px", width: 340,

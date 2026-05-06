@@ -6,17 +6,25 @@ import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import { MindmapView, parseMindmapJson } from "../components/MindmapView";
+import {
+  combineMaterialsMarkdown,
+  getCourseMaterials,
+  getFileMaterialId,
+  saveCourseMaterials,
+  type CourseMaterial,
+} from "../services/materials";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
+type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
 type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
 type LocationState = { selectedCourse?: string } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; onGoToQuiz?: () => void };
-type QuizCreateViewProps = { fileName?: string; onBack: () => void };
+type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
 const templateLabels: Record<SummaryTemplate, string> = {
   GENERAL: "일반 요약",
@@ -44,6 +52,8 @@ const getFileType = (name: string): FileKind => {
   if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "img";
   return "file";
 };
+
+const getFileNameKey = (name: string) => name.trim().toLowerCase();
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -353,7 +363,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   );
 };
 
-const QuizCreateView = ({ fileName, onBack }: QuizCreateViewProps) => {
+const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => {
   const [difficulty, setDifficulty] = useState("보통");
   const [count, setCount] = useState(10);
   const [types, setTypes] = useState<string[]>(["객관식"]);
@@ -429,7 +439,7 @@ const QuizCreateView = ({ fileName, onBack }: QuizCreateViewProps) => {
             </div>
           </div>
 
-          <button style={{
+          <button onClick={onCreate} style={{
             padding: "16px 0", borderRadius: 14, border: "none",
             background: PINK, color: "#fff", fontSize: 16, fontWeight: 700,
             cursor: "pointer", marginTop: 8
@@ -452,6 +462,7 @@ export default function Summary() {
   const [searched, setSearched] = useState(Boolean(initialCourse));
   const [selectedCourse, setSelectedCourse] = useState(initialCourse);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const filesRef = useRef<UploadedFile[]>([]);
 
   const [view, setView] = useState<SummaryView>("upload");
   const [selectedTemplate, setSelectedTemplate] = useState<SummaryTemplate | null>(null);
@@ -460,76 +471,159 @@ export default function Summary() {
   const [summaryError, setSummaryError] = useState("");
   const [loadingStep, setLoadingStep] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
-  const [extractedMarkdown, setExtractedMarkdown] = useState("");
+  const [materials, setMaterials] = useState<CourseMaterial[]>(
+    initialCourse ? getCourseMaterials(initialCourse) : []
+  );
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>(
+    initialCourse ? getCourseMaterials(initialCourse).map(material => material.id) : []
+  );
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
+  const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   const [agentThreadId, setAgentThreadId] = useState("");
+  const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
+  const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
 
-  // 과목 + 마크다운이 모두 있으면 localStorage에 자동 저장
   useEffect(() => {
-    if (selectedCourse && extractedMarkdown) {
-      localStorage.setItem(`tongkk:markdown:${selectedCourse}`, extractedMarkdown);
-    }
-  }, [selectedCourse, extractedMarkdown]);
+    filesRef.current = files;
+  }, [files]);
+
+  useEffect(() => {
+    if (!duplicateNotice) return;
+    const timer = window.setTimeout(() => setDuplicateNotice(null), 3600);
+    return () => window.clearTimeout(timer);
+  }, [duplicateNotice]);
 
   const resetCourseSelection = () => {
     setSelectedCourse("");
     setFiles([]);
+    filesRef.current = [];
     setDragOver(false);
     setUploading(false);
     setSearched(false);
-    setExtractedMarkdown("");
+    setMaterials([]);
+    setSelectedMaterialIds([]);
     setIsExtracting(false);
     setExtractError("");
+    setDuplicateNotice(null);
     navigate(pageRoutes["자료 요약"], { replace: true, state: null });
   };
 
   const handleCourseSelect = (course: string) => {
+    const nextMaterials = getCourseMaterials(course);
     setSelectedCourse(course);
     setFiles([]);
+    filesRef.current = [];
     setDragOver(false);
     setUploading(false);
     setSearched(true);
-    setExtractedMarkdown("");
+    setMaterials(nextMaterials);
+    setSelectedMaterialIds(nextMaterials.map(material => material.id));
     setIsExtracting(false);
     setExtractError("");
+    setDuplicateNotice(null);
   };
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList) return;
     const arr = Array.from(fileList).filter(f =>
-      f.type === "application/pdf" || f.type.startsWith("image/") ||
-      f.name.endsWith(".ppt") || f.name.endsWith(".pptx")
+      f.type === "application/pdf"
     );
     if (arr.length === 0) return;
+    if (!selectedCourse) return;
+
+    const existingIds = new Set([
+      ...materials.map(material => material.id),
+      ...filesRef.current.map(file => getFileMaterialId(file)),
+    ]);
+    const existingNames = new Set([
+      ...materials.map(material => getFileNameKey(material.name)),
+      ...filesRef.current.map(file => getFileNameKey(file.name)),
+    ]);
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    const duplicateNames: string[] = [];
+    const newFiles = arr.filter(file => {
+      const id = getFileMaterialId(file);
+      const nameKey = getFileNameKey(file.name);
+      const isDuplicate = existingIds.has(id) || existingNames.has(nameKey) || seenIds.has(id) || seenNames.has(nameKey);
+      seenIds.add(id);
+      seenNames.add(nameKey);
+      if (isDuplicate) duplicateNames.push(file.name);
+      return !isDuplicate;
+    });
+
+    setDuplicateNotice(duplicateNames.length > 0
+      ? { names: Array.from(new Set(duplicateNames)) }
+      : null);
+    if (newFiles.length === 0) return;
+
     setUploading(true);
 
     await new Promise(res => setTimeout(res, 1200));
 
-    const nf = arr.map(f => ({
+    const nf = newFiles.map(f => ({
       name: f.name, size: f.size, type: getFileType(f.name),
       pages: f.type === "application/pdf" ? Math.floor(Math.random() * 30) + 5 : null,
       slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
       rawFile: f,
     }));
-    setFiles(prev => [...prev, ...nf]);
+    filesRef.current = [...filesRef.current, ...nf];
+    setFiles(filesRef.current);
     setUploading(false);
     setSearched(true);
 
-    const pdfFile = arr.find(f => f.type === "application/pdf");
-    if (pdfFile) {
-      setIsExtracting(true);
-      setExtractError("");
-      setExtractedMarkdown("");
-      try {
-        const markdown = await extractMarkdownFromPDF(pdfFile);
-        setExtractedMarkdown(markdown);
-      } catch (err) {
-        setExtractError(err instanceof Error ? err.message : "PDF 분석 실패");
-      } finally {
-        setIsExtracting(false);
+    setIsExtracting(true);
+    setExtractError("");
+    const uploadedMaterials: CourseMaterial[] = [];
+    try {
+      for (const pdfFile of newFiles) {
+        try {
+          const markdown = await extractMarkdownFromPDF(pdfFile);
+          const uploadedMaterial = nf.find(f => f.rawFile === pdfFile) || nf.find(f => f.name === pdfFile.name);
+          if (uploadedMaterial) {
+            uploadedMaterials.push({
+              id: getFileMaterialId(pdfFile),
+              name: uploadedMaterial.name,
+              size: uploadedMaterial.size,
+              type: uploadedMaterial.type,
+              pages: uploadedMaterial.pages,
+              slides: uploadedMaterial.slides,
+              markdown,
+              updatedAt: Date.now(),
+            });
+          }
+        } catch (err) {
+          setExtractError(err instanceof Error ? err.message : "PDF 분석 실패");
+        }
       }
+
+      if (uploadedMaterials.length > 0) {
+        const nextMaterials = [...materials, ...uploadedMaterials];
+        saveCourseMaterials(selectedCourse, nextMaterials);
+        setMaterials(nextMaterials);
+        setSelectedMaterialIds(prev => Array.from(new Set([...prev, ...uploadedMaterials.map(material => material.id)])));
+      }
+    } finally {
+      setIsExtracting(false);
     }
+  };
+
+  const handleDeleteMaterial = (material: CourseMaterial) => {
+    if (!selectedCourse) return;
+
+    const nextMaterials = materials.filter(item => item.id !== material.id);
+    saveCourseMaterials(selectedCourse, nextMaterials);
+    setMaterials(nextMaterials);
+    setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
+    setFiles(prev => {
+      const nextFiles = prev.filter(file =>
+        getFileMaterialId(file) !== material.id &&
+        getFileNameKey(file.name) !== getFileNameKey(material.name)
+      );
+      filesRef.current = nextFiles;
+      return nextFiles;
+    });
   };
 
   const communityResults = [
@@ -542,7 +636,7 @@ export default function Summary() {
     setSelectedTemplate(template);
     setSummaryError("");
 
-    if (extractedMarkdown) {
+    if (selectedMarkdown) {
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
@@ -552,7 +646,7 @@ export default function Summary() {
       const startTime = Date.now();
       try {
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 중...`);
-        const response = await summarizeWithTemplate(extractedMarkdown, template);
+        const response = await summarizeWithTemplate(selectedMarkdown, template);
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
         if (selectedCourse) {
@@ -576,13 +670,81 @@ export default function Summary() {
   };
 
   const handleGoToQuiz = () => {
-    navigate(pageRoutes["퀴즈 생성"], { state: { course: selectedCourse, template: selectedTemplate } });
+    navigate(pageRoutes["퀴즈 생성"], {
+      state: selectedTemplate
+        ? { course: selectedCourse, template: selectedTemplate, materialIds: selectedMaterialIds }
+        : { course: selectedCourse, materialIds: selectedMaterialIds },
+    });
   };
 
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
+      {duplicateNotice && (
+        <div
+          role="dialog"
+          aria-live="polite"
+          aria-label="이미 등록된 파일 안내"
+          style={{
+            position: "fixed",
+            top: 86,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "min(360px, calc(100vw - 32px))",
+            zIndex: 140,
+            padding: "14px 16px",
+            borderRadius: 12,
+            border: "1px solid #f6c8df",
+            background: "#fff",
+            boxShadow: "0 14px 36px rgba(0,0,0,0.14)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <span style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: PINK,
+              marginTop: 7,
+              flexShrink: 0,
+            }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#222", marginBottom: 4 }}>
+                이미 등록된 파일입니다
+              </div>
+              <div style={{
+                fontSize: 12,
+                fontWeight: 600,
+                lineHeight: 1.5,
+                color: PINK,
+                wordBreak: "break-word",
+              }}>
+                {duplicateNotice.names.join(", ")}
+              </div>
+            </div>
+            <button
+              onClick={() => setDuplicateNotice(null)}
+              aria-label="중복 파일 안내 닫기"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 8,
+                border: "none",
+                background: "#fafafa",
+                color: "#aaa",
+                cursor: "pointer",
+                fontSize: 16,
+                lineHeight: "24px",
+                padding: 0,
+                flexShrink: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16 }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -601,7 +763,8 @@ export default function Summary() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
               {courses.map((c, i) => {
-                const hasMarkdown = !!localStorage.getItem(`tongkk:markdown:${c}`);
+                const courseMaterials = getCourseMaterials(c);
+                const hasMarkdown = courseMaterials.length > 0;
                 return (
                   <button
                     key={i}
@@ -639,7 +802,7 @@ export default function Summary() {
                       fontWeight: 600,
                       color: "#aaa",
                     }}>
-                      선택하기
+                      {hasMarkdown ? `${courseMaterials.length}개 자료` : "선택하기"}
                     </span>
                   </button>
                 );
@@ -667,7 +830,7 @@ export default function Summary() {
         )}
 
         {view === "quizCreate" && (
-          <QuizCreateView fileName={files[0]?.name} onBack={() => setView("upload")} />
+          <QuizCreateView fileName={selectedMaterials.map(material => material.name).join(", ")} onBack={() => setView("upload")} onCreate={handleGoToQuiz} />
         )}
 
         {view === "upload" && selectedCourse && (
@@ -691,7 +854,7 @@ export default function Summary() {
                   }}
                 >
                   <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,image/*"
-                    onChange={e => handleFiles(e.target.files)} style={{ display: "none" }} />
+                    onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
                   <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
@@ -718,9 +881,9 @@ export default function Summary() {
                     <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>PDF 분석 중...</span>
                   </div>
                 )}
-                {!isExtracting && extractedMarkdown && (
+                {!isExtracting && selectedMarkdown && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
-                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 생성 가능</span>
+                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>선택한 자료 {selectedMaterials.length}개 — 요약 생성 가능</span>
                   </div>
                 )}
                 {extractError && (
@@ -729,24 +892,60 @@ export default function Summary() {
                   </div>
                 )}
 
-                {files.length > 0 && (
+                {materials.length > 0 && (
                   <div>
-                    <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: "#555" }}>업로드된 파일</h4>
-                    {files.map((f, i) => (
-                      <div key={i} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-                        background: "#fafafa", borderRadius: 10, marginBottom: 8
+                    <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: "#555" }}>
+                      강의자료 선택
+                    </h4>
+                    {materials.map(material => {
+                      const isSelected = selectedMaterialIds.includes(material.id);
+                      return (
+                      <div key={material.id} style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
+                        background: isSelected ? "#F0FDFF" : "#fafafa",
+                        border: isSelected ? `1px solid ${CYAN}` : "1px solid transparent",
+                        borderRadius: 10, marginBottom: 8
                       }}>
-                        <FileIcon type={f.type} />
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#333" }}>{f.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            setSelectedMaterialIds(prev =>
+                              e.target.checked
+                                ? [...prev, material.id]
+                                : prev.filter(id => id !== material.id)
+                            );
+                          }}
+                        />
+                        <FileIcon type={material.type} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#333" }}>{material.name}</span>
                         <span style={{ fontSize: 12, color: "#aaa" }}>
-                          {f.pages ? `${f.pages}p` : f.slides ? `${f.slides}s` : ""}
+                          {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : ""}
                         </span>
-                        <button onClick={() => setFiles(files.filter((_, j) => j !== i))} style={{
-                          background: "none", border: "none", color: "#ccc", cursor: "pointer", fontSize: 16
-                        }}>✕</button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMaterial(material)}
+                          aria-label={`${material.name} 삭제`}
+                          title="삭제"
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 8,
+                            border: "1px solid #eeeeee",
+                            background: "#fff",
+                            color: "#bbb",
+                            cursor: "pointer",
+                            fontSize: 16,
+                            lineHeight: "24px",
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                        >
+                          ×
+                        </button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </Card>
@@ -781,15 +980,15 @@ export default function Summary() {
                     </div>
                     <div style={{ width: 1, background: "#f0f0f0" }}/>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, width: 130 }}>
-                      <button onClick={() => setView("templates")} disabled={!extractedMarkdown || isExtracting} style={{
+                      <button onClick={() => setView("templates")} disabled={!selectedMarkdown || isExtracting} style={{
                         padding: "16px 12px", borderRadius: 12, border: "none",
-                        background: extractedMarkdown && !isExtracting ? "#FFF0F6" : "#f0f0f0",
-                        color: extractedMarkdown && !isExtracting ? PINK : "#aaa",
+                        background: selectedMarkdown && !isExtracting ? "#FFF0F6" : "#f0f0f0",
+                        color: selectedMarkdown && !isExtracting ? PINK : "#aaa",
                         fontSize: 14, fontWeight: 600,
-                        cursor: extractedMarkdown && !isExtracting ? "pointer" : "default",
+                        cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
                         textAlign: "center", lineHeight: 1.4
                       }}>요약<br/>새로 생성</button>
-                      <button onClick={() => setView("quizCreate")} style={{
+                      <button onClick={handleGoToQuiz} style={{
                         padding: "16px 12px", borderRadius: 12, border: "none",
                         background: "#E8FAFE", color: CYAN, fontSize: 14, fontWeight: 600,
                         cursor: "pointer", textAlign: "center", lineHeight: 1.4

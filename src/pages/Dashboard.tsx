@@ -15,17 +15,24 @@ type Plan = { text: string; done: boolean };
 
 const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
   const [name, setName] = useState("");
+  const handleAdd = () => {
+    const courseName = name.trim();
+    if (!courseName) return;
+    onAdd(courseName);
+    onClose();
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Card style={{ padding: 28, width: 340 }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="과목명 입력" style={{
+        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="과목명 입력" style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
           fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
         }}/>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={() => { if (name.trim()) { onAdd(name.trim()); onClose(); }}} style={{
+          <button onClick={handleAdd} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
