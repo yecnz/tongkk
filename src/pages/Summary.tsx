@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -11,10 +11,11 @@ type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type SummarySample = { title: string; content: string };
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number };
 type LocationState = { selectedCourse?: string } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; onGoToQuiz?: () => void };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void };
 
 const templateLabels: Record<SummaryTemplate, string> = {
@@ -190,7 +191,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -240,7 +241,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             <span style={{ fontSize: 13, color: "#aaa", marginLeft: 8 }}>AI가 요약 중...</span>
           )}
           {!isLoading && elapsedTime && (
-            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>⏱ {elapsedTime}초</span>
+            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>{elapsedTime}초</span>
           )}
         </div>
 
@@ -289,6 +290,12 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
               padding: "10px 24px", borderRadius: 10, border: "1px solid #e0e0e0",
               background: "#fff", color: "#555", fontSize: 14, cursor: "pointer"
             }}>다운로드</button>
+            {realContent && !error && onGoToQuiz && (
+              <button onClick={onGoToQuiz} style={{
+                padding: "10px 24px", borderRadius: 10, border: "none",
+                background: PINK, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer"
+              }}>퀴즈 생성하기</button>
+            )}
           </div>
         )}
 
@@ -458,6 +465,13 @@ export default function Summary() {
   const [extractError, setExtractError] = useState("");
   const [agentThreadId, setAgentThreadId] = useState("");
 
+  // 과목 + 마크다운이 모두 있으면 localStorage에 자동 저장
+  useEffect(() => {
+    if (selectedCourse && extractedMarkdown) {
+      localStorage.setItem(`tongkk:markdown:${selectedCourse}`, extractedMarkdown);
+    }
+  }, [selectedCourse, extractedMarkdown]);
+
   const resetCourseSelection = () => {
     setSelectedCourse("");
     setFiles([]);
@@ -541,6 +555,12 @@ export default function Summary() {
         const response = await summarizeWithTemplate(extractedMarkdown, template);
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
+        if (selectedCourse) {
+          const key = `tongkk:summary:${selectedCourse}`;
+          const prev: SavedSummary[] = JSON.parse(localStorage.getItem(key) || '[]');
+          const updated = [...prev.filter(s => s.template !== template), { template, content: response.result, createdAt: Date.now() }];
+          localStorage.setItem(key, JSON.stringify(updated));
+        }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
         setSummaryError(err instanceof Error ? err.message : "요약 실패");
@@ -553,6 +573,10 @@ export default function Summary() {
       setSummaryText("");
       setView("summaryResult");
     }
+  };
+
+  const handleGoToQuiz = () => {
+    navigate(pageRoutes["퀴즈 생성"], { state: { course: selectedCourse, template: selectedTemplate } });
   };
 
   return (
@@ -576,53 +600,50 @@ export default function Summary() {
               <p style={{ margin: 0, fontSize: 13, color: "#999" }}>자료를 정리할 과목을 선택하세요</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-              {courses.map((c, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleCourseSelect(c)}
-                  style={{
-                    minHeight: 170,
-                    padding: 22,
-                    borderRadius: 14,
-                    border: "1px solid #eeeeee",
-                    background: "#fff",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                    color: "#222",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
-                    <span style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: "50%",
-                      background: "#f2f2f2",
-                      color: "#bbb",
+              {courses.map((c, i) => {
+                const hasMarkdown = !!localStorage.getItem(`tongkk:markdown:${c}`);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleCourseSelect(c)}
+                    style={{
+                      minHeight: 170,
+                      padding: 22,
+                      borderRadius: 14,
+                      border: "1px solid #eeeeee",
+                      background: "#fff",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                      color: "#222",
+                      cursor: "pointer",
+                      textAlign: "left",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      flexShrink: 0,
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                        background: hasMarkdown ? "#E8FAFE" : "#f0f0f0",
+                        color: hasMarkdown ? CYAN : "#aaa",
+                        flexShrink: 0,
+                      }}>
+                        {hasMarkdown ? "자료 있음" : "자료 없음"}
+                      </span>
+                    </div>
+                    <span style={{
+                      marginTop: 14,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#aaa",
                     }}>
+                      선택하기
                     </span>
-                  </div>
-                  <span style={{
-                    marginTop: 14,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#aaa",
-                  }}>
-                    선택하기
-                  </span>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -641,6 +662,7 @@ export default function Summary() {
             loadingStep={loadingStep}
             elapsedTime={elapsedTime}
             threadId={agentThreadId}
+            onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
           />
         )}
 
@@ -670,8 +692,7 @@ export default function Summary() {
                 >
                   <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,image/*"
                     onChange={e => handleFiles(e.target.files)} style={{ display: "none" }} />
-                  <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>📄</div>
-                  <p style={{ margin: 0, fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
+                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
                     background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
@@ -694,18 +715,17 @@ export default function Summary() {
                       width: 18, height: 18, border: `2px solid ${PINK}`, borderTop: "2px solid transparent",
                       borderRadius: "50%", animation: "spin 0.8s linear infinite"
                     }}/>
-                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>📄 PDF 분석 중...</span>
+                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>PDF 분석 중...</span>
                   </div>
                 )}
                 {!isExtracting && extractedMarkdown && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
-                    <span style={{ fontSize: 13 }}>✅</span>
                     <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>PDF 분석 완료 — 요약 생성 가능</span>
                   </div>
                 )}
                 {extractError && (
                   <div style={{ padding: "8px 0", fontSize: 12, color: "#E53E3E" }}>
-                    ⚠️ 분석 실패: {extractError}
+                    분석 실패: {extractError}
                   </div>
                 )}
 
