@@ -270,8 +270,8 @@ export default function Dashboard() {
                         <div style={{ display: "flex", gap: 8 }}>
                           {["요약", "퀴즈", "커뮤니티"].map(btn => (
                             <button key={btn} onClick={() => {
-                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c } });
-                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈"]);
+                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
+                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
                               else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
                             }} style={{
                               padding: "6px 14px", borderRadius: 8,

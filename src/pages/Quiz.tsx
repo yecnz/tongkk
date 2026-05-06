@@ -69,9 +69,12 @@ export default function Quiz() {
   // 자료 소스
   const [savedSummaries, setSavedSummaries] = useState<SavedSummary[]>([]);
   const [selectedSource, setSelectedSource] = useState<QuizSource>("raw");
+  const [materialSources, setMaterialSources] = useState<Record<string, QuizSource>>({});
   const [showPreview, setShowPreview] = useState(false);
   const pendingTemplateRef = useRef<SummaryTemplate | null>(null);
   const pendingMaterialIdsRef = useRef<string[] | null>(null);
+  const sourceTouchedRef = useRef(false);
+  const fromDashboardRef = useRef(false);
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -83,11 +86,13 @@ export default function Quiz() {
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
-    const state = location.state as { course?: string; template?: SummaryTemplate; materialIds?: string[] } | null;
-    if (state?.course) {
+    const state = location.state as { course?: string; selectedCourse?: string; template?: SummaryTemplate; materialIds?: string[]; fromDashboard?: boolean } | null;
+    const course = state?.course || state?.selectedCourse;
+    if (course) {
+      fromDashboardRef.current = Boolean(state.fromDashboard);
       if (state.template) pendingTemplateRef.current = state.template;
       if (state.materialIds) pendingMaterialIdsRef.current = state.materialIds;
-      setSelectedCourse(state.course);
+      setSelectedCourse(course);
       setView("courseDetail");
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -99,6 +104,7 @@ export default function Quiz() {
       setSelectedMaterialIds([]);
       setSavedSummaries([]);
       setSelectedSource("raw");
+      setMaterialSources({});
       setUploadedFileName("");
       setExtractError("");
       setMaterialNotice("");
@@ -120,19 +126,31 @@ export default function Quiz() {
     const initialMaterialIds = validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id);
     setSelectedMaterialIds(initialMaterialIds);
 
-    // 소스 기본값: 현재 선택 자료와 같은 요약만 사용. 예전 저장 데이터는 전체 자료 선택일 때만 호환.
+    // Summary에서 바로 넘어온 경우에는 해당 템플릿을 우선하고, 일반 진입은 선택 자료에 맞는 일반 요약이 있으면 사용한다.
     const matchingSummaries = usable.filter(s =>
       sameMaterialIds(s.materialIds, initialMaterialIds) ||
       (!s.materialIds && sameMaterialIds(initialMaterialIds, courseMaterials.map(material => material.id)))
     );
     const pt = pendingTemplateRef.current;
     pendingTemplateRef.current = null;
-    const preferred: SummaryTemplate[] = ["LECTURE_NOTE", "CHEAT_SHEET", "GENERAL"];
+    sourceTouchedRef.current = false;
     const defaultSrc: QuizSource =
       pt && matchingSummaries.some(s => s.template === pt)
         ? pt
-        : (preferred.find(t => matchingSummaries.some(s => s.template === t)) ?? "raw");
+        : matchingSummaries.some(s => s.template === "GENERAL")
+          ? "GENERAL"
+          : "raw";
     setSelectedSource(defaultSrc);
+    setMaterialSources(Object.fromEntries(courseMaterials.map(material => {
+      const materialSummaries = usable.filter(s => sameMaterialIds(s.materialIds, [material.id]));
+      const source: QuizSource =
+        pt && materialSummaries.some(s => s.template === pt)
+          ? pt
+          : materialSummaries.some(s => s.template === "GENERAL")
+            ? "GENERAL"
+            : "raw";
+      return [material.id, source];
+    })));
     setShowPreview(false);
     setUploadedFileName("");
     setExtractError("");
@@ -169,6 +187,14 @@ export default function Quiz() {
     setError(null);
   };
 
+  const handleCourseBack = () => {
+    if (fromDashboardRef.current) {
+      navigate(pageRoutes["대시보드"]);
+      return;
+    }
+    resetCourseSelection();
+  };
+
   const handleFile = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf") || isExtracting) return;
     if (!selectedCourse) return;
@@ -202,6 +228,7 @@ export default function Quiz() {
       setMaterials(nextMaterials);
       setSelectedMaterialIds(prev => Array.from(new Set([...prev, material.id])));
       setSelectedSource("raw");
+      setMaterialSources(prev => ({ ...prev, [material.id]: "raw" }));
     } catch (err) {
       setExtractError(err instanceof Error ? err.message : "PDF 변환 실패");
     } finally {
@@ -216,6 +243,27 @@ export default function Quiz() {
     if (file) handleFile(file);
   };
 
+  const getMaterialSummaries = (materialId: string) =>
+    savedSummaries.filter(s => sameMaterialIds(s.materialIds, [materialId]));
+
+  const getDefaultMaterialSource = (materialId: string): QuizSource =>
+    getMaterialSummaries(materialId).some(s => s.template === "GENERAL") ? "GENERAL" : "raw";
+
+  const getMaterialSource = (materialId: string): QuizSource =>
+    materialSources[materialId] || getDefaultMaterialSource(materialId);
+
+  const buildMaterialSourceMarkdown = (courseMaterials: CourseMaterial[]) =>
+    courseMaterials
+      .map(material => {
+        const source = getMaterialSource(material.id);
+        const summary = source === "raw"
+          ? null
+          : getMaterialSummaries(material.id).find(s => s.template === source);
+        const label = source === "raw" ? "원본 자료" : sourceLabels[source];
+        return `# ${material.name} (${label})\n\n${summary?.content || material.markdown}`;
+      })
+      .join("\n\n---\n\n");
+
   const generate = async () => {
     if (!selectedCourse.trim()) return;
     const controller = new AbortController();
@@ -223,14 +271,7 @@ export default function Quiz() {
     setView("generating");
     setError(null);
     const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
-    const markdownToUse = selectedSource === "raw"
-      ? combineMaterialsMarkdown(selectedMaterials)
-      : savedSummaries.find(s => s.template === selectedSource)?.content;
-    if (selectedSource !== "raw" && !markdownToUse) {
-      setError("선택한 요약본을 찾을 수 없습니다. 다른 소스를 선택해주세요.");
-      setView("courseDetail");
-      return;
-    }
+    const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
     try {
       const questions = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
       setQuizzes(questions);
@@ -287,18 +328,22 @@ export default function Quiz() {
   }).length;
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const activeMarkdown = combineMaterialsMarkdown(selectedMaterials);
+  const mixedSourceMarkdown = buildMaterialSourceMarkdown(selectedMaterials);
   const matchingSummaries = savedSummaries.filter(s =>
     sameMaterialIds(s.materialIds, selectedMaterialIds) ||
     (!s.materialIds && sameMaterialIds(selectedMaterialIds, materials.map(material => material.id)))
   );
-  const sourceContent = selectedSource === "raw"
-    ? activeMarkdown
-    : matchingSummaries.find(s => s.template === selectedSource)?.content;
+  const sourceContent = mixedSourceMarkdown;
 
   useEffect(() => {
-    if (selectedSource === "raw") return;
-    if (!matchingSummaries.some(s => s.template === selectedSource)) {
+    const hasSelectedSummary = matchingSummaries.some(s => s.template === selectedSource);
+    if (selectedSource !== "raw" && !hasSelectedSummary) {
       setSelectedSource("raw");
+      sourceTouchedRef.current = false;
+      return;
+    }
+    if (!sourceTouchedRef.current) {
+      setSelectedSource(matchingSummaries.some(s => s.template === "GENERAL") ? "GENERAL" : "raw");
     }
   }, [matchingSummaries, selectedSource]);
 
@@ -394,9 +439,9 @@ export default function Quiz() {
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
-          <button onClick={resetCourseSelection} style={{
+          <button onClick={handleCourseBack} style={{
             background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-          }}>← 과목 선택으로</button>
+          }}>← 돌아가기</button>
 
           <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "#222" }}>{selectedCourse}</h2>
 
@@ -433,27 +478,54 @@ export default function Quiz() {
 
             {materials.length > 0 && (
               <div style={{ marginBottom: 12 }}>
-                {materials.map(material => (
-                  <label key={material.id} style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                    borderRadius: 10, marginBottom: 8, cursor: "pointer",
-                    background: selectedMaterialIds.includes(material.id) ? "#F0FDFF" : "#fafafa",
-                    border: selectedMaterialIds.includes(material.id) ? `1px solid ${CYAN}` : "1px solid transparent",
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedMaterialIds.includes(material.id)}
-                      onChange={e => {
-                        setSelectedMaterialIds(prev =>
-                          e.target.checked
-                            ? [...prev, material.id]
-                            : prev.filter(id => id !== material.id)
-                        );
-                      }}
-                    />
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#333" }}>{material.name}</span>
-                  </label>
-                ))}
+                {materials.map(material => {
+                  const isSelected = selectedMaterialIds.includes(material.id);
+                  const materialSummaries = getMaterialSummaries(material.id);
+                  const source = getMaterialSource(material.id);
+                  return (
+                    <div key={material.id} style={{
+                      display: "grid", gridTemplateColumns: "minmax(0, 1fr) 170px", gap: 12, alignItems: "center",
+                      padding: "10px 12px", borderRadius: 10, marginBottom: 8,
+                      background: isSelected ? "#F0FDFF" : "#fafafa",
+                      border: isSelected ? `1px solid ${CYAN}` : "1px solid transparent",
+                    }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            sourceTouchedRef.current = false;
+                            setSelectedMaterialIds(prev =>
+                              e.target.checked
+                                ? [...prev, material.id]
+                                : prev.filter(id => id !== material.id)
+                            );
+                          }}
+                        />
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {material.name}
+                        </span>
+                      </label>
+                      <select
+                        value={source}
+                        disabled={!isSelected}
+                        onChange={e => setMaterialSources(prev => ({ ...prev, [material.id]: e.target.value as QuizSource }))}
+                        style={{
+                          width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #e0e0e0",
+                          background: isSelected ? "#fff" : "#f2f2f2", fontSize: 13, fontWeight: 600,
+                          color: isSelected ? "#555" : "#aaa", outline: "none", cursor: isSelected ? "pointer" : "not-allowed"
+                        }}
+                      >
+                        <option value="raw">원본 자료</option>
+                        {materialSummaries.map(summary => (
+                          <option key={summary.template} value={summary.template}>
+                            {sourceLabels[summary.template]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -494,75 +566,6 @@ export default function Quiz() {
               <span style={{ fontSize: 13, color: "#E53E3E" }}>분석 실패: {extractError}</span>
             )}
           </Card>
-
-          {/* 퀴즈 생성 소스 선택 + 미리보기 */}
-          {(savedSummaries.length > 0 || activeMarkdown) && (
-            <Card style={{ padding: 24, marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#222" }}>퀴즈 생성 소스</h3>
-
-              {matchingSummaries.length > 0 && (
-                <>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-                    {matchingSummaries.map(s => (
-                      <button
-                        key={`${s.template}:${s.materialIds?.join("|") || "legacy"}`}
-                        onClick={() => setSelectedSource(s.template)}
-                        style={{
-                          padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                          cursor: "pointer", transition: "all 0.15s",
-                          border: selectedSource === s.template ? "none" : "1px solid #e0e0e0",
-                          background: selectedSource === s.template ? PINK : "#fff",
-                          color: selectedSource === s.template ? "#fff" : "#555",
-                        }}
-                      >
-                        {sourceLabels[s.template]}
-                      </button>
-                    ))}
-                    {activeMarkdown && (
-                      <button
-                        onClick={() => setSelectedSource("raw")}
-                        style={{
-                          padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                          cursor: "pointer", transition: "all 0.15s",
-                          border: selectedSource === "raw" ? "none" : "1px solid #e0e0e0",
-                          background: selectedSource === "raw" ? "#777" : "#fff",
-                          color: selectedSource === "raw" ? "#fff" : "#555",
-                        }}
-                      >
-                        원본 자료
-                      </button>
-                    )}
-                  </div>
-                  <p style={{ margin: "0 0 12px", fontSize: 12, color: "#aaa" }}>
-                    {selectedSource === "raw"
-                      ? "원본 강의자료(raw 마크다운)로 퀴즈를 생성합니다"
-                      : `${sourceLabels[selectedSource]} 요약본으로 퀴즈를 생성합니다 (토큰 절약 · 핵심 중심)`}
-                  </p>
-                </>
-              )}
-
-              {sourceContent && (
-                <div>
-                  <button
-                    onClick={() => setShowPreview(v => !v)}
-                    style={{ background: "none", border: "none", fontSize: 13, color: CYAN, cursor: "pointer", padding: 0, fontWeight: 600 }}
-                  >
-                    {showPreview ? "▲ 미리보기 닫기" : "▼ 미리보기 열기"}
-                  </button>
-                  {showPreview && (
-                    <div style={{
-                      marginTop: 10, padding: 16, borderRadius: 10, background: "#fafafa",
-                      maxHeight: 280, overflowY: "auto", fontSize: 12, color: "#555", lineHeight: 1.7,
-                      whiteSpace: "pre-wrap", fontFamily: "monospace", border: "1px solid #f0f0f0"
-                    }}>
-                      {sourceContent.slice(0, 1500)}
-                      {sourceContent.length > 1500 && <span style={{ color: "#bbb" }}>{"\n\n…(이하 생략)"}</span>}
-                    </div>
-                  )}
-                </div>
-              )}
-            </Card>
-          )}
 
           {/* 퀴즈 설정 */}
           <Card style={{ padding: 24, marginBottom: 20 }}>
@@ -621,7 +624,7 @@ export default function Quiz() {
 
   // ── 생성 중 ──
   if (view === "generating") {
-    const sourceName = sourceContent ? (selectedSource === "raw" ? "원본 자료" : sourceLabels[selectedSource]) : null;
+    const sourceName = selectedMaterials.length > 0 ? `자료별 소스 ${selectedMaterials.length}개` : null;
     return (
       <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
