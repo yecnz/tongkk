@@ -6,7 +6,8 @@ import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
-import { MindmapView, parseMindmapJson } from "../components/MindmapView";
+import { MindmapView } from "../components/MindmapView";
+import { parseMindmapJson } from "../components/mindmapData";
 import {
   combineMaterialsMarkdown,
   getCourseMaterials,
@@ -57,6 +58,14 @@ const getFileType = (name: string): FileKind => {
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
+const getSavedSummaries = (course: string): SavedSummary[] => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`tongkk:summary:${course}`) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -282,7 +291,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
           </div>
         ) : mindmapData ? (
           <div style={{ background: "#fafafa", borderRadius: 12, padding: 24, overflowX: "auto" }}>
-            <MindmapView data={mindmapData} />
+            <MindmapView key={displayContent} data={mindmapData} />
           </div>
         ) : (
           <div style={{
@@ -555,19 +564,44 @@ export default function Summary() {
     const seenIds = new Set<string>();
     const seenNames = new Set<string>();
     const duplicateNames: string[] = [];
+    const duplicateFiles: File[] = [];
     const newFiles = arr.filter(file => {
       const id = getFileMaterialId(file);
       const nameKey = getFileNameKey(file.name);
       const isDuplicate = existingIds.has(id) || existingNames.has(nameKey) || seenIds.has(id) || seenNames.has(nameKey);
       seenIds.add(id);
       seenNames.add(nameKey);
-      if (isDuplicate) duplicateNames.push(file.name);
+      if (isDuplicate) {
+        duplicateNames.push(file.name);
+        duplicateFiles.push(file);
+      }
       return !isDuplicate;
     });
 
     setDuplicateNotice(duplicateNames.length > 0
       ? { names: Array.from(new Set(duplicateNames)) }
       : null);
+    if (duplicateFiles.length > 0) {
+      const duplicatePageCounts = await Promise.all(duplicateFiles.map(async file => ({
+        id: getFileMaterialId(file),
+        nameKey: getFileNameKey(file.name),
+        pages: await getPdfPageCount(file),
+      })));
+      let didUpdatePages = false;
+      const nextMaterials = materials.map(material => {
+        const match = duplicatePageCounts.find(item =>
+          item.id === material.id || item.nameKey === getFileNameKey(material.name)
+        );
+        if (!match || match.pages === null || material.pages === match.pages) return material;
+        didUpdatePages = true;
+        return { ...material, pages: match.pages };
+      });
+
+      if (didUpdatePages) {
+        saveCourseMaterials(selectedCourse, nextMaterials);
+        setMaterials(nextMaterials);
+      }
+    }
     if (newFiles.length === 0) return;
 
     setUploading(true);
@@ -577,7 +611,7 @@ export default function Summary() {
     const nf = await Promise.all(newFiles.map(async f => ({
       name: f.name, size: f.size, type: getFileType(f.name),
       pages: f.type === "application/pdf" ? await getPdfPageCount(f) : null,
-      slides: f.name.endsWith(".pptx") || f.name.endsWith(".ppt") ? Math.floor(Math.random() * 40) + 10 : null,
+      slides: null,
       rawFile: f,
     })));
     filesRef.current = [...filesRef.current, ...nf];
@@ -649,6 +683,23 @@ export default function Summary() {
     setSummaryError("");
 
     if (selectedMarkdown) {
+      if (selectedCourse) {
+        const savedSummary = getSavedSummaries(selectedCourse).find(s =>
+          s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)
+        );
+
+        if (savedSummary) {
+          setSummaryText(savedSummary.content);
+          setIsSummarizing(false);
+          setView("summaryResult");
+          setSummaryError("");
+          setElapsedTime(null);
+          setLoadingStep("");
+          setAgentThreadId("");
+          return;
+        }
+      }
+
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
@@ -663,7 +714,7 @@ export default function Summary() {
         setAgentThreadId(response.threadId);
         if (selectedCourse) {
           const key = `tongkk:summary:${selectedCourse}`;
-          const prev: SavedSummary[] = JSON.parse(localStorage.getItem(key) || '[]');
+          const prev = getSavedSummaries(selectedCourse);
           const updated = [
             ...prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds))),
             { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds },

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { CYAN } from "../common";
+import type { NodeData } from "./mindmapData";
 
-type NodeData = { label: string; children: NodeData[] };
 type LayoutNode = {
   id: string;
   label: string;
@@ -17,30 +17,6 @@ const NODE_H = 38;
 const H_GAP = 68;
 const V_GAP = 14;
 const PAD = 20;
-
-export function parseMindmapJson(text: string): NodeData | null {
-  try {
-    const s = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-    const start = s.indexOf("{");
-    const end = s.lastIndexOf("}");
-    if (start === -1 || end === -1) return null;
-    const parsed = JSON.parse(s.slice(start, end + 1));
-    if (typeof parsed.root !== "string") return null;
-    return { label: parsed.root, children: coerce(parsed.children) };
-  } catch {
-    return null;
-  }
-}
-
-function coerce(arr: unknown): NodeData[] {
-  if (!Array.isArray(arr)) return [];
-  return arr.flatMap(item => {
-    if (typeof item !== "object" || !item) return [];
-    const o = item as Record<string, unknown>;
-    if (typeof o.label !== "string") return [];
-    return [{ label: o.label, children: coerce(o.children) }];
-  });
-}
 
 function layoutTree(
   node: NodeData,
@@ -75,6 +51,11 @@ function flatEdges(node: LayoutNode): Array<[LayoutNode, LayoutNode]> {
   return node.children.flatMap(c => [[node, c] as [LayoutNode, LayoutNode], ...flatEdges(c)]);
 }
 
+function collapsibleIds(node: NodeData, id = "root"): string[] {
+  if (node.children.length === 0) return [];
+  return [id, ...node.children.flatMap((child, index) => collapsibleIds(child, `${id}.${index}`))];
+}
+
 const DEPTH_COLORS = [
   { bg: "#EDE9FF", border: "#C4B5FD", text: "#5B21B6" },
   { bg: "#f5f5f5", border: "#e0e0e0", text: "#333" },
@@ -82,12 +63,13 @@ const DEPTH_COLORS = [
 ];
 
 export function MindmapView({ data }: { data: NodeData }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(collapsibleIds(data)));
 
   const toggle = (id: string) =>
     setCollapsed(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
@@ -161,6 +143,8 @@ export function MindmapView({ data }: { data: NodeData }) {
             {node.hasChildren && (
               <button
                 onClick={() => toggle(node.id)}
+                aria-label={collapsed.has(node.id) ? `${node.label} 펼치기` : `${node.label} 접기`}
+                title={collapsed.has(node.id) ? "펼치기" : "접기"}
                 style={{
                   background: "rgba(0,0,0,0.06)",
                   border: "none",
@@ -176,7 +160,7 @@ export function MindmapView({ data }: { data: NodeData }) {
                   flexShrink: 0,
                 }}
               >
-                {collapsed.has(node.id) ? "›" : "‹"}
+                {collapsed.has(node.id) ? "+" : "-"}
               </button>
             )}
           </div>

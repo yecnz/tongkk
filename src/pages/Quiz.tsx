@@ -6,7 +6,6 @@ import { generateQuiz, type QuizQuestion, type QuizDifficulty, type QuizQuestion
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import {
-  combineMaterialsMarkdown,
   getCourseMaterials,
   getFileMaterialId,
   saveCourseMaterials,
@@ -71,7 +70,6 @@ export default function Quiz() {
   const [savedSummaries, setSavedSummaries] = useState<SavedSummary[]>([]);
   const [selectedSource, setSelectedSource] = useState<QuizSource>("raw");
   const [materialSources, setMaterialSources] = useState<Record<string, QuizSource>>({});
-  const [showPreview, setShowPreview] = useState(false);
   const pendingTemplateRef = useRef<SummaryTemplate | null>(null);
   const pendingMaterialIdsRef = useRef<string[] | null>(null);
   const sourceTouchedRef = useRef(false);
@@ -152,7 +150,6 @@ export default function Quiz() {
             : "raw";
       return [material.id, source];
     })));
-    setShowPreview(false);
     setUploadedFileName("");
     setExtractError("");
     setMaterialNotice("");
@@ -189,11 +186,9 @@ export default function Quiz() {
   };
 
   const handleCourseBack = () => {
-    if (fromDashboardRef.current) {
-      navigate(pageRoutes["대시보드"]);
-      return;
-    }
-    resetCourseSelection();
+    navigate(pageRoutes["자료 요약"], {
+      state: { selectedCourse, fromDashboard: fromDashboardRef.current },
+    });
   };
 
   const handleFile = async (file: File) => {
@@ -331,13 +326,10 @@ export default function Quiz() {
     return typeof v === "number" && quiz.answer === v;
   }).length;
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
-  const activeMarkdown = combineMaterialsMarkdown(selectedMaterials);
-  const mixedSourceMarkdown = buildMaterialSourceMarkdown(selectedMaterials);
   const matchingSummaries = savedSummaries.filter(s =>
     sameMaterialIds(s.materialIds, selectedMaterialIds) ||
     (!s.materialIds && sameMaterialIds(selectedMaterialIds, materials.map(material => material.id)))
   );
-  const sourceContent = mixedSourceMarkdown;
 
   useEffect(() => {
     const hasSelectedSummary = matchingSummaries.some(s => s.template === selectedSource);

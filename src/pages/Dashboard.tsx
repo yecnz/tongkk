@@ -5,6 +5,8 @@ import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
+type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
+type DeleteCourseModalProps = { course: string; onClose: () => void; onDelete: (name: string) => void };
 type JoinCommunityModalProps = { onClose: () => void; onJoin: (univ: string, dept: string) => void };
 type CustomCalendarProps = { value: string; onChange: (value: string) => void };
 type AddDdayModalProps = { onClose: () => void; onAdd: (subject: string, date: string) => void };
@@ -40,6 +42,67 @@ const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
     </div>
   );
 };
+
+const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseModalProps) => {
+  const [name, setName] = useState(course);
+  const trimmedName = name.trim();
+  const isDuplicate = trimmedName !== course && courses.includes(trimmedName);
+  const canSave = Boolean(trimmedName) && !isDuplicate;
+
+  const handleSave = () => {
+    if (!canSave) return;
+    onRename(course, trimmedName);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Card style={{ padding: 28, width: 340 }}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 이름 변경</h3>
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleSave(); }}
+          autoFocus
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 10,
+            border: isDuplicate ? "1px solid #E53E3E" : "1px solid #e0e0e0",
+            fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: isDuplicate ? 8 : 16
+          }}
+        />
+        {isDuplicate && (
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "#E53E3E" }}>이미 등록된 강의 이름입니다.</p>
+        )}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={handleSave} disabled={!canSave} style={{
+            padding: "8px 18px", borderRadius: 10, border: "none",
+            background: canSave ? PINK : "#ddd", color: "#fff",
+            cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600
+          }}>저장</button>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps) => (
+  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <Card style={{ padding: 28, width: 360 }}>
+      <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#222" }}>강의를 삭제할까요?</h3>
+      <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "#666" }}>
+        {course}의 저장된 강의자료와 요약도 함께 삭제됩니다.
+      </p>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+        <button onClick={() => { onDelete(course); onClose(); }} style={{
+          padding: "8px 18px", borderRadius: 10, border: "none",
+          background: "#E53E3E", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700
+        }}>삭제</button>
+      </div>
+    </Card>
+  </div>
+);
 
 const JoinCommunityModal = ({ onClose, onJoin }: JoinCommunityModalProps) => {
   const [univ, setUniv] = useState("");
@@ -184,7 +247,7 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { courses, addCourse } = useCourses();
+  const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [community, setCommunity] = useState<CommunityInfo | null>(() => {
@@ -201,6 +264,9 @@ export default function Dashboard() {
   const [showAddDday, setShowAddDday] = useState(false);
   const [showAllDdays, setShowAllDdays] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
+  const [openCourseMenu, setOpenCourseMenu] = useState<string | null>(null);
+  const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
+  const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
 
   useEffect(() => { localStorage.setItem("tongkk:ddays", JSON.stringify(ddays)); }, [ddays]);
   useEffect(() => { localStorage.setItem("tongkk:plans", JSON.stringify(plans)); }, [plans]);
@@ -208,6 +274,12 @@ export default function Dashboard() {
     if (community) localStorage.setItem("tongkk:community", JSON.stringify(community));
     else localStorage.removeItem("tongkk:community");
   }, [community]);
+  useEffect(() => {
+    if (!openCourseMenu) return;
+    const closeMenu = () => setOpenCourseMenu(null);
+    window.addEventListener("click", closeMenu);
+    return () => window.removeEventListener("click", closeMenu);
+  }, [openCourseMenu]);
 
   const getDaysLeft = (dateStr: string) => {
     const t = new Date(dateStr); const n = new Date();
@@ -230,6 +302,8 @@ export default function Dashboard() {
       {sidebar && <Sidebar active={page} onNav={(item) => { navigate(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
       {showAddCourse && <AddCourseModal onClose={() => setShowAddCourse(false)} onAdd={addCourse} />}
+      {renamingCourse && <RenameCourseModal course={renamingCourse} courses={courses} onClose={() => setRenamingCourse(null)} onRename={renameCourse} />}
+      {deletingCourse && <DeleteCourseModal course={deletingCourse} onClose={() => setDeletingCourse(null)} onDelete={deleteCourse} />}
       {showJoin && <JoinCommunityModal onClose={() => setShowJoin(false)} onJoin={(u, d) => setCommunity({ univ: u, dept: d })} />}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { text: t, done: false }])} />}
@@ -262,25 +336,110 @@ export default function Dashboard() {
                 ) : (
                   <div>
                     {courses.map((c, i) => (
-                      <div key={i} style={{
+                      <div key={c} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "14px 0", borderBottom: i < courses.length - 1 ? "1px solid #f5f5f5" : "none"
+                        padding: "14px 0", borderBottom: i < courses.length - 1 ? "1px solid #f5f5f5" : "none",
+                        position: "relative",
                       }}>
                         <span style={{ fontSize: 15, fontWeight: 500, color: "#333" }}>{c}</span>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          {["요약", "퀴즈", "커뮤니티"].map(btn => (
-                            <button key={btn} onClick={() => {
-                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
-                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
-                              else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
-                            }} style={{
-                              padding: "6px 14px", borderRadius: 8,
-                              border: btn === "커뮤니티" ? "1px solid #e0e0e0" : "none",
-                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
-                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
-                              fontSize: 13, fontWeight: 500, cursor: "pointer"
-                            }}>{btn}</button>
-                          ))}
+	                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+	                          {["요약", "퀴즈", "커뮤니티"].map(btn => (
+	                            <button key={btn} onClick={() => {
+	                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
+	                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
+	                              else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
+	                            }} style={{
+	                              padding: "6px 14px", borderRadius: 8,
+	                              border: btn === "커뮤니티" ? "1px solid #e0e0e0" : "none",
+	                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
+	                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
+	                              fontSize: 13, fontWeight: 500, cursor: "pointer"
+	                            }}>{btn}</button>
+	                          ))}
+	                          <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
+	                          <button
+	                            type="button"
+	                            aria-label={`${c} 관리 메뉴`}
+	                            title="강의 관리"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setOpenCourseMenu(prev => prev === c ? null : c);
+                            }}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 9,
+                              border: "1px solid #eeeeee",
+                              background: openCourseMenu === c ? "#fafafa" : "#fff",
+                              color: "#999",
+                              cursor: "pointer",
+                              fontSize: 18,
+                              lineHeight: "26px",
+                              padding: 0,
+                            }}
+                          >
+                            ⋯
+                          </button>
+                          {openCourseMenu === c && (
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{
+                                position: "absolute",
+                                right: 0,
+                                top: 50,
+                                width: 128,
+                                padding: 6,
+                                borderRadius: 12,
+                                border: "1px solid #eeeeee",
+                                background: "#fff",
+                                boxShadow: "0 12px 28px rgba(0,0,0,0.12)",
+                                zIndex: 20,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenCourseMenu(null);
+                                  setRenamingCourse(c);
+                                }}
+                                style={{
+                                  width: "100%",
+                                  padding: "9px 10px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#fff",
+                                  color: "#333",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                이름 변경
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenCourseMenu(null);
+                                  setDeletingCourse(c);
+                                }}
+                                style={{
+                                  width: "100%",
+                                  padding: "9px 10px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#fff",
+                                  color: "#E53E3E",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
