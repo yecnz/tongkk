@@ -478,10 +478,17 @@ export default function Quiz() {
                   const isSelected = selectedMaterialIds.includes(material.id);
                   const materialSummaries = getMaterialSummaries(material.id);
                   const source = getMaterialSource(material.id);
+                  const sourceOptions: { value: QuizSource; label: string }[] = [
+                    { value: "raw", label: "원본" },
+                    ...materialSummaries.map(summary => ({
+                      value: summary.template,
+                      label: sourceLabels[summary.template],
+                    })),
+                  ];
                   return (
                     <div key={material.id} style={{
-                      display: "grid", gridTemplateColumns: "minmax(0, 1fr) 170px", gap: 12, alignItems: "center",
-                      padding: "10px 12px", borderRadius: 10, marginBottom: 8,
+                      display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, alignItems: "center",
+                      padding: "12px 14px", borderRadius: 10, marginBottom: 8,
                       background: isSelected ? "#F0FDFF" : "#fafafa",
                       border: isSelected ? `1px solid ${CYAN}` : "1px solid transparent",
                     }}>
@@ -502,23 +509,36 @@ export default function Quiz() {
                           {material.name}
                         </span>
                       </label>
-                      <select
-                        value={source}
-                        disabled={!isSelected}
-                        onChange={e => setMaterialSources(prev => ({ ...prev, [material.id]: e.target.value as QuizSource }))}
-                        style={{
-                          width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #e0e0e0",
-                          background: isSelected ? "#fff" : "#f2f2f2", fontSize: 13, fontWeight: 600,
-                          color: isSelected ? "#555" : "#aaa", outline: "none", cursor: isSelected ? "pointer" : "not-allowed"
-                        }}
-                      >
-                        <option value="raw">원본 자료</option>
-                        {materialSummaries.map(summary => (
-                          <option key={summary.template} value={summary.template}>
-                            {sourceLabels[summary.template]}
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{
+                        display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 26,
+                        opacity: isSelected ? 1 : 0.55
+                      }}>
+                        {sourceOptions.map(option => {
+                          const isActiveSource = source === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              disabled={!isSelected}
+                              onClick={() => setMaterialSources(prev => ({ ...prev, [material.id]: option.value }))}
+                              style={{
+                                border: isActiveSource ? `1px solid ${PINK}` : "1px solid #eeeeee",
+                                background: isActiveSource ? "#FFF0F6" : "#fff",
+                                color: isActiveSource ? PINK : "#777",
+                                borderRadius: 999,
+                                padding: "6px 10px",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                lineHeight: 1,
+                                cursor: isSelected ? "pointer" : "not-allowed",
+                                boxShadow: isActiveSource ? "0 2px 8px rgba(240, 112, 174, 0.12)" : "none",
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
