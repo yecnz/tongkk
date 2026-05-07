@@ -163,12 +163,16 @@ OX 규칙:
 - answer는 정답 선택지의 인덱스다. 0~3 정수로 작성한다."""
 
 
-@app.post("/convert")
-async def convert_pdf_to_markdown(file: UploadFile = File(...)):
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="PDF 파일만 지원합니다.")
+SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+
+@app.post("/convert")
+async def convert_document_to_markdown(file: UploadFile = File(...)):
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 지원합니다.")
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
 

@@ -5,7 +5,7 @@ type ConvertApiResponse = {
 };
 
 /**
- * PDF 파일을 Markdown 문자열로 변환 (전처리 단계)
+ * PDF/PPT/PPTX 파일을 Markdown 문자열로 변환 (전처리 단계)
  * FastAPI 서버의 markitdown 사용
  */
 export async function extractMarkdownFromPDF(file: File): Promise<string> {
@@ -31,7 +31,7 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
     return data.markdown;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('PDF 변환 시간 초과. 파일 크기를 확인하거나 다시 시도해주세요.');
+      throw new Error('파일 변환 시간 초과. 파일 크기를 확인하거나 다시 시도해주세요.');
     }
     throw err;
   } finally {

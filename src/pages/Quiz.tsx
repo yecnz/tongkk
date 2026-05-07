@@ -24,6 +24,9 @@ const sourceLabels: Record<string, string> = {
   CHEAT_SHEET: "치트시트",
 };
 
+const isSupportedDocumentFile = (file: File) =>
+  ["pdf", "ppt", "pptx"].includes((file.name.split(".").pop() || "").toLowerCase());
+
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
@@ -192,7 +195,7 @@ export default function Quiz() {
   };
 
   const handleFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".pdf") || isExtracting) return;
+    if (!isSupportedDocumentFile(file) || isExtracting) return;
     if (!selectedCourse) return;
 
     const fileId = getFileMaterialId(file);
@@ -210,13 +213,13 @@ export default function Quiz() {
     try {
       const [markdown, pageCount] = await Promise.all([
         extractMarkdownFromPDF(file),
-        getPdfPageCount(file),
+        file.name.toLowerCase().endsWith(".pdf") ? getPdfPageCount(file) : Promise.resolve(null),
       ]);
       const material: CourseMaterial = {
         id: fileId,
         name: file.name,
         size: file.size,
-        type: "pdf",
+        type: file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "ppt",
         pages: pageCount,
         slides: null,
         markdown,
@@ -229,7 +232,7 @@ export default function Quiz() {
       setSelectedSource("raw");
       setMaterialSources(prev => ({ ...prev, [material.id]: "raw" }));
     } catch (err) {
-      setExtractError(err instanceof Error ? err.message : "PDF 변환 실패");
+      setExtractError(err instanceof Error ? err.message : "파일 변환 실패");
     } finally {
       setIsExtracting(false);
     }
@@ -451,7 +454,7 @@ export default function Quiz() {
           <Card style={{ padding: 24, marginBottom: 16 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#222" }}>강의자료</h3>
 
-            <input ref={fileRef} type="file" accept=".pdf"
+            <input ref={fileRef} type="file" accept=".pdf,.ppt,.pptx"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
               style={{ display: "none" }} />
 
@@ -558,7 +561,7 @@ export default function Quiz() {
               }}
             >
               <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
-                PDF 파일을 드래그하거나
+                PDF, PPT 파일을 드래그하거나
               </p>
               <button style={{
                 padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
@@ -569,7 +572,7 @@ export default function Quiz() {
             {isExtracting && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 14, height: 14, border: `2px solid ${PINK}`, borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: PINK }}>PDF 분석 중... ({uploadedFileName})</span>
+                <span style={{ fontSize: 13, color: PINK }}>파일 분석 중... ({uploadedFileName})</span>
               </div>
             )}
             {!isExtracting && uploadedFileName && !extractError && (
