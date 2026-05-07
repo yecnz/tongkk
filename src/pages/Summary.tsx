@@ -55,6 +55,9 @@ const getFileType = (name: string): FileKind => {
   return "file";
 };
 
+const isSupportedDocumentFile = (file: File) =>
+  ["pdf", "ppt", "pptx"].includes((file.name.split(".").pop() || "").toLowerCase());
+
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
@@ -558,9 +561,7 @@ export default function Summary() {
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList) return;
-    const arr = Array.from(fileList).filter(f =>
-      f.type === "application/pdf"
-    );
+    const arr = Array.from(fileList).filter(isSupportedDocumentFile);
     if (arr.length === 0) return;
     if (!selectedCourse) return;
 
@@ -621,7 +622,7 @@ export default function Summary() {
 
     const nf = await Promise.all(newFiles.map(async f => ({
       name: f.name, size: f.size, type: getFileType(f.name),
-      pages: f.type === "application/pdf" ? await getPdfPageCount(f) : null,
+      pages: getFileType(f.name) === "pdf" ? await getPdfPageCount(f) : null,
       slides: null,
       rawFile: f,
     })));
@@ -634,13 +635,13 @@ export default function Summary() {
     setExtractError("");
     const uploadedMaterials: CourseMaterial[] = [];
     try {
-      for (const pdfFile of newFiles) {
+      for (const documentFile of newFiles) {
         try {
-          const markdown = await extractMarkdownFromPDF(pdfFile);
-          const uploadedMaterial = nf.find(f => f.rawFile === pdfFile) || nf.find(f => f.name === pdfFile.name);
+          const markdown = await extractMarkdownFromPDF(documentFile);
+          const uploadedMaterial = nf.find(f => f.rawFile === documentFile) || nf.find(f => f.name === documentFile.name);
           if (uploadedMaterial) {
             uploadedMaterials.push({
-              id: getFileMaterialId(pdfFile),
+              id: getFileMaterialId(documentFile),
               name: uploadedMaterial.name,
               size: uploadedMaterial.size,
               type: uploadedMaterial.type,
@@ -651,7 +652,7 @@ export default function Summary() {
             });
           }
         } catch (err) {
-          setExtractError(err instanceof Error ? err.message : "PDF 분석 실패");
+          setExtractError(err instanceof Error ? err.message : "파일 분석 실패");
         }
       }
 
@@ -930,9 +931,9 @@ export default function Summary() {
                     transition: "all 0.2s", marginBottom: 20
                   }}
                 >
-                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,image/*"
+                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx"
                     onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
-                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
+                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT 파일을 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
                     background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
@@ -955,7 +956,7 @@ export default function Summary() {
                       width: 18, height: 18, border: `2px solid ${PINK}`, borderTop: "2px solid transparent",
                       borderRadius: "50%", animation: "spin 0.8s linear infinite"
                     }}/>
-                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>PDF 분석 중...</span>
+                    <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>파일 분석 중...</span>
                   </div>
                 )}
                 {!isExtracting && selectedMarkdown && (

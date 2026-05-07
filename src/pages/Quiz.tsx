@@ -24,6 +24,15 @@ const sourceLabels: Record<string, string> = {
   CHEAT_SHEET: "치트시트",
 };
 
+const isSupportedDocumentFile = (file: File) =>
+  ["pdf", "ppt", "pptx"].includes((file.name.split(".").pop() || "").toLowerCase());
+
+const getDocumentMaterialType = (file: File): CourseMaterial["type"] =>
+  file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "ppt";
+
+const formatFileNames = (files: Pick<File, "name">[]) =>
+  files.length <= 2 ? files.map(file => file.name).join(", ") : `${files[0].name} 외 ${files.length - 1}개`;
+
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
@@ -191,45 +200,85 @@ export default function Quiz() {
     });
   };
 
-  const handleFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".pdf") || isExtracting) return;
+  const handleFiles = async (fileList: FileList | File[] | null) => {
+    if (!fileList || isExtracting) return;
     if (!selectedCourse) return;
 
-    const fileId = getFileMaterialId(file);
-    const fileNameKey = file.name.trim().toLowerCase();
-    if (materials.some(material => material.id === fileId || material.name.trim().toLowerCase() === fileNameKey)) {
-      setMaterialNotice(`이미 등록된 파일입니다: ${file.name}`);
+    const supportedFiles = Array.from(fileList).filter(isSupportedDocumentFile);
+    if (supportedFiles.length === 0) {
+      setMaterialNotice("PDF, PPT, PPTX 파일만 업로드할 수 있습니다.");
+      setUploadedFileName("");
+      setExtractError("");
+      return;
+    }
+
+    const existingIds = new Set(materials.map(material => material.id));
+    const existingNames = new Set(materials.map(material => material.name.trim().toLowerCase()));
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    const duplicateNames: string[] = [];
+    const newFiles = supportedFiles.filter(file => {
+      const fileId = getFileMaterialId(file);
+      const fileNameKey = file.name.trim().toLowerCase();
+      const isDuplicate = existingIds.has(fileId) || existingNames.has(fileNameKey) || seenIds.has(fileId) || seenNames.has(fileNameKey);
+      seenIds.add(fileId);
+      seenNames.add(fileNameKey);
+      if (isDuplicate) duplicateNames.push(file.name);
+      return !isDuplicate;
+    });
+
+    if (duplicateNames.length > 0) {
+      setMaterialNotice(`이미 등록된 파일입니다: ${Array.from(new Set(duplicateNames)).join(", ")}`);
+    } else {
+      setMaterialNotice("");
+    }
+    if (newFiles.length === 0) {
       setUploadedFileName("");
       return;
     }
 
-    setUploadedFileName(file.name);
+    setUploadedFileName(formatFileNames(newFiles));
     setIsExtracting(true);
     setExtractError("");
-    setMaterialNotice("");
+    const uploadedMaterials: CourseMaterial[] = [];
+    const failedNames: string[] = [];
+
     try {
-      const [markdown, pageCount] = await Promise.all([
-        extractMarkdownFromPDF(file),
-        getPdfPageCount(file),
-      ]);
-      const material: CourseMaterial = {
-        id: fileId,
-        name: file.name,
-        size: file.size,
-        type: "pdf",
-        pages: pageCount,
-        slides: null,
-        markdown,
-        updatedAt: Date.now(),
-      };
-      const nextMaterials = [...materials, material];
-      saveCourseMaterials(selectedCourse, nextMaterials);
-      setMaterials(nextMaterials);
-      setSelectedMaterialIds(prev => Array.from(new Set([...prev, material.id])));
+      for (const file of newFiles) {
+        try {
+          const [markdown, pageCount] = await Promise.all([
+            extractMarkdownFromPDF(file),
+            getDocumentMaterialType(file) === "pdf" ? getPdfPageCount(file) : Promise.resolve(null),
+          ]);
+          uploadedMaterials.push({
+            id: getFileMaterialId(file),
+            name: file.name,
+            size: file.size,
+            type: getDocumentMaterialType(file),
+            pages: pageCount,
+            slides: null,
+            markdown,
+            updatedAt: Date.now(),
+          });
+        } catch {
+          failedNames.push(file.name);
+        }
+      }
+
+      if (uploadedMaterials.length > 0) {
+        const nextMaterials = [...materials, ...uploadedMaterials];
+        saveCourseMaterials(selectedCourse, nextMaterials);
+        setMaterials(nextMaterials);
+        setSelectedMaterialIds(prev => Array.from(new Set([...prev, ...uploadedMaterials.map(material => material.id)])));
+        setMaterialSources(prev => ({
+          ...prev,
+          ...Object.fromEntries(uploadedMaterials.map(material => [material.id, "raw" as QuizSource])),
+        }));
+      }
       setSelectedSource("raw");
-      setMaterialSources(prev => ({ ...prev, [material.id]: "raw" }));
-    } catch (err) {
-      setExtractError(err instanceof Error ? err.message : "PDF 변환 실패");
+      if (failedNames.length > 0) {
+        setExtractError(`${failedNames.join(", ")} 변환 실패`);
+      }
     } finally {
       setIsExtracting(false);
     }
@@ -238,8 +287,7 @@ export default function Quiz() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    handleFiles(e.dataTransfer.files);
   };
 
   const getMaterialSummaries = (materialId: string) =>
@@ -451,8 +499,8 @@ export default function Quiz() {
           <Card style={{ padding: 24, marginBottom: 16 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#222" }}>강의자료</h3>
 
-            <input ref={fileRef} type="file" accept=".pdf"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+            <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx"
+              onChange={e => { handleFiles(e.target.files); e.target.value = ""; }}
               style={{ display: "none" }} />
 
             {materials.length > 0 && (
@@ -558,7 +606,7 @@ export default function Quiz() {
               }}
             >
               <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
-                PDF 파일을 드래그하거나
+                PDF, PPT 파일을 여러 개 드래그하거나
               </p>
               <button style={{
                 padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
@@ -569,7 +617,7 @@ export default function Quiz() {
             {isExtracting && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 14, height: 14, border: `2px solid ${PINK}`, borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: PINK }}>PDF 분석 중... ({uploadedFileName})</span>
+                <span style={{ fontSize: 13, color: PINK }}>파일 분석 중... ({uploadedFileName})</span>
               </div>
             )}
             {!isExtracting && uploadedFileName && !extractError && (
