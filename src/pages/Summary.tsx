@@ -21,7 +21,7 @@ type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[]; materialNames?: string[] };
 type LocationState = { selectedCourse?: string; fromDashboard?: boolean } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
@@ -61,6 +61,9 @@ const isSupportedDocumentFile = (file: File) =>
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
+const sameMaterialNames = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].map(name => name.trim().toLowerCase()).sort()
+    .every((name, index) => name === [...b].map(item => item.trim().toLowerCase()).sort()[index]);
 const getSavedSummaries = (course: string): SavedSummary[] => {
   try {
     const parsed = JSON.parse(localStorage.getItem(`tongkk:summary:${course}`) || "[]");
@@ -727,9 +730,19 @@ export default function Summary() {
         if (selectedCourse) {
           const key = `tongkk:summary:${selectedCourse}`;
           const prev = getSavedSummaries(selectedCourse);
+          const selectedMaterialNames = selectedMaterials.map(material => material.name);
           const updated = [
-            ...prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds))),
-            { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds },
+            ...prev.filter(s => !(s.template === template && (
+              sameMaterialIds(s.materialIds, selectedMaterialIds) ||
+              sameMaterialNames(s.materialNames, selectedMaterialNames)
+            ))),
+            {
+              template,
+              content: response.result,
+              createdAt: Date.now(),
+              materialIds: selectedMaterialIds,
+              materialNames: selectedMaterialNames,
+            },
           ];
           localStorage.setItem(key, JSON.stringify(updated));
         }

@@ -13,7 +13,7 @@ import {
 } from "../services/materials";
 
 type QuizView = "courseList" | "courseDetail" | "generating" | "quiz" | "result";
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
+type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[]; materialNames?: string[] };
 type QuizSource = "raw" | SummaryTemplate;
 
 const sourceLabels: Record<string, string> = {
@@ -35,6 +35,10 @@ const formatFileNames = (files: Pick<File, "name">[]) =>
 
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
+
+const sameMaterialNames = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].map(name => name.trim().toLowerCase()).sort()
+    .every((name, index) => name === [...b].map(item => item.trim().toLowerCase()).sort()[index]);
 
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
@@ -135,8 +139,12 @@ export default function Quiz() {
     setSelectedMaterialIds(initialMaterialIds);
 
     // Summary에서 바로 넘어온 경우에는 해당 템플릿을 우선하고, 일반 진입은 선택 자료에 맞는 일반 요약이 있으면 사용한다.
+    const initialMaterialNames = courseMaterials
+      .filter(material => initialMaterialIds.includes(material.id))
+      .map(material => material.name);
     const matchingSummaries = usable.filter(s =>
       sameMaterialIds(s.materialIds, initialMaterialIds) ||
+      sameMaterialNames(s.materialNames, initialMaterialNames) ||
       (!s.materialIds && sameMaterialIds(initialMaterialIds, courseMaterials.map(material => material.id)))
     );
     const pt = pendingTemplateRef.current;
@@ -150,7 +158,10 @@ export default function Quiz() {
           : "raw";
     setSelectedSource(defaultSrc);
     setMaterialSources(Object.fromEntries(courseMaterials.map(material => {
-      const materialSummaries = usable.filter(s => sameMaterialIds(s.materialIds, [material.id]));
+      const materialSummaries = usable.filter(s =>
+        sameMaterialIds(s.materialIds, [material.id]) ||
+        sameMaterialNames(s.materialNames, [material.name])
+      );
       const source: QuizSource =
         pt && materialSummaries.some(s => s.template === pt)
           ? pt
@@ -290,22 +301,25 @@ export default function Quiz() {
     handleFiles(e.dataTransfer.files);
   };
 
-  const getMaterialSummaries = (materialId: string) =>
-    savedSummaries.filter(s => sameMaterialIds(s.materialIds, [materialId]));
+  const getMaterialSummaries = (material: CourseMaterial) =>
+    savedSummaries.filter(s =>
+      sameMaterialIds(s.materialIds, [material.id]) ||
+      sameMaterialNames(s.materialNames, [material.name])
+    );
 
-  const getDefaultMaterialSource = (materialId: string): QuizSource =>
-    getMaterialSummaries(materialId).some(s => s.template === "GENERAL") ? "GENERAL" : "raw";
+  const getDefaultMaterialSource = (material: CourseMaterial): QuizSource =>
+    getMaterialSummaries(material).some(s => s.template === "GENERAL") ? "GENERAL" : "raw";
 
-  const getMaterialSource = (materialId: string): QuizSource =>
-    materialSources[materialId] || getDefaultMaterialSource(materialId);
+  const getMaterialSource = (material: CourseMaterial): QuizSource =>
+    materialSources[material.id] || getDefaultMaterialSource(material);
 
   const buildMaterialSourceMarkdown = (courseMaterials: CourseMaterial[]) =>
     courseMaterials
       .map(material => {
-        const source = getMaterialSource(material.id);
+        const source = getMaterialSource(material);
         const summary = source === "raw"
           ? null
-          : getMaterialSummaries(material.id).find(s => s.template === source);
+          : getMaterialSummaries(material).find(s => s.template === source);
         const label = source === "raw" ? "원본 자료" : sourceLabels[source];
         return `# ${material.name} (${label})\n\n${summary?.content || material.markdown}`;
       })
@@ -374,8 +388,10 @@ export default function Quiz() {
     return typeof v === "number" && quiz.answer === v;
   }).length;
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
+  const selectedMaterialNames = selectedMaterials.map(material => material.name);
   const matchingSummaries = savedSummaries.filter(s =>
     sameMaterialIds(s.materialIds, selectedMaterialIds) ||
+    sameMaterialNames(s.materialNames, selectedMaterialNames) ||
     (!s.materialIds && sameMaterialIds(selectedMaterialIds, materials.map(material => material.id)))
   );
 
@@ -524,8 +540,8 @@ export default function Quiz() {
               <div style={{ marginBottom: 12 }}>
                 {materials.map(material => {
                   const isSelected = selectedMaterialIds.includes(material.id);
-                  const materialSummaries = getMaterialSummaries(material.id);
-                  const source = getMaterialSource(material.id);
+                  const materialSummaries = getMaterialSummaries(material);
+                  const source = getMaterialSource(material);
                   const sourceOptions: { value: QuizSource; label: string }[] = [
                     { value: "raw", label: "원본" },
                     ...materialSummaries.map(summary => ({
