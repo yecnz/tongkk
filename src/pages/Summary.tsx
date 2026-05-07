@@ -250,21 +250,51 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
         background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 템플릿 선택으로</button>
       <Card style={{ padding: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <span style={{
-            padding: "4px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-            background: template === "GENERAL" ? "#f5f5f5" : template === "LECTURE_NOTE" ? "#FFF0F6" : template === "MINDMAP" ? "#E8FAFE" : "#F2EEFF",
-            color: template === "GENERAL" ? "#555" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "#7C3AED"
-          }}>{templateLabels[template]}</span>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#222" }}>
-            {templateLabels[template]} 요약
-          </h2>
-          {isLoading && (
-            <span style={{ fontSize: 13, color: "#aaa", marginLeft: 8 }}>AI가 요약 중...</span>
-          )}
-          {!isLoading && elapsedTime && (
-            <span style={{ fontSize: 12, color: "#bbb", marginLeft: 8 }}>{elapsedTime}초</span>
-          )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <span style={{
+              padding: "9px 18px", borderRadius: 999, border: "2px solid #eeeeee",
+              background: "#fff", fontSize: 17, fontWeight: 600, flex: "0 0 auto",
+              color: template === "GENERAL" ? "#555" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "#7C3AED"
+            }}>{templateLabels[template]}</span>
+            {isLoading && (
+              <span style={{ fontSize: 13, color: "#aaa", fontWeight: 700 }}>
+                AI가 요약 중...
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
+            {isLoading && (
+              <span style={{
+                padding: "6px 10px", borderRadius: 999, background: "#FFF7FB",
+                color: PINK, fontSize: 12, fontWeight: 800
+              }}>요약 중</span>
+            )}
+            {!isLoading && elapsedTime && (
+              <span style={{
+                padding: "6px 10px", borderRadius: 999, background: "#fafafa",
+                color: "#999", fontSize: 12, fontWeight: 700
+              }}>{elapsedTime}초</span>
+            )}
+            {!isLoading && (
+              <>
+                <button style={{
+                  height: 34, padding: "0 14px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
+                }}>공유하기</button>
+                <button style={{
+                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+                  background: "#fff", color: "#555", fontSize: 13, fontWeight: 600, cursor: "pointer"
+                }}>다운로드</button>
+                {realContent && !error && onGoToQuiz && (
+                  <button onClick={onGoToQuiz} style={{
+                    height: 34, padding: "0 14px", borderRadius: 10, border: "none",
+                    background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
+                  }}>퀴즈 생성하기</button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -299,25 +329,6 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             fontSize: 14, color: "#444", lineHeight: 1.8
           }}>
             <FormattedAiText content={displayContent} />
-          </div>
-        )}
-
-        {!isLoading && (
-          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <button style={{
-              padding: "10px 24px", borderRadius: 10, border: "none",
-              background: CYAN, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer"
-            }}>공유하기</button>
-            <button style={{
-              padding: "10px 24px", borderRadius: 10, border: "1px solid #e0e0e0",
-              background: "#fff", color: "#555", fontSize: 14, cursor: "pointer"
-            }}>다운로드</button>
-            {realContent && !error && onGoToQuiz && (
-              <button onClick={onGoToQuiz} style={{
-                padding: "10px 24px", borderRadius: 10, border: "none",
-                background: PINK, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer"
-              }}>퀴즈 생성하기</button>
-            )}
           </div>
         )}
 
