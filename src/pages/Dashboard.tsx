@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { useAuth } from "../AuthContext";
 import type { PageRouteLabel } from "../common";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
@@ -248,16 +249,21 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
+  const { user } = useAuth();
+  const userStorageKey = useCallback(
+    (key: string) => user ? `tongkk:${user.id}:${key}` : `tongkk:${key}`,
+    [user],
+  );
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [community, setCommunity] = useState<CommunityInfo | null>(() => {
-    try { const v = localStorage.getItem("tongkk:community"); return v ? JSON.parse(v) as CommunityInfo : null; } catch { return null; }
+    try { const v = localStorage.getItem(userStorageKey("community")); return v ? JSON.parse(v) as CommunityInfo : null; } catch { return null; }
   });
   const [ddays, setDdays] = useState<Dday[]>(() => {
-    try { return JSON.parse(localStorage.getItem("tongkk:ddays") || "[]") as Dday[]; } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(userStorageKey("ddays")) || "[]") as Dday[]; } catch { return []; }
   });
   const [plans, setPlans] = useState<Plan[]>(() => {
-    try { return JSON.parse(localStorage.getItem("tongkk:plans") || "[]") as Plan[]; } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(userStorageKey("plans")) || "[]") as Plan[]; } catch { return []; }
   });
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
@@ -268,12 +274,12 @@ export default function Dashboard() {
   const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
 
-  useEffect(() => { localStorage.setItem("tongkk:ddays", JSON.stringify(ddays)); }, [ddays]);
-  useEffect(() => { localStorage.setItem("tongkk:plans", JSON.stringify(plans)); }, [plans]);
+  useEffect(() => { localStorage.setItem(userStorageKey("ddays"), JSON.stringify(ddays)); }, [ddays, userStorageKey]);
+  useEffect(() => { localStorage.setItem(userStorageKey("plans"), JSON.stringify(plans)); }, [plans, userStorageKey]);
   useEffect(() => {
-    if (community) localStorage.setItem("tongkk:community", JSON.stringify(community));
-    else localStorage.removeItem("tongkk:community");
-  }, [community]);
+    if (community) localStorage.setItem(userStorageKey("community"), JSON.stringify(community));
+    else localStorage.removeItem(userStorageKey("community"));
+  }, [community, userStorageKey]);
   useEffect(() => {
     if (!openCourseMenu) return;
     const closeMenu = () => setOpenCourseMenu(null);
@@ -342,25 +348,24 @@ export default function Dashboard() {
                         position: "relative",
                       }}>
                         <span style={{ fontSize: 15, fontWeight: 500, color: "#333" }}>{c}</span>
-	                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-	                          {["요약", "퀴즈", "커뮤니티"].map(btn => (
-	                            <button key={btn} onClick={() => {
-	                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
-	                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
-	                              else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
-	                            }} style={{
-	                              padding: "6px 14px", borderRadius: 8,
-	                              border: btn === "커뮤니티" ? "1px solid #e0e0e0" : "none",
-	                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
-	                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
-	                              fontSize: 13, fontWeight: 500, cursor: "pointer"
-	                            }}>{btn}</button>
-	                          ))}
-	                          <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
-	                          <button
-	                            type="button"
-	                            aria-label={`${c} 관리 메뉴`}
-	                            title="강의 관리"
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {["요약", "퀴즈"].map(btn => (
+                            <button key={btn} onClick={() => {
+                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
+                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
+                            }} style={{
+                              padding: "6px 14px", borderRadius: 8,
+                              border: "none",
+                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
+                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
+                              fontSize: 13, fontWeight: 500, cursor: "pointer"
+                            }}>{btn}</button>
+                          ))}
+                          <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
+                          <button
+                            type="button"
+                            aria-label={`${c} 관리 메뉴`}
+                            title="강의 관리"
                             onClick={e => {
                               e.stopPropagation();
                               setOpenCourseMenu(prev => prev === c ? null : c);

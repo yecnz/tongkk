@@ -5,15 +5,17 @@ import { useCourses } from "../CourseContext";
 import { generateQuiz, type QuizQuestion, type QuizDifficulty, type QuizQuestionType, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
+import { getLocalSummaries, loadSummariesFromServer, type SavedSummary } from "../services/summaries";
+import { loadQuizSetsFromServer, saveQuizSetToServer } from "../services/quizSets";
 import {
   getCourseMaterials,
   getFileMaterialId,
+  loadCourseMaterialsFromServer,
   saveCourseMaterials,
   type CourseMaterial,
 } from "../services/materials";
 
 type QuizView = "courseList" | "courseDetail" | "generating" | "quiz" | "result";
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
 type QuizSource = "raw" | SummaryTemplate;
 
 const sourceLabels: Record<string, string> = {
@@ -77,11 +79,9 @@ export default function Quiz() {
 
   // 자료 소스
   const [savedSummaries, setSavedSummaries] = useState<SavedSummary[]>([]);
-  const [selectedSource, setSelectedSource] = useState<QuizSource>("raw");
   const [materialSources, setMaterialSources] = useState<Record<string, QuizSource>>({});
   const pendingTemplateRef = useRef<SummaryTemplate | null>(null);
   const pendingMaterialIdsRef = useRef<string[] | null>(null);
-  const sourceTouchedRef = useRef(false);
   const fromDashboardRef = useRef(false);
 
   // 퀴즈
@@ -107,11 +107,12 @@ export default function Quiz() {
 
   // 과목 선택 시 localStorage에서 마크다운 + 요약본 로드
   useEffect(() => {
+    let ignore = false;
+
     if (!selectedCourse) {
       setMaterials([]);
       setSelectedMaterialIds([]);
       setSavedSummaries([]);
-      setSelectedSource("raw");
       setMaterialSources({});
       setUploadedFileName("");
       setExtractError("");
@@ -119,49 +120,67 @@ export default function Quiz() {
       return;
     }
 
-    const courseMaterials = getCourseMaterials(selectedCourse);
-    setMaterials(courseMaterials);
+    const applyCourseMaterials = (courseMaterials: CourseMaterial[]) => {
+      if (ignore) return;
+      setMaterials(courseMaterials);
 
-    const summaryRaw = localStorage.getItem(`tongkk:summary:${selectedCourse}`);
-    const summaries: SavedSummary[] = summaryRaw ? (JSON.parse(summaryRaw) as SavedSummary[]) : [];
-    // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
-    const usable = summaries.filter(s => s.template !== "MINDMAP");
-    setSavedSummaries(usable);
+      const summaries = getLocalSummaries(selectedCourse);
+      // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
+      const usable = summaries.filter(s => s.template !== "MINDMAP");
+      setSavedSummaries(usable);
 
-    const pendingMaterialIds = pendingMaterialIdsRef.current;
-    pendingMaterialIdsRef.current = null;
-    const validPendingIds = pendingMaterialIds?.filter(id => courseMaterials.some(material => material.id === id)) || [];
-    const initialMaterialIds = validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id);
-    setSelectedMaterialIds(initialMaterialIds);
+      const pendingMaterialIds = pendingMaterialIdsRef.current;
+      pendingMaterialIdsRef.current = null;
+      const validPendingIds = pendingMaterialIds?.filter(id => courseMaterials.some(material => material.id === id)) || [];
+      const initialMaterialIds = validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id);
+      setSelectedMaterialIds(initialMaterialIds);
 
-    // Summary에서 바로 넘어온 경우에는 해당 템플릿을 우선하고, 일반 진입은 선택 자료에 맞는 일반 요약이 있으면 사용한다.
-    const matchingSummaries = usable.filter(s =>
-      sameMaterialIds(s.materialIds, initialMaterialIds) ||
-      (!s.materialIds && sameMaterialIds(initialMaterialIds, courseMaterials.map(material => material.id)))
-    );
-    const pt = pendingTemplateRef.current;
-    pendingTemplateRef.current = null;
-    sourceTouchedRef.current = false;
-    const defaultSrc: QuizSource =
-      pt && matchingSummaries.some(s => s.template === pt)
-        ? pt
-        : matchingSummaries.some(s => s.template === "GENERAL")
-          ? "GENERAL"
-          : "raw";
-    setSelectedSource(defaultSrc);
-    setMaterialSources(Object.fromEntries(courseMaterials.map(material => {
-      const materialSummaries = usable.filter(s => sameMaterialIds(s.materialIds, [material.id]));
-      const source: QuizSource =
-        pt && materialSummaries.some(s => s.template === pt)
-          ? pt
-          : materialSummaries.some(s => s.template === "GENERAL")
-            ? "GENERAL"
-            : "raw";
-      return [material.id, source];
-    })));
-    setUploadedFileName("");
-    setExtractError("");
-    setMaterialNotice("");
+      const pt = pendingTemplateRef.current;
+      pendingTemplateRef.current = null;
+      setMaterialSources(Object.fromEntries(courseMaterials.map(material => {
+        const materialSummaries = usable
+          .filter(s => !s.materialIds || s.materialIds.includes(material.id))
+          .sort((a, b) => {
+            const aExact = sameMaterialIds(a.materialIds, [material.id]);
+            const bExact = sameMaterialIds(b.materialIds, [material.id]);
+            if (aExact !== bExact) return aExact ? -1 : 1;
+            return b.createdAt - a.createdAt;
+          });
+        const source: QuizSource =
+          pt && materialSummaries.some(s => s.template === pt)
+            ? pt
+            : materialSummaries.some(s => s.template === "GENERAL")
+              ? "GENERAL"
+              : "raw";
+        return [material.id, source];
+      })));
+      setUploadedFileName("");
+      setExtractError("");
+      setMaterialNotice("");
+    };
+
+    applyCourseMaterials(getCourseMaterials(selectedCourse));
+    loadCourseMaterialsFromServer(selectedCourse)
+      .then(applyCourseMaterials)
+      .catch(() => {
+        // Keep local cached materials when the backend is unavailable.
+      });
+
+    loadSummariesFromServer(selectedCourse)
+      .then(summaries => {
+        if (ignore) return;
+        setSavedSummaries(summaries.filter(s => s.template !== "MINDMAP"));
+      })
+      .catch(() => {
+        // Keep local cached summaries when the backend is unavailable.
+      });
+    loadQuizSetsFromServer(selectedCourse).catch(() => {
+      // Quiz history is best-effort for now.
+    });
+
+    return () => {
+      ignore = true;
+    };
   }, [selectedCourse]);
   // spin 애니메이션 CSS 한 번만 주입
   useEffect(() => {
@@ -275,7 +294,6 @@ export default function Quiz() {
           ...Object.fromEntries(uploadedMaterials.map(material => [material.id, "raw" as QuizSource])),
         }));
       }
-      setSelectedSource("raw");
       if (failedNames.length > 0) {
         setExtractError(`${failedNames.join(", ")} 변환 실패`);
       }
@@ -291,7 +309,14 @@ export default function Quiz() {
   };
 
   const getMaterialSummaries = (materialId: string) =>
-    savedSummaries.filter(s => sameMaterialIds(s.materialIds, [materialId]));
+    savedSummaries
+      .filter(s => !s.materialIds || s.materialIds.includes(materialId))
+      .sort((a, b) => {
+        const aExact = sameMaterialIds(a.materialIds, [materialId]);
+        const bExact = sameMaterialIds(b.materialIds, [materialId]);
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        return b.createdAt - a.createdAt;
+      });
 
   const getDefaultMaterialSource = (materialId: string): QuizSource =>
     getMaterialSummaries(materialId).some(s => s.template === "GENERAL") ? "GENERAL" : "raw";
@@ -299,17 +324,37 @@ export default function Quiz() {
   const getMaterialSource = (materialId: string): QuizSource =>
     materialSources[materialId] || getDefaultMaterialSource(materialId);
 
-  const buildMaterialSourceMarkdown = (courseMaterials: CourseMaterial[]) =>
-    courseMaterials
+  const buildMaterialSourceMarkdown = (courseMaterials: CourseMaterial[]) => {
+    const usedSummaryKeys = new Set<string>();
+
+    return courseMaterials
       .map(material => {
         const source = getMaterialSource(material.id);
         const summary = source === "raw"
           ? null
           : getMaterialSummaries(material.id).find(s => s.template === source);
         const label = source === "raw" ? "원본 자료" : sourceLabels[source];
+
+        if (summary) {
+          const summaryKey = `${summary.template}:${summary.createdAt}:${(summary.materialIds || []).join("|")}`;
+          if (usedSummaryKeys.has(summaryKey)) return "";
+          usedSummaryKeys.add(summaryKey);
+
+          const summaryMaterials = summary.materialIds
+            ? materials.filter(item => summary.materialIds?.includes(item.id))
+            : courseMaterials;
+          const title = summaryMaterials.length > 1
+            ? summaryMaterials.map(item => item.name).join(", ")
+            : material.name;
+
+          return `# ${title} (${label})\n\n${summary.content}`;
+        }
+
         return `# ${material.name} (${label})\n\n${summary?.content || material.markdown}`;
       })
+      .filter(Boolean)
       .join("\n\n---\n\n");
+  };
 
   const generate = async () => {
     if (!selectedCourse.trim()) return;
@@ -322,6 +367,16 @@ export default function Quiz() {
     try {
       const questions = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
       setQuizzes(questions);
+      saveQuizSetToServer(selectedCourse, {
+        title: `${selectedCourse} ${questionType} 퀴즈`,
+        difficulty,
+        questionType,
+        count: questions.length,
+        materialIds: selectedMaterialIds,
+        questions,
+      }).catch(error => {
+        console.warn("퀴즈 서버 저장 실패", error);
+      });
       setCurrent(0);
       setAnswers({});
       setShortAnswerInput("");
@@ -374,23 +429,6 @@ export default function Quiz() {
     return typeof v === "number" && quiz.answer === v;
   }).length;
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
-  const matchingSummaries = savedSummaries.filter(s =>
-    sameMaterialIds(s.materialIds, selectedMaterialIds) ||
-    (!s.materialIds && sameMaterialIds(selectedMaterialIds, materials.map(material => material.id)))
-  );
-
-  useEffect(() => {
-    const hasSelectedSummary = matchingSummaries.some(s => s.template === selectedSource);
-    if (selectedSource !== "raw" && !hasSelectedSummary) {
-      setSelectedSource("raw");
-      sourceTouchedRef.current = false;
-      return;
-    }
-    if (!sourceTouchedRef.current) {
-      setSelectedSource(matchingSummaries.some(s => s.template === "GENERAL") ? "GENERAL" : "raw");
-    }
-  }, [matchingSummaries, selectedSource]);
-
   const handleNav = (item: PageRouteLabel) => {
     if (view === "quiz") {
       if (!window.confirm("퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다.\n페이지를 떠나시겠습니까?")) {
@@ -425,8 +463,7 @@ export default function Quiz() {
               {courses.map((c, i) => {
                 const courseMaterials = getCourseMaterials(c);
                 const hasMarkdown = courseMaterials.length > 0;
-                const summaryRaw = localStorage.getItem(`tongkk:summary:${c}`);
-                const summaryCount = summaryRaw ? (JSON.parse(summaryRaw) as SavedSummary[]).filter(s => s.template !== "MINDMAP").length : 0;
+                const summaryCount = getLocalSummaries(c).filter(s => s.template !== "MINDMAP").length;
                 return (
                   <button
                     key={i}
@@ -528,10 +565,10 @@ export default function Quiz() {
                   const source = getMaterialSource(material.id);
                   const sourceOptions: { value: QuizSource; label: string }[] = [
                     { value: "raw", label: "원본" },
-                    ...materialSummaries.map(summary => ({
-                      value: summary.template,
-                      label: sourceLabels[summary.template],
-                    })),
+                    ...materialSummaries.reduce<{ value: QuizSource; label: string }[]>((options, summary) => {
+                      if (options.some(option => option.value === summary.template)) return options;
+                      return [...options, { value: summary.template, label: sourceLabels[summary.template] }];
+                    }, []),
                   ];
                   return (
                     <div key={material.id} style={{
@@ -545,7 +582,6 @@ export default function Quiz() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={e => {
-                            sourceTouchedRef.current = false;
                             setSelectedMaterialIds(prev =>
                               e.target.checked
                                 ? [...prev, material.id]

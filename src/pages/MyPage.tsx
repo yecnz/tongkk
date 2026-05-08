@@ -2,6 +2,7 @@ import { useState, useRef, type ChangeEvent, type CSSProperties } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { useAuth } from "../AuthContext";
 import { samplePosts, type Post } from "../data/posts";
 
 type ToggleProps = { on: boolean; onToggle: () => void };
@@ -200,14 +201,13 @@ export default function MyPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { courses } = useCourses();
+  const { user, signOut } = useAuth();
   const [sidebar, setSidebar] = useState(false);
   const [dark, setDark] = useState(false);
   const [notif, setNotif] = useState(true);
   const [view, setView] = useState(((location.state as LocationState)?.view) || "main");
-  const [loggedIn, setLoggedIn] = useState(true);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  const [nickname, setNickname] = useState("학생닉네임");
+  const [nickname, setNickname] = useState(user?.email?.split("@")[0] || "학생닉네임");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const handleProfileSave = (newName: string, newAvatar: string | null) => {
@@ -227,38 +227,6 @@ export default function MyPage() {
     commented: { title: "댓글 단 글", posts: commentedPosts },
     saved: { title: "스크랩한 글", posts: savedPosts },
   };
-
-  if (!loggedIn) {
-    return (
-      <div style={{
-        minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "#ffffff"
-      }}>
-        {showLoginModal && (
-          <LoginModal onClose={() => setShowLoginModal(false)} onLogin={() => { setLoggedIn(true); setShowLoginModal(false); }} />
-        )}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ marginBottom: 32 }}>
-            <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontSize: 36, fontWeight: 800, color: PINK, letterSpacing: -1, cursor: "pointer" }}>Tongkk</button>
-          </div>
-          <div style={{
-            background: "#ffffff", borderRadius: 24, padding: "40px 36px", width: 340,
-            boxShadow: "0 8px 40px rgba(0,192,232,0.12)"
-          }}>
-            <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 500, color: "#222" }}>로그인이 필요합니다</h2>
-            <p style={{ fontSize: 14, color: "#aaa", margin: "0 0 28px" }}>Tongkk를 이용하려면 로그인해주세요</p>
-            <button onClick={() => setShowLoginModal(true)} style={{
-              width: "100%", padding: "14px 0", borderRadius: 14,
-              background: "#e8e8e8", border: "none",
-              color: "#555", fontSize: 15, fontWeight: 600, cursor: "pointer",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.08)"
-            }}>로그인</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -309,10 +277,10 @@ export default function MyPage() {
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#222", marginBottom: 4 }}>{nickname}</div>
                     <div style={{ fontSize: 13, color: "#888", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
-                    <div style={{ fontSize: 13, color: "#aaa" }}>student@jejunu.ac.kr</div>
+                    <div style={{ fontSize: 13, color: "#aaa" }}>{user?.email}</div>
                   </div>
                 </div>
-                <button onClick={() => setLoggedIn(false)} style={{
+                <button onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
                   width: "100%", padding: "10px 0", borderRadius: 10,
                   border: "1px solid #e0e0e0", background: "#fff", color: "#999",
                   fontSize: 13, cursor: "pointer"

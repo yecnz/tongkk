@@ -11,12 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
+.claude/
 
 # Python
 .venv/
 __pycache__/
 *.py[cod]
 .env
+*.sqlite3
 
 # Editor directories and files
 .vscode/*

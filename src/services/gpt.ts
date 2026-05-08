@@ -1,8 +1,4 @@
-const BACKEND_URL = (
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_BACKEND_URL ||
-  'http://localhost:8000'
-).replace(/\/$/, '');
+import { BACKEND_URL, parseApiError } from './backend';
 
 export type QuizQuestion = {
   type?: QuizQuestionType;
@@ -15,25 +11,6 @@ export type QuizQuestion = {
 
 export type QuizDifficulty = '쉬움' | '보통' | '어려움';
 export type QuizQuestionType = '객관식' | 'OX' | '단답형';
-
-type ApiErrorBody = { detail?: string };
-
-async function parseApiError(response: Response): Promise<string> {
-  const text = await response.text().catch(() => '');
-  if (!text) return `API 오류 (${response.status})`;
-
-  try {
-    const parsed = JSON.parse(text) as ApiErrorBody;
-    if (parsed.detail) return parsed.detail;
-  } catch {
-    // JSON이 아닌 응답(HTML/text)일 수 있으므로 fallback 메시지 사용
-  }
-
-  const compactText = text.replace(/\s+/g, ' ').trim().slice(0, 180);
-  return compactText
-    ? `API 오류 (${response.status}): ${compactText}`
-    : `API 오류 (${response.status})`;
-}
 
 export async function generateQuiz(
   subject: string,

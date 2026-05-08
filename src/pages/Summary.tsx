@@ -6,12 +6,19 @@ import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
+import {
+  getLocalSummaries,
+  loadSummariesFromServer,
+  saveSummaryToServer,
+  type SavedSummary,
+} from "../services/summaries";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
 import {
   combineMaterialsMarkdown,
   getCourseMaterials,
   getFileMaterialId,
+  loadCourseMaterialsFromServer,
   saveCourseMaterials,
   type CourseMaterial,
 } from "../services/materials";
@@ -21,7 +28,6 @@ type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
-type SavedSummary = { template: SummaryTemplate; content: string; createdAt: number; materialIds?: string[] };
 type LocationState = { selectedCourse?: string; fromDashboard?: boolean } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
@@ -61,14 +67,7 @@ const isSupportedDocumentFile = (file: File) =>
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
-const getSavedSummaries = (course: string): SavedSummary[] => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(`tongkk:summary:${course}`) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
+const getSavedSummaries = getLocalSummaries;
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -516,6 +515,34 @@ export default function Summary() {
   }, [files]);
 
   useEffect(() => {
+    if (!selectedCourse) return;
+    let ignore = false;
+
+    loadCourseMaterialsFromServer(selectedCourse)
+      .then(nextMaterials => {
+        if (ignore) return;
+        setMaterials(nextMaterials);
+        setSelectedMaterialIds(prev => {
+          const validPreviousIds = prev.filter(id => nextMaterials.some(material => material.id === id));
+          return validPreviousIds.length > 0
+            ? validPreviousIds
+            : nextMaterials.map(material => material.id);
+        });
+      })
+      .catch(() => {
+        // Keep local cached materials when the backend is unavailable.
+      });
+
+    loadSummariesFromServer(selectedCourse).catch(() => {
+      // Keep local cached summaries when the backend is unavailable.
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedCourse]);
+
+  useEffect(() => {
     if (!duplicateNotice) return;
     const timer = window.setTimeout(() => setDuplicateNotice(null), 3600);
     return () => window.clearTimeout(timer);
@@ -727,11 +754,15 @@ export default function Summary() {
         if (selectedCourse) {
           const key = `tongkk:summary:${selectedCourse}`;
           const prev = getSavedSummaries(selectedCourse);
+          const savedSummary = { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds };
           const updated = [
             ...prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds))),
-            { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds },
+            savedSummary,
           ];
           localStorage.setItem(key, JSON.stringify(updated));
+          saveSummaryToServer(selectedCourse, savedSummary).catch(error => {
+            console.warn("요약 서버 저장 실패", error);
+          });
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
