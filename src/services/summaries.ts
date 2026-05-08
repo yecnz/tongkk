@@ -9,6 +9,7 @@ export type SavedSummary = {
   content: string;
   createdAt: number;
   materialIds?: string[];
+  materialNames?: string[];
 };
 
 type SummaryRow = {
@@ -100,7 +101,7 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
-  const saved = toSavedSummary(data);
+  const saved = { ...toSavedSummary(data), materialNames: summary.materialNames || [] };
   const summaries = [
     ...getLocalSummaries(course).filter(item =>
       !(item.template === saved.template && sameMaterialIds(item.materialIds, saved.materialIds))

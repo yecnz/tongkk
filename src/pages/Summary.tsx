@@ -67,6 +67,9 @@ const isSupportedDocumentFile = (file: File) =>
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
+const sameMaterialNames = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].map(name => name.trim().toLowerCase()).sort()
+    .every((name, index) => name === [...b].map(item => item.trim().toLowerCase()).sort()[index]);
 const getSavedSummaries = getLocalSummaries;
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
@@ -754,9 +757,19 @@ export default function Summary() {
         if (selectedCourse) {
           const key = `tongkk:summary:${selectedCourse}`;
           const prev = getSavedSummaries(selectedCourse);
-          const savedSummary = { template, content: response.result, createdAt: Date.now(), materialIds: selectedMaterialIds };
+          const selectedMaterialNames = selectedMaterials.map(material => material.name);
+          const savedSummary = {
+            template,
+            content: response.result,
+            createdAt: Date.now(),
+            materialIds: selectedMaterialIds,
+            materialNames: selectedMaterialNames,
+          };
           const updated = [
-            ...prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds))),
+            ...prev.filter(s => !(s.template === template && (
+              sameMaterialIds(s.materialIds, selectedMaterialIds) ||
+              sameMaterialNames(s.materialNames, selectedMaterialNames)
+            ))),
             savedSummary,
           ];
           localStorage.setItem(key, JSON.stringify(updated));

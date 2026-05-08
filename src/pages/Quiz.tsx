@@ -38,6 +38,10 @@ const formatFileNames = (files: Pick<File, "name">[]) =>
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
+const sameMaterialNames = (a: string[] = [], b: string[] = []) =>
+  a.length === b.length && [...a].map(name => name.trim().toLowerCase()).sort()
+    .every((name, index) => name === [...b].map(item => item.trim().toLowerCase()).sort()[index]);
+
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
@@ -135,23 +139,43 @@ export default function Quiz() {
       const initialMaterialIds = validPendingIds.length > 0 ? validPendingIds : courseMaterials.map(material => material.id);
       setSelectedMaterialIds(initialMaterialIds);
 
+      const initialMaterialNames = courseMaterials
+        .filter(material => initialMaterialIds.includes(material.id))
+        .map(material => material.name);
+      const matchingSummaries = usable.filter(s =>
+        sameMaterialIds(s.materialIds, initialMaterialIds) ||
+        sameMaterialNames(s.materialNames, initialMaterialNames) ||
+        (!s.materialIds && sameMaterialIds(initialMaterialIds, courseMaterials.map(material => material.id)))
+      );
       const pt = pendingTemplateRef.current;
       pendingTemplateRef.current = null;
+      const defaultSource: QuizSource =
+        pt && matchingSummaries.some(s => s.template === pt)
+          ? pt
+          : matchingSummaries.some(s => s.template === "GENERAL")
+            ? "GENERAL"
+            : "raw";
+
       setMaterialSources(Object.fromEntries(courseMaterials.map(material => {
         const materialSummaries = usable
-          .filter(s => !s.materialIds || s.materialIds.includes(material.id))
+          .filter(s =>
+            sameMaterialIds(s.materialIds, [material.id]) ||
+            sameMaterialNames(s.materialNames, [material.name])
+          )
           .sort((a, b) => {
-            const aExact = sameMaterialIds(a.materialIds, [material.id]);
-            const bExact = sameMaterialIds(b.materialIds, [material.id]);
+            const aExact = sameMaterialIds(a.materialIds, [material.id]) || sameMaterialNames(a.materialNames, [material.name]);
+            const bExact = sameMaterialIds(b.materialIds, [material.id]) || sameMaterialNames(b.materialNames, [material.name]);
             if (aExact !== bExact) return aExact ? -1 : 1;
             return b.createdAt - a.createdAt;
           });
         const source: QuizSource =
           pt && materialSummaries.some(s => s.template === pt)
             ? pt
-            : materialSummaries.some(s => s.template === "GENERAL")
-              ? "GENERAL"
-              : "raw";
+            : materialSummaries.some(s => s.template === defaultSource)
+              ? defaultSource
+              : materialSummaries.some(s => s.template === "GENERAL")
+                ? "GENERAL"
+                : "raw";
         return [material.id, source];
       })));
       setUploadedFileName("");
@@ -308,31 +332,34 @@ export default function Quiz() {
     handleFiles(e.dataTransfer.files);
   };
 
-  const getMaterialSummaries = (materialId: string) =>
+  const getMaterialSummaries = (material: CourseMaterial) =>
     savedSummaries
-      .filter(s => !s.materialIds || s.materialIds.includes(materialId))
+      .filter(s =>
+        sameMaterialIds(s.materialIds, [material.id]) ||
+        sameMaterialNames(s.materialNames, [material.name])
+      )
       .sort((a, b) => {
-        const aExact = sameMaterialIds(a.materialIds, [materialId]);
-        const bExact = sameMaterialIds(b.materialIds, [materialId]);
+        const aExact = sameMaterialIds(a.materialIds, [material.id]) || sameMaterialNames(a.materialNames, [material.name]);
+        const bExact = sameMaterialIds(b.materialIds, [material.id]) || sameMaterialNames(b.materialNames, [material.name]);
         if (aExact !== bExact) return aExact ? -1 : 1;
         return b.createdAt - a.createdAt;
       });
 
-  const getDefaultMaterialSource = (materialId: string): QuizSource =>
-    getMaterialSummaries(materialId).some(s => s.template === "GENERAL") ? "GENERAL" : "raw";
+  const getDefaultMaterialSource = (material: CourseMaterial): QuizSource =>
+    getMaterialSummaries(material).some(s => s.template === "GENERAL") ? "GENERAL" : "raw";
 
-  const getMaterialSource = (materialId: string): QuizSource =>
-    materialSources[materialId] || getDefaultMaterialSource(materialId);
+  const getMaterialSource = (material: CourseMaterial): QuizSource =>
+    materialSources[material.id] || getDefaultMaterialSource(material);
 
   const buildMaterialSourceMarkdown = (courseMaterials: CourseMaterial[]) => {
     const usedSummaryKeys = new Set<string>();
 
     return courseMaterials
       .map(material => {
-        const source = getMaterialSource(material.id);
+        const source = getMaterialSource(material);
         const summary = source === "raw"
           ? null
-          : getMaterialSummaries(material.id).find(s => s.template === source);
+          : getMaterialSummaries(material).find(s => s.template === source);
         const label = source === "raw" ? "원본 자료" : sourceLabels[source];
 
         if (summary) {
@@ -561,8 +588,8 @@ export default function Quiz() {
               <div style={{ marginBottom: 12 }}>
                 {materials.map(material => {
                   const isSelected = selectedMaterialIds.includes(material.id);
-                  const materialSummaries = getMaterialSummaries(material.id);
-                  const source = getMaterialSource(material.id);
+                  const materialSummaries = getMaterialSummaries(material);
+                  const source = getMaterialSource(material);
                   const sourceOptions: { value: QuizSource; label: string }[] = [
                     { value: "raw", label: "원본" },
                     ...materialSummaries.reduce<{ value: QuizSource; label: string }[]>((options, summary) => {
