@@ -7,16 +7,13 @@ import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
-  getLocalSummaries,
   loadSummariesFromServer,
   saveSummaryToServer,
-  type SavedSummary,
 } from "../services/summaries";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
 import {
   combineMaterialsMarkdown,
-  getCourseMaterials,
   getFileMaterialId,
   loadCourseMaterialsFromServer,
   saveCourseMaterials,
@@ -67,11 +64,6 @@ const isSupportedDocumentFile = (file: File) =>
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
-const sameMaterialNames = (a: string[] = [], b: string[] = []) =>
-  a.length === b.length && [...a].map(name => name.trim().toLowerCase()).sort()
-    .every((name, index) => name === [...b].map(item => item.trim().toLowerCase()).sort()[index]);
-const getSavedSummaries = getLocalSummaries;
-
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
     title: "일반 요약",
@@ -500,12 +492,8 @@ export default function Summary() {
   const [summaryError, setSummaryError] = useState("");
   const [loadingStep, setLoadingStep] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
-  const [materials, setMaterials] = useState<CourseMaterial[]>(
-    initialCourse ? getCourseMaterials(initialCourse) : []
-  );
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>(
-    initialCourse ? getCourseMaterials(initialCourse).map(material => material.id) : []
-  );
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
@@ -532,12 +520,12 @@ export default function Summary() {
             : nextMaterials.map(material => material.id);
         });
       })
-      .catch(() => {
-        // Keep local cached materials when the backend is unavailable.
+      .catch(error => {
+        setExtractError(error instanceof Error ? error.message : "강의자료 불러오기 실패");
       });
 
     loadSummariesFromServer(selectedCourse).catch(() => {
-      // Keep local cached summaries when the backend is unavailable.
+      // 요약 목록은 템플릿 선택 시 다시 조회한다.
     });
 
     return () => {
@@ -575,15 +563,14 @@ export default function Summary() {
   };
 
   const handleCourseSelect = (course: string) => {
-    const nextMaterials = getCourseMaterials(course);
     setSelectedCourse(course);
     setFiles([]);
     filesRef.current = [];
     setDragOver(false);
     setUploading(false);
     setSearched(true);
-    setMaterials(nextMaterials);
-    setSelectedMaterialIds(nextMaterials.map(material => material.id));
+    setMaterials([]);
+    setSelectedMaterialIds([]);
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
@@ -640,7 +627,7 @@ export default function Summary() {
       });
 
       if (didUpdatePages) {
-        saveCourseMaterials(selectedCourse, nextMaterials);
+        await saveCourseMaterials(selectedCourse, nextMaterials);
         setMaterials(nextMaterials);
       }
     }
@@ -688,7 +675,7 @@ export default function Summary() {
 
       if (uploadedMaterials.length > 0) {
         const nextMaterials = [...materials, ...uploadedMaterials];
-        saveCourseMaterials(selectedCourse, nextMaterials);
+        await saveCourseMaterials(selectedCourse, nextMaterials);
         setMaterials(nextMaterials);
         setSelectedMaterialIds(prev => Array.from(new Set([...prev, ...uploadedMaterials.map(material => material.id)])));
       }
@@ -697,21 +684,25 @@ export default function Summary() {
     }
   };
 
-  const handleDeleteMaterial = (material: CourseMaterial) => {
+  const handleDeleteMaterial = async (material: CourseMaterial) => {
     if (!selectedCourse) return;
 
     const nextMaterials = materials.filter(item => item.id !== material.id);
-    saveCourseMaterials(selectedCourse, nextMaterials);
-    setMaterials(nextMaterials);
-    setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
-    setFiles(prev => {
-      const nextFiles = prev.filter(file =>
-        getFileMaterialId(file) !== material.id &&
-        getFileNameKey(file.name) !== getFileNameKey(material.name)
-      );
-      filesRef.current = nextFiles;
-      return nextFiles;
-    });
+    try {
+      await saveCourseMaterials(selectedCourse, nextMaterials);
+      setMaterials(nextMaterials);
+      setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
+      setFiles(prev => {
+        const nextFiles = prev.filter(file =>
+          getFileMaterialId(file) !== material.id &&
+          getFileNameKey(file.name) !== getFileNameKey(material.name)
+        );
+        filesRef.current = nextFiles;
+        return nextFiles;
+      });
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : "강의자료 삭제 실패");
+    }
   };
 
   const communityResults = [
@@ -726,7 +717,7 @@ export default function Summary() {
 
     if (selectedMarkdown) {
       if (selectedCourse) {
-        const savedSummary = getSavedSummaries(selectedCourse).find(s =>
+        const savedSummary = (await loadSummariesFromServer(selectedCourse)).find(s =>
           s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)
         );
 
@@ -755,8 +746,6 @@ export default function Summary() {
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
         if (selectedCourse) {
-          const key = `tongkk:summary:${selectedCourse}`;
-          const prev = getSavedSummaries(selectedCourse);
           const selectedMaterialNames = selectedMaterials.map(material => material.name);
           const savedSummary = {
             template,
@@ -765,17 +754,7 @@ export default function Summary() {
             materialIds: selectedMaterialIds,
             materialNames: selectedMaterialNames,
           };
-          const updated = [
-            ...prev.filter(s => !(s.template === template && (
-              sameMaterialIds(s.materialIds, selectedMaterialIds) ||
-              sameMaterialNames(s.materialNames, selectedMaterialNames)
-            ))),
-            savedSummary,
-          ];
-          localStorage.setItem(key, JSON.stringify(updated));
-          saveSummaryToServer(selectedCourse, savedSummary).catch(error => {
-            console.warn("요약 서버 저장 실패", error);
-          });
+          await saveSummaryToServer(selectedCourse, savedSummary);
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
@@ -884,10 +863,7 @@ export default function Summary() {
               <p style={{ margin: 0, fontSize: 13, color: "#999" }}>자료를 정리할 과목을 선택하세요</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-              {courses.map((c, i) => {
-                const courseMaterials = getCourseMaterials(c);
-                const hasMarkdown = courseMaterials.length > 0;
-                return (
+              {courses.map((c, i) => (
                   <button
                     key={i}
                     onClick={() => handleCourseSelect(c)}
@@ -911,11 +887,11 @@ export default function Summary() {
                       <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
                       <span style={{
                         padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        background: hasMarkdown ? "#E8FAFE" : "#f0f0f0",
-                        color: hasMarkdown ? CYAN : "#aaa",
+                        background: "#E8FAFE",
+                        color: CYAN,
                         flexShrink: 0,
                       }}>
-                        {hasMarkdown ? "자료 있음" : "자료 없음"}
+                        서버 저장
                       </span>
                     </div>
                     <span style={{
@@ -924,11 +900,10 @@ export default function Summary() {
                       fontWeight: 600,
                       color: "#aaa",
                     }}>
-                      {hasMarkdown ? `${courseMaterials.length}개 자료` : "선택하기"}
+                      선택하기
                     </span>
                   </button>
-                );
-              })}
+              ))}
             </div>
           </div>
         )}

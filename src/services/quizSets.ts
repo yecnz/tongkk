@@ -1,5 +1,4 @@
 import { fetchCourses } from './courses';
-import { cacheCourseId, getCachedCourseId } from './materials';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { QuizDifficulty, QuizQuestion, QuizQuestionType } from './gpt';
 
@@ -27,8 +26,6 @@ type QuizSetRow = {
   updated_at: string;
 };
 
-const quizSetsKey = (course: string) => `tongkk:quizSets:${course}`;
-
 const toSavedQuizSet = (row: QuizSetRow): SavedQuizSet => ({
   id: row.id,
   title: row.title,
@@ -42,33 +39,16 @@ const toSavedQuizSet = (row: QuizSetRow): SavedQuizSet => ({
 });
 
 const getCourseId = async (course: string) => {
-  const cachedCourseId = getCachedCourseId(course);
-  if (cachedCourseId) return cachedCourseId;
-
   const courses = await fetchCourses();
   const found = courses.find(item => item.name === course);
   if (!found) return null;
 
-  cacheCourseId(course, found.id);
   return found.id;
-};
-
-export const getLocalQuizSets = (course: string): SavedQuizSet[] => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(quizSetsKey(course)) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const cacheQuizSets = (course: string, quizSets: SavedQuizSet[]) => {
-  localStorage.setItem(quizSetsKey(course), JSON.stringify(quizSets));
 };
 
 export async function loadQuizSetsFromServer(course: string): Promise<SavedQuizSet[]> {
   const courseId = await getCourseId(course);
-  if (!courseId) return getLocalQuizSets(course);
+  if (!courseId) return [];
 
   const { data, error } = await supabase
     .from('quiz_sets')
@@ -77,9 +57,7 @@ export async function loadQuizSetsFromServer(course: string): Promise<SavedQuizS
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
-  const quizSets = (data || []).map(toSavedQuizSet);
-  cacheQuizSets(course, quizSets);
-  return quizSets;
+  return (data || []).map(toSavedQuizSet);
 }
 
 export async function saveQuizSetToServer(
@@ -88,9 +66,7 @@ export async function saveQuizSetToServer(
 ): Promise<SavedQuizSet> {
   const courseId = await getCourseId(course);
   if (!courseId) {
-    const fallback: SavedQuizSet = { ...quizSet, id: crypto.randomUUID(), createdAt: Date.now(), updatedAt: Date.now() };
-    cacheQuizSets(course, [fallback, ...getLocalQuizSets(course)]);
-    return fallback;
+    throw new Error('과목을 찾을 수 없습니다.');
   }
 
   const user = await requireSupabaseUser();
@@ -110,7 +86,5 @@ export async function saveQuizSetToServer(
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
-  const saved = toSavedQuizSet(data);
-  cacheQuizSets(course, [saved, ...getLocalQuizSets(course).filter(item => item.id !== saved.id)]);
-  return saved;
+  return toSavedQuizSet(data);
 }

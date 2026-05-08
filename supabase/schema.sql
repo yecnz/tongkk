@@ -50,6 +50,15 @@ create table if not exists public.quiz_sets (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.dashboard_state (
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  key text not null check (key in ('community', 'ddays', 'plans')),
+  value jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, key)
+);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -80,10 +89,16 @@ create trigger set_quiz_sets_updated_at
 before update on public.quiz_sets
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_dashboard_state_updated_at on public.dashboard_state;
+create trigger set_dashboard_state_updated_at
+before update on public.dashboard_state
+for each row execute function public.set_updated_at();
+
 alter table public.courses enable row level security;
 alter table public.materials enable row level security;
 alter table public.summaries enable row level security;
 alter table public.quiz_sets enable row level security;
+alter table public.dashboard_state enable row level security;
 
 drop policy if exists "users can manage own courses" on public.courses;
 create policy "users can manage own courses"
@@ -109,6 +124,13 @@ with check (auth.uid() = user_id);
 drop policy if exists "users can manage own quiz sets" on public.quiz_sets;
 create policy "users can manage own quiz sets"
 on public.quiz_sets
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "users can manage own dashboard state" on public.dashboard_state;
+create policy "users can manage own dashboard state"
+on public.dashboard_state
 for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);

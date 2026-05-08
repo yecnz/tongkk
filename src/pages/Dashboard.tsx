@@ -1,9 +1,9 @@
-import { useCallback, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
-import { useAuth } from "../AuthContext";
 import type { PageRouteLabel } from "../common";
+import { loadDashboardState, removeDashboardState, saveDashboardState } from "../services/dashboardState";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -249,22 +249,12 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
-  const { user } = useAuth();
-  const userStorageKey = useCallback(
-    (key: string) => user ? `tongkk:${user.id}:${key}` : `tongkk:${key}`,
-    [user],
-  );
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
-  const [community, setCommunity] = useState<CommunityInfo | null>(() => {
-    try { const v = localStorage.getItem(userStorageKey("community")); return v ? JSON.parse(v) as CommunityInfo : null; } catch { return null; }
-  });
-  const [ddays, setDdays] = useState<Dday[]>(() => {
-    try { return JSON.parse(localStorage.getItem(userStorageKey("ddays")) || "[]") as Dday[]; } catch { return []; }
-  });
-  const [plans, setPlans] = useState<Plan[]>(() => {
-    try { return JSON.parse(localStorage.getItem(userStorageKey("plans")) || "[]") as Plan[]; } catch { return []; }
-  });
+  const [community, setCommunity] = useState<CommunityInfo | null>(null);
+  const [ddays, setDdays] = useState<Dday[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [dashboardStateLoaded, setDashboardStateLoaded] = useState(false);
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showAddDday, setShowAddDday] = useState(false);
@@ -274,12 +264,45 @@ export default function Dashboard() {
   const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
 
-  useEffect(() => { localStorage.setItem(userStorageKey("ddays"), JSON.stringify(ddays)); }, [ddays, userStorageKey]);
-  useEffect(() => { localStorage.setItem(userStorageKey("plans"), JSON.stringify(plans)); }, [plans, userStorageKey]);
   useEffect(() => {
-    if (community) localStorage.setItem(userStorageKey("community"), JSON.stringify(community));
-    else localStorage.removeItem(userStorageKey("community"));
-  }, [community, userStorageKey]);
+    let ignore = false;
+    Promise.all([
+      loadDashboardState<CommunityInfo | null>("community", null),
+      loadDashboardState<Dday[]>("ddays", []),
+      loadDashboardState<Plan[]>("plans", []),
+    ])
+      .then(([nextCommunity, nextDdays, nextPlans]) => {
+        if (ignore) return;
+        setCommunity(nextCommunity);
+        setDdays(nextDdays);
+        setPlans(nextPlans);
+        setDashboardStateLoaded(true);
+      })
+      .catch(error => {
+        console.warn("대시보드 상태 불러오기 실패", error);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!dashboardStateLoaded) return;
+    saveDashboardState("ddays", ddays).catch(console.warn);
+  }, [dashboardStateLoaded, ddays]);
+
+  useEffect(() => {
+    if (!dashboardStateLoaded) return;
+    saveDashboardState("plans", plans).catch(console.warn);
+  }, [dashboardStateLoaded, plans]);
+
+  useEffect(() => {
+    if (!dashboardStateLoaded) return;
+    const request = community
+      ? saveDashboardState("community", community)
+      : removeDashboardState("community");
+    request.catch(console.warn);
+  }, [community, dashboardStateLoaded]);
   useEffect(() => {
     if (!openCourseMenu) return;
     const closeMenu = () => setOpenCourseMenu(null);

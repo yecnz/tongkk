@@ -5,10 +5,9 @@ import { useCourses } from "../CourseContext";
 import { generateQuiz, type QuizQuestion, type QuizDifficulty, type QuizQuestionType, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
-import { getLocalSummaries, loadSummariesFromServer, type SavedSummary } from "../services/summaries";
+import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, saveQuizSetToServer } from "../services/quizSets";
 import {
-  getCourseMaterials,
   getFileMaterialId,
   loadCourseMaterialsFromServer,
   saveCourseMaterials,
@@ -109,7 +108,7 @@ export default function Quiz() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 과목 선택 시 localStorage에서 마크다운 + 요약본 로드
+  // 과목 선택 시 Supabase에서 마크다운 + 요약본 로드
   useEffect(() => {
     let ignore = false;
 
@@ -124,11 +123,10 @@ export default function Quiz() {
       return;
     }
 
-    const applyCourseMaterials = (courseMaterials: CourseMaterial[]) => {
+    const applyCourseMaterials = (courseMaterials: CourseMaterial[], summaries: SavedSummary[]) => {
       if (ignore) return;
       setMaterials(courseMaterials);
 
-      const summaries = getLocalSummaries(selectedCourse);
       // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
       const usable = summaries.filter(s => s.template !== "MINDMAP");
       setSavedSummaries(usable);
@@ -183,20 +181,15 @@ export default function Quiz() {
       setMaterialNotice("");
     };
 
-    applyCourseMaterials(getCourseMaterials(selectedCourse));
-    loadCourseMaterialsFromServer(selectedCourse)
-      .then(applyCourseMaterials)
-      .catch(() => {
-        // Keep local cached materials when the backend is unavailable.
-      });
-
-    loadSummariesFromServer(selectedCourse)
-      .then(summaries => {
-        if (ignore) return;
-        setSavedSummaries(summaries.filter(s => s.template !== "MINDMAP"));
+    Promise.all([
+      loadCourseMaterialsFromServer(selectedCourse),
+      loadSummariesFromServer(selectedCourse),
+    ])
+      .then(([courseMaterials, summaries]) => {
+        applyCourseMaterials(courseMaterials, summaries);
       })
-      .catch(() => {
-        // Keep local cached summaries when the backend is unavailable.
+      .catch(error => {
+        if (!ignore) setExtractError(error instanceof Error ? error.message : "강의자료 불러오기 실패");
       });
     loadQuizSetsFromServer(selectedCourse).catch(() => {
       // Quiz history is best-effort for now.
@@ -310,7 +303,7 @@ export default function Quiz() {
 
       if (uploadedMaterials.length > 0) {
         const nextMaterials = [...materials, ...uploadedMaterials];
-        saveCourseMaterials(selectedCourse, nextMaterials);
+        await saveCourseMaterials(selectedCourse, nextMaterials);
         setMaterials(nextMaterials);
         setSelectedMaterialIds(prev => Array.from(new Set([...prev, ...uploadedMaterials.map(material => material.id)])));
         setMaterialSources(prev => ({
@@ -394,15 +387,13 @@ export default function Quiz() {
     try {
       const questions = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
       setQuizzes(questions);
-      saveQuizSetToServer(selectedCourse, {
+      await saveQuizSetToServer(selectedCourse, {
         title: `${selectedCourse} ${questionType} 퀴즈`,
         difficulty,
         questionType,
         count: questions.length,
         materialIds: selectedMaterialIds,
         questions,
-      }).catch(error => {
-        console.warn("퀴즈 서버 저장 실패", error);
       });
       setCurrent(0);
       setAnswers({});
@@ -487,11 +478,7 @@ export default function Quiz() {
 
           {courses.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-              {courses.map((c, i) => {
-                const courseMaterials = getCourseMaterials(c);
-                const hasMarkdown = courseMaterials.length > 0;
-                const summaryCount = getLocalSummaries(c).filter(s => s.template !== "MINDMAP").length;
-                return (
+              {courses.map((c, i) => (
                   <button
                     key={i}
                     onClick={() => handleCourseSelect(c)}
@@ -507,27 +494,18 @@ export default function Quiz() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                         <span style={{
                           padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                          background: hasMarkdown ? "#E8FAFE" : "#f0f0f0",
-                          color: hasMarkdown ? CYAN : "#aaa", flexShrink: 0,
+                          background: "#E8FAFE",
+                          color: CYAN, flexShrink: 0,
                         }}>
-                          {hasMarkdown ? "자료 있음" : "자료 없음"}
+                          서버 저장
                         </span>
-                        {summaryCount > 0 && (
-                          <span style={{
-                            padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                            background: "#FFF0F6", color: PINK, flexShrink: 0,
-                          }}>
-                            요약 {summaryCount}개
-                          </span>
-                        )}
                       </div>
                     </div>
                     <span style={{ marginTop: 14, fontSize: 12, fontWeight: 600, color: "#aaa" }}>
-                      {hasMarkdown ? `${courseMaterials.length}개 자료` : "선택하기"}
+                      선택하기
                     </span>
                   </button>
-                );
-              })}
+              ))}
             </div>
           ) : (
             <Card style={{ padding: 40, textAlign: "center" }}>

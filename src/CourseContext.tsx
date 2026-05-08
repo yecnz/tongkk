@@ -7,20 +7,6 @@ import {
   type CourseRecord,
 } from "./services/courses";
 import { useAuth } from "./AuthContext";
-import { cacheCourseId, getCachedCourseId } from "./services/materials";
-
-const legacyCoursesKey = "tongkk:courses";
-const coursesKey = (userId: string) => `tongkk:${userId}:courses`;
-const courseIdKey = (course: string) => `tongkk:course-id:${course}`;
-
-function loadCourses(key: string): string[] {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as string[]) : [];
-  } catch {
-    return [];
-  }
-}
 
 type CourseContextValue = {
   courses: string[];
@@ -35,28 +21,22 @@ const CourseContext = createContext<CourseContextValue | null>(null);
 
 export function CourseProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const currentCoursesKey = user ? coursesKey(user.id) : legacyCoursesKey;
   const [courses, setCourses] = useState<string[]>([]);
+  const [courseRecords, setCourseRecords] = useState<CourseRecord[]>([]);
   const [isSyncingCourses, setIsSyncingCourses] = useState(false);
   const [courseSyncError, setCourseSyncError] = useState("");
 
-  const persistCourses = (next: string[]) => {
-    localStorage.setItem(currentCoursesKey, JSON.stringify(next));
-  };
-
   const applyServerCourses = useCallback((serverCourses: CourseRecord[]) => {
-    serverCourses.forEach(course => cacheCourseId(course.name, course.id));
+    setCourseRecords(serverCourses);
     const names = serverCourses.map(course => course.name);
     setCourses(names);
-    localStorage.setItem(currentCoursesKey, JSON.stringify(names));
-  }, [currentCoursesKey]);
+  }, []);
 
-  const moveStorageKey = (oldKey: string, newKey: string) => {
-    const value = localStorage.getItem(oldKey);
-    if (value === null) return;
-    localStorage.setItem(newKey, value);
-    localStorage.removeItem(oldKey);
-  };
+  const reloadCourses = useCallback(async () => {
+    const serverCourses = await fetchCourses();
+    applyServerCourses(serverCourses);
+    return serverCourses;
+  }, [applyServerCourses]);
 
   useEffect(() => {
     let ignore = false;
@@ -67,13 +47,11 @@ export function CourseProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    setCourses(loadCourses(currentCoursesKey));
-
     const loadServerCourses = async () => {
       setIsSyncingCourses(true);
       setCourseSyncError("");
       try {
-        const serverCourses = await fetchCourses();
+        const serverCourses = await reloadCourses();
         if (!ignore) applyServerCourses(serverCourses);
       } catch (err) {
         if (!ignore) {
@@ -88,83 +66,49 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     return () => {
       ignore = true;
     };
-  }, [applyServerCourses, currentCoursesKey, user]);
-
-  const removeCourseStorage = (course: string) => {
-    [
-      `tongkk:materials:${course}`,
-      `tongkk:markdown:${course}`,
-      `tongkk:material:${course}`,
-      `tongkk:summary:${course}`,
-      courseIdKey(course),
-    ].forEach(key => localStorage.removeItem(key));
-  };
+  }, [applyServerCourses, reloadCourses, user]);
 
   const addCourse = (name: string) => {
-    setCourses(prev => {
-      if (prev.includes(name)) return prev;
-      const next = [...prev, name];
-      persistCourses(next);
-      return next;
-    });
-
     createCourse(name)
-      .then(course => cacheCourseId(course.name, course.id))
+      .then(() => reloadCourses())
       .catch(async error => {
         setCourseSyncError(error instanceof Error ? error.message : "강의 추가 동기화 실패");
         try {
-          applyServerCourses(await fetchCourses());
+          await reloadCourses();
         } catch {
-          // Keep optimistic local state when the server is unavailable.
+          // Keep the sync error visible.
         }
       });
   };
 
   const renameCourse = (oldName: string, newName: string) => {
-    const courseId = getCachedCourseId(oldName);
-    setCourses(prev => {
-      if (oldName === newName || prev.includes(newName)) return prev;
-      const next = prev.map(course => course === oldName ? newName : course);
-      persistCourses(next);
-      moveStorageKey(`tongkk:materials:${oldName}`, `tongkk:materials:${newName}`);
-      moveStorageKey(`tongkk:markdown:${oldName}`, `tongkk:markdown:${newName}`);
-      moveStorageKey(`tongkk:material:${oldName}`, `tongkk:material:${newName}`);
-      moveStorageKey(`tongkk:summary:${oldName}`, `tongkk:summary:${newName}`);
-      moveStorageKey(courseIdKey(oldName), courseIdKey(newName));
-      return next;
-    });
-
+    const courseId = courseRecords.find(course => course.name === oldName)?.id;
     if (!courseId) return;
     updateCourse(courseId, newName)
-      .then(course => cacheCourseId(course.name, course.id))
+      .then(() => reloadCourses())
       .catch(async error => {
         setCourseSyncError(error instanceof Error ? error.message : "강의 이름 변경 동기화 실패");
         try {
-          applyServerCourses(await fetchCourses());
+          await reloadCourses();
         } catch {
-          // Keep optimistic local state when the server is unavailable.
+          // Keep the sync error visible.
         }
       });
   };
 
   const deleteCourse = (name: string) => {
-    const courseId = getCachedCourseId(name);
-    setCourses(prev => {
-      const next = prev.filter(course => course !== name);
-      persistCourses(next);
-      removeCourseStorage(name);
-      return next;
-    });
-
+    const courseId = courseRecords.find(course => course.name === name)?.id;
     if (!courseId) return;
-    removeCourse(courseId).catch(async error => {
-      setCourseSyncError(error instanceof Error ? error.message : "강의 삭제 동기화 실패");
-      try {
-        applyServerCourses(await fetchCourses());
-      } catch {
-        // Keep optimistic local state when the server is unavailable.
-      }
-    });
+    removeCourse(courseId)
+      .then(() => reloadCourses())
+      .catch(async error => {
+        setCourseSyncError(error instanceof Error ? error.message : "강의 삭제 동기화 실패");
+        try {
+          await reloadCourses();
+        } catch {
+          // Keep the sync error visible.
+        }
+      });
   };
 
   const value = { courses, addCourse, renameCourse, deleteCourse, isSyncingCourses, courseSyncError };
