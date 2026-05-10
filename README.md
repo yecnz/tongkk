@@ -2,7 +2,8 @@
 
 ## Backend
 
-FastAPI 서버는 강의자료 변환, 요약, 에이전트, 퀴즈 생성 API와 SQLite 기반 과목/자료 저장 API를 제공합니다.
+FastAPI 서버는 강의자료 변환, 요약, 에이전트, 퀴즈 생성 API만 제공합니다.
+사용자 인증과 데이터 저장은 Supabase Auth/DB가 담당합니다.
 
 ```bash
 cd server
@@ -18,19 +19,6 @@ uvicorn main:app --reload
 ### API
 
 - `GET /health`
-- `GET /courses`
-- `POST /courses`
-- `GET /courses/{course_id}`
-- `DELETE /courses/{course_id}`
-- `GET /courses/{course_id}/materials`
-- `POST /courses/{course_id}/materials`
-- `DELETE /materials/{material_id}`
-- `GET /courses/{course_id}/summaries`
-- `POST /courses/{course_id}/summaries`
-- `DELETE /summaries/{summary_id}`
-- `GET /courses/{course_id}/quiz-sets`
-- `POST /courses/{course_id}/quiz-sets`
-- `DELETE /quiz-sets/{quiz_set_id}`
 - `POST /convert`
 - `POST /summarize`
 - `POST /agent`
@@ -41,7 +29,6 @@ uvicorn main:app --reload
 `server/.env.example`을 `server/.env`로 복사한 뒤 필요한 키를 채웁니다.
 
 - `FRONTEND_ORIGIN`: CORS 허용 프론트엔드 주소
-- `DATABASE_PATH`: SQLite 파일 경로
 - `OPENAI_API_KEY`, `OPENAI_MODEL`: GPT 요약/에이전트/퀴즈 설정
 - `GEMINI_API_KEY`, `GEMINI_MODEL`: Gemini 요약/에이전트/퀴즈 설정
 

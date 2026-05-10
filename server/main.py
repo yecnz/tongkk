@@ -1,8 +1,6 @@
 import json
 import os
-import sqlite3
 import tempfile
-import time
 from pathlib import Path
 from typing import Literal
 
@@ -19,23 +17,6 @@ from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
 from agent import run_study_agent, build_llm
-from storage import (
-    create_course,
-    create_material,
-    create_quiz_set,
-    delete_course,
-    delete_material,
-    delete_quiz_set,
-    delete_summary,
-    get_course,
-    init_db,
-    list_courses,
-    list_materials,
-    list_quiz_sets,
-    list_summaries,
-    update_course_name,
-    upsert_summary,
-)
 
 
 app = FastAPI()
@@ -53,11 +34,6 @@ app.add_middleware(
 )
 
 md_converter = MarkItDown()
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
 
 SummaryTemplate = Literal["GENERAL", "LECTURE_NOTE", "MINDMAP", "CHEAT_SHEET"]
 
@@ -146,94 +122,6 @@ class QuizRequest(BaseModel):
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
 
 
-class CourseCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
-
-
-class CourseUpdateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
-
-
-class CourseResponse(BaseModel):
-    id: str
-    name: str
-    created_at: int = Field(alias="createdAt")
-    updated_at: int = Field(alias="updatedAt")
-
-    model_config = {"populate_by_name": True}
-
-
-class MaterialCreateRequest(BaseModel):
-    id: str | None = None
-    name: str = Field(min_length=1, max_length=255)
-    size: int | None = Field(default=None, ge=0)
-    type: MaterialKind
-    pages: int | None = Field(default=None, ge=0)
-    slides: int | None = Field(default=None, ge=0)
-    markdown: str = Field(min_length=1)
-
-
-class MaterialResponse(BaseModel):
-    id: str
-    course_id: str = Field(alias="courseId")
-    name: str
-    size: int | None
-    type: MaterialKind
-    pages: int | None
-    slides: int | None
-    markdown: str
-    created_at: int = Field(alias="createdAt")
-    updated_at: int = Field(alias="updatedAt")
-
-    model_config = {"populate_by_name": True}
-
-
-class SummaryCreateRequest(BaseModel):
-    template: SummaryTemplate
-    content: str = Field(min_length=1)
-    material_ids: list[str] = Field(default_factory=list, alias="materialIds")
-
-    model_config = {"populate_by_name": True}
-
-
-class SummaryResponse(BaseModel):
-    id: str
-    course_id: str = Field(alias="courseId")
-    template: SummaryTemplate
-    content: str
-    material_ids: list[str] = Field(alias="materialIds")
-    created_at: int = Field(alias="createdAt")
-    updated_at: int = Field(alias="updatedAt")
-
-    model_config = {"populate_by_name": True}
-
-
-class QuizSetCreateRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=255)
-    difficulty: Literal["쉬움", "보통", "어려움"]
-    question_type: Literal["객관식", "OX", "단답형"] = Field(alias="questionType")
-    count: int = Field(ge=1, le=30)
-    material_ids: list[str] = Field(default_factory=list, alias="materialIds")
-    questions: list[dict[str, object]] = Field(min_length=1)
-
-    model_config = {"populate_by_name": True}
-
-
-class QuizSetResponse(BaseModel):
-    id: str
-    course_id: str = Field(alias="courseId")
-    title: str
-    difficulty: Literal["쉬움", "보통", "어려움"]
-    question_type: Literal["객관식", "OX", "단답형"] = Field(alias="questionType")
-    count: int
-    material_ids: list[str] = Field(alias="materialIds")
-    questions: list[dict[str, object]]
-    created_at: int = Field(alias="createdAt")
-    updated_at: int = Field(alias="updatedAt")
-
-    model_config = {"populate_by_name": True}
-
-
 QUIZ_SYSTEM_PROMPT = """너는 대학 강의자료 기반 퀴즈 출제 전문가다.
 반드시 순수 JSON 배열만 출력해. 설명, 코드 블록, 마크다운, 기타 텍스트 없이 JSON 배열만 출력해.
 
@@ -279,175 +167,6 @@ OX 규칙:
 
 
 SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
-
-
-def _json_list(value: str) -> list:
-    parsed = json.loads(value)
-    return parsed if isinstance(parsed, list) else []
-
-
-def _summary_for_response(summary: dict) -> dict:
-    return {
-        **summary,
-        "material_ids": _json_list(summary["material_ids"]),
-    }
-
-
-def _quiz_set_for_response(quiz_set: dict) -> dict:
-    return {
-        **quiz_set,
-        "material_ids": _json_list(quiz_set["material_ids"]),
-        "questions": _json_list(quiz_set["questions"]),
-    }
-
-
-@app.get("/courses", response_model=list[CourseResponse])
-def get_courses():
-    return list_courses()
-
-
-@app.post("/courses", response_model=CourseResponse, status_code=201)
-def post_course(req: CourseCreateRequest):
-    name = req.name.strip()
-    if not name:
-        raise HTTPException(status_code=422, detail="과목명을 입력해주세요.")
-
-    try:
-        return create_course(name, _now_ms())
-    except sqlite3.IntegrityError as e:
-        raise HTTPException(status_code=409, detail="이미 존재하는 과목명입니다.") from e
-
-
-@app.get("/courses/{course_id}", response_model=CourseResponse)
-def get_course_by_id(course_id: str):
-    course = get_course(course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-    return course
-
-
-@app.patch("/courses/{course_id}", response_model=CourseResponse)
-def patch_course(course_id: str, req: CourseUpdateRequest):
-    name = req.name.strip()
-    if not name:
-        raise HTTPException(status_code=422, detail="과목명을 입력해주세요.")
-
-    try:
-        course = update_course_name(course_id, name, _now_ms())
-    except sqlite3.IntegrityError as e:
-        raise HTTPException(status_code=409, detail="이미 존재하는 과목명입니다.") from e
-
-    if course is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-    return course
-
-
-@app.delete("/courses/{course_id}", status_code=204)
-def delete_course_by_id(course_id: str):
-    if not delete_course(course_id):
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-    return None
-
-
-@app.get("/courses/{course_id}/materials", response_model=list[MaterialResponse])
-def get_course_materials(course_id: str):
-    if get_course(course_id) is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-    return list_materials(course_id)
-
-
-@app.post("/courses/{course_id}/materials", response_model=MaterialResponse, status_code=201)
-def post_course_material(course_id: str, req: MaterialCreateRequest):
-    if get_course(course_id) is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-
-    name = req.name.strip()
-    if not name:
-        raise HTTPException(status_code=422, detail="자료명을 입력해주세요.")
-
-    return create_material(
-        material_id=req.id,
-        course_id=course_id,
-        name=name,
-        size=req.size,
-        material_type=req.type,
-        pages=req.pages,
-        slides=req.slides,
-        markdown=req.markdown,
-        now_ms=_now_ms(),
-    )
-
-
-@app.delete("/materials/{material_id}", status_code=204)
-def delete_material_by_id(material_id: str):
-    if not delete_material(material_id):
-        raise HTTPException(status_code=404, detail="자료를 찾을 수 없습니다.")
-    return None
-
-
-@app.get("/courses/{course_id}/summaries", response_model=list[SummaryResponse])
-def get_course_summaries(course_id: str):
-    if get_course(course_id) is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-    return [_summary_for_response(summary) for summary in list_summaries(course_id)]
-
-
-@app.post("/courses/{course_id}/summaries", response_model=SummaryResponse, status_code=201)
-def post_course_summary(course_id: str, req: SummaryCreateRequest):
-    if get_course(course_id) is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-
-    summary = upsert_summary(
-        course_id=course_id,
-        template=req.template,
-        content=req.content,
-        material_ids=json.dumps(sorted(req.material_ids), ensure_ascii=False),
-        now_ms=_now_ms(),
-    )
-    return _summary_for_response(summary)
-
-
-@app.delete("/summaries/{summary_id}", status_code=204)
-def delete_summary_by_id(summary_id: str):
-    if not delete_summary(summary_id):
-        raise HTTPException(status_code=404, detail="요약을 찾을 수 없습니다.")
-    return None
-
-
-@app.get("/courses/{course_id}/quiz-sets", response_model=list[QuizSetResponse])
-def get_course_quiz_sets(course_id: str):
-    if get_course(course_id) is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-    return [_quiz_set_for_response(quiz_set) for quiz_set in list_quiz_sets(course_id)]
-
-
-@app.post("/courses/{course_id}/quiz-sets", response_model=QuizSetResponse, status_code=201)
-def post_course_quiz_set(course_id: str, req: QuizSetCreateRequest):
-    if get_course(course_id) is None:
-        raise HTTPException(status_code=404, detail="과목을 찾을 수 없습니다.")
-
-    quiz_set = create_quiz_set(
-        course_id=course_id,
-        title=req.title.strip(),
-        difficulty=req.difficulty,
-        question_type=req.question_type,
-        count=req.count,
-        material_ids=json.dumps(sorted(req.material_ids), ensure_ascii=False),
-        questions=json.dumps(req.questions, ensure_ascii=False),
-        now_ms=_now_ms(),
-    )
-    return _quiz_set_for_response(quiz_set)
-
-
-@app.delete("/quiz-sets/{quiz_set_id}", status_code=204)
-def delete_quiz_set_by_id(quiz_set_id: str):
-    if not delete_quiz_set(quiz_set_id):
-        raise HTTPException(status_code=404, detail="퀴즈를 찾을 수 없습니다.")
-    return None
 
 
 @app.post("/convert")
