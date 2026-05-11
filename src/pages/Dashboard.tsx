@@ -13,8 +13,8 @@ type CustomCalendarProps = { value: string; onChange: (value: string) => void };
 type AddDdayModalProps = { onClose: () => void; onAdd: (subject: string, date: string) => void };
 type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
 type CommunityInfo = { univ: string; dept: string };
-type Dday = { subj: string; date: string };
-type Plan = { text: string; done: boolean };
+type Dday = { id?: string; subj: string; date: string };
+type Plan = { id?: string; text: string; done: boolean };
 
 const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
   const [name, setName] = useState("");
@@ -264,6 +264,8 @@ export default function Dashboard() {
   const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
 
+  const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   useEffect(() => {
     let ignore = false;
     Promise.all([
@@ -320,6 +322,26 @@ export default function Dashboard() {
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
 
+  const deleteDday = (target: Dday) => {
+    let removed = false;
+    setDdays(prev => prev.filter(item => {
+      const sameItem = target.id
+        ? item.id === target.id
+        : item.subj === target.subj && item.date === target.date && !removed;
+      if (sameItem) {
+        removed = true;
+        return false;
+      }
+      return true;
+    }));
+  };
+
+  const deletePlan = (target: Plan, targetIndex: number) => {
+    setPlans(prev => prev.filter((item, index) =>
+      target.id ? item.id !== target.id : index !== targetIndex
+    ));
+  };
+
   const communityPosts = community ? [
     { title: "알고리즘 자료 공유" },
     { title: "빅데이터프로그래밍 퀴즈 공유" },
@@ -334,8 +356,8 @@ export default function Dashboard() {
       {renamingCourse && <RenameCourseModal course={renamingCourse} courses={courses} onClose={() => setRenamingCourse(null)} onRename={renameCourse} />}
       {deletingCourse && <DeleteCourseModal course={deletingCourse} onClose={() => setDeletingCourse(null)} onDelete={deleteCourse} />}
       {showJoin && <JoinCommunityModal onClose={() => setShowJoin(false)} onJoin={(u, d) => setCommunity({ univ: u, dept: d })} />}
-      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { subj: s, date: d }])} />}
-      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { text: t, done: false }])} />}
+      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { id: createId(), subj: s, date: d }])} />}
+      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { id: createId(), text: t, done: false }])} />}
 
       {/* Header */}
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
@@ -529,14 +551,35 @@ export default function Dashboard() {
                   {displayDdays.map((d, i) => {
                     const left = getDaysLeft(d.date);
                     return (
-                      <div key={i} style={{
+                      <div key={d.id || `${d.subj}-${d.date}-${i}`} style={{
                         display: "flex", justifyContent: "space-between", alignItems: "center",
                         padding: "10px 0", borderBottom: i < displayDdays.length - 1 ? "1px solid #f5f5f5" : "none"
                       }}>
                         <span style={{ fontSize: 14, fontWeight: 500, color: "#333" }}>{d.subj}</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
-                          {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
+                            {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
+                          </span>
+                          <button
+                            onClick={() => deleteDday(d)}
+                            aria-label={`${d.subj} D-day 삭제`}
+                            title="삭제"
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 8,
+                              border: "1px solid #eeeeee",
+                              background: "#fff",
+                              color: "#bbb",
+                              cursor: "pointer",
+                              fontSize: 15,
+                              lineHeight: "22px",
+                              padding: 0,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -562,7 +605,7 @@ export default function Dashboard() {
                 <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "10px 0" }}>학습 계획을 추가해보세요</p>
               ) : (
                 plans.map((p, i) => (
-                  <div key={i} style={{
+                  <div key={p.id || `${p.text}-${i}`} style={{
                     display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
                     borderBottom: i < plans.length - 1 ? "1px solid #f5f5f5" : "none"
                   }}>
@@ -576,9 +619,30 @@ export default function Dashboard() {
                       {p.done && <span style={{ color: "#fff", fontSize: 12 }}>v</span>}
                     </button>
                     <span style={{
+                      flex: 1,
                       fontSize: 14, color: p.done ? "#bbb" : "#444",
                       textDecoration: p.done ? "line-through" : "none"
                     }}>{p.text}</span>
+                    <button
+                      onClick={() => deletePlan(p, i)}
+                      aria-label={`${p.text} 학습 계획 삭제`}
+                      title="삭제"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 8,
+                        border: "1px solid #eeeeee",
+                        background: "#fff",
+                        color: "#bbb",
+                        cursor: "pointer",
+                        fontSize: 15,
+                        lineHeight: "22px",
+                        padding: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
                 ))
               )}

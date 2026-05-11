@@ -32,7 +32,7 @@ export const SidebarIcon = () => (
 );
 
 export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
-  <div style={{
+  <div className="tongkk-sidebar" style={{
     position: "fixed", top: 0, left: 0, width: 240, height: "100vh",
     background: "#fff", borderRight: "1px solid #eee", zIndex: 100,
     display: "flex", flexDirection: "column", padding: "24px 0",
@@ -53,7 +53,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
 );
 
 export const Card = ({ children, style, ...props }: CardProps) => (
-  <div style={{
+  <div className="tongkk-card" style={{
     background: "#fff", borderRadius: 14, border: "1px solid #f0f0f0",
     boxShadow: "0 1px 4px rgba(0,0,0,0.04)", ...style
   }} {...props}>{children}</div>

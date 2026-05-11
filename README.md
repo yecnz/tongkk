@@ -29,6 +29,7 @@ uvicorn main:app --reload
 `server/.env.example`을 `server/.env`로 복사한 뒤 필요한 키를 채웁니다.
 
 - `FRONTEND_ORIGIN`: CORS 허용 프론트엔드 주소
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`: FastAPI API 호출자의 Supabase 로그인 토큰 검증용 설정
 - `OPENAI_API_KEY`, `OPENAI_MODEL`: GPT 요약/에이전트/퀴즈 설정
 - `GEMINI_API_KEY`, `GEMINI_MODEL`: Gemini 요약/에이전트/퀴즈 설정
 

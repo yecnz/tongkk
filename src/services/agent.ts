@@ -1,4 +1,4 @@
-import { BACKEND_URL, parseApiError } from './backend';
+import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type AgentRole = 'user' | 'assistant';
 
@@ -30,7 +30,7 @@ export async function sendAgentMessage(
   try {
     const response = await fetch(`${BACKEND_URL}/agent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ thread_id: threadId, messages }),
       signal: controller.signal,
     });

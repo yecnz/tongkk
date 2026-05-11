@@ -18,3 +18,9 @@ export const requireSupabaseUser = async () => {
 
 export const formatSupabaseError = (error: { message?: string } | null) =>
   error?.message || 'Supabase 요청 실패';
+
+export const getSupabaseAuthHeader = async (): Promise<Record<string, string>> => {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};

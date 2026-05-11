@@ -218,7 +218,42 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const canUseAgent = Boolean(threadId);
+  const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
+
+  const handleDownload = () => {
+    const blob = new Blob([exportText], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tongkk-${template.toLowerCase()}-summary.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setActionMessage("요약본을 다운로드했습니다.");
+  };
+
+  const handleShare = async () => {
+    setActionMessage("");
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `Tongkk ${templateLabels[template]} 요약`,
+          text: exportText,
+        });
+        setActionMessage("공유 요청을 보냈습니다.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(exportText);
+      setActionMessage("요약본을 클립보드에 복사했습니다.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setActionMessage("공유에 실패했습니다.");
+    }
+  };
 
   const handleAgentSubmit = async () => {
     const content = agentInput.trim();
@@ -275,11 +310,11 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             )}
             {!isLoading && (
               <>
-                <button style={{
+                <button onClick={handleShare} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "none",
                   background: CYAN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
                 }}>공유하기</button>
-                <button style={{
+                <button onClick={handleDownload} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
                   background: "#fff", color: "#555", fontSize: 13, fontWeight: 600, cursor: "pointer"
                 }}>다운로드</button>
@@ -293,6 +328,11 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             )}
           </div>
         </div>
+        {actionMessage && !isLoading && (
+          <div style={{ margin: "-6px 0 16px", fontSize: 12, color: "#888", textAlign: "right" }}>
+            {actionMessage}
+          </div>
+        )}
 
         {isLoading ? (
           <div style={{

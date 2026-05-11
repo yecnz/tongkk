@@ -1,4 +1,4 @@
-import { BACKEND_URL, parseApiError } from './backend';
+import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type QuizQuestion = {
   type?: QuizQuestionType;
@@ -29,7 +29,7 @@ export async function generateQuiz(
   try {
     const response = await fetch(`${BACKEND_URL}/quiz`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType }),
       signal: controller.signal,
     });
@@ -118,7 +118,7 @@ export async function summarizeWithTemplate(
   try {
     const response = await fetch(`${BACKEND_URL}/summarize`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ markdown, template }),
       signal: controller.signal,
     });

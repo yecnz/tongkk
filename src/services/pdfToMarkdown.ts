@@ -1,4 +1,4 @@
-import { BACKEND_URL, parseApiError } from './backend';
+import { BACKEND_URL, getAuthRequestHeaders, parseApiError } from './backend';
 
 type ConvertApiResponse = {
   markdown: string;
@@ -18,6 +18,7 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
   try {
     const response = await fetch(`${BACKEND_URL}/convert`, {
       method: 'POST',
+      headers: await getAuthRequestHeaders(),
       body: formData,
       signal: controller.signal,
     });

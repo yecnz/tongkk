@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { CourseProvider } from "./CourseContext";
 import Dashboard from "./pages/Dashboard";
@@ -7,9 +8,31 @@ import Quiz from "./pages/Quiz";
 import Community from "./pages/Community";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
+import { loadUserProfile } from "./services/profile";
+import { applyTheme } from "./services/theme";
 
 function ProtectedApp() {
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!user) {
+      applyTheme(false);
+      return;
+    }
+
+    let ignore = false;
+    loadUserProfile()
+      .then(profile => {
+        if (!ignore) applyTheme(profile.darkMode);
+      })
+      .catch(() => {
+        if (!ignore) applyTheme(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [user]);
 
   if (loading) {
     return (

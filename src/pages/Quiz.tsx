@@ -370,7 +370,7 @@ export default function Quiz() {
           return `# ${title} (${label})\n\n${summary.content}`;
         }
 
-        return `# ${material.name} (${label})\n\n${summary?.content || material.markdown}`;
+        return `# ${material.name} (${label})\n\n${material.markdown}`;
       })
       .filter(Boolean)
       .join("\n\n---\n\n");

@@ -1,3 +1,5 @@
+import { getSupabaseAuthHeader } from './supabase';
+
 export const BACKEND_URL = (
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_BACKEND_URL ||
@@ -21,4 +23,15 @@ export async function parseApiError(response: Response): Promise<string> {
   return compactText
     ? `API 오류 (${response.status}): ${compactText}`
     : `API 오류 (${response.status})`;
+}
+
+export async function getJsonRequestHeaders(): Promise<HeadersInit> {
+  return {
+    'Content-Type': 'application/json',
+    ...await getSupabaseAuthHeader(),
+  };
+}
+
+export async function getAuthRequestHeaders(): Promise<HeadersInit> {
+  return await getSupabaseAuthHeader();
 }
