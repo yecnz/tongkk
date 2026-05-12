@@ -6,16 +6,26 @@ import { generateQuiz, type QuizQuestion, type QuizDifficulty, type QuizQuestion
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
-import { loadQuizSetsFromServer, saveQuizSetToServer } from "../services/quizSets";
+import { loadQuizSetsFromServer, saveQuizSetToServer, type SavedQuizSet } from "../services/quizSets";
 import {
   getFileMaterialId,
   loadCourseMaterialsFromServer,
   saveCourseMaterials,
+  uploadCourseMaterialFile,
   type CourseMaterial,
 } from "../services/materials";
 
 type QuizView = "courseList" | "courseDetail" | "generating" | "quiz" | "result";
 type QuizSource = "raw" | SummaryTemplate;
+type QuizLocationState = {
+  course?: string;
+  selectedCourse?: string;
+  template?: SummaryTemplate;
+  materialIds?: string[];
+  fromDashboard?: boolean;
+  quizSetId?: string;
+  openQuiz?: boolean;
+} | null;
 
 const sourceLabels: Record<string, string> = {
   raw: "원본 자료",
@@ -85,7 +95,9 @@ export default function Quiz() {
   const [materialSources, setMaterialSources] = useState<Record<string, QuizSource>>({});
   const pendingTemplateRef = useRef<SummaryTemplate | null>(null);
   const pendingMaterialIdsRef = useRef<string[] | null>(null);
+  const pendingQuizSetIdRef = useRef<string | null>(null);
   const fromDashboardRef = useRef(false);
+  const [openedQuizTitle, setOpenedQuizTitle] = useState("");
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -97,12 +109,13 @@ export default function Quiz() {
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
-    const state = location.state as { course?: string; selectedCourse?: string; template?: SummaryTemplate; materialIds?: string[]; fromDashboard?: boolean } | null;
+    const state = location.state as QuizLocationState;
     const course = state?.course || state?.selectedCourse;
     if (course) {
       fromDashboardRef.current = Boolean(state.fromDashboard);
       if (state.template) pendingTemplateRef.current = state.template;
       if (state.materialIds) pendingMaterialIdsRef.current = state.materialIds;
+      if (state.openQuiz && state.quizSetId) pendingQuizSetIdRef.current = state.quizSetId;
       setSelectedCourse(course);
       setView("courseDetail");
     }
@@ -120,10 +133,11 @@ export default function Quiz() {
       setUploadedFileName("");
       setExtractError("");
       setMaterialNotice("");
+      setOpenedQuizTitle("");
       return;
     }
 
-    const applyCourseMaterials = (courseMaterials: CourseMaterial[], summaries: SavedSummary[]) => {
+    const applyCourseMaterials = (courseMaterials: CourseMaterial[], summaries: SavedSummary[], quizSets: SavedQuizSet[]) => {
       if (ignore) return;
       setMaterials(courseMaterials);
 
@@ -179,21 +193,40 @@ export default function Quiz() {
       setUploadedFileName("");
       setExtractError("");
       setMaterialNotice("");
+
+      const pendingQuizSetId = pendingQuizSetIdRef.current;
+      if (pendingQuizSetId) {
+        pendingQuizSetIdRef.current = null;
+        const savedQuizSet = quizSets.find(item => item.id === pendingQuizSetId);
+        if (savedQuizSet) {
+          setDifficulty(savedQuizSet.difficulty);
+          setQuestionType(savedQuizSet.questionType);
+          setCount(savedQuizSet.count);
+          setSelectedMaterialIds(savedQuizSet.materialIds.filter(id => courseMaterials.some(material => material.id === id)));
+          setQuizzes(savedQuizSet.questions);
+          setCurrent(0);
+          setAnswers({});
+          setShortAnswerInput("");
+          setShowExplanation(false);
+          setOpenedQuizTitle(savedQuizSet.title);
+          setView("quiz");
+        }
+      } else {
+        setOpenedQuizTitle("");
+      }
     };
 
     Promise.all([
       loadCourseMaterialsFromServer(selectedCourse),
       loadSummariesFromServer(selectedCourse),
+      loadQuizSetsFromServer(selectedCourse),
     ])
-      .then(([courseMaterials, summaries]) => {
-        applyCourseMaterials(courseMaterials, summaries);
+      .then(([courseMaterials, summaries, quizSets]) => {
+        applyCourseMaterials(courseMaterials, summaries, quizSets);
       })
       .catch(error => {
         if (!ignore) setExtractError(error instanceof Error ? error.message : "강의자료 불러오기 실패");
       });
-    loadQuizSetsFromServer(selectedCourse).catch(() => {
-      // Quiz history is best-effort for now.
-    });
 
     return () => {
       ignore = true;
@@ -228,6 +261,7 @@ export default function Quiz() {
     setSelectedCourse("");
     setView("courseList");
     setError(null);
+    setOpenedQuizTitle("");
   };
 
   const handleCourseBack = () => {
@@ -253,13 +287,17 @@ export default function Quiz() {
     const seenIds = new Set<string>();
     const seenNames = new Set<string>();
     const duplicateNames: string[] = [];
+    const duplicateFiles: File[] = [];
     const newFiles = supportedFiles.filter(file => {
       const fileId = getFileMaterialId(file);
       const fileNameKey = file.name.trim().toLowerCase();
       const isDuplicate = existingIds.has(fileId) || existingNames.has(fileNameKey) || seenIds.has(fileId) || seenNames.has(fileNameKey);
       seenIds.add(fileId);
       seenNames.add(fileNameKey);
-      if (isDuplicate) duplicateNames.push(file.name);
+      if (isDuplicate) {
+        duplicateNames.push(file.name);
+        duplicateFiles.push(file);
+      }
       return !isDuplicate;
     });
 
@@ -269,6 +307,26 @@ export default function Quiz() {
       setMaterialNotice("");
     }
     if (newFiles.length === 0) {
+      let didAttachFile = false;
+      const nextMaterials = [...materials];
+      for (const file of duplicateFiles) {
+        const fileId = getFileMaterialId(file);
+        const fileNameKey = file.name.trim().toLowerCase();
+        const index = nextMaterials.findIndex(material =>
+          material.id === fileId || material.name.trim().toLowerCase() === fileNameKey
+        );
+        if (index < 0 || nextMaterials[index].filePath) continue;
+        try {
+          nextMaterials[index] = await uploadCourseMaterialFile(selectedCourse, nextMaterials[index], file);
+          didAttachFile = true;
+        } catch (err) {
+          setExtractError(err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패");
+        }
+      }
+      if (didAttachFile) {
+        await saveCourseMaterials(selectedCourse, nextMaterials);
+        setMaterials(nextMaterials);
+      }
       setUploadedFileName("");
       return;
     }
@@ -286,7 +344,7 @@ export default function Quiz() {
             extractMarkdownFromPDF(file),
             getDocumentMaterialType(file) === "pdf" ? getPdfPageCount(file) : Promise.resolve(null),
           ]);
-          uploadedMaterials.push({
+          const baseMaterial: CourseMaterial = {
             id: getFileMaterialId(file),
             name: file.name,
             size: file.size,
@@ -295,7 +353,12 @@ export default function Quiz() {
             slides: null,
             markdown,
             updatedAt: Date.now(),
-          });
+          };
+          try {
+            uploadedMaterials.push(await uploadCourseMaterialFile(selectedCourse, baseMaterial, file));
+          } catch {
+            uploadedMaterials.push(baseMaterial);
+          }
         } catch {
           failedNames.push(file.name);
         }
@@ -387,7 +450,7 @@ export default function Quiz() {
     try {
       const questions = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
       setQuizzes(questions);
-      await saveQuizSetToServer(selectedCourse, {
+      const savedQuizSet = await saveQuizSetToServer(selectedCourse, {
         title: `${selectedCourse} ${questionType} 퀴즈`,
         difficulty,
         questionType,
@@ -395,6 +458,7 @@ export default function Quiz() {
         materialIds: selectedMaterialIds,
         questions,
       });
+      setOpenedQuizTitle(savedQuizSet.title);
       setCurrent(0);
       setAnswers({});
       setShortAnswerInput("");
@@ -489,17 +553,8 @@ export default function Quiz() {
                       justifyContent: "space-between", transition: "border 0.15s, box-shadow 0.15s",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                    <div>
                       <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                          background: "#E8FAFE",
-                          color: CYAN, flexShrink: 0,
-                        }}>
-                          서버 저장
-                        </span>
-                      </div>
                     </div>
                     <span style={{ marginTop: 14, fontSize: 12, fontWeight: 600, color: "#aaa" }}>
                       선택하기
@@ -808,7 +863,7 @@ export default function Quiz() {
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
-      <Header label={`${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
+      <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={<span style={{ fontSize: 14, fontWeight: 600, color: "#999" }}>{current + 1} / {quizzes.length}</span>} />
       <div style={{ height: 3, background: "#f0f0f0" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>

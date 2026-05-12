@@ -17,11 +17,28 @@ const ensureThemeStyle = () => {
       color: #E8EDF3 !important;
     }
 
+    html[data-theme="dark"] #root h1,
+    html[data-theme="dark"] #root h2,
+    html[data-theme="dark"] #root h3,
+    html[data-theme="dark"] #root h4 {
+      color: #F8FAFC !important;
+    }
+
+    html[data-theme="dark"] #root p {
+      color: #CBD5E1 !important;
+    }
+
     html[data-theme="dark"] .tongkk-card,
     html[data-theme="dark"] .tongkk-sidebar {
       background: #151F2A !important;
       border-color: #263241 !important;
       box-shadow: 0 1px 8px rgba(0,0,0,0.28) !important;
+    }
+
+    html[data-theme="dark"] .tongkk-card,
+    html[data-theme="dark"] .tongkk-card div,
+    html[data-theme="dark"] .tongkk-card button {
+      border-color: #2B3A4B !important;
     }
 
     html[data-theme="dark"] .tongkk-card h1,

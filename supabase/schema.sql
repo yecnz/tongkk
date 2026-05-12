@@ -19,6 +19,8 @@ create table if not exists public.materials (
   pages integer,
   slides integer,
   markdown text not null,
+  file_path text,
+  mime_type text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (course_id, id)
@@ -36,6 +38,24 @@ create table if not exists public.summaries (
   unique (course_id, template, material_ids)
 );
 
+alter table public.materials
+add column if not exists file_path text;
+
+alter table public.materials
+add column if not exists mime_type text;
+
+create table if not exists public.summary_chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  summary_id uuid not null references public.summaries(id) on delete cascade,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists summary_chat_messages_summary_created_idx
+on public.summary_chat_messages (summary_id, created_at);
+
 create table if not exists public.quiz_sets (
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references public.courses(id) on delete cascade,
@@ -52,7 +72,7 @@ create table if not exists public.quiz_sets (
 
 create table if not exists public.dashboard_state (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  key text not null check (key in ('community', 'ddays', 'plans')),
+  key text not null check (key in ('ddays', 'plans')),
   value jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -69,35 +89,12 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.community_posts (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  author_name text not null,
-  title text not null,
-  content text not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.community_comments (
-  id uuid primary key default gen_random_uuid(),
-  post_id uuid not null references public.community_posts(id) on delete cascade,
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  author_name text not null,
-  text text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.community_reactions (
-  post_id uuid not null references public.community_posts(id) on delete cascade,
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  type text not null check (type in ('like', 'save')),
-  created_at timestamptz not null default now(),
-  primary key (post_id, user_id, type)
-);
-
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
+on conflict (id) do update set public = excluded.public;
+
+insert into storage.buckets (id, name, public)
+values ('course-materials', 'course-materials', false)
 on conflict (id) do update set public = excluded.public;
 
 create or replace function public.set_updated_at()
@@ -140,20 +137,13 @@ create trigger set_profiles_updated_at
 before update on public.profiles
 for each row execute function public.set_updated_at();
 
-drop trigger if exists set_community_posts_updated_at on public.community_posts;
-create trigger set_community_posts_updated_at
-before update on public.community_posts
-for each row execute function public.set_updated_at();
-
 alter table public.courses enable row level security;
 alter table public.materials enable row level security;
 alter table public.summaries enable row level security;
+alter table public.summary_chat_messages enable row level security;
 alter table public.quiz_sets enable row level security;
 alter table public.dashboard_state enable row level security;
 alter table public.profiles enable row level security;
-alter table public.community_posts enable row level security;
-alter table public.community_comments enable row level security;
-alter table public.community_reactions enable row level security;
 
 drop policy if exists "users can manage own courses" on public.courses;
 create policy "users can manage own courses"
@@ -172,6 +162,13 @@ with check (auth.uid() = user_id);
 drop policy if exists "users can manage own summaries" on public.summaries;
 create policy "users can manage own summaries"
 on public.summaries
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "users can manage own summary chat messages" on public.summary_chat_messages;
+create policy "users can manage own summary chat messages"
+on public.summary_chat_messages
 for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
@@ -203,67 +200,20 @@ for all
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
-drop policy if exists "authenticated users can view community posts" on public.community_posts;
-create policy "authenticated users can view community posts"
-on public.community_posts
-for select
-using (auth.role() = 'authenticated');
-
-drop policy if exists "users can insert own community posts" on public.community_posts;
-create policy "users can insert own community posts"
-on public.community_posts
-for insert
-with check (auth.uid() = user_id);
-
-drop policy if exists "users can update own community posts" on public.community_posts;
-create policy "users can update own community posts"
-on public.community_posts
-for update
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
-drop policy if exists "users can delete own community posts" on public.community_posts;
-create policy "users can delete own community posts"
-on public.community_posts
-for delete
-using (auth.uid() = user_id);
-
-drop policy if exists "authenticated users can view community comments" on public.community_comments;
-create policy "authenticated users can view community comments"
-on public.community_comments
-for select
-using (auth.role() = 'authenticated');
-
-drop policy if exists "users can insert own community comments" on public.community_comments;
-create policy "users can insert own community comments"
-on public.community_comments
-for insert
-with check (auth.uid() = user_id);
-
-drop policy if exists "users can delete own community comments" on public.community_comments;
-create policy "users can delete own community comments"
-on public.community_comments
-for delete
-using (auth.uid() = user_id);
-
-drop policy if exists "authenticated users can view community reactions" on public.community_reactions;
-create policy "authenticated users can view community reactions"
-on public.community_reactions
-for select
-using (auth.role() = 'authenticated');
-
-drop policy if exists "users can manage own community reactions" on public.community_reactions;
-create policy "users can manage own community reactions"
-on public.community_reactions
-for all
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
-
 drop policy if exists "users can view avatar files" on storage.objects;
 create policy "users can view avatar files"
 on storage.objects
 for select
 using (bucket_id = 'avatars');
+
+drop policy if exists "users can view own course material files" on storage.objects;
+create policy "users can view own course material files"
+on storage.objects
+for select
+using (
+  bucket_id = 'course-materials'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
 
 drop policy if exists "users can insert own avatar files" on storage.objects;
 create policy "users can insert own avatar files"
@@ -271,6 +221,15 @@ on storage.objects
 for insert
 with check (
   bucket_id = 'avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users can insert own course material files" on storage.objects;
+create policy "users can insert own course material files"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'course-materials'
   and auth.uid()::text = (storage.foldername(name))[1]
 );
 
@@ -287,11 +246,33 @@ with check (
   and auth.uid()::text = (storage.foldername(name))[1]
 );
 
+drop policy if exists "users can update own course material files" on storage.objects;
+create policy "users can update own course material files"
+on storage.objects
+for update
+using (
+  bucket_id = 'course-materials'
+  and auth.uid()::text = (storage.foldername(name))[1]
+)
+with check (
+  bucket_id = 'course-materials'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
 drop policy if exists "users can delete own avatar files" on storage.objects;
 create policy "users can delete own avatar files"
 on storage.objects
 for delete
 using (
   bucket_id = 'avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users can delete own course material files" on storage.objects;
+create policy "users can delete own course material files"
+on storage.objects
+for delete
+using (
+  bucket_id = 'course-materials'
   and auth.uid()::text = (storage.foldername(name))[1]
 );

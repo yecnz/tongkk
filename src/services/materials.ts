@@ -11,8 +11,12 @@ export type CourseMaterial = {
   pages: number | null;
   slides: number | null;
   markdown: string;
+  filePath?: string | null;
+  mimeType?: string | null;
   updatedAt: number;
 };
+
+const MATERIAL_STORAGE_BUCKET = 'course-materials';
 
 export const getFileMaterialId = (file: Pick<File, "name" | "size">) => `${file.name}:${file.size}`;
 
@@ -30,6 +34,8 @@ const toServerMaterial = (courseId: string, material: CourseMaterial) => ({
   pages: material.pages,
   slides: material.slides,
   markdown: material.markdown,
+  file_path: material.filePath || null,
+  mime_type: material.mimeType || null,
 });
 
 const toCourseMaterial = (material: {
@@ -40,6 +46,10 @@ const toCourseMaterial = (material: {
   pages: number | null;
   slides: number | null;
   markdown: string;
+  filePath?: string | null;
+  file_path?: string | null;
+  mimeType?: string | null;
+  mime_type?: string | null;
   updatedAt?: number;
   updated_at?: number;
 }): CourseMaterial => ({
@@ -50,6 +60,8 @@ const toCourseMaterial = (material: {
   pages: material.pages,
   slides: material.slides,
   markdown: material.markdown,
+  filePath: material.filePath ?? material.file_path ?? null,
+  mimeType: material.mimeType ?? material.mime_type ?? null,
   updatedAt: material.updatedAt || material.updated_at || Date.now(),
 });
 
@@ -59,13 +71,53 @@ const findCourseRecord = async (course: string): Promise<CourseRecord | null> =>
   return found;
 };
 
+const sanitizeStorageName = (name: string) =>
+  name.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim() || 'material';
+
+export const uploadCourseMaterialFile = async (
+  course: string,
+  material: CourseMaterial,
+  file: File,
+): Promise<CourseMaterial> => {
+  const courseId = (await findCourseRecord(course))?.id;
+  if (!courseId) throw new Error('과목을 찾을 수 없습니다.');
+
+  const user = await requireSupabaseUser();
+  const filePath = `${user.id}/${courseId}/${encodeURIComponent(material.id)}/${sanitizeStorageName(file.name)}`;
+  const { error } = await supabase.storage
+    .from(MATERIAL_STORAGE_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      contentType: file.type || 'application/octet-stream',
+      upsert: true,
+    });
+
+  if (error) throw new Error(formatSupabaseError(error));
+  return {
+    ...material,
+    filePath,
+    mimeType: file.type || 'application/octet-stream',
+  };
+};
+
+export const createCourseMaterialFileUrl = async (material: CourseMaterial): Promise<string | null> => {
+  if (!material.filePath) return null;
+
+  const { data, error } = await supabase.storage
+    .from(MATERIAL_STORAGE_BUCKET)
+    .createSignedUrl(material.filePath, 60 * 60);
+
+  if (error) throw new Error(formatSupabaseError(error));
+  return data.signedUrl;
+};
+
 export const loadCourseMaterialsFromServer = async (course: string): Promise<CourseMaterial[]> => {
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return [];
 
   const { data, error } = await supabase
     .from('materials')
-    .select('id, name, size, type, pages, slides, markdown, updated_at')
+    .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
     .eq('course_id', courseId)
     .order('updated_at', { ascending: false });
 
@@ -80,6 +132,22 @@ export const loadCourseMaterialsFromServer = async (course: string): Promise<Cou
 export const deleteCourseMaterialFromServer = async (course: string, materialId: string) => {
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return;
+
+  const { data: material, error: loadError } = await supabase
+    .from('materials')
+    .select('file_path')
+    .eq('course_id', courseId)
+    .eq('id', materialId)
+    .maybeSingle<{ file_path: string | null }>();
+
+  if (loadError) throw new Error(formatSupabaseError(loadError));
+  if (material?.file_path) {
+    const removeResult = await supabase.storage
+      .from(MATERIAL_STORAGE_BUCKET)
+      .remove([material.file_path]);
+    if (removeResult.error) throw new Error(formatSupabaseError(removeResult.error));
+  }
+
   const { error } = await supabase
     .from('materials')
     .delete()
@@ -94,7 +162,6 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
   if (!courseId) return;
 
   const serverMaterials = await loadCourseMaterialsFromServer(course);
-  const serverByName = new Map(serverMaterials.map(material => [material.name.trim().toLowerCase(), material]));
   const localNames = new Set(materials.map(material => material.name.trim().toLowerCase()));
 
   for (const serverMaterial of serverMaterials) {
@@ -105,14 +172,13 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
 
   const user = await requireSupabaseUser();
   for (const material of materials) {
-    const key = material.name.trim().toLowerCase();
-    if (serverByName.has(key)) continue;
-
     const { error } = await supabase
       .from('materials')
-      .insert({
+      .upsert({
         ...toServerMaterial(courseId, material),
         user_id: user.id,
+      }, {
+        onConflict: 'course_id,id',
       });
 
     if (error) throw new Error(formatSupabaseError(error));

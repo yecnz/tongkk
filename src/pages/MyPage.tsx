@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
-import {
-  fetchCommunityActivity,
-  type CommunityActivity,
-  type CommunityPost,
-} from "../services/community";
 import {
   deleteOwnAppData,
   loadUserProfile,
@@ -18,23 +13,13 @@ import {
 import { applyTheme } from "../services/theme";
 
 type ToggleProps = { on: boolean; onToggle: () => void };
-type PostListViewProps = { title: string; posts: CommunityPost[]; onBack: () => void; onSelect: (post: CommunityPost) => void };
 type ProfileEditModalProps = {
   nickname: string;
   avatarUrl: string | null;
   onSave: (nickname: string, avatarFile: File | null) => Promise<void>;
   onClose: () => void;
 };
-type LocationState = { view?: string } | null;
-type PostViewKey = "myPosts" | "liked" | "commented" | "saved";
 type SettingsDialog = "notice" | "contact" | "deleteAccount" | null;
-
-const emptyActivity: CommunityActivity = {
-  myPosts: [],
-  likedPosts: [],
-  commentedPosts: [],
-  savedPosts: [],
-};
 
 const Toggle = ({ on, onToggle }: ToggleProps) => (
   <button onClick={onToggle} style={{
@@ -48,34 +33,6 @@ const Toggle = ({ on, onToggle }: ToggleProps) => (
       boxShadow: "0 1px 3px rgba(0,0,0,0.15)"
     }}/>
   </button>
-);
-
-const PostListView = ({ title, posts, onBack, onSelect }: PostListViewProps) => (
-  <div>
-    <button onClick={onBack} style={{
-      background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 16, padding: 0
-    }}>← 돌아가기</button>
-    <h2 style={{ margin: "0 0 16px", fontSize: 20, fontWeight: 700, color: "#222" }}>{title}</h2>
-    {posts.length === 0 ? (
-      <Card style={{ padding: 40, textAlign: "center" }}>
-        <p style={{ color: "#bbb", fontSize: 14 }}>아직 글이 없습니다</p>
-      </Card>
-    ) : (
-      posts.map(post => (
-        <Card key={post.id}
-          onClick={() => onSelect(post)}
-          onMouseEnter={event => event.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)"}
-          onMouseLeave={event => event.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)"}
-          style={{ padding: "16px 20px", marginBottom: 10, cursor: "pointer", transition: "box-shadow 0.2s" }}
-        >
-          <h4 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, color: "#222" }}>{post.title}</h4>
-          <div style={{ fontSize: 12, color: "#aaa" }}>
-            좋아요 {post.likes} · 댓글 {post.comments} · {post.time}
-          </div>
-        </Card>
-      ))
-    )}
-  </div>
 );
 
 const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditModalProps) => {
@@ -194,7 +151,7 @@ const SettingsModal = ({
         {type === "notice" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
             <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다.</p>
-            <p style={{ margin: "0 0 10px" }}>자료 변환, 요약, 퀴즈, 커뮤니티, 마이페이지 데이터는 Supabase에 사용자별로 저장됩니다.</p>
+            <p style={{ margin: "0 0 10px" }}>자료 변환, 요약, 퀴즈, 마이페이지 데이터는 Supabase에 사용자별로 저장됩니다.</p>
             <p style={{ margin: 0 }}>시연 전에는 Supabase SQL 스키마 적용과 환경변수 설정을 먼저 확인하세요.</p>
           </div>
         )}
@@ -214,7 +171,7 @@ const SettingsModal = ({
         {type === "deleteAccount" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
             <p style={{ margin: "0 0 10px" }}>
-              이 작업은 현재 계정의 과목, 자료, 요약, 퀴즈, 커뮤니티 글/댓글/반응, 프로필 데이터를 삭제합니다.
+              이 작업은 현재 계정의 과목, 자료, 요약, 퀴즈, 프로필 데이터를 삭제합니다.
             </p>
             <p style={{ margin: "0 0 14px", color: "#E53E3E", fontWeight: 700 }}>
               Supabase Auth 계정 자체 삭제는 관리자 권한이 필요한 별도 서버 기능입니다.
@@ -240,11 +197,9 @@ const SettingsModal = ({
 
 export default function MyPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { courses } = useCourses();
   const { user, signOut } = useAuth();
   const [sidebar, setSidebar] = useState(false);
-  const [view, setView] = useState(((location.state as LocationState)?.view) || "main");
   const [showEdit, setShowEdit] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialog>(null);
   const [profile, setProfile] = useState<UserProfile>({
@@ -253,30 +208,36 @@ export default function MyPage() {
     darkMode: false,
     notificationsEnabled: true,
   });
-  const [activity, setActivity] = useState<CommunityActivity>(emptyActivity);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const reload = async () => {
-    setLoading(true);
-    setError("");
     try {
-      const [nextProfile, nextActivity] = await Promise.all([
-        loadUserProfile(),
-        fetchCommunityActivity(),
-      ]);
+      const nextProfile = await loadUserProfile();
       setProfile(nextProfile);
       applyTheme(nextProfile.darkMode);
-      setActivity(nextActivity);
+      setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "마이페이지 정보 불러오기 실패");
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    reload();
+    let ignore = false;
+    const loadInitialProfile = async () => {
+      try {
+        const nextProfile = await loadUserProfile();
+        if (ignore) return;
+        setProfile(nextProfile);
+        applyTheme(nextProfile.darkMode);
+        setError("");
+      } catch (err) {
+        if (!ignore) setError(err instanceof Error ? err.message : "마이페이지 정보 불러오기 실패");
+      }
+    };
+    void loadInitialProfile();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const updateProfile = async (nextProfile: UserProfile) => {
@@ -303,15 +264,6 @@ export default function MyPage() {
     navigate("/auth", { replace: true });
   };
 
-  const postViews: Record<PostViewKey, { title: string; posts: CommunityPost[] }> = {
-    myPosts: { title: "내가 쓴 글", posts: activity.myPosts },
-    liked: { title: "좋아요한 글", posts: activity.likedPosts },
-    commented: { title: "댓글 단 글", posts: activity.commentedPosts },
-    saved: { title: "스크랩한 글", posts: activity.savedPosts },
-  };
-
-  const selectedView = postViews[view as PostViewKey];
-
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="마이페이지" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
@@ -328,15 +280,7 @@ export default function MyPage() {
       </div>
 
       <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
-        {selectedView ? (
-          <PostListView
-            title={selectedView.title}
-            posts={selectedView.posts}
-            onBack={() => setView("main")}
-            onSelect={(post) => navigate("/community", { state: { post, from: "/mypage", view } })}
-          />
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <Card style={{ padding: 28 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -418,30 +362,8 @@ export default function MyPage() {
                   </div>
                 )}
               </Card>
-
-              {[
-                { key: "myPosts", label: "내가 쓴 글", count: activity.myPosts.length },
-                { key: "liked", label: "좋아요한 글", count: activity.likedPosts.length },
-                { key: "commented", label: "댓글 단 글", count: activity.commentedPosts.length },
-                { key: "saved", label: "스크랩한 글", count: activity.savedPosts.length },
-              ].map(item => (
-                <Card key={item.key} style={{ padding: "18px 22px", cursor: loading ? "default" : "pointer", transition: "box-shadow 0.2s" }}
-                  onClick={() => { if (!loading) setView(item.key); }}
-                  onMouseEnter={event => event.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)"}
-                  onMouseLeave={event => event.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)"}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 15, fontWeight: 600, color: "#333" }}>{item.label}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 13, color: CYAN, fontWeight: 600 }}>{loading ? "-" : item.count}</span>
-                      <span style={{ color: "#ddd", fontSize: 16 }}>›</span>
-                    </div>
-                  </div>
-                </Card>
-              ))}
             </div>
           </div>
-        )}
       </div>
     </div>
   );

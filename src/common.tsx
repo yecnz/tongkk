@@ -7,7 +7,6 @@ export const pageRoutes = {
   "대시보드": "/",
   "자료 요약": "/summary",
   "퀴즈 생성": "/quiz",
-  "커뮤니티": "/community",
   "마이페이지": "/mypage",
 } as const;
 

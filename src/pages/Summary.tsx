@@ -7,6 +7,10 @@ import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
+  loadSummaryChatMessages,
+  saveSummaryChatMessage,
+} from "../services/summaryChats";
+import {
   loadSummariesFromServer,
   saveSummaryToServer,
 } from "../services/summaries";
@@ -14,21 +18,33 @@ import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
 import {
   combineMaterialsMarkdown,
+  createCourseMaterialFileUrl,
   getFileMaterialId,
   loadCourseMaterialsFromServer,
   saveCourseMaterials,
+  uploadCourseMaterialFile,
   type CourseMaterial,
 } from "../services/materials";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
-type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate";
+type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
-type LocationState = { selectedCourse?: string; fromDashboard?: boolean } | null;
+type LocationState = {
+  selectedCourse?: string;
+  fromDashboard?: boolean;
+  materialId?: string;
+  viewMaterial?: boolean;
+  summaryId?: string;
+  summaryTemplate?: SummaryTemplate;
+  materialIds?: string[];
+  openSummary?: boolean;
+} | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; onGoToQuiz?: () => void };
+type MaterialDetailViewProps = { material: CourseMaterial; onBack: () => void; onGoSummary: () => void; onGoQuiz: () => void };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
 const templateLabels: Record<SummaryTemplate, string> = {
@@ -36,6 +52,33 @@ const templateLabels: Record<SummaryTemplate, string> = {
   LECTURE_NOTE: "강의 노트",
   MINDMAP: "마인드맵",
   CHEAT_SHEET: "치트시트",
+};
+
+const suggestedTutorQuestions: Record<SummaryTemplate, string[]> = {
+  GENERAL: [
+    "이 요약을 처음 듣는 사람 기준으로 쉽게 설명해줘",
+    "시험에 나올 핵심 포인트만 5개로 정리해줘",
+    "중요 용어를 예시와 함께 설명해줘",
+    "헷갈리기 쉬운 개념을 비교해서 설명해줘",
+  ],
+  LECTURE_NOTE: [
+    "이번 강의 흐름을 단계별로 다시 설명해줘",
+    "교수님이 시험에 낼 만한 질문을 뽑아줘",
+    "핵심 개념 사이의 관계를 설명해줘",
+    "내가 복습할 수 있게 질문을 하나씩 내줘",
+  ],
+  MINDMAP: [
+    "마인드맵의 큰 가지별 의미를 설명해줘",
+    "가지 사이의 관계를 쉬운 예시로 설명해줘",
+    "가장 먼저 외워야 할 개념부터 정리해줘",
+    "이 구조로 시험 대비 순서를 짜줘",
+  ],
+  CHEAT_SHEET: [
+    "이 치트시트에서 꼭 외워야 할 것만 골라줘",
+    "비슷해서 헷갈리는 항목을 비교해줘",
+    "빈칸 문제처럼 나한테 질문해줘",
+    "시험 직전 5분 복습 순서를 만들어줘",
+  ],
 };
 
 const FileIcon = ({ type }: FileIconProps) => {
@@ -210,17 +253,54 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
+  const [localThreadId, setLocalThreadId] = useState(threadId);
   const [agentInput, setAgentInput] = useState("");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  const canUseAgent = Boolean(threadId);
+  const canUseAgent = Boolean(displayContent.trim());
+  const questions = suggestedTutorQuestions[template];
   const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
+
+  useEffect(() => {
+    let ignore = false;
+    setLocalThreadId(threadId);
+    setAgentInput("");
+    setAgentError("");
+    setChatLoading(false);
+
+    if (!summaryId) {
+      setAgentMessages([]);
+      return () => {
+        ignore = true;
+      };
+    }
+
+    setChatLoading(true);
+    loadSummaryChatMessages(summaryId)
+      .then(messages => {
+        if (!ignore) setAgentMessages(messages);
+      })
+      .catch(err => {
+        if (!ignore) {
+          setAgentMessages([]);
+          setAgentError(err instanceof Error ? err.message : "AI 튜터 대화 불러오기 실패");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setChatLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [summaryId, threadId, displayContent]);
 
   const handleDownload = () => {
     const blob = new Blob([exportText], { type: "text/markdown;charset=utf-8" });
@@ -255,25 +335,55 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     }
   };
 
-  const handleAgentSubmit = async () => {
-    const content = agentInput.trim();
-    if (!content || !canUseAgent || agentLoading) return;
+  const sendAgentQuestion = async (question: string) => {
+    const content = question.trim();
+    if (!content || !canUseAgent || chatLoading || agentLoading) return;
 
     const userMessage: AgentMessage = { role: "user", content };
-    setAgentMessages(prev => [...prev, userMessage]);
+    const nextMessages = [...agentMessages, userMessage];
+    setAgentMessages(nextMessages);
     setAgentInput("");
     setAgentError("");
     setAgentLoading(true);
 
     try {
-      const response = await sendAgentMessage(threadId, [userMessage]);
-      setAgentMessages(prev => [...prev, { role: "assistant", content: response.result }]);
+      let persistenceError = "";
+      if (summaryId) {
+        try {
+          await saveSummaryChatMessage(summaryId, userMessage);
+        } catch (err) {
+          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
+        }
+      }
+
+      const response = await sendAgentMessage(
+        localThreadId,
+        localThreadId ? [userMessage] : nextMessages,
+        localThreadId ? undefined : agentContext || displayContent,
+      );
+      const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
+      setLocalThreadId(response.threadId);
+      setAgentMessages(prev => [...prev, assistantMessage]);
+      if (summaryId) {
+        try {
+          await saveSummaryChatMessage(summaryId, assistantMessage);
+        } catch (err) {
+          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
+        }
+      }
+      if (persistenceError) {
+        setAgentError(`대화 저장 실패: ${persistenceError}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Agent 요청 실패";
       setAgentError(message);
     } finally {
       setAgentLoading(false);
     }
+  };
+
+  const handleAgentSubmit = async () => {
+    await sendAgentQuestion(agentInput);
   };
 
   return (
@@ -356,66 +466,263 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
           }}>
             <strong>요약 실패:</strong> {error}
           </div>
-        ) : mindmapData ? (
-          <div style={{ background: "#fafafa", borderRadius: 12, padding: 24, overflowX: "auto" }}>
-            <MindmapView key={displayContent} data={mindmapData} />
-          </div>
         ) : (
-          <div style={{
-            background: "#fafafa", borderRadius: 12, padding: 24,
-            fontSize: 14, color: "#444", lineHeight: 1.8
-          }}>
-            <FormattedAiText content={displayContent} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18, alignItems: "start" }}>
+            <div style={{
+              background: "#fafafa", borderRadius: 12, padding: 24,
+              fontSize: 14, color: "#444", lineHeight: 1.8,
+              overflowX: "auto",
+            }}>
+              {mindmapData ? (
+                <MindmapView key={displayContent} data={mindmapData} />
+              ) : (
+                <FormattedAiText content={displayContent} />
+              )}
+            </div>
+
+            <div style={{
+              border: "1px solid #f0f0f0",
+              borderRadius: 12,
+              padding: 18,
+              minHeight: 420,
+              display: "flex",
+              flexDirection: "column",
+              background: "#fff",
+            }}>
+              <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 800, color: "#222" }}>AI 튜터</h3>
+              <p style={{ margin: "0 0 14px", fontSize: 12, lineHeight: 1.6, color: "#888" }}>
+                요약본을 기준으로 헷갈리는 개념을 이어서 질문하세요.
+              </p>
+
+              {canUseAgent && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {questions.map(question => (
+                      <button
+                        key={question}
+                        type="button"
+                        onClick={() => sendAgentQuestion(question)}
+                        disabled={chatLoading || agentLoading}
+                        style={{
+                          padding: "7px 10px",
+                          borderRadius: 999,
+                          border: "1px solid #eeeeee",
+                          background: "#fafafa",
+                          color: "#555",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          lineHeight: 1.35,
+                          cursor: chatLoading || agentLoading ? "default" : "pointer",
+                          opacity: chatLoading || agentLoading ? 0.55 : 1,
+                          textAlign: "left",
+                        }}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 260, marginBottom: 14 }}>
+                {!canUseAgent ? (
+                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+                    새로 생성한 요약에서 AI 튜터 대화를 시작할 수 있습니다.
+                  </div>
+                ) : chatLoading ? (
+                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+                    이전 AI 튜터 대화를 불러오는 중입니다.
+                  </div>
+                ) : agentMessages.length === 0 ? (
+                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+                    예: “이 개념을 쉬운 예시로 설명해줘” 또는 “시험에 나올 만한 포인트를 알려줘”
+                  </div>
+                ) : (
+                  agentMessages.map((msg, i) => (
+                    <div key={`${msg.role}-${i}`} style={{
+                      alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                      maxWidth: "88%",
+                      padding: "10px 14px",
+                      borderRadius: 12,
+                      background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
+                      color: "#444",
+                      fontSize: 13,
+                      lineHeight: 1.6
+                    }}>
+                      <FormattedAiText content={msg.content} />
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {agentError && (
+                <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={agentInput}
+                  onChange={e => setAgentInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleAgentSubmit(); }}
+                  disabled={!canUseAgent || chatLoading || agentLoading}
+                  placeholder="요약본에 대해 질문하기"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "11px 13px",
+                    borderRadius: 10,
+                    border: "1px solid #e0e0e0",
+                    fontSize: 13,
+                    outline: "none"
+                  }}
+                />
+                <button
+                  onClick={handleAgentSubmit}
+                  disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
+                  style={{
+                    padding: "0 14px", borderRadius: 10, border: "none",
+                    background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff",
+                    fontSize: 13, fontWeight: 800,
+                    cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  {agentLoading ? "응답 중" : "전송"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
+      </Card>
+    </div>
+  );
+};
 
-        {canUseAgent && !isLoading && !error && (
-          <div style={{ marginTop: 24, paddingTop: 22, borderTop: "1px solid #f0f0f0" }}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#222" }}>추가 질문</h3>
-            {agentMessages.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
-                {agentMessages.map((msg, i) => (
-                  <div key={`${msg.role}-${i}`} style={{
-                    alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                    maxWidth: "78%",
-                    padding: "10px 14px",
-                    borderRadius: 12,
-                    background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
-                    color: "#444",
-                    fontSize: 13,
-                    lineHeight: 1.6
-                  }}>
-                    <FormattedAiText content={msg.content} />
-                  </div>
-                ))}
-              </div>
+const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: MaterialDetailViewProps) => {
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
+
+  useEffect(() => {
+    let ignore = false;
+    const loadFileUrl = async () => {
+      setFileUrl(null);
+      setFileError("");
+
+      if (!material.filePath) {
+        setFileLoading(false);
+        return;
+      }
+
+      setFileLoading(true);
+      try {
+        const url = await createCourseMaterialFileUrl(material);
+        if (!ignore) setFileUrl(url);
+      } catch (err) {
+        if (!ignore) setFileError(err instanceof Error ? err.message : "원본 파일을 불러오지 못했습니다.");
+      } finally {
+        if (!ignore) setFileLoading(false);
+      }
+    };
+
+    void loadFileUrl();
+
+    return () => {
+      ignore = true;
+    };
+  }, [material]);
+
+  return (
+    <div>
+      <button onClick={onBack} style={{
+        background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+      }}>← 과목 자료로</button>
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{
+          padding: "14px 18px",
+          borderBottom: "1px solid #f0f0f0",
+          background: "#202020",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#fff", wordBreak: "break-word" }}>
+              {material.name}
+            </h2>
+            <p style={{ margin: 0, fontSize: 12, color: "#b7b7b7" }}>
+              {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : material.type.toUpperCase()} · PDF 원본 보기
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {fileUrl && (
+              <a href={fileUrl} target="_blank" rel="noreferrer" style={{
+                height: 34,
+                padding: "0 12px",
+                borderRadius: 8,
+                background: "#333",
+                color: CYAN,
+                fontSize: 13,
+                fontWeight: 800,
+                display: "inline-flex",
+                alignItems: "center",
+                textDecoration: "none",
+              }}>새 창</a>
             )}
-            {agentError && (
-              <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>
-            )}
-            <div style={{ display: "flex", gap: 10 }}>
-              <input
-                value={agentInput}
-                onChange={e => setAgentInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleAgentSubmit(); }}
-                placeholder="요약본에 대해 이어서 질문하기"
-                style={{
-                  flex: 1, padding: "11px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  fontSize: 14, outline: "none"
-                }}
-              />
-              <button
-                onClick={handleAgentSubmit}
-                disabled={!agentInput.trim() || agentLoading}
-                style={{
-                  padding: "0 18px", borderRadius: 10, border: "none",
-                  background: agentLoading ? "#ddd" : PINK, color: "#fff",
-                  fontSize: 14, fontWeight: 700, cursor: agentLoading ? "default" : "pointer"
-                }}
-              >
-                {agentLoading ? "응답 중" : "전송"}
-              </button>
+            <button onClick={onGoSummary} style={{
+              height: 34, padding: "0 12px", borderRadius: 8, border: "none",
+              background: "#FFF0F6", color: PINK, fontSize: 13, fontWeight: 800, cursor: "pointer"
+            }}>요약</button>
+            <button onClick={onGoQuiz} style={{
+              height: 34, padding: "0 12px", borderRadius: 8, border: "none",
+              background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer"
+            }}>퀴즈</button>
+          </div>
+        </div>
+
+        {fileLoading ? (
+          <div style={{ minHeight: 520, display: "grid", placeItems: "center", background: "#2b2b2b", color: "#ddd", fontSize: 14 }}>
+            원본 PDF를 불러오는 중입니다.
+          </div>
+        ) : fileUrl && isPdf ? (
+          <iframe
+            title={material.name}
+            src={`${fileUrl}#toolbar=1&navpanes=0`}
+            style={{
+              width: "100%",
+              height: "calc(100vh - 190px)",
+              minHeight: 620,
+              border: "none",
+              background: "#2b2b2b",
+              display: "block",
+            }}
+          />
+        ) : (
+          <div style={{
+            background: "#fafafa",
+            padding: 24,
+            fontSize: 14,
+            color: "#444",
+            lineHeight: 1.8,
+            minHeight: 520,
+            maxHeight: "calc(100vh - 220px)",
+            overflowY: "auto",
+          }}>
+            <div style={{
+              marginBottom: 18,
+              padding: "12px 14px",
+              borderRadius: 10,
+              background: fileError ? "#FFF5F5" : "#FFF8E8",
+              color: fileError ? "#E53E3E" : "#9A6B00",
+              fontSize: 13,
+              fontWeight: 700,
+            }}>
+              {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
             </div>
+            <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
           </div>
         )}
       </Card>
@@ -513,8 +820,15 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
-  const initialCourse = ((location.state as LocationState)?.selectedCourse || "").trim();
-  const fromDashboardRef = useRef(Boolean(initialCourse && (location.state as LocationState)?.fromDashboard));
+  const locationState = (location.state as LocationState) || null;
+  const initialCourse = (locationState?.selectedCourse || "").trim();
+  const fromDashboardRef = useRef(Boolean(initialCourse && locationState?.fromDashboard));
+  const pendingMaterialIdRef = useRef(locationState?.viewMaterial ? locationState.materialId || "" : "");
+  const pendingSummaryRef = useRef(locationState?.openSummary ? {
+    id: locationState.summaryId || "",
+    template: locationState.summaryTemplate,
+    materialIds: locationState.materialIds || [],
+  } : null);
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -527,17 +841,20 @@ export default function Summary() {
 
   const [view, setView] = useState<SummaryView>("upload");
   const [selectedTemplate, setSelectedTemplate] = useState<SummaryTemplate | null>(null);
+  const [activeSummaryId, setActiveSummaryId] = useState<string | null>(null);
   const [summaryText, setSummaryText] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const [loadingStep, setLoadingStep] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   const [agentThreadId, setAgentThreadId] = useState("");
+  const [resultBackView, setResultBackView] = useState<"templates" | "upload">("templates");
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
 
@@ -549,10 +866,57 @@ export default function Summary() {
     if (!selectedCourse) return;
     let ignore = false;
 
-    loadCourseMaterialsFromServer(selectedCourse)
-      .then(nextMaterials => {
+    Promise.all([
+      loadCourseMaterialsFromServer(selectedCourse),
+      loadSummariesFromServer(selectedCourse),
+    ])
+      .then(([nextMaterials, summaries]) => {
         if (ignore) return;
         setMaterials(nextMaterials);
+        const pendingMaterialId = pendingMaterialIdRef.current;
+        if (pendingMaterialId) {
+          pendingMaterialIdRef.current = "";
+          const material = nextMaterials.find(item => item.id === pendingMaterialId);
+          if (material) {
+            setActiveMaterial(material);
+            setSelectedMaterialIds([material.id]);
+            setSearched(true);
+            setView("materialDetail");
+            return;
+          }
+        }
+
+        const pendingSummary = pendingSummaryRef.current;
+        if (pendingSummary) {
+          pendingSummaryRef.current = null;
+          const summary = summaries.find(item =>
+            (pendingSummary.id && item.id === pendingSummary.id) ||
+            (
+              pendingSummary.template &&
+              item.template === pendingSummary.template &&
+              sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+            )
+          );
+          if (summary) {
+            const validMaterialIds = (summary.materialIds || []).filter(id =>
+              nextMaterials.some(material => material.id === id)
+            );
+            setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : nextMaterials.map(material => material.id));
+            setSelectedTemplate(summary.template);
+            setActiveSummaryId(summary.id || null);
+            setSummaryText(summary.content);
+            setIsSummarizing(false);
+            setSummaryError("");
+            setElapsedTime(null);
+            setLoadingStep("");
+            setAgentThreadId("");
+            setResultBackView("upload");
+            setSearched(true);
+            setView("summaryResult");
+            return;
+          }
+        }
+
         setSelectedMaterialIds(prev => {
           const validPreviousIds = prev.filter(id => nextMaterials.some(material => material.id === id));
           return validPreviousIds.length > 0
@@ -563,10 +927,6 @@ export default function Summary() {
       .catch(error => {
         setExtractError(error instanceof Error ? error.message : "강의자료 불러오기 실패");
       });
-
-    loadSummariesFromServer(selectedCourse).catch(() => {
-      // 요약 목록은 템플릿 선택 시 다시 조회한다.
-    });
 
     return () => {
       ignore = true;
@@ -587,10 +947,12 @@ export default function Summary() {
     setUploading(false);
     setSearched(false);
     setMaterials([]);
+    setActiveMaterial(null);
     setSelectedMaterialIds([]);
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
+    setActiveSummaryId(null);
     navigate(pageRoutes["자료 요약"], { replace: true, state: null });
   };
 
@@ -610,10 +972,12 @@ export default function Summary() {
     setUploading(false);
     setSearched(true);
     setMaterials([]);
+    setActiveMaterial(null);
     setSelectedMaterialIds([]);
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
+    setActiveSummaryId(null);
   };
 
   const handleFiles = async (fileList: FileList | null) => {
@@ -654,19 +1018,33 @@ export default function Summary() {
       const duplicatePageCounts = await Promise.all(duplicateFiles.map(async file => ({
         id: getFileMaterialId(file),
         nameKey: getFileNameKey(file.name),
+        file,
         pages: await getPdfPageCount(file),
       })));
       let didUpdatePages = false;
-      const nextMaterials = materials.map(material => {
+      let didAttachFiles = false;
+      const nextMaterials: CourseMaterial[] = [];
+      for (const material of materials) {
         const match = duplicatePageCounts.find(item =>
           item.id === material.id || item.nameKey === getFileNameKey(material.name)
         );
-        if (!match || match.pages === null || material.pages === match.pages) return material;
-        didUpdatePages = true;
-        return { ...material, pages: match.pages };
-      });
+        let nextMaterial = material;
+        if (match && match.pages !== null && match.pages !== material.pages) {
+          didUpdatePages = true;
+          nextMaterial = { ...nextMaterial, pages: match.pages };
+        }
+        if (match && !nextMaterial.filePath) {
+          try {
+            nextMaterial = await uploadCourseMaterialFile(selectedCourse, nextMaterial, match.file);
+            didAttachFiles = true;
+          } catch (err) {
+            setExtractError(err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패");
+          }
+        }
+        nextMaterials.push(nextMaterial);
+      }
 
-      if (didUpdatePages) {
+      if (didUpdatePages || didAttachFiles) {
         await saveCourseMaterials(selectedCourse, nextMaterials);
         setMaterials(nextMaterials);
       }
@@ -697,7 +1075,7 @@ export default function Summary() {
           const markdown = await extractMarkdownFromPDF(documentFile);
           const uploadedMaterial = nf.find(f => f.rawFile === documentFile) || nf.find(f => f.name === documentFile.name);
           if (uploadedMaterial) {
-            uploadedMaterials.push({
+            const baseMaterial: CourseMaterial = {
               id: getFileMaterialId(documentFile),
               name: uploadedMaterial.name,
               size: uploadedMaterial.size,
@@ -706,7 +1084,13 @@ export default function Summary() {
               slides: uploadedMaterial.slides,
               markdown,
               updatedAt: Date.now(),
-            });
+            };
+            try {
+              uploadedMaterials.push(await uploadCourseMaterialFile(selectedCourse, baseMaterial, documentFile));
+            } catch (err) {
+              setExtractError(err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패");
+              uploadedMaterials.push(baseMaterial);
+            }
           }
         } catch (err) {
           setExtractError(err instanceof Error ? err.message : "파일 분석 실패");
@@ -745,12 +1129,6 @@ export default function Summary() {
     }
   };
 
-  const communityResults = [
-    { title: "알고리즘 7주차 정리", type: "요약" },
-    { title: "DP 문제풀이 퀴즈", type: "퀴즈" },
-    { title: "중간고사 예상문제 모음", type: "요약" },
-  ];
-
   const handleTemplateSelect = async (template: SummaryTemplate) => {
     setSelectedTemplate(template);
     setSummaryError("");
@@ -763,12 +1141,14 @@ export default function Summary() {
 
         if (savedSummary) {
           setSummaryText(savedSummary.content);
+          setActiveSummaryId(savedSummary.id || null);
           setIsSummarizing(false);
           setView("summaryResult");
           setSummaryError("");
           setElapsedTime(null);
           setLoadingStep("");
           setAgentThreadId("");
+          setResultBackView("templates");
           return;
         }
       }
@@ -776,9 +1156,11 @@ export default function Summary() {
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
+      setActiveSummaryId(null);
       setSummaryError("");
       setElapsedTime(null);
       setAgentThreadId("");
+      setResultBackView("templates");
       const startTime = Date.now();
       try {
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 중...`);
@@ -794,7 +1176,8 @@ export default function Summary() {
             materialIds: selectedMaterialIds,
             materialNames: selectedMaterialNames,
           };
-          await saveSummaryToServer(selectedCourse, savedSummary);
+          const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
+          setActiveSummaryId(persistedSummary.id || null);
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
@@ -806,6 +1189,7 @@ export default function Summary() {
       }
     } else {
       setSummaryText("");
+      setActiveSummaryId(null);
       setView("summaryResult");
     }
   };
@@ -923,16 +1307,8 @@ export default function Summary() {
                       transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                    <div>
                       <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        background: "#E8FAFE",
-                        color: CYAN,
-                        flexShrink: 0,
-                      }}>
-                        서버 저장
-                      </span>
                     </div>
                     <span style={{
                       marginTop: 14,
@@ -955,14 +1331,25 @@ export default function Summary() {
         {view === "summaryResult" && selectedTemplate && (
           <SummaryResultView
             template={selectedTemplate}
-            onBack={() => setView("templates")}
+            onBack={() => setView(resultBackView)}
             realContent={summaryText}
             isLoading={isSummarizing}
             error={summaryError}
             loadingStep={loadingStep}
             elapsedTime={elapsedTime}
             threadId={agentThreadId}
+            summaryId={activeSummaryId}
+            agentContext={selectedMarkdown || summaryText}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
+          />
+        )}
+
+        {view === "materialDetail" && activeMaterial && (
+          <MaterialDetailView
+            material={activeMaterial}
+            onBack={() => setView("upload")}
+            onGoSummary={() => setView("templates")}
+            onGoQuiz={handleGoToQuiz}
           />
         )}
 
@@ -1091,46 +1478,29 @@ export default function Summary() {
             {searched && (
               <div>
                 <Card style={{ padding: 24 }}>
-                  <h3 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 700, color: "#222", textAlign: "center" }}>
-                    커뮤니티 검색 결과
+                  <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 800, color: "#222" }}>
+                    선택한 자료로 만들기
                   </h3>
-                  <div style={{ display: "flex", gap: 20 }}>
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700, color: "#222" }}>제주대</h4>
-                      {communityResults.map((item, i) => (
-                        <div key={i} style={{
-                          display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
-                          borderBottom: "1px solid #f5f5f5"
-                        }}>
-                          <span style={{
-                            width: 8, height: 8, borderRadius: "50%",
-                            background: item.type === "요약" ? PINK : CYAN, flexShrink: 0
-                          }}/>
-                          <span style={{ flex: 1, fontSize: 14, color: "#444" }}>{item.title}</span>
-                          <span style={{
-                            fontSize: 11, padding: "2px 10px", borderRadius: 10,
-                            background: item.type === "요약" ? "#FFF0F6" : "#E8FAFE",
-                            color: item.type === "요약" ? PINK : CYAN, fontWeight: 500
-                          }}>{item.type}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ width: 1, background: "#f0f0f0" }}/>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12, width: 130 }}>
-                      <button onClick={() => setView("templates")} disabled={!selectedMarkdown || isExtracting} style={{
-                        padding: "16px 12px", borderRadius: 12, border: "none",
-                        background: selectedMarkdown && !isExtracting ? "#FFF0F6" : "#f0f0f0",
-                        color: selectedMarkdown && !isExtracting ? PINK : "#aaa",
-                        fontSize: 14, fontWeight: 600,
-                        cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
-                        textAlign: "center", lineHeight: 1.4
-                      }}>요약<br/>새로 생성</button>
-                      <button onClick={handleGoToQuiz} style={{
-                        padding: "16px 12px", borderRadius: 12, border: "none",
-                        background: "#E8FAFE", color: CYAN, fontSize: 14, fontWeight: 600,
-                        cursor: "pointer", textAlign: "center", lineHeight: 1.4
-                      }}>퀴즈<br/>새로 생성</button>
-                    </div>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.6, color: "#888" }}>
+                    체크한 강의자료를 기준으로 요약을 만들거나 바로 퀴즈를 생성할 수 있습니다.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <button onClick={() => setView("templates")} disabled={!selectedMarkdown || isExtracting} style={{
+                      padding: "18px 14px", borderRadius: 12, border: "none",
+                      background: selectedMarkdown && !isExtracting ? "#FFF0F6" : "#f0f0f0",
+                      color: selectedMarkdown && !isExtracting ? PINK : "#aaa",
+                      fontSize: 14, fontWeight: 800,
+                      cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
+                      textAlign: "center", lineHeight: 1.4
+                    }}>요약<br/>새로 생성</button>
+                    <button onClick={handleGoToQuiz} disabled={!selectedMarkdown || isExtracting} style={{
+                      padding: "18px 14px", borderRadius: 12, border: "none",
+                      background: selectedMarkdown && !isExtracting ? "#E8FAFE" : "#f0f0f0",
+                      color: selectedMarkdown && !isExtracting ? CYAN : "#aaa",
+                      fontSize: 14, fontWeight: 800,
+                      cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
+                      textAlign: "center", lineHeight: 1.4
+                    }}>퀴즈<br/>새로 생성</button>
                   </div>
                 </Card>
               </div>
