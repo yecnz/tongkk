@@ -91,6 +91,7 @@ export async function deleteOwnAppData(): Promise<void> {
   const user = await requireSupabaseUser();
   const deletes = [
     () => supabase.from('dashboard_state').delete().eq('user_id', user.id),
+    () => supabase.from('quiz_attempts').delete().eq('user_id', user.id),
     () => supabase.from('quiz_sets').delete().eq('user_id', user.id),
     () => supabase.from('summary_chat_messages').delete().eq('user_id', user.id),
     () => supabase.from('summaries').delete().eq('user_id', user.id),

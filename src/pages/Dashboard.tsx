@@ -26,6 +26,8 @@ type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
 type Dday = { id?: string; subj: string; date: string };
 type Plan = { id?: string; text: string; done: boolean };
 
+const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 const templateLabels: Record<SavedSummary["template"], string> = {
   GENERAL: "일반 요약",
   LECTURE_NOTE: "강의 노트",
@@ -475,8 +477,6 @@ export default function Dashboard() {
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
   const [detailCourse, setDetailCourse] = useState<string | null>(null);
 
-  const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
   useEffect(() => {
     let ignore = false;
     Promise.all([
@@ -585,8 +585,8 @@ export default function Dashboard() {
           }}
         />
       )}
-      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { id: createId(), subj: s, date: d }])} />}
-      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { id: createId(), text: t, done: false }])} />}
+      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { id: createClientId(), subj: s, date: d }])} />}
+      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { id: createClientId(), text: t, done: false }])} />}
 
       {/* Header */}
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
