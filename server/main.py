@@ -348,22 +348,27 @@ async def convert_document_to_markdown(
 
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
-    messages = [
-        {
-            "role": "user",
-            "content": SUMMARY_USER_PROMPT.format(
-                template_label=TEMPLATE_LABELS[req.template],
-                template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
-                markdown=req.markdown,
-            ),
-        }
-    ]
+    prompt = SUMMARY_USER_PROMPT.format(
+        template_label=TEMPLATE_LABELS[req.template],
+        template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
+        markdown=req.markdown,
+    )
+
+    def _call_llm():
+        from langchain_core.messages import HumanMessage, SystemMessage
+        llm = build_llm(req.model)
+        response = llm.invoke([
+            SystemMessage(content="너는 대학 강의자료 요약 전문가다. 지시한 템플릿 형식으로만 요약하고, 후속 질문이나 추가 제안은 절대 붙이지 마."),
+            HumanMessage(content=prompt),
+        ])
+        return {"result": _message_content_to_text(response.content).strip()}
+
     try:
-        return await run_in_threadpool(run_study_agent, req.model, messages, req.thread_id)
+        return await run_in_threadpool(_call_llm)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Agent 실행 실패: {str(e)}") from e
+        raise HTTPException(status_code=502, detail=f"요약 실패: {str(e)}") from e
 
 
 @app.post("/agent")
