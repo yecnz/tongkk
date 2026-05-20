@@ -205,6 +205,106 @@ const FormattedAiText = ({ content }: { content: string }) => {
   );
 };
 
+const escapeHtml = (text: string) =>
+  text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const renderPdfInlineText = (text: string) =>
+  escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+const renderSummaryPdfBody = (content: string) => {
+  const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
+
+  return lines.map((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) return "<div class=\"spacer\"></div>";
+
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      const level = heading[1].length;
+      return `<h${Math.min(level + 1, 4)}>${renderPdfInlineText(heading[2])}</h${Math.min(level + 1, 4)}>`;
+    }
+
+    const boldHeading = line.match(/^\*\*(.+)\*\*$/);
+    if (boldHeading) return `<h3>${renderPdfInlineText(boldHeading[1])}</h3>`;
+
+    const bullet = line.match(/^[-*•]\s+(.+)$/);
+    if (bullet) return `<p class="bullet"><span></span>${renderPdfInlineText(bullet[1])}</p>`;
+
+    const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
+    if (numbered) return `<p class="numbered"><strong>${numbered[1]}.</strong>${renderPdfInlineText(numbered[2])}</p>`;
+
+    return `<p>${renderPdfInlineText(line)}</p>`;
+  }).join("");
+};
+
+const createSummaryPdfHtml = (title: string, content: string) => `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      @page { size: A4; margin: 18mm; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: #222;
+        background: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        font-size: 13px;
+        line-height: 1.75;
+      }
+      h1 {
+        margin: 0 0 18px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #f0f0f0;
+        font-size: 22px;
+        line-height: 1.35;
+      }
+      h2, h3, h4 {
+        margin: 16px 0 7px;
+        color: #222;
+        line-height: 1.45;
+        page-break-after: avoid;
+      }
+      h2 { font-size: 17px; }
+      h3 { font-size: 15px; }
+      h4 { font-size: 14px; }
+      p {
+        margin: 0 0 7px;
+        page-break-inside: avoid;
+      }
+      strong { font-weight: 800; }
+      .spacer { height: 8px; }
+      .bullet, .numbered {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .bullet span {
+        width: 5px;
+        height: 5px;
+        margin-top: 10px;
+        border-radius: 50%;
+        background: #FF5AA5;
+        flex: 0 0 auto;
+      }
+      .numbered strong {
+        min-width: 20px;
+        color: #FF5AA5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(title)}</h1>
+    ${renderSummaryPdfBody(content)}
+  </body>
+</html>`;
+
 const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
     { key: "GENERAL", name: "일반 요약", desc: "핵심 내용과 결론을 빠르게 정리", accent: "#555" },
@@ -303,35 +403,50 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   }, [summaryId, threadId, displayContent]);
 
   const handleDownload = () => {
-    const blob = new Blob([exportText], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `tongkk-${template.toLowerCase()}-summary.md`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setActionMessage("요약본을 다운로드했습니다.");
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setActionMessage("PDF 저장 창을 열 수 없습니다. 팝업 차단을 확인해주세요.");
+      return;
+    }
+
+    const title = `Tongkk ${templateLabels[template]} 요약`;
+    printWindow.document.open();
+    printWindow.document.write(createSummaryPdfHtml(title, displayContent));
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+    setActionMessage("PDF 저장 창을 열었습니다.");
   };
 
-  const handleShare = async () => {
+  const copySummaryToClipboard = async () => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(exportText);
+      return;
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = exportText;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.top = "-9999px";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.select();
+
+    const copied = document.execCommand("copy");
+    textArea.remove();
+    if (!copied) throw new Error("Clipboard copy failed");
+  };
+
+  const handleCopyAll = async () => {
     setActionMessage("");
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: `Tongkk ${templateLabels[template]} 요약`,
-          text: exportText,
-        });
-        setActionMessage("공유 요청을 보냈습니다.");
-        return;
-      }
-
-      await navigator.clipboard.writeText(exportText);
-      setActionMessage("요약본을 클립보드에 복사했습니다.");
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setActionMessage("공유에 실패했습니다.");
+      await copySummaryToClipboard();
+      setActionMessage("요약본 전체를 클립보드에 복사했습니다.");
+    } catch {
+      setActionMessage("전체 복사에 실패했습니다.");
     }
   };
 
@@ -420,14 +535,14 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             )}
             {!isLoading && (
               <>
-                <button onClick={handleShare} style={{
-                  height: 34, padding: "0 14px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
-                }}>공유하기</button>
+                <button onClick={handleCopyAll} style={{
+                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+                  background: "#fff", color: "#555", fontSize: 13, fontWeight: 700, cursor: "pointer"
+                }}>전체 복사</button>
                 <button onClick={handleDownload} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  background: "#fff", color: "#555", fontSize: 13, fontWeight: 600, cursor: "pointer"
-                }}>다운로드</button>
+                  background: "#70dff0", color: "#555", fontSize: 13, fontWeight: 600, cursor: "pointer"
+                }}>PDF 다운로드</button>
                 {realContent && !error && onGoToQuiz && (
                   <button onClick={onGoToQuiz} style={{
                     height: 34, padding: "0 14px", borderRadius: 10, border: "none",
