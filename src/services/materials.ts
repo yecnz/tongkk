@@ -71,8 +71,23 @@ const findCourseRecord = async (course: string): Promise<CourseRecord | null> =>
   return found;
 };
 
-const sanitizeStorageName = (name: string) =>
-  name.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim() || 'material';
+const getStorageSegmentHash = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+};
+
+const sanitizeStorageSegment = (value: string, fallback: string) => {
+  const normalized = value.normalize('NFKD');
+  const safeName = normalized
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 120);
+  return `${getStorageSegmentHash(value)}-${safeName || fallback}`;
+};
 
 export const uploadCourseMaterialFile = async (
   course: string,
@@ -83,7 +98,9 @@ export const uploadCourseMaterialFile = async (
   if (!courseId) throw new Error('과목을 찾을 수 없습니다.');
 
   const user = await requireSupabaseUser();
-  const filePath = `${user.id}/${courseId}/${encodeURIComponent(material.id)}/${sanitizeStorageName(file.name)}`;
+  const materialPath = sanitizeStorageSegment(material.id, 'material');
+  const fileName = sanitizeStorageSegment(file.name, 'file');
+  const filePath = `${user.id}/${courseId}/${materialPath}/${fileName}`;
   const { error } = await supabase.storage
     .from(MATERIAL_STORAGE_BUCKET)
     .upload(filePath, file, {
@@ -171,20 +188,17 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
   }
 
   const user = await requireSupabaseUser();
-  for (const material of materials) {
-    const { error } = await supabase
-      .from('materials')
-      .upsert({
+  const { error } = await supabase
+    .from('materials')
+    .upsert(
+      materials.map(material => ({
         ...toServerMaterial(courseId, material),
         user_id: user.id,
-      }, {
-        onConflict: 'course_id,id',
-      });
+      })),
+      { onConflict: 'course_id,id' },
+    );
 
-    if (error) throw new Error(formatSupabaseError(error));
-  }
-
-  await loadCourseMaterialsFromServer(course);
+  if (error) throw new Error(formatSupabaseError(error));
 };
 
 export const saveCourseMaterials = syncCourseMaterials;

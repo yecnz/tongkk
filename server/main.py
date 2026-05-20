@@ -27,6 +27,10 @@ ALLOWED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:3000", "http://localhost:3
 ALLOWED_ORIGIN_REGEX = r"https://.*\.trycloudflare\.com"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_PLACEHOLDER_VALUES = {
+    "https://your-project.supabase.co",
+    "your-supabase-url",
+}
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +46,8 @@ md_converter = MarkItDown()
 async def require_api_user(authorization: str | None = Header(default=None)):
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         return None
+    if SUPABASE_URL in SUPABASE_PLACEHOLDER_VALUES:
+        raise HTTPException(status_code=503, detail="백엔드 Supabase URL이 실제 프로젝트 주소로 설정되지 않았습니다.")
 
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="로그인이 필요한 API입니다.")
@@ -332,7 +338,7 @@ async def convert_document_to_markdown(
         tmp_path = tmp.name
 
     try:
-        result = md_converter.convert(tmp_path)
+        result = await run_in_threadpool(md_converter.convert, tmp_path)
         return {"markdown": result.text_content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e

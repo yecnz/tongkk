@@ -1053,8 +1053,6 @@ export default function Summary() {
 
     setUploading(true);
 
-    await new Promise(res => setTimeout(res, 1200));
-
     const nf = await Promise.all(newFiles.map(async f => ({
       name: f.name, size: f.size, type: getFileType(f.name),
       pages: getFileType(f.name) === "pdf" ? await getPdfPageCount(f) : null,
