@@ -27,6 +27,38 @@ const toProfile = (row: ProfileRow): UserProfile => ({
   notificationsEnabled: row.notifications_enabled,
 });
 
+const listStorageFilePaths = async (bucket: string, prefix: string): Promise<string[]> => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .list(prefix);
+
+  if (error) throw new Error(formatSupabaseError(error));
+
+  const paths: string[] = [];
+  for (const item of data || []) {
+    const itemPath = `${prefix}/${item.name}`;
+    if (item.metadata) {
+      paths.push(itemPath);
+      continue;
+    }
+
+    paths.push(...await listStorageFilePaths(bucket, itemPath));
+  }
+
+  return paths;
+};
+
+const deleteStoragePrefix = async (bucket: string, prefix: string): Promise<void> => {
+  const paths = await listStorageFilePaths(bucket, prefix);
+  if (paths.length === 0) return;
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .remove(paths);
+
+  if (error) throw new Error(formatSupabaseError(error));
+};
+
 export async function loadUserProfile(): Promise<UserProfile> {
   const user = await requireSupabaseUser();
   const { data, error } = await supabase
@@ -89,6 +121,9 @@ export async function uploadAvatar(file: File): Promise<string> {
 
 export async function deleteOwnAppData(): Promise<void> {
   const user = await requireSupabaseUser();
+  await deleteStoragePrefix('avatars', user.id);
+  await deleteStoragePrefix('course-materials', user.id);
+
   const deletes = [
     () => supabase.from('dashboard_state').delete().eq('user_id', user.id),
     () => supabase.from('quiz_attempts').delete().eq('user_id', user.id),
@@ -103,18 +138,5 @@ export async function deleteOwnAppData(): Promise<void> {
   for (const request of deletes) {
     const result = await request();
     if (result.error) throw new Error(formatSupabaseError(result.error));
-  }
-
-  const { data, error } = await supabase.storage
-    .from('avatars')
-    .list(user.id);
-  if (error) {
-    throw new Error(formatSupabaseError(error));
-  }
-
-  const paths = (data || []).map(item => `${user.id}/${item.name}`);
-  if (paths.length > 0) {
-    const removeResult = await supabase.storage.from('avatars').remove(paths);
-    if (removeResult.error) throw new Error(formatSupabaseError(removeResult.error));
   }
 }
