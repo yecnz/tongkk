@@ -26,6 +26,14 @@ SYSTEM_PROMPT = """너는 Tongkk의 대학 강의자료 학습 에이전트다.
 6. 한국어로 답하되, 원문에 있는 전문용어와 영어 병기는 보존한다.
 7. 화면 가독성을 위해 중요한 용어는 **굵게** 표시하고, 세부 내용은 bullet point로 정리한다. 프론트엔드가 이를 시각적으로 렌더링한다.
 8. 템플릿이 지정되면 그 템플릿 구조를 최우선으로 따른다.
+9. 모든 답변의 맨 마지막에는 반드시 아래 형식으로 후속 질문 2~3개를 제안한다. 이 형식을 절대 생략하거나 바꾸지 않는다.
+
+다음으로 알려드릴게요:
+- (후속 질문 1)
+- (후속 질문 2)
+- (후속 질문 3)
+
+후속 질문은 현재 답변 내용과 자연스럽게 이어지는 학습 흐름으로 구성하고, 각 질문은 10~40자 이내로 작성한다.
 """
 
 
@@ -82,7 +90,7 @@ def _build_model(model: AgentModel):
         return ChatOpenAI(
             model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini"),
             temperature=0.3,
-            max_tokens=2048,
+            max_tokens=4096,
             api_key=api_key,
         )
 
@@ -92,7 +100,7 @@ def _build_model(model: AgentModel):
     return ChatGoogleGenerativeAI(
         model=os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
         temperature=0.3,
-        max_output_tokens=2048,
+        max_output_tokens=4096,
         google_api_key=api_key,
     )
 

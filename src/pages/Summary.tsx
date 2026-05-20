@@ -137,20 +137,79 @@ const renderInlineText = (text: string): ReactNode[] => {
   });
 };
 
+const isTableRow = (line: string) => /^\|.+\|$/.test(line.trim());
+const isSeparatorRow = (line: string) => /^\|[\s|:-]+\|$/.test(line.trim());
+
+const renderTableBlock = (tableLines: string[], key: number) => {
+  const rows = tableLines.filter(l => !isSeparatorRow(l));
+  if (rows.length < 1) return null;
+  const parseRow = (line: string) =>
+    line.trim().replace(/^\||\|$/g, "").split("|").map(cell => cell.trim());
+  const [headerRow, ...bodyRows] = rows;
+  const headers = parseRow(headerRow);
+  return (
+    <div key={key} style={{ overflowX: "auto", margin: "4px 0" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <thead>
+          <tr>
+            {headers.map((h, i) => (
+              <th key={i} style={{ padding: "7px 12px", background: "#FFF0F6", color: "#444", fontWeight: 700, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
+                {renderInlineText(h)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {bodyRows.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? "#fff" : "#fafafa" }}>
+              {parseRow(row).map((cell, ci) => (
+                <td key={ci} style={{ padding: "6px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>
+                  {renderInlineText(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 const FormattedAiText = ({ content }: { content: string }) => {
   const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
 
+  // Group consecutive table lines into blocks
+  type Block = { type: "table"; lines: string[] } | { type: "line"; raw: string; index: number };
+  const blocks: Block[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (isTableRow(lines[i])) {
+      const tableLines: string[] = [];
+      while (i < lines.length && (isTableRow(lines[i]) || isSeparatorRow(lines[i]))) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: "table", lines: tableLines });
+    } else {
+      blocks.push({ type: "line", raw: lines[i], index: i });
+      i++;
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {lines.map((rawLine, index) => {
+      {blocks.map((block, blockIdx) => {
+        if (block.type === "table") return renderTableBlock(block.lines, blockIdx);
+
+        const { raw: rawLine, index } = block;
         const line = rawLine.trim();
-        if (!line) return <div key={index} style={{ height: 8 }} />;
+        if (!line) return <div key={blockIdx} style={{ height: 8 }} />;
 
         const heading = line.match(/^(#{1,6})\s+(.+)$/);
         if (heading) {
           const level = heading[1].length;
           return (
-            <div key={index} style={{
+            <div key={blockIdx} style={{
               fontSize: level <= 2 ? 18 : 16,
               fontWeight: 800,
               color: "#222",
@@ -165,7 +224,7 @@ const FormattedAiText = ({ content }: { content: string }) => {
         const boldHeading = line.match(/^\*\*(.+)\*\*$/);
         if (boldHeading) {
           return (
-            <div key={index} style={{
+            <div key={blockIdx} style={{
               fontSize: 15,
               fontWeight: 800,
               color: "#222",
@@ -180,7 +239,7 @@ const FormattedAiText = ({ content }: { content: string }) => {
         const bullet = line.match(/^[-*•]\s+(.+)$/);
         if (bullet) {
           return (
-            <div key={index} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
+            <div key={blockIdx} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: PINK, marginTop: 10, flexShrink: 0 }} />
               <span>{renderInlineText(bullet[1])}</span>
             </div>
@@ -190,7 +249,7 @@ const FormattedAiText = ({ content }: { content: string }) => {
         const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
         if (numbered) {
           return (
-            <div key={index} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
+            <div key={blockIdx} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
               <span style={{ color: PINK, fontWeight: 800, minWidth: 18 }}>{numbered[1]}.</span>
               <span>{renderInlineText(numbered[2])}</span>
             </div>
@@ -198,7 +257,7 @@ const FormattedAiText = ({ content }: { content: string }) => {
         }
 
         return (
-          <div key={index} style={{ lineHeight: 1.75 }}>
+          <div key={blockIdx} style={{ lineHeight: 1.75 }}>
             {renderInlineText(line)}
           </div>
         );
@@ -357,6 +416,72 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
+const SUGGESTION_TRIGGER = /원하시면|다음으로는|해드릴게요|알려드릴게요|다음 단계로|중 하나로|바꿔드릴게요|골라주세요|선택해주세요/;
+
+const parseAiSuggestions = (content: string): { mainContent: string; suggestions: string[] } => {
+  const lines = content.split("\n");
+
+  // Step 1: collect trailing bullet block (skip blank lines at the end)
+  let tail = lines.length - 1;
+  while (tail >= 0 && !lines[tail].trim()) tail--;
+
+  const bulletItems: string[] = [];
+  let bulletStart = tail + 1;
+  let i = tail;
+  while (i >= 0) {
+    const line = lines[i].trim();
+    if (!line) { i--; continue; }
+    const m = line.match(/^[-•*]\s+(.{4,80})$/);
+    if (m) { bulletItems.unshift(m[1].replace(/\*\*/g, "")); bulletStart = i; i--; }
+    else break;
+  }
+
+  // Also collect quoted suggestions from the last few lines if no bullets found
+  if (bulletItems.length === 0) {
+    let cutIndex = lines.length;
+    let inSection = false;
+    for (let j = lines.length - 1; j >= 0; j--) {
+      const line = lines[j].trim();
+      if (!line) continue;
+      const quotedMatches = [...line.matchAll(/[“”“”]([^””“”]{4,60})[“”“”]/g)].map(m => m[1]);
+      if (quotedMatches.length > 0) {
+        bulletItems.unshift(...quotedMatches);
+        cutIndex = j;
+        inSection = true;
+      } else if (SUGGESTION_TRIGGER.test(line)) {
+        cutIndex = j;
+        inSection = true;
+      } else if (inSection) {
+        break;
+      } else {
+        break;
+      }
+    }
+    if (bulletItems.length > 0) {
+      return { mainContent: lines.slice(0, cutIndex).join("\n").trim(), suggestions: bulletItems };
+    }
+    return { mainContent: content, suggestions: [] };
+  }
+
+  // Step 2: require at least 2 bullets to treat as suggestions
+  if (bulletItems.length < 2) return { mainContent: content, suggestions: [] };
+
+  // Step 3: look for a trigger phrase before the bullet block (within 6 lines)
+  let cutIdx = bulletStart;
+  let j = bulletStart - 1;
+  while (j >= 0 && bulletStart - j <= 6) {
+    const line = lines[j].trim();
+    if (!line) { j--; continue; }
+    if (SUGGESTION_TRIGGER.test(line)) { cutIdx = j; }
+    j--;
+  }
+
+  return {
+    mainContent: lines.slice(0, cutIdx).join("\n").trim(),
+    suggestions: bulletItems,
+  };
+};
+
 const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
@@ -369,14 +494,25 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   const [chatLoading, setChatLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const skipNextScrollRef = useRef(false);
   const canUseAgent = Boolean(displayContent.trim());
+
+  const scrollToBottom = () => {
+    const el = chatContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+
+  const handleChatScroll = () => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBtn(distFromBottom > 60);
+  };
   const questions = suggestedTutorQuestions[template];
 
-  useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [agentMessages, agentLoading]);
   const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
 
   useEffect(() => {
@@ -412,6 +548,17 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
       ignore = true;
     };
   }, [summaryId, threadId, displayContent]);
+
+  useEffect(() => {
+    if (skipNextScrollRef.current) { skipNextScrollRef.current = false; return; }
+    const lastMsg = agentMessages[agentMessages.length - 1];
+    if (!lastMsg || lastMsg.role !== "user") return;
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const userDivs = el.querySelectorAll<HTMLElement>("[data-msg-role='user']");
+    const last = userDivs[userDivs.length - 1];
+    if (last) last.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [agentMessages]);
 
   const handleDownload = async () => {
     if (!pdfExportRef.current || pdfSaving) return;
@@ -687,7 +834,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             <strong>요약 실패:</strong> {error}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18, alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 18, alignItems: "start" }}>
             <div style={{
               background: "#fafafa", borderRadius: 12, padding: 24,
               fontSize: 14, color: "#444", lineHeight: 1.8,
@@ -704,12 +851,24 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
               border: "1px solid #f0f0f0",
               borderRadius: 12,
               padding: 18,
-              minHeight: 420,
+              height: 720,
               display: "flex",
               flexDirection: "column",
               background: "#fff",
             }}>
-              <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 800, color: "#222" }}>AI 튜터</h3>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#222" }}>AI 튜터</h3>
+                {agentMessages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setAgentMessages([]); setLocalThreadId(""); setAgentError(""); }}
+                    style={{
+                      padding: "4px 10px", borderRadius: 8, border: "1px solid #e0e0e0",
+                      background: "#fafafa", color: "#999", fontSize: 12, cursor: "pointer",
+                    }}
+                  >새 대화</button>
+                )}
+              </div>
               <p style={{ margin: "0 0 14px", fontSize: 12, lineHeight: 1.6, color: "#888" }}>
                 요약본을 기준으로 헷갈리는 개념을 이어서 질문하세요.
               </p>
@@ -745,7 +904,8 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                 </div>
               )}
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 260, maxHeight: 420, marginBottom: 14 }}>
+              <div style={{ flex: 1, minHeight: 0, position: "relative", marginBottom: 14 }}>
+              <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
                 {!canUseAgent ? (
                   <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
                     새로 생성한 요약에서 AI 튜터 대화를 시작할 수 있습니다.
@@ -760,27 +920,88 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                   </div>
                 ) : (
                   <>
-                    {agentMessages.map((msg, i) => (
-                      <div key={`${msg.role}-${i}`} style={{
-                        alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                        maxWidth: "88%",
-                        padding: "10px 14px",
-                        borderRadius: 12,
-                        background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
-                        color: "#444",
-                        fontSize: 13,
-                        lineHeight: 1.6
-                      }}>
-                        <FormattedAiText content={msg.content} />
-                      </div>
-                    ))}
+                    {agentMessages.map((msg, i) => {
+                      const isLastAssistant = msg.role === "assistant" && i === agentMessages.length - 1 && !agentLoading;
+                      const { mainContent, suggestions } = msg.role === "assistant"
+                        ? parseAiSuggestions(msg.content)
+                        : { mainContent: msg.content, suggestions: [] };
+                      return (
+                        <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{
+                            padding: "10px 14px",
+                            borderRadius: 12,
+                            background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
+                            color: "#444",
+                            fontSize: 13,
+                            lineHeight: 1.6
+                          }}>
+                            <FormattedAiText content={mainContent} />
+                          </div>
+                          {isLastAssistant && suggestions.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", letterSpacing: "0.04em" }}>바로 이어서</span>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {suggestions.map(suggestion => (
+                                  <button
+                                    key={suggestion}
+                                    type="button"
+                                    onClick={() => { skipNextScrollRef.current = true; sendAgentQuestion(suggestion); }}
+                                    disabled={agentLoading}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: 999,
+                                      border: `1px solid ${PINK}33`,
+                                      background: "#FFF0F6",
+                                      color: PINK,
+                                      fontSize: 12,
+                                      fontWeight: 400,
+                                      lineHeight: 1.35,
+                                      cursor: agentLoading ? "default" : "pointer",
+                                      opacity: agentLoading ? 0.55 : 1,
+                                      textAlign: "left",
+                                    }}
+                                  >
+                                    {suggestion.replace(/\*\*/g, "")}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     {agentLoading && (
                       <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: 12, background: "#fafafa", color: "#aaa", fontSize: 13 }}>
                         응답 중...
                       </div>
                     )}
-                    <div ref={chatBottomRef} />
                   </>
+                )}
+              </div>
+                {showScrollBtn && (
+                  <button
+                    type="button"
+                    onClick={scrollToBottom}
+                    title="맨 아래로"
+                    style={{
+                      position: "absolute",
+                      bottom: 8,
+                      right: 8,
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      border: "1px solid #e0e0e0",
+                      background: "#fff",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                      color: "#888",
+                      fontSize: 16,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 10,
+                    }}
+                  >↓</button>
                 )}
               </div>
 
