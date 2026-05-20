@@ -13,6 +13,7 @@ import {
   saveSummaryChatMessage,
 } from "../services/summaryChats";
 import {
+  deleteSummariesByMaterialId,
   loadSummariesFromServer,
   saveSummaryToServer,
 } from "../services/summaries";
@@ -1560,7 +1561,10 @@ export default function Summary() {
 
     const nextMaterials = materials.filter(item => item.id !== material.id);
     try {
-      await saveCourseMaterials(selectedCourse, nextMaterials);
+      await Promise.all([
+        saveCourseMaterials(selectedCourse, nextMaterials),
+        deleteSummariesByMaterialId(selectedCourse, material.id),
+      ]);
       setMaterials(nextMaterials);
       setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
       setFiles(prev => {

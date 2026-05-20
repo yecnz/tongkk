@@ -1,6 +1,7 @@
-import base64
 import json
 import os
+import base64
+import zipfile
 import tempfile
 from pathlib import Path
 from typing import Literal
@@ -15,6 +16,7 @@ load_dotenv(SERVER_DIR / ".env")
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
@@ -42,6 +44,19 @@ app.add_middleware(
 )
 
 md_converter = MarkItDown()
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+VISUAL_ANALYSIS_MAX_ITEMS = _env_int("VISUAL_ANALYSIS_MAX_ITEMS", 50)
+VISUAL_ANALYSIS_BATCH_SIZE = max(1, _env_int("VISUAL_ANALYSIS_BATCH_SIZE", 5))
+PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 110)
+PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 async def require_api_user(authorization: str | None = Header(default=None)):
@@ -91,7 +106,8 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
     "LECTURE_NOTE": """강의 노트 형식으로 작성해.
 - 제목, 학습 목표, 전체 흐름, 핵심 개념, 세부 설명, 시험 포인트, 복습 질문 순서로 구성해.
 - 강의자가 설명하듯 자연스럽고 읽기 쉬운 문장으로 정리해.
-- 원문의 대단원/소단원 순서를 최대한 유지해.""",
+- 원문의 대단원/소단원 순서를 최대한 유지해.
+- 같은 제목의 섹션을 반복하지 말고 하나로 병합해.""",
     "MINDMAP": """강의자료의 핵심 구조를 JSON으로만 출력해. 공통 기준은 무시하고 아래 형식만 따라.
 
 출력 형식 (순수 JSON만, 코드 블록·설명 없이):
@@ -324,93 +340,122 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
 
 SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 
-MAX_VISION_IMAGES = 20  # API 비용 상한
-MIN_IMAGE_DIMENSION = 100  # 아이콘·장식 이미지 제외 (px)
-SCAN_TEXT_THRESHOLD = 50   # 이 글자 수 미만이면 스캔 페이지로 판단
-
-VISION_PROMPT = (
-    "이 이미지에서 모든 텍스트·수식·표·손글씨 내용을 그대로 추출해줘. "
-    "이미지 설명이 아닌 실제 텍스트 내용만 마크다운 형식으로 출력해. "
-    "내용이 없으면 빈 문자열을 반환해."
-)
+def _image_data_url(image_bytes: bytes, mime_type: str = "image/png") -> str:
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
-def _ocr_image_with_vision(image_bytes: bytes, mime: str = "image/png") -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return ""
+def _render_pdf_pages_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        b64 = base64.b64encode(image_bytes).decode()
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": VISION_PROMPT},
-                    {"type": "image_url", "image_url": {
-                        "url": f"data:{mime};base64,{b64}",
-                        "detail": "high",
-                    }},
-                ],
-            }],
-            max_tokens=1500,
-        )
-        return (response.choices[0].message.content or "").strip()
-    except Exception:
+        import fitz
+    except ImportError as e:
+        raise RuntimeError("PDF 이미지 분석을 위해 PyMuPDF가 필요합니다.") from e
+
+    pages: list[dict[str, str]] = []
+    scale = PDF_VISUAL_RENDER_DPI / 72
+    matrix = fitz.Matrix(scale, scale)
+
+    with fitz.open(file_path) as doc:
+        page_count = min(len(doc), VISUAL_ANALYSIS_MAX_ITEMS)
+        for index in range(page_count):
+            page = doc.load_page(index)
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            pages.append({
+                "label": f"PDF {index + 1}페이지",
+                "data_url": _image_data_url(pixmap.tobytes("png")),
+            })
+
+    return pages
+
+
+def _extract_pptx_images_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
+    images: list[dict[str, str]] = []
+    with zipfile.ZipFile(file_path) as archive:
+        media_names = [
+            name for name in archive.namelist()
+            if name.startswith("ppt/media/")
+            and Path(name).suffix.lower() in PPTX_IMAGE_EXTENSIONS
+        ]
+        for index, name in enumerate(media_names[:VISUAL_ANALYSIS_MAX_ITEMS]):
+            suffix = Path(name).suffix.lower()
+            mime_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
+            images.append({
+                "label": f"PPTX 삽입 이미지 {index + 1}",
+                "data_url": _image_data_url(archive.read(name), mime_type),
+            })
+    return images
+
+
+def _collect_visual_inputs(file_path: str, suffix: str) -> list[dict[str, str]]:
+    if suffix == ".pdf":
+        return _render_pdf_pages_for_visual_analysis(file_path)
+    if suffix == ".pptx":
+        return _extract_pptx_images_for_visual_analysis(file_path)
+    return []
+
+
+def _visual_batches(items: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+    return [
+        items[index:index + VISUAL_ANALYSIS_BATCH_SIZE]
+        for index in range(0, len(items), VISUAL_ANALYSIS_BATCH_SIZE)
+    ]
+
+
+def _analyze_document_visuals(file_path: str, suffix: str) -> str:
+    visual_inputs = _collect_visual_inputs(file_path, suffix)
+    if not visual_inputs:
         return ""
 
+    model = os.getenv("VISUAL_ANALYSIS_MODEL", "GPT")
 
-def _process_pdf_images(pdf_path: str) -> list[str]:
-    """PDF에서 이미지를 추출하고 Vision OCR을 수행해 섹션 문자열 목록을 반환한다."""
-    try:
-        import fitz  # pymupdf
-    except ImportError:
-        return []
+    if model == "GPT" and not os.getenv("OPENAI_API_KEY"):
+        return ""
+    if model == "Gemini" and not os.getenv("GEMINI_API_KEY"):
+        return ""
 
-    doc = fitz.open(pdf_path)
+    llm = build_llm(model)
     sections: list[str] = []
-    seen_xrefs: set[int] = set()
 
-    for page_num, page in enumerate(doc, start=1):
-        if len(sections) >= MAX_VISION_IMAGES:
-            break
+    for batch in _visual_batches(visual_inputs):
+        content: list[dict[str, object]] = [{
+            "type": "text",
+            "text": (
+                "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
+                "반드시 각 항목을 '## 라벨' 제목으로 시작하고, 이미지 순서대로 작성해. "
+                "분석 대상: " + ", ".join(item["label"] for item in batch)
+            ),
+        }]
+        for item in batch:
+            content.extend([
+                {
+                    "type": "text",
+                    "text": f"[{item['label']}]",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": item["data_url"]},
+                },
+            ])
 
-        embedded = page.get_images(full=True)
+        response = llm.invoke([
+            SystemMessage(content="""너는 강의자료 이미지와 손글씨를 Markdown으로 전사하는 OCR 보조 분석기다.
+규칙:
+- 이미지 안의 인쇄 텍스트, 도표 텍스트, 손글씨를 최대한 읽어 Markdown bullet로 정리한다.
+- 수식, 표, 화살표 관계, 도식의 의미도 강의 요약/퀴즈 생성에 쓸 수 있게 설명한다.
+- 확실하지 않은 글자는 추측하지 말고 '[불확실]'로 표시한다.
+- 이미지에 유의미한 학습 내용이 없으면 '유의미한 학습 내용 없음'이라고만 답한다.
+- 여러 이미지가 들어오면 이미지별로 반드시 별도 섹션을 만든다.
+- 한국어로 답한다."""),
+            HumanMessage(content=content),
+        ])
+        text = _message_content_to_text(response.content).strip()
+        if text and text != "유의미한 학습 내용 없음":
+            sections.append(text)
 
-        if embedded:
-            for img_info in embedded:
-                if len(sections) >= MAX_VISION_IMAGES:
-                    break
-                xref = img_info[0]
-                if xref in seen_xrefs:
-                    continue
-                seen_xrefs.add(xref)
+    if not sections:
+        return ""
 
-                base_img = doc.extract_image(xref)
-                w, h = base_img.get("width", 0), base_img.get("height", 0)
-                if w < MIN_IMAGE_DIMENSION or h < MIN_IMAGE_DIMENSION:
-                    continue
-
-                ext = base_img.get("ext", "png")
-                mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
-                text = _ocr_image_with_vision(base_img["image"], mime)
-                if text:
-                    sections.append(f"### 페이지 {page_num} — 이미지 인식\n\n{text}")
-        else:
-            # 임베디드 이미지 없음 + 텍스트도 없음 → 스캔 페이지
-            page_text = page.get_text().strip()
-            if len(page_text) < SCAN_TEXT_THRESHOLD:
-                mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI
-                pix = page.get_pixmap(matrix=mat)
-                png_bytes = pix.tobytes("png")
-                text = _ocr_image_with_vision(png_bytes, "image/png")
-                if text:
-                    sections.append(f"### 페이지 {page_num} — 스캔/손글씨 인식\n\n{text}")
-
-    doc.close()
-    return sections
+    return "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
 
 
 @app.post("/convert")
@@ -429,19 +474,14 @@ async def convert_document_to_markdown(
     try:
         # 1단계: markitdown으로 텍스트 레이어 추출
         result = await run_in_threadpool(md_converter.convert, tmp_path)
-        text_markdown = result.text_content or ""
-
-        # 2단계: PDF면 이미지/손글씨 Vision OCR 병행
-        if suffix == ".pdf":
-            image_sections = await run_in_threadpool(_process_pdf_images, tmp_path)
-            if image_sections:
-                text_markdown = (
-                    text_markdown.rstrip()
-                    + "\n\n---\n\n## 이미지 · 손글씨 인식 결과\n\n"
-                    + "\n\n".join(image_sections)
-                )
-
-        return {"markdown": text_markdown}
+        base_markdown = (result.text_content or "").strip()
+        visual_markdown = ""
+        try:
+            visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix)
+        except Exception as visual_error:
+            visual_markdown = f"# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석 실패: {str(visual_error)}"
+        markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
+        return {"markdown": "\n\n---\n\n".join(markdown_parts)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
     finally:

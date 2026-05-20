@@ -51,6 +51,31 @@ export async function loadSummariesFromServer(course: string): Promise<SavedSumm
   return summaries;
 }
 
+export async function deleteSummariesByMaterialId(course: string, materialId: string): Promise<void> {
+  const courseId = await getCourseId(course);
+  if (!courseId) return;
+
+  const { data, error } = await supabase
+    .from('summaries')
+    .select('id, material_ids')
+    .eq('course_id', courseId);
+
+  if (error) throw new Error(formatSupabaseError(error));
+
+  const toDelete = (data || [])
+    .filter(row => (row.material_ids || []).includes(materialId))
+    .map(row => row.id);
+
+  if (toDelete.length === 0) return;
+
+  const { error: deleteError } = await supabase
+    .from('summaries')
+    .delete()
+    .in('id', toDelete);
+
+  if (deleteError) throw new Error(formatSupabaseError(deleteError));
+}
+
 export async function saveSummaryToServer(course: string, summary: SavedSummary): Promise<SavedSummary> {
   const courseId = await getCourseId(course);
   if (!courseId) return summary;
