@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type AgentRole = 'user' | 'assistant';
 
@@ -23,6 +23,7 @@ type AgentApiResponse = {
 export async function sendAgentMessage(
   threadId: string,
   messages: AgentMessage[],
+  markdown?: string,
 ): Promise<AgentResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
@@ -30,14 +31,13 @@ export async function sendAgentMessage(
   try {
     const response = await fetch(`${BACKEND_URL}/agent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ thread_id: threadId, messages }),
+      headers: await getJsonRequestHeaders(),
+      body: JSON.stringify({ thread_id: threadId || undefined, messages, markdown }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || `API 오류 (${response.status})`);
+      throw new Error(await parseApiError(response));
     }
 
     const data = await response.json() as AgentApiResponse;

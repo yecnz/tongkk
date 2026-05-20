@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+import { BACKEND_URL, parseApiError } from './backend';
 
 export type SummaryResponse = {
   result: string;
@@ -27,8 +27,7 @@ export async function summarizeWithGemini(markdown: string): Promise<SummaryResp
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || `API 오류 (${response.status})`);
+      throw new Error(await parseApiError(response));
     }
 
     const data = await response.json() as SummaryApiResponse;

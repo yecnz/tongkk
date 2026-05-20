@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', '.claude']),
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -30,7 +30,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/common.tsx', 'src/CourseContext.tsx'],
+    files: ['src/common.tsx', 'src/CourseContext.tsx', 'src/AuthContext.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+import { BACKEND_URL, getAuthRequestHeaders, parseApiError } from './backend';
 
 type ConvertApiResponse = {
   markdown: string;
@@ -18,13 +18,13 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
   try {
     const response = await fetch(`${BACKEND_URL}/convert`, {
       method: 'POST',
+      headers: await getAuthRequestHeaders(),
       body: formData,
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || `변환 실패 (${response.status})`);
+      throw new Error(await parseApiError(response));
     }
 
     const data = await response.json() as ConvertApiResponse;

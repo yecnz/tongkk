@@ -1,80 +1,117 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-
-const COURSES_KEY = "tongkk:courses";
-
-function loadCourses(): string[] {
-  try {
-    const raw = localStorage.getItem(COURSES_KEY);
-    return raw ? (JSON.parse(raw) as string[]) : [];
-  } catch {
-    return [];
-  }
-}
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createCourse,
+  fetchCourses,
+  removeCourse,
+  updateCourse,
+  type CourseRecord,
+} from "./services/courses";
+import { useAuth } from "./AuthContext";
 
 type CourseContextValue = {
   courses: string[];
   addCourse: (name: string) => void;
   renameCourse: (oldName: string, newName: string) => void;
   deleteCourse: (name: string) => void;
+  isSyncingCourses: boolean;
+  courseSyncError: string;
 };
 
 const CourseContext = createContext<CourseContextValue | null>(null);
 
 export function CourseProvider({ children }: { children: ReactNode }) {
-  const [courses, setCourses] = useState<string[]>(loadCourses);
+  const { user } = useAuth();
+  const [courses, setCourses] = useState<string[]>([]);
+  const [courseRecords, setCourseRecords] = useState<CourseRecord[]>([]);
+  const [isSyncingCourses, setIsSyncingCourses] = useState(false);
+  const [courseSyncError, setCourseSyncError] = useState("");
 
-  const persistCourses = (next: string[]) => {
-    localStorage.setItem(COURSES_KEY, JSON.stringify(next));
-  };
+  const applyServerCourses = useCallback((serverCourses: CourseRecord[]) => {
+    setCourseRecords(serverCourses);
+    const names = serverCourses.map(course => course.name);
+    setCourses(names);
+  }, []);
 
-  const moveStorageKey = (oldKey: string, newKey: string) => {
-    const value = localStorage.getItem(oldKey);
-    if (value === null) return;
-    localStorage.setItem(newKey, value);
-    localStorage.removeItem(oldKey);
-  };
+  const reloadCourses = useCallback(async () => {
+    const serverCourses = await fetchCourses();
+    applyServerCourses(serverCourses);
+    return serverCourses;
+  }, [applyServerCourses]);
 
-  const removeCourseStorage = (course: string) => {
-    [
-      `tongkk:materials:${course}`,
-      `tongkk:markdown:${course}`,
-      `tongkk:material:${course}`,
-      `tongkk:summary:${course}`,
-    ].forEach(key => localStorage.removeItem(key));
-  };
+  useEffect(() => {
+    let ignore = false;
+    if (!user) {
+      setCourses([]);
+      return () => {
+        ignore = true;
+      };
+    }
+
+    const loadServerCourses = async () => {
+      setIsSyncingCourses(true);
+      setCourseSyncError("");
+      try {
+        const serverCourses = await reloadCourses();
+        if (!ignore) applyServerCourses(serverCourses);
+      } catch (err) {
+        if (!ignore) {
+          setCourseSyncError(err instanceof Error ? err.message : "강의 목록 동기화 실패");
+        }
+      } finally {
+        if (!ignore) setIsSyncingCourses(false);
+      }
+    };
+
+    loadServerCourses();
+    return () => {
+      ignore = true;
+    };
+  }, [applyServerCourses, reloadCourses, user]);
 
   const addCourse = (name: string) => {
-    setCourses(prev => {
-      if (prev.includes(name)) return prev;
-      const next = [...prev, name];
-      persistCourses(next);
-      return next;
-    });
+    createCourse(name)
+      .then(() => reloadCourses())
+      .catch(async error => {
+        setCourseSyncError(error instanceof Error ? error.message : "강의 추가 동기화 실패");
+        try {
+          await reloadCourses();
+        } catch {
+          // Keep the sync error visible.
+        }
+      });
   };
 
   const renameCourse = (oldName: string, newName: string) => {
-    setCourses(prev => {
-      if (oldName === newName || prev.includes(newName)) return prev;
-      const next = prev.map(course => course === oldName ? newName : course);
-      persistCourses(next);
-      moveStorageKey(`tongkk:materials:${oldName}`, `tongkk:materials:${newName}`);
-      moveStorageKey(`tongkk:markdown:${oldName}`, `tongkk:markdown:${newName}`);
-      moveStorageKey(`tongkk:material:${oldName}`, `tongkk:material:${newName}`);
-      moveStorageKey(`tongkk:summary:${oldName}`, `tongkk:summary:${newName}`);
-      return next;
-    });
+    const courseId = courseRecords.find(course => course.name === oldName)?.id;
+    if (!courseId) return;
+    updateCourse(courseId, newName)
+      .then(() => reloadCourses())
+      .catch(async error => {
+        setCourseSyncError(error instanceof Error ? error.message : "강의 이름 변경 동기화 실패");
+        try {
+          await reloadCourses();
+        } catch {
+          // Keep the sync error visible.
+        }
+      });
   };
 
   const deleteCourse = (name: string) => {
-    setCourses(prev => {
-      const next = prev.filter(course => course !== name);
-      persistCourses(next);
-      removeCourseStorage(name);
-      return next;
-    });
+    const courseId = courseRecords.find(course => course.name === name)?.id;
+    if (!courseId) return;
+    removeCourse(courseId)
+      .then(() => reloadCourses())
+      .catch(async error => {
+        setCourseSyncError(error instanceof Error ? error.message : "강의 삭제 동기화 실패");
+        try {
+          await reloadCourses();
+        } catch {
+          // Keep the sync error visible.
+        }
+      });
   };
 
-  const value = { courses, addCourse, renameCourse, deleteCourse };
+  const value = { courses, addCourse, renameCourse, deleteCourse, isSyncingCourses, courseSyncError };
 
   return (
     <CourseContext.Provider value={value}>

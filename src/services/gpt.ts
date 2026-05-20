@@ -1,8 +1,4 @@
-const BACKEND_URL = (
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_BACKEND_URL ||
-  'http://localhost:8000'
-).replace(/\/$/, '');
+import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type QuizQuestion = {
   type?: QuizQuestionType;
@@ -14,26 +10,14 @@ export type QuizQuestion = {
 };
 
 export type QuizDifficulty = '쉬움' | '보통' | '어려움';
-export type QuizQuestionType = '객관식' | 'OX' | '단답형';
+export type QuizQuestionType = '객관식' | 'OX' | '단답형' | '주관식';
 
-type ApiErrorBody = { detail?: string };
-
-async function parseApiError(response: Response): Promise<string> {
-  const text = await response.text().catch(() => '');
-  if (!text) return `API 오류 (${response.status})`;
-
-  try {
-    const parsed = JSON.parse(text) as ApiErrorBody;
-    if (parsed.detail) return parsed.detail;
-  } catch {
-    // JSON이 아닌 응답(HTML/text)일 수 있으므로 fallback 메시지 사용
-  }
-
-  const compactText = text.replace(/\s+/g, ' ').trim().slice(0, 180);
-  return compactText
-    ? `API 오류 (${response.status}): ${compactText}`
-    : `API 오류 (${response.status})`;
-}
+export type SubjectiveGradeResult = {
+  score: number;
+  isCorrect: boolean;
+  feedback: string;
+  referenceAnswer: string;
+};
 
 export async function generateQuiz(
   subject: string,
@@ -52,7 +36,7 @@ export async function generateQuiz(
   try {
     const response = await fetch(`${BACKEND_URL}/quiz`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType }),
       signal: controller.signal,
     });
@@ -82,7 +66,7 @@ export async function generateQuiz(
 
       if (!hasBaseFields) throw new Error('퀴즈 데이터 형식이 올바르지 않습니다.');
 
-      if (type === '단답형') {
+      if (type === '단답형' || type === '주관식') {
         if (typeof question.answerText !== 'string' || question.answerText.trim().length === 0) {
           throw new Error('퀴즈 데이터 형식이 올바르지 않습니다.');
         }
@@ -107,6 +91,63 @@ export async function generateQuiz(
         throw new Error('퀴즈 생성이 취소되었습니다.');
       }
       throw new Error('퀴즈 생성 시간 초과. 다시 시도해주세요.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onExternalAbort);
+  }
+}
+
+export async function gradeSubjectiveAnswer(
+  question: string,
+  referenceAnswer: string,
+  studentAnswer: string,
+  markdown?: string,
+  signal?: AbortSignal,
+): Promise<SubjectiveGradeResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener('abort', onExternalAbort);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/quiz/grade-subjective`, {
+      method: 'POST',
+      headers: await getJsonRequestHeaders(),
+      body: JSON.stringify({
+        question,
+        reference_answer: referenceAnswer,
+        student_answer: studentAnswer,
+        markdown,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response));
+    }
+
+    const data = await response.json() as {
+      score?: unknown;
+      is_correct?: unknown;
+      feedback?: unknown;
+      reference_answer?: unknown;
+    };
+    const score = typeof data.score === 'number'
+      ? Math.max(0, Math.min(100, Math.round(data.score)))
+      : 0;
+
+    return {
+      score,
+      isCorrect: typeof data.is_correct === 'boolean' ? data.is_correct : score >= 70,
+      feedback: typeof data.feedback === 'string' ? data.feedback : '채점 결과를 확인했습니다.',
+      referenceAnswer: typeof data.reference_answer === 'string' ? data.reference_answer : referenceAnswer,
+    };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('주관식 채점 시간이 초과되었습니다. 다시 시도해주세요.');
     }
     throw err;
   } finally {
@@ -141,7 +182,7 @@ export async function summarizeWithTemplate(
   try {
     const response = await fetch(`${BACKEND_URL}/summarize`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ markdown, template }),
       signal: controller.signal,
     });

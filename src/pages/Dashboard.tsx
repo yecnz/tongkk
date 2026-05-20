@@ -3,17 +3,40 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
+import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
+import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
+import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
+import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
 type DeleteCourseModalProps = { course: string; onClose: () => void; onDelete: (name: string) => void };
-type JoinCommunityModalProps = { onClose: () => void; onJoin: (univ: string, dept: string) => void };
+type CourseDetailModalProps = {
+  course: string;
+  onClose: () => void;
+  onGoSummary: () => void;
+  onGoQuiz: () => void;
+  onOpenMaterial: (material: CourseMaterial) => void;
+  onOpenSummary: (summary: SavedSummary) => void;
+  onOpenQuiz: (quizSet: SavedQuizSet) => void;
+};
 type CustomCalendarProps = { value: string; onChange: (value: string) => void };
 type AddDdayModalProps = { onClose: () => void; onAdd: (subject: string, date: string) => void };
 type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
-type CommunityInfo = { univ: string; dept: string };
-type Dday = { subj: string; date: string };
-type Plan = { text: string; done: boolean };
+type Dday = { id?: string; subj: string; date: string };
+type Plan = { id?: string; text: string; done: boolean };
+
+const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const templateLabels: Record<SavedSummary["template"], string> = {
+  GENERAL: "일반 요약",
+  LECTURE_NOTE: "강의 노트",
+  MINDMAP: "마인드맵",
+  CHEAT_SHEET: "치트시트",
+};
+
+const formatDate = (timestamp: number) =>
+  new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
 
 const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
   const [name, setName] = useState("");
@@ -103,32 +126,6 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
     </Card>
   </div>
 );
-
-const JoinCommunityModal = ({ onClose, onJoin }: JoinCommunityModalProps) => {
-  const [univ, setUniv] = useState("");
-  const [dept, setDept] = useState("");
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>커뮤니티 가입하기</h3>
-        <input value={univ} onChange={e => setUniv(e.target.value)} placeholder="대학교 입력 (예: 제주대)" style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12
-        }}/>
-        <input value={dept} onChange={e => setDept(e.target.value)} placeholder="학과 입력 (예: 컴퓨터공학과)" style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
-        }}/>
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={() => { if (univ.trim() && dept.trim()) { onJoin(univ.trim(), dept.trim()); onClose(); }}} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>가입</button>
-        </div>
-      </Card>
-    </div>
-  );
-};
 
 const MONTH_NAMES = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
@@ -245,35 +242,271 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   );
 };
 
+const CourseDetailModal = ({
+  course,
+  onClose,
+  onGoSummary,
+  onGoQuiz,
+  onOpenMaterial,
+  onOpenSummary,
+  onOpenQuiz,
+}: CourseDetailModalProps) => {
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [summaries, setSummaries] = useState<SavedSummary[]>([]);
+  const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+    const loadCourseDetail = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const [nextMaterials, nextSummaries, nextQuizSets] = await Promise.all([
+          loadCourseMaterialsFromServer(course),
+          loadSummariesFromServer(course),
+          loadQuizSetsFromServer(course),
+        ]);
+        if (ignore) return;
+        setMaterials(nextMaterials);
+        setSummaries(nextSummaries);
+        setQuizSets(nextQuizSets);
+      } catch (err) {
+        if (!ignore) setError(err instanceof Error ? err.message : "과목 상세 정보를 불러오지 못했습니다.");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    void loadCourseDetail();
+    return () => {
+      ignore = true;
+    };
+  }, [course]);
+
+  const emptyText = loading ? "불러오는 중..." : "아직 기록이 없습니다";
+  const preview = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 120);
+
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 220,
+      background: "rgba(0,0,0,0.32)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+    }}>
+      <Card style={{
+        width: "min(980px, 100%)",
+        maxHeight: "calc(100vh - 56px)",
+        overflowY: "auto",
+        padding: 28,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 22 }}>
+          <div>
+            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 800, color: "#222" }}>{course}</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>강의 자료, 요약 내역, 퀴즈 내역을 한 번에 확인합니다.</p>
+          </div>
+          <button onClick={onClose} aria-label="과목 상세 닫기" style={{
+            width: 32,
+            height: 32,
+            borderRadius: 9,
+            border: "none",
+            background: "#fafafa",
+            color: "#999",
+            cursor: "pointer",
+            fontSize: 18,
+            lineHeight: "32px",
+            padding: 0,
+            flexShrink: 0,
+          }}>×</button>
+        </div>
+
+        {error && (
+          <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "#FFF5F5", color: "#E53E3E", fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+          <div style={{ border: "1px solid #f0f0f0", borderRadius: 12, padding: 16, minHeight: 250 }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>강의 자료</h3>
+            {materials.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {materials.map(material => (
+                  <button
+                    key={material.id}
+                    type="button"
+                    onClick={() => onOpenMaterial(material)}
+                    style={{
+                      width: "100%",
+                      padding: "0 0 10px",
+                      border: "none",
+                      borderBottom: "1px solid #f5f5f5",
+                      background: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                      {material.name}
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
+                      {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : material.type.toUpperCase()} · {formatDate(material.updatedAt)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ border: "1px solid #f0f0f0", borderRadius: 12, padding: 16, minHeight: 250 }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>요약 내역</h3>
+            {summaries.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {summaries.map((summary, index) => (
+                  <button
+                    key={summary.id || `${summary.template}-${index}`}
+                    type="button"
+                    onClick={() => onOpenSummary(summary)}
+                    style={{
+                      width: "100%",
+                      padding: "0 0 10px",
+                      border: "none",
+                      borderBottom: "1px solid #f5f5f5",
+                      background: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: PINK }}>{templateLabels[summary.template]}</span>
+                      <span style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>{formatDate(summary.createdAt)}</span>
+                    </div>
+                    <p style={{ margin: "7px 0 0", fontSize: 12, lineHeight: 1.6, color: "#666" }}>
+                      {preview(summary.content) || "요약 내용 없음"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ border: "1px solid #f0f0f0", borderRadius: 12, padding: 16, minHeight: 250 }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>퀴즈 내역</h3>
+            {quizSets.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {quizSets.map(quizSet => (
+                  <button
+                    key={quizSet.id}
+                    type="button"
+                    onClick={() => onOpenQuiz(quizSet)}
+                    style={{
+                      width: "100%",
+                      padding: "0 0 10px",
+                      border: "none",
+                      borderBottom: "1px solid #f5f5f5",
+                      background: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                      {quizSet.title}
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
+                      {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
+                    </div>
+                    <div style={{ marginTop: 3, fontSize: 11, color: "#aaa" }}>{formatDate(quizSet.createdAt)}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button onClick={onGoSummary} style={{
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: "none",
+            background: "#FFF0F6",
+            color: PINK,
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: "pointer",
+          }}>자료 요약으로</button>
+          <button onClick={onGoQuiz} style={{
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: "none",
+            background: "#E8FAFE",
+            color: CYAN,
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: "pointer",
+          }}>퀴즈 생성으로</button>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
-  const [community, setCommunity] = useState<CommunityInfo | null>(() => {
-    try { const v = localStorage.getItem("tongkk:community"); return v ? JSON.parse(v) as CommunityInfo : null; } catch { return null; }
-  });
-  const [ddays, setDdays] = useState<Dday[]>(() => {
-    try { return JSON.parse(localStorage.getItem("tongkk:ddays") || "[]") as Dday[]; } catch { return []; }
-  });
-  const [plans, setPlans] = useState<Plan[]>(() => {
-    try { return JSON.parse(localStorage.getItem("tongkk:plans") || "[]") as Plan[]; } catch { return []; }
-  });
+  const [ddays, setDdays] = useState<Dday[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [dashboardStateLoaded, setDashboardStateLoaded] = useState(false);
   const [showAddCourse, setShowAddCourse] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
   const [showAddDday, setShowAddDday] = useState(false);
   const [showAllDdays, setShowAllDdays] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [openCourseMenu, setOpenCourseMenu] = useState<string | null>(null);
   const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
+  const [detailCourse, setDetailCourse] = useState<string | null>(null);
 
-  useEffect(() => { localStorage.setItem("tongkk:ddays", JSON.stringify(ddays)); }, [ddays]);
-  useEffect(() => { localStorage.setItem("tongkk:plans", JSON.stringify(plans)); }, [plans]);
   useEffect(() => {
-    if (community) localStorage.setItem("tongkk:community", JSON.stringify(community));
-    else localStorage.removeItem("tongkk:community");
-  }, [community]);
+    let ignore = false;
+    Promise.all([
+      loadDashboardState<Dday[]>("ddays", []),
+      loadDashboardState<Plan[]>("plans", []),
+    ])
+      .then(([nextDdays, nextPlans]) => {
+        if (ignore) return;
+        setDdays(nextDdays);
+        setPlans(nextPlans);
+        setDashboardStateLoaded(true);
+      })
+      .catch(error => {
+        console.warn("대시보드 상태 불러오기 실패", error);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!dashboardStateLoaded) return;
+    saveDashboardState("ddays", ddays).catch(console.warn);
+  }, [dashboardStateLoaded, ddays]);
+
+  useEffect(() => {
+    if (!dashboardStateLoaded) return;
+    saveDashboardState("plans", plans).catch(console.warn);
+  }, [dashboardStateLoaded, plans]);
+
   useEffect(() => {
     if (!openCourseMenu) return;
     const closeMenu = () => setOpenCourseMenu(null);
@@ -291,11 +524,25 @@ export default function Dashboard() {
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
 
-  const communityPosts = community ? [
-    { title: "알고리즘 자료 공유" },
-    { title: "빅데이터프로그래밍 퀴즈 공유" },
-    { title: "데베 예상문제 50개" },
-  ] : [];
+  const deleteDday = (target: Dday) => {
+    let removed = false;
+    setDdays(prev => prev.filter(item => {
+      const sameItem = target.id
+        ? item.id === target.id
+        : item.subj === target.subj && item.date === target.date && !removed;
+      if (sameItem) {
+        removed = true;
+        return false;
+      }
+      return true;
+    }));
+  };
+
+  const deletePlan = (target: Plan, targetIndex: number) => {
+    setPlans(prev => prev.filter((item, index) =>
+      target.id ? item.id !== target.id : index !== targetIndex
+    ));
+  };
 
   return (
     <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -304,9 +551,42 @@ export default function Dashboard() {
       {showAddCourse && <AddCourseModal onClose={() => setShowAddCourse(false)} onAdd={addCourse} />}
       {renamingCourse && <RenameCourseModal course={renamingCourse} courses={courses} onClose={() => setRenamingCourse(null)} onRename={renameCourse} />}
       {deletingCourse && <DeleteCourseModal course={deletingCourse} onClose={() => setDeletingCourse(null)} onDelete={deleteCourse} />}
-      {showJoin && <JoinCommunityModal onClose={() => setShowJoin(false)} onJoin={(u, d) => setCommunity({ univ: u, dept: d })} />}
-      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { subj: s, date: d }])} />}
-      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { text: t, done: false }])} />}
+      {detailCourse && (
+        <CourseDetailModal
+          course={detailCourse}
+          onClose={() => setDetailCourse(null)}
+          onGoSummary={() => {
+            navigate(pageRoutes["자료 요약"], { state: { selectedCourse: detailCourse, fromDashboard: true } });
+          }}
+          onGoQuiz={() => {
+            navigate(pageRoutes["퀴즈 생성"], { state: { course: detailCourse, fromDashboard: true } });
+          }}
+          onOpenMaterial={(material) => {
+            navigate(pageRoutes["자료 요약"], {
+              state: { selectedCourse: detailCourse, materialId: material.id, viewMaterial: true, fromDashboard: true },
+            });
+          }}
+          onOpenSummary={(summary) => {
+            navigate(pageRoutes["자료 요약"], {
+              state: {
+                selectedCourse: detailCourse,
+                summaryId: summary.id,
+                summaryTemplate: summary.template,
+                materialIds: summary.materialIds || [],
+                openSummary: true,
+                fromDashboard: true,
+              },
+            });
+          }}
+          onOpenQuiz={(quizSet) => {
+            navigate(pageRoutes["퀴즈 생성"], {
+              state: { course: detailCourse, quizSetId: quizSet.id, openQuiz: true, fromDashboard: true },
+            });
+          }}
+        />
+      )}
+      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { id: createClientId(), subj: s, date: d }])} />}
+      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { id: createClientId(), text: t, done: false }])} />}
 
       {/* Header */}
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
@@ -341,26 +621,42 @@ export default function Dashboard() {
                         padding: "14px 0", borderBottom: i < courses.length - 1 ? "1px solid #f5f5f5" : "none",
                         position: "relative",
                       }}>
-                        <span style={{ fontSize: 15, fontWeight: 500, color: "#333" }}>{c}</span>
-	                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-	                          {["요약", "퀴즈", "커뮤니티"].map(btn => (
-	                            <button key={btn} onClick={() => {
-	                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
-	                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
-	                              else if (btn === "커뮤니티") navigate(pageRoutes["커뮤니티"]);
-	                            }} style={{
-	                              padding: "6px 14px", borderRadius: 8,
-	                              border: btn === "커뮤니티" ? "1px solid #e0e0e0" : "none",
-	                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
-	                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
-	                              fontSize: 13, fontWeight: 500, cursor: "pointer"
-	                            }}>{btn}</button>
-	                          ))}
-	                          <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
-	                          <button
-	                            type="button"
-	                            aria-label={`${c} 관리 메뉴`}
-	                            title="강의 관리"
+                        <button
+                          type="button"
+                          onClick={() => setDetailCourse(c)}
+                          style={{
+                            border: "none",
+                            background: "none",
+                            padding: 0,
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: "#333",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            lineHeight: 1.4,
+                            minWidth: 0,
+                          }}
+                        >
+                          {c}
+                        </button>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {["요약", "퀴즈"].map(btn => (
+                            <button key={btn} onClick={() => {
+                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
+                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
+                            }} style={{
+                              padding: "6px 14px", borderRadius: 8,
+                              border: "none",
+                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
+                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
+                              fontSize: 13, fontWeight: 500, cursor: "pointer"
+                            }}>{btn}</button>
+                          ))}
+                          <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
+                          <button
+                            type="button"
+                            aria-label={`${c} 관리 메뉴`}
+                            title="강의 관리"
                             onClick={e => {
                               e.stopPropagation();
                               setOpenCourseMenu(prev => prev === c ? null : c);
@@ -452,36 +748,6 @@ export default function Dashboard() {
                 )}
               </Card>
             </div>
-
-            {/* 커뮤니티 글 */}
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 14px", color: "#222" }}>커뮤니티 글</h2>
-              <Card style={{ padding: 20 }}>
-                {!community ? (
-                  <div style={{ textAlign: "center", padding: "30px 0", color: "#aaa" }}>
-                    <p style={{ margin: "0 0 16px", fontSize: 14 }}>가입된 커뮤니티가 없습니다</p>
-                    <button onClick={() => setShowJoin(true)} style={{
-                      padding: "10px 22px", borderRadius: 12, border: "none", background: CYAN, color: "#fff",
-                      fontSize: 14, fontWeight: 600, cursor: "pointer"
-                    }}>커뮤니티 가입하기</button>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "#222" }}>
-                      {community.univ} 컴공 게시판
-                    </h3>
-                    {communityPosts.map((p, i) => (
-                      <div key={i} style={{
-                        display: "flex", alignItems: "center",
-                        padding: "12px 0", borderBottom: i < communityPosts.length - 1 ? "1px solid #f5f5f5" : "none"
-                      }}>
-                        <span style={{ fontSize: 14, color: "#444" }}>• {p.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </div>
           </div>
 
           {/* Right */}
@@ -501,14 +767,35 @@ export default function Dashboard() {
                   {displayDdays.map((d, i) => {
                     const left = getDaysLeft(d.date);
                     return (
-                      <div key={i} style={{
+                      <div key={d.id || `${d.subj}-${d.date}-${i}`} style={{
                         display: "flex", justifyContent: "space-between", alignItems: "center",
                         padding: "10px 0", borderBottom: i < displayDdays.length - 1 ? "1px solid #f5f5f5" : "none"
                       }}>
                         <span style={{ fontSize: 14, fontWeight: 500, color: "#333" }}>{d.subj}</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
-                          {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
+                            {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
+                          </span>
+                          <button
+                            onClick={() => deleteDday(d)}
+                            aria-label={`${d.subj} D-day 삭제`}
+                            title="삭제"
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 8,
+                              border: "1px solid #eeeeee",
+                              background: "#fff",
+                              color: "#bbb",
+                              cursor: "pointer",
+                              fontSize: 15,
+                              lineHeight: "22px",
+                              padding: 0,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -534,7 +821,7 @@ export default function Dashboard() {
                 <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "10px 0" }}>학습 계획을 추가해보세요</p>
               ) : (
                 plans.map((p, i) => (
-                  <div key={i} style={{
+                  <div key={p.id || `${p.text}-${i}`} style={{
                     display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
                     borderBottom: i < plans.length - 1 ? "1px solid #f5f5f5" : "none"
                   }}>
@@ -548,9 +835,30 @@ export default function Dashboard() {
                       {p.done && <span style={{ color: "#fff", fontSize: 12 }}>v</span>}
                     </button>
                     <span style={{
+                      flex: 1,
                       fontSize: 14, color: p.done ? "#bbb" : "#444",
                       textDecoration: p.done ? "line-through" : "none"
                     }}>{p.text}</span>
+                    <button
+                      onClick={() => deletePlan(p, i)}
+                      aria-label={`${p.text} 학습 계획 삭제`}
+                      title="삭제"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 8,
+                        border: "1px solid #eeeeee",
+                        background: "#fff",
+                        color: "#bbb",
+                        cursor: "pointer",
+                        fontSize: 15,
+                        lineHeight: "22px",
+                        padding: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
                 ))
               )}
