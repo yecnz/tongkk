@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import tempfile
@@ -323,6 +324,94 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
 
 SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 
+MAX_VISION_IMAGES = 20  # API 비용 상한
+MIN_IMAGE_DIMENSION = 100  # 아이콘·장식 이미지 제외 (px)
+SCAN_TEXT_THRESHOLD = 50   # 이 글자 수 미만이면 스캔 페이지로 판단
+
+VISION_PROMPT = (
+    "이 이미지에서 모든 텍스트·수식·표·손글씨 내용을 그대로 추출해줘. "
+    "이미지 설명이 아닌 실제 텍스트 내용만 마크다운 형식으로 출력해. "
+    "내용이 없으면 빈 문자열을 반환해."
+)
+
+
+def _ocr_image_with_vision(image_bytes: bytes, mime: str = "image/png") -> str:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return ""
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        b64 = base64.b64encode(image_bytes).decode()
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": VISION_PROMPT},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:{mime};base64,{b64}",
+                        "detail": "high",
+                    }},
+                ],
+            }],
+            max_tokens=1500,
+        )
+        return (response.choices[0].message.content or "").strip()
+    except Exception:
+        return ""
+
+
+def _process_pdf_images(pdf_path: str) -> list[str]:
+    """PDF에서 이미지를 추출하고 Vision OCR을 수행해 섹션 문자열 목록을 반환한다."""
+    try:
+        import fitz  # pymupdf
+    except ImportError:
+        return []
+
+    doc = fitz.open(pdf_path)
+    sections: list[str] = []
+    seen_xrefs: set[int] = set()
+
+    for page_num, page in enumerate(doc, start=1):
+        if len(sections) >= MAX_VISION_IMAGES:
+            break
+
+        embedded = page.get_images(full=True)
+
+        if embedded:
+            for img_info in embedded:
+                if len(sections) >= MAX_VISION_IMAGES:
+                    break
+                xref = img_info[0]
+                if xref in seen_xrefs:
+                    continue
+                seen_xrefs.add(xref)
+
+                base_img = doc.extract_image(xref)
+                w, h = base_img.get("width", 0), base_img.get("height", 0)
+                if w < MIN_IMAGE_DIMENSION or h < MIN_IMAGE_DIMENSION:
+                    continue
+
+                ext = base_img.get("ext", "png")
+                mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+                text = _ocr_image_with_vision(base_img["image"], mime)
+                if text:
+                    sections.append(f"### 페이지 {page_num} — 이미지 인식\n\n{text}")
+        else:
+            # 임베디드 이미지 없음 + 텍스트도 없음 → 스캔 페이지
+            page_text = page.get_text().strip()
+            if len(page_text) < SCAN_TEXT_THRESHOLD:
+                mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI
+                pix = page.get_pixmap(matrix=mat)
+                png_bytes = pix.tobytes("png")
+                text = _ocr_image_with_vision(png_bytes, "image/png")
+                if text:
+                    sections.append(f"### 페이지 {page_num} — 스캔/손글씨 인식\n\n{text}")
+
+    doc.close()
+    return sections
+
 
 @app.post("/convert")
 async def convert_document_to_markdown(
@@ -338,8 +427,21 @@ async def convert_document_to_markdown(
         tmp_path = tmp.name
 
     try:
+        # 1단계: markitdown으로 텍스트 레이어 추출
         result = await run_in_threadpool(md_converter.convert, tmp_path)
-        return {"markdown": result.text_content}
+        text_markdown = result.text_content or ""
+
+        # 2단계: PDF면 이미지/손글씨 Vision OCR 병행
+        if suffix == ".pdf":
+            image_sections = await run_in_threadpool(_process_pdf_images, tmp_path)
+            if image_sections:
+                text_markdown = (
+                    text_markdown.rstrip()
+                    + "\n\n---\n\n## 이미지 · 손글씨 인식 결과\n\n"
+                    + "\n\n".join(image_sections)
+                )
+
+        return {"markdown": text_markdown}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
     finally:
