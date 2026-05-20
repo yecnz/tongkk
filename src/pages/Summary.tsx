@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
@@ -205,105 +207,107 @@ const FormattedAiText = ({ content }: { content: string }) => {
   );
 };
 
-const escapeHtml = (text: string) =>
-  text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
-const renderPdfInlineText = (text: string) =>
-  escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-
-const renderSummaryPdfBody = (content: string) => {
+const PdfFormattedAiText = ({ content }: { content: string }) => {
   const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
 
-  return lines.map((rawLine) => {
-    const line = rawLine.trim();
-    if (!line) return "<div class=\"spacer\"></div>";
+  return (
+    <div>
+      {lines.map((rawLine, index) => {
+        const line = rawLine.trim();
+        if (!line) return <div key={index} style={{ height: 10 }} />;
 
-    const heading = line.match(/^(#{1,6})\s+(.+)$/);
-    if (heading) {
-      const level = heading[1].length;
-      return `<h${Math.min(level + 1, 4)}>${renderPdfInlineText(heading[2])}</h${Math.min(level + 1, 4)}>`;
-    }
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+          const level = heading[1].length;
+          return (
+            <div key={index} style={{
+              display: "block",
+              margin: `${index === 0 ? 0 : 16}px 0 8px`,
+              fontSize: level <= 2 ? 20 : 17,
+              fontWeight: 800,
+              lineHeight: "28px",
+              color: "#222",
+            }}>
+              {renderInlineText(heading[2])}
+            </div>
+          );
+        }
 
-    const boldHeading = line.match(/^\*\*(.+)\*\*$/);
-    if (boldHeading) return `<h3>${renderPdfInlineText(boldHeading[1])}</h3>`;
+        const boldHeading = line.match(/^\*\*(.+)\*\*$/);
+        if (boldHeading) {
+          return (
+            <div key={index} style={{
+              display: "block",
+              margin: `${index === 0 ? 0 : 14}px 0 8px`,
+              fontSize: 17,
+              fontWeight: 800,
+              lineHeight: "26px",
+              color: "#222",
+            }}>
+              {renderInlineText(boldHeading[1])}
+            </div>
+          );
+        }
 
-    const bullet = line.match(/^[-*•]\s+(.+)$/);
-    if (bullet) return `<p class="bullet"><span></span>${renderPdfInlineText(bullet[1])}</p>`;
+        const bullet = line.match(/^[-*•]\s+(.+)$/);
+        if (bullet) {
+          return (
+            <div key={index} style={{
+              display: "block",
+              margin: "0 0 8px 0",
+              paddingLeft: 18,
+              position: "relative",
+              lineHeight: "25px",
+            }}>
+              <span style={{
+                position: "absolute",
+                left: 2,
+                top: 10,
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: PINK,
+              }} />
+              {renderInlineText(bullet[1])}
+            </div>
+          );
+        }
 
-    const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
-    if (numbered) return `<p class="numbered"><strong>${numbered[1]}.</strong>${renderPdfInlineText(numbered[2])}</p>`;
+        const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
+        if (numbered) {
+          return (
+            <div key={index} style={{
+              display: "block",
+              margin: "0 0 8px 0",
+              paddingLeft: 28,
+              position: "relative",
+              lineHeight: "25px",
+            }}>
+              <strong style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                color: PINK,
+                fontWeight: 800,
+              }}>{numbered[1]}.</strong>
+              {renderInlineText(numbered[2])}
+            </div>
+          );
+        }
 
-    return `<p>${renderPdfInlineText(line)}</p>`;
-  }).join("");
+        return (
+          <div key={index} style={{
+            display: "block",
+            margin: "0 0 8px 0",
+            lineHeight: "25px",
+          }}>
+            {renderInlineText(line)}
+          </div>
+        );
+      })}
+    </div>
+  );
 };
-
-const createSummaryPdfHtml = (title: string, content: string) => `<!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <title>${escapeHtml(title)}</title>
-    <style>
-      @page { size: A4; margin: 18mm; }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        color: #222;
-        background: #fff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-        font-size: 13px;
-        line-height: 1.75;
-      }
-      h1 {
-        margin: 0 0 18px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid #f0f0f0;
-        font-size: 22px;
-        line-height: 1.35;
-      }
-      h2, h3, h4 {
-        margin: 16px 0 7px;
-        color: #222;
-        line-height: 1.45;
-        page-break-after: avoid;
-      }
-      h2 { font-size: 17px; }
-      h3 { font-size: 15px; }
-      h4 { font-size: 14px; }
-      p {
-        margin: 0 0 7px;
-        page-break-inside: avoid;
-      }
-      strong { font-weight: 800; }
-      .spacer { height: 8px; }
-      .bullet, .numbered {
-        display: flex;
-        gap: 8px;
-        align-items: flex-start;
-      }
-      .bullet span {
-        width: 5px;
-        height: 5px;
-        margin-top: 10px;
-        border-radius: 50%;
-        background: #FF5AA5;
-        flex: 0 0 auto;
-      }
-      .numbered strong {
-        min-width: 20px;
-        color: #FF5AA5;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>${escapeHtml(title)}</h1>
-    ${renderSummaryPdfBody(content)}
-  </body>
-</html>`;
 
 const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
@@ -364,8 +368,15 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   const [agentError, setAgentError] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [pdfSaving, setPdfSaving] = useState(false);
+  const pdfExportRef = useRef<HTMLDivElement | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const canUseAgent = Boolean(displayContent.trim());
   const questions = suggestedTutorQuestions[template];
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [agentMessages, agentLoading]);
   const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
 
   useEffect(() => {
@@ -402,22 +413,76 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     };
   }, [summaryId, threadId, displayContent]);
 
-  const handleDownload = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      setActionMessage("PDF 저장 창을 열 수 없습니다. 팝업 차단을 확인해주세요.");
-      return;
-    }
+  const handleDownload = async () => {
+    if (!pdfExportRef.current || pdfSaving) return;
 
-    const title = `Tongkk ${templateLabels[template]} 요약`;
-    printWindow.document.open();
-    printWindow.document.write(createSummaryPdfHtml(title, displayContent));
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
-    setActionMessage("PDF 저장 창을 열었습니다.");
+    setActionMessage("PDF를 생성 중입니다...");
+    setPdfSaving(true);
+
+    try {
+      await document.fonts.ready;
+      const exportNode = pdfExportRef.current;
+      if (!exportNode) return;
+
+      // 캡처 전 전체 뷰포트를 흰 막으로 덮어 다른 콘텐츠 유입 차단
+      const backdrop = document.createElement("div");
+      backdrop.setAttribute("data-pdf-backdrop", "");
+      backdrop.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;";
+      document.body.appendChild(backdrop);
+
+      exportNode.style.left = "0px";
+      exportNode.style.top = "0px";
+      exportNode.style.zIndex = "99999";
+      exportNode.style.letterSpacing = "0.01px";
+      void exportNode.getBoundingClientRect();
+
+      const canvas = await html2canvas(exportNode, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+      });
+
+      document.body.removeChild(backdrop);
+      exportNode.style.left = "-10000px";
+      exportNode.style.top = "0px";
+      exportNode.style.zIndex = "-1";
+      exportNode.style.letterSpacing = "";
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2;
+      const imgHeight = (canvas.height * contentWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let y = margin;
+
+      pdf.addImage(imgData, "PNG", margin, y, contentWidth, imgHeight);
+      heightLeft -= contentHeight;
+
+      while (heightLeft > 0) {
+        pdf.addPage();
+        y -= contentHeight;
+        pdf.addImage(imgData, "PNG", margin, y, contentWidth, imgHeight);
+        heightLeft -= contentHeight;
+      }
+
+      pdf.save(`tongkk-${template.toLowerCase()}-summary.pdf`);
+      setActionMessage("PDF를 다운로드했습니다.");
+    } catch {
+      document.querySelectorAll<HTMLElement>('[data-pdf-backdrop]').forEach(el => el.remove());
+      if (pdfExportRef.current) {
+        pdfExportRef.current.style.left = "-10000px";
+        pdfExportRef.current.style.zIndex = "-1";
+        pdfExportRef.current.style.letterSpacing = "";
+      }
+      setActionMessage("PDF 다운로드에 실패했습니다.");
+    } finally {
+      setPdfSaving(false);
+    }
   };
 
   const copySummaryToClipboard = async () => {
@@ -539,10 +604,13 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                   height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
                   background: "#fff", color: "#555", fontSize: 13, fontWeight: 700, cursor: "pointer"
                 }}>전체 복사</button>
-                <button onClick={handleDownload} style={{
+                <button onClick={handleDownload} disabled={pdfSaving} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  background: "#70dff0", color: "#555", fontSize: 13, fontWeight: 600, cursor: "pointer"
-                }}>PDF 다운로드</button>
+                  background: pdfSaving ? "#d9f5f9" : "#70dff0",
+                  color: "#555", fontSize: 13, fontWeight: 600,
+                  cursor: pdfSaving ? "default" : "pointer",
+                  opacity: pdfSaving ? 0.75 : 1,
+                }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
                 {realContent && !error && onGoToQuiz && (
                   <button onClick={onGoToQuiz} style={{
                     height: 34, padding: "0 14px", borderRadius: 10, border: "none",
@@ -556,6 +624,43 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
         {actionMessage && !isLoading && (
           <div style={{ margin: "-6px 0 16px", fontSize: 12, color: "#888", textAlign: "right" }}>
             {actionMessage}
+          </div>
+        )}
+
+        {!isLoading && !error && (
+          <div
+            ref={pdfExportRef}
+            aria-hidden="true"
+            style={{
+              position: "fixed",
+              left: "-10000px",
+              top: 0,
+              zIndex: -1,
+              width: 794,
+              padding: 48,
+              background: "#fff",
+              color: "#222",
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
+              fontSize: 14,
+              lineHeight: "25px",
+              pointerEvents: "none",
+            }}
+          >
+            <h1 style={{
+              margin: "0 0 22px",
+              paddingBottom: 14,
+              borderBottom: "2px solid #f0f0f0",
+              fontSize: 24,
+              lineHeight: 1.35,
+              color: "#222",
+            }}>
+              Tongkk {templateLabels[template]} 요약
+            </h1>
+            {mindmapData ? (
+              <MindmapView key={`pdf-${displayContent}`} data={mindmapData} />
+            ) : (
+              <PdfFormattedAiText content={displayContent} />
+            )}
           </div>
         )}
 
@@ -640,7 +745,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                 </div>
               )}
 
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 260, marginBottom: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 260, maxHeight: 420, marginBottom: 14 }}>
                 {!canUseAgent ? (
                   <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
                     새로 생성한 요약에서 AI 튜터 대화를 시작할 수 있습니다.
@@ -654,20 +759,28 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                     예: “이 개념을 쉬운 예시로 설명해줘” 또는 “시험에 나올 만한 포인트를 알려줘”
                   </div>
                 ) : (
-                  agentMessages.map((msg, i) => (
-                    <div key={`${msg.role}-${i}`} style={{
-                      alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                      maxWidth: "88%",
-                      padding: "10px 14px",
-                      borderRadius: 12,
-                      background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
-                      color: "#444",
-                      fontSize: 13,
-                      lineHeight: 1.6
-                    }}>
-                      <FormattedAiText content={msg.content} />
-                    </div>
-                  ))
+                  <>
+                    {agentMessages.map((msg, i) => (
+                      <div key={`${msg.role}-${i}`} style={{
+                        alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                        maxWidth: "88%",
+                        padding: "10px 14px",
+                        borderRadius: 12,
+                        background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
+                        color: "#444",
+                        fontSize: 13,
+                        lineHeight: 1.6
+                      }}>
+                        <FormattedAiText content={msg.content} />
+                      </div>
+                    ))}
+                    {agentLoading && (
+                      <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: 12, background: "#fafafa", color: "#aaa", fontSize: 13 }}>
+                        응답 중...
+                      </div>
+                    )}
+                    <div ref={chatBottomRef} />
+                  </>
                 )}
               </div>
 
