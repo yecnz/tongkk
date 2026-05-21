@@ -13,7 +13,6 @@ import {
 } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
-import { extractTextWithGoogleVision } from "../services/visionOcr";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, saveQuizSetToServer, type SavedQuizSet } from "../services/quizSets";
 import {
@@ -60,8 +59,7 @@ const getDocumentMaterialType = (file: File): CourseMaterial["type"] =>
       ? "img"
       : "ppt";
 
-const extractMarkdownFromMaterialFile = (file: File) =>
-  getDocumentMaterialType(file) === "img" ? extractTextWithGoogleVision(file) : extractMarkdownFromPDF(file);
+const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
 
 const formatFileNames = (files: Pick<File, "name">[]) =>
   files.length <= 2 ? files.map(file => file.name).join(", ") : `${files[0].name} 외 ${files.length - 1}개`;
@@ -869,7 +867,7 @@ export default function Quiz() {
             {materials.length > 0 && (
               <div style={{
                 padding: "12px 16px", borderRadius: 10, background: "#E8FAFE",
-                fontSize: 13, color: CYAN, marginBottom: 14, fontWeight: 500
+                fontSize: 13, color: CYAN, marginBottom: 14, fontWeight: 800
               }}>
                 저장된 강의자료 {materials.length}개 중 {selectedMaterials.length}개가 퀴즈에 반영됩니다
               </div>
@@ -885,6 +883,10 @@ export default function Quiz() {
 
             {materials.length > 0 && (
               <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 10 }}>
+                  <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 선택</button>
+                  <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 해제</button>
+                </div>
                 {materials.map(material => {
                   const isSelected = selectedMaterialIds.includes(material.id);
                   const materialSummaries = getMaterialSummaries(material);
@@ -969,7 +971,7 @@ export default function Quiz() {
               }}
             >
               <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
-                PDF, PPT 파일을 여러 개 드래그하거나
+                강의자료 파일을 여러 개 드래그하거나
               </p>
               <button style={{
                 padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
@@ -1108,6 +1110,17 @@ export default function Quiz() {
   // ── 결과 ──
   if (view === "result") {
     const nextDifficulty: QuizDifficulty = scorePercent >= 80 ? "어려움" : scorePercent >= 55 ? "보통" : "쉬움";
+    const goToSummary = (tutorQuestion?: string) => {
+      navigate(pageRoutes["자료 요약"], {
+        state: {
+          selectedCourse,
+          openSummary: true,
+          materialIds: selectedMaterialIds,
+          fromDashboard: fromDashboardRef.current,
+          tutorQuestion,
+        },
+      });
+    };
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
@@ -1147,24 +1160,47 @@ export default function Quiz() {
                   {resultWeakTopics.map(topic => (
                     <div key={topic} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                       <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>약점 후보: <strong>{topic}</strong></span>
-                      <a
-                        href={youtubeSearchUrl(selectedCourse, topic)}
-                        target="_blank"
-                        rel="noreferrer"
+                      <div
                         style={{
                           flexShrink: 0,
-                          padding: "7px 10px",
-                          borderRadius: 9,
-                          background: "#fff",
-                          border: "1px solid #e8e8e8",
-                          color: CYAN,
-                          fontSize: 12,
-                          fontWeight: 800,
-                          textDecoration: "none",
+                          display: "flex",
+                          gap: 6,
                         }}
                       >
-                        영상 찾기
-                      </a>
+                        <button
+                          type="button"
+                          onClick={() => goToSummary(`${topic} 부분을 요약 기준으로 다시 설명해줘`)}
+                          style={{
+                            padding: "7px 10px",
+                            borderRadius: 9,
+                            background: "#FFF0F6",
+                            border: "1px solid #f3c3da",
+                            color: PINK,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          튜터 질문
+                        </button>
+                        <a
+                          href={youtubeSearchUrl(selectedCourse, topic)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            padding: "7px 10px",
+                            borderRadius: 9,
+                            background: "#fff",
+                            border: "1px solid #e8e8e8",
+                            color: CYAN,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            textDecoration: "none",
+                          }}
+                        >
+                          영상 찾기
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1176,6 +1212,10 @@ export default function Quiz() {
             </div>
 
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <button onClick={() => goToSummary()} style={{
+                padding: "12px 24px", borderRadius: 12, border: "1px solid #f3c3da",
+                background: "#FFF0F6", fontSize: 14, fontWeight: 700, cursor: "pointer", color: PINK
+              }}>요약 다시 보기</button>
               <button onClick={resetCourseSelection} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid #e0e0e0",
                 background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#555"

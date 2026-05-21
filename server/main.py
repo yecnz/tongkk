@@ -370,9 +370,25 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
     return result
 
 
-SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
+SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENSIONS}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _extract_image_text_with_tesseract(path: str) -> str:
+    from PIL import Image
+    import pytesseract
+
+    language = os.getenv("TESSERACT_LANG", "kor+eng")
+    with Image.open(path) as image:
+        normalized = image.convert("L")
+        try:
+            return pytesseract.image_to_string(normalized, lang=language).strip()
+        except pytesseract.TesseractError:
+            if language == "eng":
+                raise
+            return pytesseract.image_to_string(normalized, lang="eng").strip()
 
 def _image_data_url(image_bytes: bytes, mime_type: str = "image/png") -> str:
     encoded = base64.b64encode(image_bytes).decode("ascii")
@@ -538,13 +554,20 @@ async def convert_document_to_markdown(
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 지원합니다.")
+        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX, 이미지 파일만 지원합니다.")
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(await file.read())
+        file_bytes = await file.read()
+        if suffix in SUPPORTED_IMAGE_EXTENSIONS and len(file_bytes) > MAX_OCR_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="이미지 파일은 10MB 이하만 OCR할 수 있습니다.")
+        tmp.write(file_bytes)
         tmp_path = tmp.name
 
     try:
+        if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+            text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
+            return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
+
         # 1단계: markitdown으로 텍스트 레이어 추출
         result = await run_in_threadpool(md_converter.convert, tmp_path)
         base_markdown = (result.text_content or "").strip()

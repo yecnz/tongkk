@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
-import { extractTextWithGoogleVision } from "../services/visionOcr";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   loadSummaryChatMessages,
@@ -44,10 +45,11 @@ type LocationState = {
   summaryTemplate?: SummaryTemplate;
   materialIds?: string[];
   openSummary?: boolean;
+  tutorQuestion?: string;
 } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; resetTutorHistory?: boolean; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
 type MaterialDetailViewProps = { material: CourseMaterial; onBack: () => void; onGoSummary: () => void; onGoQuiz: () => void };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
@@ -108,8 +110,7 @@ const getFileType = (name: string): FileKind => {
 const isSupportedDocumentFile = (file: File) =>
   ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
-const extractMarkdownFromMaterialFile = (file: File) =>
-  getFileType(file.name) === "img" ? extractTextWithGoogleVision(file) : extractMarkdownFromPDF(file);
+const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
@@ -151,132 +152,111 @@ const renderInlineText = (text: string): ReactNode[] => {
   });
 };
 
-const isTableRow = (line: string) => /^\|.+\|$/.test(line.trim());
-const isSeparatorRow = (line: string) => /^\|[\s|:-]+\|$/.test(line.trim());
-
-const renderTableBlock = (tableLines: string[], key: number) => {
-  const rows = tableLines.filter(l => !isSeparatorRow(l));
-  if (rows.length < 1) return null;
-  const parseRow = (line: string) =>
-    line.trim().replace(/^\||\|$/g, "").split("|").map(cell => cell.trim());
-  const [headerRow, ...bodyRows] = rows;
-  const headers = parseRow(headerRow);
-  return (
-    <div key={key} style={{ overflowX: "auto", margin: "4px 0" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-        <thead>
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} style={{ padding: "7px 12px", background: "#FFF0F6", color: "#444", fontWeight: 700, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
-                {renderInlineText(h)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {bodyRows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? "#fff" : "#fafafa" }}>
-              {parseRow(row).map((cell, ci) => (
-                <td key={ci} style={{ padding: "6px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>
-                  {renderInlineText(cell)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+const markdownStyles = {
+  paragraph: { margin: "0 0 10px", lineHeight: 1.8, color: "#444" } satisfies CSSProperties,
+  list: { margin: "6px 0 14px", paddingLeft: 24, lineHeight: 1.75 } satisfies CSSProperties,
+  tableWrap: { overflowX: "auto", margin: "12px 0 16px" } satisfies CSSProperties,
 };
 
-const FormattedAiText = ({ content }: { content: string }) => {
-  const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
-
-  // Group consecutive table lines into blocks
-  type Block = { type: "table"; lines: string[] } | { type: "line"; raw: string; index: number };
-  const blocks: Block[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    if (isTableRow(lines[i])) {
-      const tableLines: string[] = [];
-      while (i < lines.length && (isTableRow(lines[i]) || isSeparatorRow(lines[i]))) {
-        tableLines.push(lines[i]);
-        i++;
-      }
-      blocks.push({ type: "table", lines: tableLines });
-    } else {
-      blocks.push({ type: "line", raw: lines[i], index: i });
-      i++;
+const markdownComponents: Components = {
+  h1: ({ children }) => (
+    <h1 style={{ margin: "0 0 18px", paddingBottom: 12, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 style={{ margin: "26px 0 12px", paddingTop: 18, borderTop: "1px solid #f0f0f0", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "#222" }}>
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => <h3 style={{ margin: "20px 0 10px", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{children}</h3>,
+  h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "#333" }}>{children}</h4>,
+  h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "#444" }}>{children}</h5>,
+  h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "#555" }}>{children}</h6>,
+  p: ({ children }) => <p style={markdownStyles.paragraph}>{children}</p>,
+  ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
+  li: ({ children }) => <li style={{ marginBottom: 6, paddingLeft: 4 }}>{children}</li>,
+  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{children}</strong>,
+  em: ({ children }) => <em style={{ color: "#555" }}>{children}</em>,
+  blockquote: ({ children }) => (
+    <blockquote style={{ margin: "14px 0", padding: "10px 14px", borderLeft: `4px solid ${PINK}`, borderRadius: 8, background: "#FFF7FB", color: "#555" }}>
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, className }) => {
+    if (className) {
+      return <code className={className} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 13 }}>{children}</code>;
     }
+    return (
+      <code style={{ padding: "2px 6px", borderRadius: 6, background: "#f3f4f6", color: "#d6336c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }) => (
+    <pre style={{ margin: "14px 0", padding: 16, borderRadius: 12, background: "#f6f7f9", border: "1px solid #eceff3", overflowX: "auto", lineHeight: 1.6 }}>
+      {children}
+    </pre>
+  ),
+  hr: () => <hr style={{ margin: "22px 0", border: "none", borderTop: "1px solid #ededed" }} />,
+  table: ({ children }) => (
+    <div style={markdownStyles.tableWrap}>
+      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 480, fontSize: 13 }}>{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: "9px 12px", background: "#FFF0F6", color: "#333", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>{children}</td>,
+};
+
+const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
+
+const splitCheatSheetSections = (content: string) => {
+  const lines = normalizeMarkdownContent(content).split("\n");
+  const sections: string[] = [];
+  let current: string[] = [];
+
+  lines.forEach((line, index) => {
+    const isSectionStart = /^(#{1,3}\s+|\*\*[^*]+\*\*\s*$)/.test(line.trim());
+    if (isSectionStart && current.some(item => item.trim())) {
+      sections.push(current.join("\n").trim());
+      current = [];
+    }
+    current.push(line);
+    if (index === lines.length - 1 && current.some(item => item.trim())) {
+      sections.push(current.join("\n").trim());
+    }
+  });
+
+  return sections.length > 1 ? sections : [normalizeMarkdownContent(content)];
+};
+
+const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
+  const cleaned = normalizeMarkdownContent(content);
+  if (!cleaned) return null;
+
+  if (template === "CHEAT_SHEET") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+        {splitCheatSheetSections(cleaned).map((section, index) => (
+          <div key={index} style={{ padding: 18, borderRadius: 12, border: "1px solid #eeeeee", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {section}
+            </ReactMarkdown>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {blocks.map((block, blockIdx) => {
-        if (block.type === "table") return renderTableBlock(block.lines, blockIdx);
-
-        const { raw: rawLine, index } = block;
-        const line = rawLine.trim();
-        if (!line) return <div key={blockIdx} style={{ height: 8 }} />;
-
-        const heading = line.match(/^(#{1,6})\s+(.+)$/);
-        if (heading) {
-          const level = heading[1].length;
-          return (
-            <div key={blockIdx} style={{
-              fontSize: level <= 2 ? 18 : 16,
-              fontWeight: 800,
-              color: "#222",
-              marginTop: index === 0 ? 0 : 10,
-              lineHeight: 1.45,
-            }}>
-              {renderInlineText(heading[2])}
-            </div>
-          );
-        }
-
-        const boldHeading = line.match(/^\*\*(.+)\*\*$/);
-        if (boldHeading) {
-          return (
-            <div key={blockIdx} style={{
-              fontSize: 15,
-              fontWeight: 800,
-              color: "#222",
-              marginTop: index === 0 ? 0 : 8,
-              lineHeight: 1.45,
-            }}>
-              {renderInlineText(boldHeading[1])}
-            </div>
-          );
-        }
-
-        const bullet = line.match(/^[-*•]\s+(.+)$/);
-        if (bullet) {
-          return (
-            <div key={blockIdx} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: PINK, marginTop: 10, flexShrink: 0 }} />
-              <span>{renderInlineText(bullet[1])}</span>
-            </div>
-          );
-        }
-
-        const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
-        if (numbered) {
-          return (
-            <div key={blockIdx} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
-              <span style={{ color: PINK, fontWeight: 800, minWidth: 18 }}>{numbered[1]}.</span>
-              <span>{renderInlineText(numbered[2])}</span>
-            </div>
-          );
-        }
-
-        return (
-          <div key={blockIdx} style={{ lineHeight: 1.75 }}>
-            {renderInlineText(line)}
-          </div>
-        );
-      })}
-    </div>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {cleaned}
+    </ReactMarkdown>
   );
 };
 
@@ -496,7 +476,7 @@ const parseAiSuggestions = (content: string): { mainContent: string; suggestions
   };
 };
 
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, resetTutorHistory = false, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -509,14 +489,11 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [isTutorOpen, setIsTutorOpen] = useState(false);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const tutorSectionRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
-
-  useEffect(() => {
-    tutorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  const initialTutorQuestionRef = useRef("");
   const canUseAgent = Boolean(displayContent.trim());
 
   const scrollToBottom = () => {
@@ -688,6 +665,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     const content = question.trim();
     if (!content || !canUseAgent || chatLoading || agentLoading) return;
 
+    setIsTutorOpen(true);
     const userMessage: AgentMessage = { role: "user", content };
     const nextMessages = [...agentMessages, userMessage];
     setAgentMessages(nextMessages);
@@ -735,6 +713,14 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     await sendAgentQuestion(agentInput);
   };
 
+  useEffect(() => {
+    const question = initialTutorQuestion?.trim();
+    if (!question || initialTutorQuestionRef.current === question || !canUseAgent || isLoading) return;
+    initialTutorQuestionRef.current = question;
+    setIsTutorOpen(true);
+    setAgentInput(question);
+  }, [initialTutorQuestion, canUseAgent, isLoading]);
+
   return (
     <div>
       <button onClick={onBack} style={{
@@ -780,6 +766,12 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                   cursor: pdfSaving ? "default" : "pointer",
                   opacity: pdfSaving ? 0.75 : 1,
                 }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
+                <button onClick={() => setIsTutorOpen(true)} disabled={!canUseAgent} style={{
+                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #f3c3da",
+                  background: canUseAgent ? "#FFF0F6" : "#f2f2f2",
+                  color: canUseAgent ? PINK : "#aaa", fontSize: 13, fontWeight: 800,
+                  cursor: canUseAgent ? "pointer" : "default",
+                }}>AI 튜터에게 물어보기</button>
                 {realContent && !error && onGoToQuiz && (
                   <button onClick={onGoToQuiz} style={{
                     height: 34, padding: "0 14px", borderRadius: 10, border: "none",
@@ -793,6 +785,32 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
         {actionMessage && !isLoading && (
           <div style={{ margin: "-6px 0 16px", fontSize: 12, color: "#888", textAlign: "right" }}>
             {actionMessage}
+          </div>
+        )}
+        {!isLoading && !error && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, borderBottom: "1px solid #f0f0f0" }}>
+            <button type="button" style={{
+              padding: "10px 4px 12px",
+              border: "none",
+              borderBottom: `2px solid ${PINK}`,
+              background: "transparent",
+              color: "#222",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: "default",
+            }}>요약 결과</button>
+            {onGoToQuiz && (
+              <button type="button" onClick={onGoToQuiz} style={{
+                padding: "10px 4px 12px",
+                border: "none",
+                borderBottom: "2px solid transparent",
+                background: "transparent",
+                color: "#888",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}>퀴즈 풀기</button>
+            )}
           </div>
         )}
 
@@ -856,30 +874,74 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             <strong>요약 실패:</strong> {error}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 18, alignItems: "start" }}>
+          <div style={{ position: "relative" }}>
             <div style={{
-              background: "#fafafa", borderRadius: 12, padding: 24,
-              fontSize: 14, color: "#444", lineHeight: 1.8,
+              background: "#fff", borderRadius: 12, padding: 28,
+              border: "1px solid #f0f0f0",
+              fontSize: 15, color: "#444", lineHeight: 1.85,
               overflowX: "auto",
             }}>
               {mindmapData ? (
                 <MindmapView key={displayContent} data={mindmapData} />
               ) : (
-                <FormattedAiText content={displayContent} />
+                <FormattedAiText content={displayContent} template={template} />
               )}
             </div>
 
-            <div ref={tutorSectionRef} style={{
+            {canUseAgent && (
+              <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</span>
+                {questions.slice(0, 3).map(question => (
+                  <button
+                    key={question}
+                    type="button"
+                    onClick={() => sendAgentQuestion(question)}
+                    disabled={chatLoading || agentLoading}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      border: "1px solid #eeeeee",
+                      background: "#fafafa",
+                      color: "#555",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: chatLoading || agentLoading ? "default" : "pointer",
+                      opacity: chatLoading || agentLoading ? 0.55 : 1,
+                    }}
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isTutorOpen && (
+              <div
+                onClick={() => setIsTutorOpen(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 180, background: "rgba(20,20,20,0.18)" }}
+              />
+            )}
+            <div style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              width: "min(420px, 100vw)",
+              height: "100vh",
+              zIndex: 190,
               border: "1px solid #f0f0f0",
-              borderRadius: 12,
-              padding: 18,
-              height: 720,
+              borderRight: "none",
+              borderRadius: "16px 0 0 16px",
+              padding: 20,
               display: "flex",
               flexDirection: "column",
               background: "#fff",
+              boxShadow: "-18px 0 44px rgba(0,0,0,0.18)",
+              transform: isTutorOpen ? "translateX(0)" : "translateX(104%)",
+              transition: "transform 0.22s ease",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#222" }}>AI 튜터</h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {agentMessages.length > 0 && (
                   <button
                     type="button"
@@ -890,6 +952,24 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                     }}
                   >새 대화</button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setIsTutorOpen(false)}
+                  aria-label="AI 튜터 닫기"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 10,
+                    border: "1px solid #e0e0e0",
+                    background: "#fff",
+                    color: "#999",
+                    cursor: "pointer",
+                    fontSize: 18,
+                    lineHeight: "28px",
+                    padding: 0,
+                  }}
+                >×</button>
+                </div>
               </div>
               <p style={{ margin: "0 0 14px", fontSize: 12, lineHeight: 1.6, color: "#888" }}>
                 요약본을 기준으로 헷갈리는 개념을 이어서 질문하세요.
@@ -1309,6 +1389,9 @@ export default function Summary() {
   const [uploading, setUploading] = useState(false);
   const [searched, setSearched] = useState(Boolean(initialCourse));
   const [selectedCourse, setSelectedCourse] = useState(initialCourse);
+  const [inputMode, setInputMode] = useState<"file" | "text">("file");
+  const [textMaterialTitle, setTextMaterialTitle] = useState("");
+  const [textMaterialContent, setTextMaterialContent] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const filesRef = useRef<UploadedFile[]>([]);
 
@@ -1328,6 +1411,9 @@ export default function Summary() {
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<"templates" | "upload">("templates");
+  const [pendingTutorQuestion] = useState(
+    shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
+  );
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
 
@@ -1341,6 +1427,8 @@ export default function Summary() {
       replace: true,
       state: initialCourse ? { selectedCourse: initialCourse, fromDashboard: locationState.fromDashboard } : null,
     });
+    // The location handoff should be consumed once on mount so refreshes do not reopen nested views.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1370,14 +1458,17 @@ export default function Summary() {
         const pendingSummary = pendingSummaryRef.current;
         if (pendingSummary) {
           pendingSummaryRef.current = null;
-          const summary = summaries.find(item =>
-            (pendingSummary.id && item.id === pendingSummary.id) ||
-            (
-              pendingSummary.template &&
-              item.template === pendingSummary.template &&
-              sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+          const matchingSummaries = summaries
+            .filter(item =>
+              (pendingSummary.id && item.id === pendingSummary.id) ||
+              (
+                pendingSummary.template
+                  ? item.template === pendingSummary.template && sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+                  : sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+              )
             )
-          );
+            .sort((a, b) => b.createdAt - a.createdAt);
+          const summary = matchingSummaries[0];
           if (summary) {
             const validMaterialIds = (summary.materialIds || []).filter(id =>
               nextMaterials.some(material => material.id === id)
@@ -1584,6 +1675,43 @@ export default function Summary() {
       }
     } finally {
       setIsExtracting(false);
+    }
+  };
+
+  const handleAddTextMaterial = async () => {
+    const title = textMaterialTitle.trim();
+    const markdown = textMaterialContent.trim();
+    if (!selectedCourse || !title || !markdown) return;
+
+    const name = title.toLowerCase().endsWith(".txt") ? title : `${title}.txt`;
+    const nameKey = getFileNameKey(name);
+    if (materials.some(material => getFileNameKey(material.name) === nameKey)) {
+      setDuplicateNotice({ names: [name] });
+      return;
+    }
+
+    const material: CourseMaterial = {
+      id: `text:${name}:${Date.now()}`,
+      name,
+      size: markdown.length,
+      type: "file",
+      pages: null,
+      slides: null,
+      markdown,
+      mimeType: "text/plain",
+      updatedAt: Date.now(),
+    };
+
+    try {
+      const nextMaterials = [material, ...materials];
+      await saveCourseMaterials(selectedCourse, nextMaterials);
+      setMaterials(nextMaterials);
+      setSelectedMaterialIds(prev => Array.from(new Set([...prev, material.id])));
+      setTextMaterialTitle("");
+      setTextMaterialContent("");
+      setSearched(true);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : "텍스트 자료 추가 실패");
     }
   };
 
@@ -1804,6 +1932,7 @@ export default function Summary() {
             summaryId={activeSummaryId}
             agentContext={selectedMarkdown || summaryText}
             resetTutorHistory={isReloadNavigationRef.current}
+            initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
           />
         )}
@@ -1829,26 +1958,82 @@ export default function Summary() {
             <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>
-                <div
-                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-                  onClick={() => fileRef.current?.click()}
-                  style={{
-                    border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
-                    borderRadius: 14, padding: "40px 20px", textAlign: "center",
-                    cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
-                    transition: "all 0.2s", marginBottom: 20
-                  }}
-                >
-                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
-                    onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
-                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
-                  <button style={{
-                    marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
-                    background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
-                  }}>파일 선택</button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                  {(["file", "text"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setInputMode(mode)}
+                      style={{
+                        padding: "10px 0",
+                        borderRadius: 10,
+                        border: inputMode === mode ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                        background: inputMode === mode ? "#FFF0F6" : "#fff",
+                        color: inputMode === mode ? PINK : "#777",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {mode === "file" ? "파일 업로드" : "텍스트 붙여넣기"}
+                    </button>
+                  ))}
                 </div>
+                {inputMode === "file" ? (
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+                    onClick={() => fileRef.current?.click()}
+                    style={{
+                      border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
+                      borderRadius: 14, padding: "40px 20px", textAlign: "center",
+                      cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
+                      transition: "all 0.2s", marginBottom: 20
+                    }}
+                  >
+                    <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
+                      onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
+                    <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>강의자료 파일을 드래그하거나</p>
+                    <button style={{
+                      marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
+                      background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
+                    }}>파일 선택</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                    <input
+                      value={textMaterialTitle}
+                      onChange={e => setTextMaterialTitle(e.target.value)}
+                      placeholder="자료 이름 (예: 3주차 강의 노트)"
+                      style={{ padding: "12px 13px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, outline: "none" }}
+                    />
+                    <textarea
+                      value={textMaterialContent}
+                      onChange={e => setTextMaterialContent(e.target.value)}
+                      placeholder="강의 스크립트나 노트를 붙여넣으세요..."
+                      rows={8}
+                      style={{ padding: 13, borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, lineHeight: 1.6, resize: "vertical", outline: "none", fontFamily: "inherit" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddTextMaterial}
+                      disabled={!textMaterialTitle.trim() || !textMaterialContent.trim()}
+                      style={{
+                        padding: "11px 0",
+                        borderRadius: 10,
+                        border: "none",
+                        background: textMaterialTitle.trim() && textMaterialContent.trim() ? PINK : "#e5e5e5",
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        cursor: textMaterialTitle.trim() && textMaterialContent.trim() ? "pointer" : "default",
+                      }}
+                    >
+                      자료로 추가
+                    </button>
+                  </div>
+                )}
 
                 <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
                 {uploading && (
@@ -1871,7 +2056,7 @@ export default function Summary() {
                 )}
                 {!isExtracting && selectedMarkdown && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
-                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>선택한 자료 {selectedMaterials.length}개 — 요약 생성 가능</span>
+                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 700 }}>선택됨: {selectedMaterials.length}개</span>
                   </div>
                 )}
                 {extractError && (
@@ -1882,9 +2067,15 @@ export default function Summary() {
 
                 {materials.length > 0 && (
                   <div>
-                    <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: "#555" }}>
-                      강의자료 선택
-                    </h4>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
+                      <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#555" }}>
+                        강의자료 선택
+                      </h4>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 선택</button>
+                        <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 해제</button>
+                      </div>
+                    </div>
                     {materials.map(material => {
                       const isSelected = selectedMaterialIds.includes(material.id);
                       return (
