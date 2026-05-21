@@ -56,9 +56,12 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-VISUAL_ANALYSIS_MAX_ITEMS = _env_int("VISUAL_ANALYSIS_MAX_ITEMS", 50)
-VISUAL_ANALYSIS_BATCH_SIZE = max(1, _env_int("VISUAL_ANALYSIS_BATCH_SIZE", 5))
-PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 110)
+VISUAL_ANALYSIS_MODE = os.getenv("VISUAL_ANALYSIS_MODE", "auto").lower()
+VISUAL_ANALYSIS_MAX_ITEMS = _env_int("VISUAL_ANALYSIS_MAX_ITEMS", 12)
+VISUAL_ANALYSIS_BATCH_SIZE = max(1, _env_int("VISUAL_ANALYSIS_BATCH_SIZE", 4))
+VISUAL_ANALYSIS_MIN_TEXT_CHARS = _env_int("VISUAL_ANALYSIS_MIN_TEXT_CHARS", 1200)
+PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 90)
+PDF_VISUAL_TEXT_PAGE_CHARS = _env_int("PDF_VISUAL_TEXT_PAGE_CHARS", 180)
 PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
@@ -376,7 +379,19 @@ def _image_data_url(image_bytes: bytes, mime_type: str = "image/png") -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
-def _render_pdf_pages_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
+def _text_length(text: str) -> int:
+    return len("".join(text.split()))
+
+
+def _pdf_page_has_image(page) -> bool:
+    page_dict = page.get_text("dict")
+    for block in page_dict.get("blocks", []):
+        if block.get("type") == 1:
+            return True
+    return False
+
+
+def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -> list[dict[str, str]]:
     try:
         import fitz
     except ImportError as e:
@@ -387,8 +402,19 @@ def _render_pdf_pages_for_visual_analysis(file_path: str) -> list[dict[str, str]
     matrix = fitz.Matrix(scale, scale)
 
     with fitz.open(file_path) as doc:
-        page_count = min(len(doc), VISUAL_ANALYSIS_MAX_ITEMS)
-        for index in range(page_count):
+        selected_indexes: list[int] = []
+        for index in range(len(doc)):
+            page = doc.load_page(index)
+            if force:
+                selected_indexes.append(index)
+            else:
+                page_text_len = _text_length(page.get_text("text") or "")
+                if page_text_len < PDF_VISUAL_TEXT_PAGE_CHARS or _pdf_page_has_image(page):
+                    selected_indexes.append(index)
+            if len(selected_indexes) >= VISUAL_ANALYSIS_MAX_ITEMS:
+                break
+
+        for index in selected_indexes:
             page = doc.load_page(index)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
             pages.append({
@@ -417,9 +443,21 @@ def _extract_pptx_images_for_visual_analysis(file_path: str) -> list[dict[str, s
     return images
 
 
-def _collect_visual_inputs(file_path: str, suffix: str) -> list[dict[str, str]]:
+def _should_analyze_visuals(base_markdown: str, suffix: str) -> bool:
+    if VISUAL_ANALYSIS_MODE in {"off", "never", "false", "0"}:
+        return False
+    if VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}:
+        return True
+    if suffix not in {".pdf", ".pptx"}:
+        return False
     if suffix == ".pdf":
-        return _render_pdf_pages_for_visual_analysis(file_path)
+        return True
+    return _text_length(base_markdown) < VISUAL_ANALYSIS_MIN_TEXT_CHARS
+
+
+def _collect_visual_inputs(file_path: str, suffix: str, force: bool = False) -> list[dict[str, str]]:
+    if suffix == ".pdf":
+        return _render_pdf_pages_for_visual_analysis(file_path, force)
     if suffix == ".pptx":
         return _extract_pptx_images_for_visual_analysis(file_path)
     return []
@@ -432,8 +470,12 @@ def _visual_batches(items: list[dict[str, str]]) -> list[list[dict[str, str]]]:
     ]
 
 
-def _analyze_document_visuals(file_path: str, suffix: str) -> str:
-    visual_inputs = _collect_visual_inputs(file_path, suffix)
+def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = "") -> str:
+    force_visual_scan = VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}
+    if not force_visual_scan and not _should_analyze_visuals(base_markdown, suffix):
+        return ""
+
+    visual_inputs = _collect_visual_inputs(file_path, suffix, force_visual_scan)
     if not visual_inputs:
         return ""
 
@@ -508,7 +550,7 @@ async def convert_document_to_markdown(
         base_markdown = (result.text_content or "").strip()
         visual_markdown = ""
         try:
-            visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix)
+            visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
         except Exception as visual_error:
             visual_markdown = f"# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석 실패: {str(visual_error)}"
         markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
