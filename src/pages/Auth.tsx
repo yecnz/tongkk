@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
-import { PINK, CYAN } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, SOFT_SHADOW } from "../common";
 import { useAuth } from "../AuthContext";
 
 type AuthMode = "signIn" | "signUp";
@@ -9,20 +9,20 @@ const inputStyle = (focused: boolean): CSSProperties => ({
   width: "100%",
   padding: "13px 16px",
   borderRadius: 12,
-  border: `1.5px solid ${focused ? CYAN : "#e8e8e8"}`,
+  border: `1.5px solid ${focused ? CYAN : BORDER_COLOR}`,
   fontSize: 14,
   outline: "none",
   boxSizing: "border-box",
-  background: focused ? "rgba(0,192,232,0.04)" : "#fafafa",
+  background: focused ? "rgba(0,192,232,0.04)" : MUTED_SURFACE,
   transition: "border 0.2s, background 0.2s",
-  color: "#222",
+  color: "#111827",
 });
 
 const linkStyle: CSSProperties = {
   background: "none",
   border: "none",
   fontSize: 12,
-  color: "#bbb",
+  color: "#94a3b8",
   cursor: "pointer",
   padding: 0,
 };
@@ -67,7 +67,7 @@ export default function Auth() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      background: "#ffffff",
+      background: PAGE_BACKGROUND,
       padding: 24,
       boxSizing: "border-box",
     }}>
@@ -79,7 +79,7 @@ export default function Auth() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "rgba(0,0,0,0.18)",
+          background: "rgba(15,23,42,0.2)",
           backdropFilter: "blur(6px)",
           padding: 24,
           boxSizing: "border-box",
@@ -88,19 +88,20 @@ export default function Auth() {
             onSubmit={handleSubmit}
             style={{
               width: "min(380px, 100%)",
-              background: "#ffffff",
-              borderRadius: 24,
+              background: CARD_BACKGROUND,
+              borderRadius: 20,
               padding: "36px 32px",
-              boxShadow: "0 12px 48px rgba(0,0,0,0.14)",
+              border: `1px solid ${BORDER_COLOR}`,
+              boxShadow: "0 18px 48px rgba(15, 23, 42, 0.09)",
               boxSizing: "border-box",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
               <div>
-                <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 500, color: "#222" }}>
+                <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 500, color: "#111827" }}>
                   {mode === "signIn" ? "로그인" : "회원가입"}
                 </h2>
-                <p style={{ margin: 0, fontSize: 13, color: "#aaa" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#667085" }}>
                   {mode === "signIn" ? "계정에 로그인하세요" : "계정을 생성하세요"}
                 </p>
               </div>
@@ -112,14 +113,14 @@ export default function Auth() {
                 }}
                 aria-label="닫기"
                 style={{
-                  background: "#f4f4f4",
+                  background: MUTED_SURFACE,
                   border: "none",
                   borderRadius: "50%",
                   width: 34,
                   height: 34,
                   cursor: "pointer",
                   fontSize: 16,
-                  color: "#999",
+                  color: "#64748b",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -130,7 +131,7 @@ export default function Auth() {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
                 아이디
               </label>
               <input
@@ -147,7 +148,7 @@ export default function Auth() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#888", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
                 비밀번호
               </label>
               <input
@@ -178,8 +179,8 @@ export default function Auth() {
                 padding: "14px 0",
                 borderRadius: 14,
                 border: "none",
-                background: "#e8e8e8",
-                color: "#555",
+                background: PINK,
+                color: "#fff",
                 fontSize: 15,
                 fontWeight: 600,
                 cursor: submitting ? "default" : "pointer",
@@ -224,17 +225,18 @@ export default function Auth() {
           </div>
         </div>
         <div style={{
-          background: "#ffffff",
-          borderRadius: 24,
+          background: CARD_BACKGROUND,
+          borderRadius: 20,
           padding: "40px 36px",
           width: "min(340px, calc(100vw - 48px))",
-          boxShadow: "0 8px 40px rgba(0,192,232,0.12)",
+          border: `1px solid ${BORDER_COLOR}`,
+          boxShadow: SOFT_SHADOW,
           boxSizing: "border-box",
         }}>
-          <h1 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 500, color: "#222" }}>
+          <h1 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 500, color: "#111827" }}>
             로그인이 필요합니다
           </h1>
-          <p style={{ fontSize: 14, color: "#aaa", margin: "0 0 28px" }}>
+          <p style={{ fontSize: 14, color: "#667085", margin: "0 0 28px" }}>
             Tongkk를 이용하려면 로그인해주세요
           </p>
           <button
@@ -244,13 +246,13 @@ export default function Auth() {
               width: "100%",
               padding: "14px 0",
               borderRadius: 14,
-              background: "#e8e8e8",
+              background: PINK,
               border: "none",
-              color: "#555",
+              color: "#fff",
               fontSize: 15,
               fontWeight: 600,
               cursor: "pointer",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+              boxShadow: "0 8px 18px rgba(240,112,174,0.16)",
             }}
           >
             로그인

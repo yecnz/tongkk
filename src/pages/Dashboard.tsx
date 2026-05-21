@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
@@ -545,7 +545,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active={page} onNav={(item) => { navigate(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
       {showAddCourse && <AddCourseModal onClose={() => setShowAddCourse(false)} onAdd={addCourse} />}
@@ -649,7 +649,7 @@ export default function Dashboard() {
                               border: "none",
                               background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
                               color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
-                              fontSize: 13, fontWeight: 500, cursor: "pointer"
+                              fontSize: 13, fontWeight: 600, cursor: "pointer"
                             }}>{btn}</button>
                           ))}
                           <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
@@ -832,7 +832,7 @@ export default function Dashboard() {
                       background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
                       alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
                     }}>
-                      {p.done && <span style={{ color: "#fff", fontSize: 12 }}>v</span>}
+                      {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                     </button>
                     <span style={{
                       flex: 1,
