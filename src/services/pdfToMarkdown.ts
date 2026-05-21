@@ -13,7 +13,7 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
   formData.append('file', file);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+  const timeoutId = setTimeout(() => controller.abort(), 600_000);
 
   try {
     const response = await fetch(`${BACKEND_URL}/convert`, {
@@ -31,7 +31,7 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
     return data.markdown;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('파일 변환 시간 초과. 파일 크기를 확인하거나 다시 시도해주세요.');
+      throw new Error('파일 변환 시간 초과. 이미지가 많은 PDF라면 잠시 후 다시 시도하거나 페이지 수를 줄여주세요.');
     }
     throw err;
   } finally {

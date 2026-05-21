@@ -1,5 +1,7 @@
 import json
 import os
+import base64
+import zipfile
 import tempfile
 from pathlib import Path
 from typing import Literal
@@ -8,12 +10,15 @@ import httpx
 from dotenv import load_dotenv
 
 SERVER_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SERVER_DIR.parent
 
+load_dotenv(PROJECT_DIR / ".env")
 load_dotenv(SERVER_DIR / ".env")
 
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
@@ -27,6 +32,7 @@ ALLOWED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:3000", "http://localhost:3
 ALLOWED_ORIGIN_REGEX = r"https://.*\.trycloudflare\.com"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+GOOGLE_VISION_API_KEY = os.getenv("GOOGLE_VISION_API_KEY", "")
 SUPABASE_PLACEHOLDER_VALUES = {
     "https://your-project.supabase.co",
     "your-supabase-url",
@@ -41,6 +47,19 @@ app.add_middleware(
 )
 
 md_converter = MarkItDown()
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+VISUAL_ANALYSIS_MAX_ITEMS = _env_int("VISUAL_ANALYSIS_MAX_ITEMS", 50)
+VISUAL_ANALYSIS_BATCH_SIZE = max(1, _env_int("VISUAL_ANALYSIS_BATCH_SIZE", 5))
+PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 110)
+PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 async def require_api_user(authorization: str | None = Header(default=None)):
@@ -87,10 +106,29 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - 제목, 핵심 결론, 주요 내용, 중요 키워드, 한 줄 요약 순서로 구성해.
 - 전체 내용을 처음 보는 사람도 빠르게 이해할 수 있게 간결하게 정리해.
 - 세부 설명보다 핵심 흐름과 결론을 우선해.""",
-    "LECTURE_NOTE": """강의 노트 형식으로 작성해.
-- 제목, 학습 목표, 전체 흐름, 핵심 개념, 세부 설명, 시험 포인트 순서로 구성해.
-- 강의자가 설명하듯 자연스럽고 읽기 쉬운 문장으로 정리해.
-- 원문의 대단원/소단원 순서를 최대한 유지해.""",
+    "LECTURE_NOTE": """시험 대비용 강의 노트 형식으로 작성해.
+- 아래 Markdown 제목을 정확히 이 순서와 이름으로만 사용해. '전체 흐름', '세부 설명' 같은 다른 최상위 제목은 만들지 마.
+  # 제목
+  ## 1. 학습 목표
+  ## 2. 슬라이드별 핵심 흐름
+  ## 3. 코드/수식 핵심
+  ## 4. 핵심 개념 정리
+  ## 5. 연습문제/과제
+  ## 6. 시험 포인트
+  ## 7. 복습 질문
+- '# 제목' 바로 아래에는 자료의 실제 제목을 반드시 한 줄로 적어. 제목을 비워두지 마.
+- 원문의 대단원/소단원 순서를 최대한 유지하고, 같은 제목이나 같은 설명을 반복하지 마.
+- '슬라이드별 핵심 흐름'의 하위 제목은 자료에 실제로 등장한 제목이나 주제만 사용하고, 예시 제목이나 이전 자료의 제목을 재사용하지 마.
+- '코드/수식 핵심'은 원문 코드 목록이 아니라 시험/구현에 필요한 핵심 원리만 요약해. 반드시 8~12개 bullet로 제한하고, 12개를 초과하지 마.
+- '코드/수식 핵심'에서는 import, scene/camera/renderer 생성, geometry attribute 설정, controls 설정처럼 연속된 설정 코드를 각각 나열하지 말고 하나의 개념 bullet로 묶어.
+- 개별 코드 줄은 꼭 필요한 대표 예시만 backtick으로 1개까지 인용하고, 같은 bullet 안에서 의미/주의점/시험 포인트를 설명해.
+- 파일명, 제출일, 과제 조건, 좌표 목록은 '## 5. 연습문제/과제'에 정리하고, '코드/수식 핵심'에 섞지 마.
+- 코드가 있는 자료라도 개념 설명과 실행 흐름을 우선 정리해. 함수명, 변수명, 행렬식, import는 필요한 경우에만 대표 표기로 보존해.
+- 셰이더나 변환식처럼 단계가 바뀌는 내용은 초반 예제와 이후 적용 예제를 분리해서 설명해.
+- built-in 항목은 가능하면 uniform과 attribute처럼 역할별로 나눠 정리해.
+- 행렬 곱 순서, 좌표계, local/global 기준처럼 결과를 바꾸는 조건은 반드시 별도 bullet로 강조해.
+- 연습문제와 과제는 요구사항, 위치값, 금지 조건, 제출일, 파일명 등 원문 조건을 빠뜨리지 말고 정확히 적어.
+- 과제가 자료에 있으면 '## 5. 연습문제/과제'에 반드시 포함하고, 자료에 없으면 '과제: 자료에서 확인되지 않음'이라고 적어.""",
     "MINDMAP": """강의자료의 핵심 구조를 JSON으로만 출력해. 공통 기준은 무시하고 아래 형식만 따라.
 
 출력 형식 (순수 JSON만, 코드 블록·설명 없이):
@@ -123,9 +161,17 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 4. 원문에 없는 내용을 추가하지 마.
 5. 시험 직전 복습에 바로 쓸 수 있게 정리해.
 6. 화면 가독성을 위해 핵심 용어는 **굵게** 표시하고, 세부 내용은 bullet point로 정리해.
+7. 코드, 수식, 파일명, 날짜, 숫자, 좌표, 함수명, 변수명은 가능한 한 원문 그대로 보존해.
+8. 자료에서 글자가 흐리거나 내용이 불확실하면 추측하지 말고 **[확인 필요]**라고 표시해.
+9. PDF 변환 결과에 코드가 일부 누락된 것처럼 보이면, 보이는 정보만 정리하고 누락 가능성을 **[확인 필요]**로 남겨.
 
 [강의자료]
 {markdown}
+
+최종 출력 점검:
+- {template_label} 템플릿 지시와 공통 기준만 따라 작성해.
+- 템플릿 지시에서 허용한 최상위 Markdown 제목 외에는 새 최상위 제목을 만들지 마.
+- 자료 앞뒤에 붙은 앱 UI 문구, 이전 요약 형식, 예시 제목을 출력에 섞지 마.
 """
 
 
@@ -322,6 +368,125 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
 
 
 SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
+SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
+MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
+
+def _image_data_url(image_bytes: bytes, mime_type: str = "image/png") -> str:
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def _render_pdf_pages_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
+    try:
+        import fitz
+    except ImportError as e:
+        raise RuntimeError("PDF 이미지 분석을 위해 PyMuPDF가 필요합니다.") from e
+
+    pages: list[dict[str, str]] = []
+    scale = PDF_VISUAL_RENDER_DPI / 72
+    matrix = fitz.Matrix(scale, scale)
+
+    with fitz.open(file_path) as doc:
+        page_count = min(len(doc), VISUAL_ANALYSIS_MAX_ITEMS)
+        for index in range(page_count):
+            page = doc.load_page(index)
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            pages.append({
+                "label": f"PDF {index + 1}페이지",
+                "data_url": _image_data_url(pixmap.tobytes("png")),
+            })
+
+    return pages
+
+
+def _extract_pptx_images_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
+    images: list[dict[str, str]] = []
+    with zipfile.ZipFile(file_path) as archive:
+        media_names = [
+            name for name in archive.namelist()
+            if name.startswith("ppt/media/")
+            and Path(name).suffix.lower() in PPTX_IMAGE_EXTENSIONS
+        ]
+        for index, name in enumerate(media_names[:VISUAL_ANALYSIS_MAX_ITEMS]):
+            suffix = Path(name).suffix.lower()
+            mime_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
+            images.append({
+                "label": f"PPTX 삽입 이미지 {index + 1}",
+                "data_url": _image_data_url(archive.read(name), mime_type),
+            })
+    return images
+
+
+def _collect_visual_inputs(file_path: str, suffix: str) -> list[dict[str, str]]:
+    if suffix == ".pdf":
+        return _render_pdf_pages_for_visual_analysis(file_path)
+    if suffix == ".pptx":
+        return _extract_pptx_images_for_visual_analysis(file_path)
+    return []
+
+
+def _visual_batches(items: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+    return [
+        items[index:index + VISUAL_ANALYSIS_BATCH_SIZE]
+        for index in range(0, len(items), VISUAL_ANALYSIS_BATCH_SIZE)
+    ]
+
+
+def _analyze_document_visuals(file_path: str, suffix: str) -> str:
+    visual_inputs = _collect_visual_inputs(file_path, suffix)
+    if not visual_inputs:
+        return ""
+
+    model = os.getenv("VISUAL_ANALYSIS_MODEL", "GPT")
+
+    if model == "GPT" and not os.getenv("OPENAI_API_KEY"):
+        return ""
+    if model == "Gemini" and not os.getenv("GEMINI_API_KEY"):
+        return ""
+
+    llm = build_llm(model)
+    sections: list[str] = []
+
+    for batch in _visual_batches(visual_inputs):
+        content: list[dict[str, object]] = [{
+            "type": "text",
+            "text": (
+                "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
+                "반드시 각 항목을 '## 라벨' 제목으로 시작하고, 이미지 순서대로 작성해. "
+                "분석 대상: " + ", ".join(item["label"] for item in batch)
+            ),
+        }]
+        for item in batch:
+            content.extend([
+                {
+                    "type": "text",
+                    "text": f"[{item['label']}]",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": item["data_url"]},
+                },
+            ])
+
+        response = llm.invoke([
+            SystemMessage(content="""너는 강의자료 이미지와 손글씨를 Markdown으로 전사하는 OCR 보조 분석기다.
+규칙:
+- 이미지 안의 인쇄 텍스트, 도표 텍스트, 손글씨를 최대한 읽어 Markdown bullet로 정리한다.
+- 수식, 표, 화살표 관계, 도식의 의미도 강의 요약/퀴즈 생성에 쓸 수 있게 설명한다.
+- 확실하지 않은 글자는 추측하지 말고 '[불확실]'로 표시한다.
+- 이미지에 유의미한 학습 내용이 없으면 '유의미한 학습 내용 없음'이라고만 답한다.
+- 여러 이미지가 들어오면 이미지별로 반드시 별도 섹션을 만든다.
+- 한국어로 답한다."""),
+            HumanMessage(content=content),
+        ])
+        text = _message_content_to_text(response.content).strip()
+        if text and text != "유의미한 학습 내용 없음":
+            sections.append(text)
+
+    if not sections:
+        return ""
+
+    return "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
 
 
 @app.post("/convert")
@@ -338,12 +503,87 @@ async def convert_document_to_markdown(
         tmp_path = tmp.name
 
     try:
+        # 1단계: markitdown으로 텍스트 레이어 추출
         result = await run_in_threadpool(md_converter.convert, tmp_path)
-        return {"markdown": result.text_content}
+        base_markdown = (result.text_content or "").strip()
+        visual_markdown = ""
+        try:
+            visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix)
+        except Exception as visual_error:
+            visual_markdown = f"# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석 실패: {str(visual_error)}"
+        markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
+        return {"markdown": "\n\n---\n\n".join(markdown_parts)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
     finally:
         os.unlink(tmp_path)
+
+
+@app.post("/vision/ocr")
+async def extract_text_with_google_vision(
+    file: UploadFile = File(...),
+    _user=Depends(require_api_user),
+):
+    if not GOOGLE_VISION_API_KEY:
+        raise HTTPException(status_code=503, detail="서버에 GOOGLE_VISION_API_KEY가 설정되지 않았습니다.")
+
+    content_type = (file.content_type or "").lower()
+    if content_type not in SUPPORTED_OCR_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="이미지 OCR은 JPG, PNG, WEBP, GIF, BMP, TIFF 파일만 지원합니다.")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="이미지 파일이 비어 있습니다.")
+    if len(image_bytes) > MAX_OCR_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="이미지 파일은 10MB 이하만 OCR할 수 있습니다.")
+
+    payload = {
+        "requests": [
+            {
+                "image": {"content": base64.b64encode(image_bytes).decode("ascii")},
+                "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
+                "imageContext": {"languageHints": ["ko", "en"]},
+            }
+        ]
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                "https://vision.googleapis.com/v1/images:annotate",
+                params={"key": GOOGLE_VISION_API_KEY},
+                json=payload,
+            )
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=503, detail=f"Google Vision API 호출 실패: {str(e)}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail="Google Vision API 응답을 읽을 수 없습니다.") from e
+
+    if response.status_code >= 400:
+        error = data.get("error") if isinstance(data, dict) else None
+        message = error.get("message") if isinstance(error, dict) else response.text
+        raise HTTPException(status_code=response.status_code, detail=f"Google Vision OCR 실패: {message}")
+
+    result = (data.get("responses") or [{}])[0]
+    if isinstance(result, dict) and result.get("error"):
+        error = result["error"]
+        message = error.get("message") if isinstance(error, dict) else "OCR 처리 중 오류가 발생했습니다."
+        raise HTTPException(status_code=502, detail=f"Google Vision OCR 실패: {message}")
+
+    text = ""
+    if isinstance(result, dict):
+        full_text = result.get("fullTextAnnotation")
+        if isinstance(full_text, dict) and isinstance(full_text.get("text"), str):
+            text = full_text["text"].strip()
+        elif isinstance(result.get("textAnnotations"), list) and result["textAnnotations"]:
+            first_annotation = result["textAnnotations"][0]
+            if isinstance(first_annotation, dict) and isinstance(first_annotation.get("description"), str):
+                text = first_annotation["description"].strip()
+
+    return {"text": text}
 
 
 @app.post("/summarize")
