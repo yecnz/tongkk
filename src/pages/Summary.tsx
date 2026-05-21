@@ -7,6 +7,7 @@ import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
+import { extractTextWithGoogleVision } from "../services/visionOcr";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   loadSummaryChatMessages,
@@ -46,7 +47,7 @@ type LocationState = {
 } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; resetTutorHistory?: boolean; onGoToQuiz?: () => void };
 type MaterialDetailViewProps = { material: CourseMaterial; onBack: () => void; onGoSummary: () => void; onGoQuiz: () => void };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
@@ -100,16 +101,28 @@ const getFileType = (name: string): FileKind => {
   const ext = (name.split(".").pop() || "").toLowerCase();
   if (ext === "pdf") return "pdf";
   if (["ppt", "pptx"].includes(ext)) return "ppt";
-  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "img";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff"].includes(ext)) return "img";
   return "file";
 };
 
 const isSupportedDocumentFile = (file: File) =>
-  ["pdf", "ppt", "pptx"].includes((file.name.split(".").pop() || "").toLowerCase());
+  ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
+
+const extractMarkdownFromMaterialFile = (file: File) =>
+  getFileType(file.name) === "img" ? extractTextWithGoogleVision(file) : extractMarkdownFromPDF(file);
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
+
+const isPageReload = () => {
+  if (typeof window === "undefined") return false;
+  const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+  if (navigationEntry?.type === "reload") return true;
+  const legacyNavigation = window.performance as Performance & { navigation?: { type: number; TYPE_RELOAD: number } };
+  return legacyNavigation.navigation?.type === legacyNavigation.navigation?.TYPE_RELOAD;
+};
+
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
     title: "일반 요약",
@@ -483,7 +496,7 @@ const parseAiSuggestions = (content: string): { mainContent: string; suggestions
   };
 };
 
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, resetTutorHistory = false, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -523,7 +536,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     setAgentError("");
     setChatLoading(false);
 
-    if (!summaryId) {
+    if (!summaryId || resetTutorHistory) {
       setAgentMessages([]);
       return () => {
         ignore = true;
@@ -548,7 +561,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     return () => {
       ignore = true;
     };
-  }, [summaryId, threadId, displayContent]);
+  }, [summaryId, threadId, displayContent, resetTutorHistory]);
 
   useEffect(() => {
     if (skipNextScrollRef.current) { skipNextScrollRef.current = false; return; }
@@ -1271,10 +1284,12 @@ export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state as LocationState) || null;
+  const isReloadNavigationRef = useRef(isPageReload());
+  const shouldRestoreLocationView = !isReloadNavigationRef.current;
   const initialCourse = (locationState?.selectedCourse || "").trim();
   const fromDashboardRef = useRef(Boolean(initialCourse && locationState?.fromDashboard));
-  const pendingMaterialIdRef = useRef(locationState?.viewMaterial ? locationState.materialId || "" : "");
-  const pendingSummaryRef = useRef(locationState?.openSummary ? {
+  const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialId || "" : "");
+  const pendingSummaryRef = useRef(shouldRestoreLocationView && locationState?.openSummary ? {
     id: locationState.summaryId || "",
     template: locationState.summaryTemplate,
     materialIds: locationState.materialIds || [],
@@ -1311,6 +1326,14 @@ export default function Summary() {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
+
+  useEffect(() => {
+    if (!locationState?.openSummary && !locationState?.viewMaterial) return;
+    navigate(pageRoutes["자료 요약"], {
+      replace: true,
+      state: initialCourse ? { selectedCourse: initialCourse, fromDashboard: locationState.fromDashboard } : null,
+    });
+  }, []);
 
   useEffect(() => {
     if (!selectedCourse) return;
@@ -1520,7 +1543,7 @@ export default function Summary() {
     try {
       for (const documentFile of newFiles) {
         try {
-          const markdown = await extractMarkdownFromPDF(documentFile);
+          const markdown = await extractMarkdownFromMaterialFile(documentFile);
           const uploadedMaterial = nf.find(f => f.rawFile === documentFile) || nf.find(f => f.name === documentFile.name);
           if (uploadedMaterial) {
             const baseMaterial: CourseMaterial = {
@@ -1585,25 +1608,6 @@ export default function Summary() {
     setSummaryError("");
 
     if (selectedMarkdown) {
-      if (selectedCourse) {
-        const savedSummary = (await loadSummariesFromServer(selectedCourse)).find(s =>
-          s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)
-        );
-
-        if (savedSummary) {
-          setSummaryText(savedSummary.content);
-          setActiveSummaryId(savedSummary.id || null);
-          setIsSummarizing(false);
-          setView("summaryResult");
-          setSummaryError("");
-          setElapsedTime(null);
-          setLoadingStep("");
-          setAgentThreadId("");
-          setResultBackView("templates");
-          return;
-        }
-      }
-
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
@@ -1791,6 +1795,7 @@ export default function Summary() {
             threadId={agentThreadId}
             summaryId={activeSummaryId}
             agentContext={selectedMarkdown || summaryText}
+            resetTutorHistory={isReloadNavigationRef.current}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
           />
         )}
@@ -1828,9 +1833,9 @@ export default function Summary() {
                     transition: "all 0.2s", marginBottom: 20
                   }}
                 >
-                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx"
+                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
                     onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
-                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT 파일을 드래그하거나</p>
+                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
                   <button style={{
                     marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
                     background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"

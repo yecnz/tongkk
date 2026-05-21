@@ -13,6 +13,7 @@ import {
 } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
+import { extractTextWithGoogleVision } from "../services/visionOcr";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, saveQuizSetToServer, type SavedQuizSet } from "../services/quizSets";
 import {
@@ -50,10 +51,17 @@ const sourceLabels: Record<string, string> = {
 };
 
 const isSupportedDocumentFile = (file: File) =>
-  ["pdf", "ppt", "pptx"].includes((file.name.split(".").pop() || "").toLowerCase());
+  ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
 const getDocumentMaterialType = (file: File): CourseMaterial["type"] =>
-  file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "ppt";
+  file.name.toLowerCase().endsWith(".pdf")
+    ? "pdf"
+    : ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase())
+      ? "img"
+      : "ppt";
+
+const extractMarkdownFromMaterialFile = (file: File) =>
+  getDocumentMaterialType(file) === "img" ? extractTextWithGoogleVision(file) : extractMarkdownFromPDF(file);
 
 const formatFileNames = (files: Pick<File, "name">[]) =>
   files.length <= 2 ? files.map(file => file.name).join(", ") : `${files[0].name} 외 ${files.length - 1}개`;
@@ -366,7 +374,7 @@ export default function Quiz() {
 
     const supportedFiles = Array.from(fileList).filter(isSupportedDocumentFile);
     if (supportedFiles.length === 0) {
-      setMaterialNotice("PDF, PPT, PPTX 파일만 업로드할 수 있습니다.");
+      setMaterialNotice("PDF, PPT, PPTX, 이미지 파일만 업로드할 수 있습니다.");
       setUploadedFileName("");
       setExtractError("");
       return;
@@ -431,7 +439,7 @@ export default function Quiz() {
       for (const file of newFiles) {
         try {
           const [markdown, pageCount] = await Promise.all([
-            extractMarkdownFromPDF(file),
+            extractMarkdownFromMaterialFile(file),
             getDocumentMaterialType(file) === "pdf" ? getPdfPageCount(file) : Promise.resolve(null),
           ]);
           const baseMaterial: CourseMaterial = {
@@ -854,7 +862,7 @@ export default function Quiz() {
           <Card style={{ padding: 24, marginBottom: 16 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#222" }}>강의자료</h3>
 
-            <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx"
+            <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
               onChange={e => { handleFiles(e.target.files); e.target.value = ""; }}
               style={{ display: "none" }} />
 
@@ -871,7 +879,7 @@ export default function Quiz() {
                 padding: "12px 16px", borderRadius: 10, background: "#fafafa",
                 fontSize: 13, color: "#aaa", marginBottom: 14
               }}>
-                저장된 자료가 없습니다. PDF를 업로드하거나 과목명으로만 퀴즈를 생성할 수 있습니다.
+                저장된 자료가 없습니다. PDF나 이미지를 업로드하거나 과목명으로만 퀴즈를 생성할 수 있습니다.
               </div>
             )}
 
