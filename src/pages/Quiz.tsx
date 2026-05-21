@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useCourses } from "../CourseContext";
 import {
   generateQuiz,
@@ -762,11 +762,11 @@ export default function Quiz() {
   // ── 과목 카드 리스트 ──
   if (view === "courseList") {
     return (
-      <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 12 }}>
             <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
             <p style={{ margin: 0, fontSize: 13, color: "#999" }}>퀴즈를 만들 과목을 선택하세요</p>
           </div>
@@ -779,7 +779,7 @@ export default function Quiz() {
                     onClick={() => handleCourseSelect(c)}
                     style={{
                       minHeight: 170, padding: 22, borderRadius: 14, border: "1px solid #eeeeee",
-                      background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", color: "#222",
+                      background: CARD_BACKGROUND, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", color: "#222",
                       cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column",
                       justifyContent: "space-between", transition: "border 0.15s, box-shadow 0.15s",
                     }}
@@ -807,7 +807,7 @@ export default function Quiz() {
   if (view === "courseDetail") {
     const canGenerate = !isExtracting;
     return (
-      <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
@@ -900,13 +900,14 @@ export default function Quiz() {
                     <div key={material.id} style={{
                       display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, alignItems: "center",
                       padding: "12px 14px", borderRadius: 10, marginBottom: 8,
-                      background: isSelected ? "#F0FDFF" : "#fafafa",
-                      border: isSelected ? `1px solid ${CYAN}` : "1px solid transparent",
+                      background: isSelected ? "#f8fbff" : MUTED_SURFACE,
+                      border: isSelected ? "1px solid #cfd8e6" : `1px solid ${BORDER_COLOR}`,
                     }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, cursor: "pointer" }}>
                         <input
                           type="checkbox"
                           checked={isSelected}
+                          style={{ accentColor: PINK }}
                           onChange={e => {
                             setSelectedMaterialIds(prev =>
                               e.target.checked
@@ -932,8 +933,8 @@ export default function Quiz() {
                               disabled={!isSelected}
                               onClick={() => setMaterialSources(prev => ({ ...prev, [material.id]: option.value }))}
                               style={{
-                                border: isActiveSource ? `1px solid ${PINK}` : "1px solid #eeeeee",
-                                background: isActiveSource ? "#FFF0F6" : "#fff",
+                                border: isActiveSource ? "1px solid rgba(240, 112, 174, 0.24)" : `1px solid ${BORDER_COLOR}`,
+                                background: isActiveSource ? "rgba(240, 112, 174, 0.07)" : CARD_BACKGROUND,
                                 color: isActiveSource ? PINK : "#777",
                                 borderRadius: 999,
                                 padding: "6px 10px",
@@ -941,7 +942,7 @@ export default function Quiz() {
                                 fontWeight: 700,
                                 lineHeight: 1,
                                 cursor: isSelected ? "pointer" : "not-allowed",
-                                boxShadow: isActiveSource ? "0 2px 8px rgba(240, 112, 174, 0.12)" : "none",
+                                boxShadow: "none",
                               }}
                             >
                               {option.label}
@@ -961,9 +962,9 @@ export default function Quiz() {
               onDrop={handleDrop}
               onClick={() => fileRef.current?.click()}
               style={{
-                border: `2px dashed ${dragOver ? CYAN : "#ddd"}`,
+                border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
                 borderRadius: 12, padding: "28px 20px", textAlign: "center",
-                cursor: "pointer", background: dragOver ? "#F0FDFF" : "#fafafa",
+                cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
                 transition: "all 0.2s", marginBottom: 12
               }}
             >
@@ -1087,7 +1088,7 @@ export default function Quiz() {
   if (view === "generating") {
     const sourceName = selectedMaterials.length > 0 ? `자료별 소스 ${selectedMaterials.length}개` : null;
     return (
-      <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 48, height: 48, border: "3px solid #f0f0f0", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
           <p style={{ fontSize: 16, fontWeight: 600, color: "#333" }}>AI가 퀴즈를 생성하고 있습니다...</p>
@@ -1108,7 +1109,7 @@ export default function Quiz() {
   if (view === "result") {
     const nextDifficulty: QuizDifficulty = scorePercent >= 80 ? "어려움" : scorePercent >= 55 ? "보통" : "쉬움";
     return (
-      <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 680, margin: "40px auto", textAlign: "center" }}>
@@ -1212,7 +1213,7 @@ export default function Quiz() {
   const subjectiveGrade = subjectiveGrades[current];
   if (!q) {
     return (
-      <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 600, margin: "40px auto" }}>
@@ -1228,7 +1229,7 @@ export default function Quiz() {
     );
   }
   return (
-    <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
       <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={

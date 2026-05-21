@@ -177,7 +177,7 @@ export async function summarizeWithTemplate(
   template: SummaryTemplate,
 ): Promise<SummaryResponse> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 130_000);
+  const timeoutId = setTimeout(() => controller.abort(), 95_000);
 
   try {
     const response = await fetch(`${BACKEND_URL}/summarize`, {
@@ -195,7 +195,7 @@ export async function summarizeWithTemplate(
     return { result: data.result, threadId: data.thread_id || data.threadId || '' };
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('요약 요청 시간 초과. 다시 시도해주세요.');
+      throw new Error('요약 요청 시간 초과. Cloudflare 터널에서는 긴 요약 요청이 끊길 수 있어 페이지 수를 줄여 다시 시도해주세요.');
     }
     throw err;
   } finally {
