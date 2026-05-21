@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { PINK, CYAN, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
@@ -497,7 +497,12 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const tutorSectionRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
+
+  useEffect(() => {
+    tutorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
   const canUseAgent = Boolean(displayContent.trim());
 
   const scrollToBottom = () => {
@@ -541,7 +546,10 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
         }
       })
       .finally(() => {
-        if (!ignore) setChatLoading(false);
+        if (!ignore) {
+          setChatLoading(false);
+          requestAnimationFrame(() => scrollToBottom());
+        }
       });
 
     return () => {
@@ -847,7 +855,7 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
               )}
             </div>
 
-            <div style={{
+            <div ref={tutorSectionRef} style={{
               border: "1px solid #f0f0f0",
               borderRadius: 12,
               padding: 18,
@@ -1650,7 +1658,7 @@ export default function Summary() {
   };
 
   return (
-    <div style={{ background: "#fff", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
       {duplicateNotice && (
@@ -1743,7 +1751,7 @@ export default function Summary() {
                       padding: 22,
                       borderRadius: 14,
                       border: "1px solid #eeeeee",
-                      background: "#fff",
+                      background: CARD_BACKGROUND,
                       boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                       color: "#222",
                       cursor: "pointer",
@@ -1818,9 +1826,9 @@ export default function Summary() {
                   onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
                   onClick={() => fileRef.current?.click()}
                   style={{
-                    border: `2px dashed ${dragOver ? CYAN : "#ddd"}`,
+                    border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
                     borderRadius: 14, padding: "40px 20px", textAlign: "center",
-                    cursor: "pointer", background: dragOver ? "#F0FDFF" : "#fafafa",
+                    cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
                     transition: "all 0.2s", marginBottom: 20
                   }}
                 >
@@ -1871,23 +1879,28 @@ export default function Summary() {
                     {materials.map(material => {
                       const isSelected = selectedMaterialIds.includes(material.id);
                       return (
-                      <div key={material.id} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
-                        background: isSelected ? "#F0FDFF" : "#fafafa",
-                        border: isSelected ? `1px solid ${CYAN}` : "1px solid transparent",
-                        borderRadius: 10, marginBottom: 8
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={e => {
-                            setSelectedMaterialIds(prev =>
-                              e.target.checked
-                                ? [...prev, material.id]
-                                : prev.filter(id => id !== material.id)
-                            );
-                          }}
-                        />
+                      <div
+                        key={material.id}
+                        onClick={() => setSelectedMaterialIds(prev =>
+                          prev.includes(material.id)
+                            ? prev.filter(id => id !== material.id)
+                            : [...prev, material.id]
+                        )}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
+                          background: isSelected ? "#fff7fa" : MUTED_SURFACE,
+                          border: isSelected ? `1.5px solid ${PINK}44` : `1px solid ${BORDER_COLOR}`,
+                          borderRadius: 10, marginBottom: 8, cursor: "pointer",
+                        }}>
+                        <div style={{
+                          width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+                          background: isSelected ? PINK : "transparent",
+                          border: isSelected ? `2px solid ${PINK}` : "2px solid #ccc",
+                          transition: "all 0.15s",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {isSelected && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1, fontWeight: 800 }}>✓</span>}
+                        </div>
                         <FileIcon type={material.type} />
                         <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#333" }}>{material.name}</span>
                         <span style={{ fontSize: 12, color: "#aaa" }}>
@@ -1895,15 +1908,15 @@ export default function Summary() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleDeleteMaterial(material)}
+                          onClick={e => { e.stopPropagation(); handleDeleteMaterial(material); }}
                           aria-label={`${material.name} 삭제`}
                           title="삭제"
                           style={{
                             width: 26,
                             height: 26,
                             borderRadius: 8,
-                            border: "1px solid #eeeeee",
-                            background: "#fff",
+                            border: `1px solid ${BORDER_COLOR}`,
+                            background: CARD_BACKGROUND,
                             color: "#bbb",
                             cursor: "pointer",
                             fontSize: 16,
@@ -1938,7 +1951,7 @@ export default function Summary() {
                       color: selectedMarkdown && !isExtracting ? PINK : "#aaa",
                       fontSize: 14, fontWeight: 800,
                       cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
-                      textAlign: "center", lineHeight: 1.4
+                      textAlign: "center", lineHeight: 1.4,
                     }}>요약<br/>새로 생성</button>
                     <button onClick={handleGoToQuiz} disabled={!selectedMarkdown || isExtracting} style={{
                       padding: "18px 14px", borderRadius: 12, border: "none",
@@ -1946,7 +1959,7 @@ export default function Summary() {
                       color: selectedMarkdown && !isExtracting ? CYAN : "#aaa",
                       fontSize: 14, fontWeight: 800,
                       cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
-                      textAlign: "center", lineHeight: 1.4
+                      textAlign: "center", lineHeight: 1.4,
                     }}>퀴즈<br/>새로 생성</button>
                   </div>
                 </Card>
