@@ -107,9 +107,6 @@ const inferWeakTopic = (question: string) => {
 const uniqueWeakTopics = (questions: QuizQuestion[]) =>
   Array.from(new Set(questions.map(question => inferWeakTopic(question.question)))).slice(0, 4);
 
-const youtubeSearchUrl = (course: string, topic: string) =>
-  `https://www.youtube.com/results?search_query=${encodeURIComponent(`${course} ${topic} 개념 설명`)}`;
-
 const normalizeAnswer = (value: string) =>
   value.toLowerCase().replace(/\s+/g, "").replace(/[.,:;!?()[\]{}'"`]/g, "");
 
@@ -345,19 +342,6 @@ export default function Quiz() {
   const handleCourseSelect = (course: string) => {
     setSelectedCourse(course);
     setView("courseDetail");
-  };
-
-  const resetCourseSelection = () => {
-    setSelectedCourse("");
-    setView("courseList");
-    setError(null);
-    setOpenedQuizTitle("");
-    setActiveQuizSetId(null);
-    setSubjectiveGrades({});
-    setRemainingSeconds(null);
-    setQuizStartedAt(null);
-    setTimedOut(false);
-    setAttemptSaveNotice("");
   };
 
   const handleCourseBack = () => {
@@ -1110,22 +1094,52 @@ export default function Quiz() {
   // ── 결과 ──
   if (view === "result") {
     const nextDifficulty: QuizDifficulty = scorePercent >= 80 ? "어려움" : scorePercent >= 55 ? "보통" : "쉬움";
-    const goToSummary = (tutorQuestion?: string) => {
+    const reviewMaterials = selectedMaterials.length > 0
+      ? selectedMaterials
+      : materials.filter(material => selectedMaterialIds.includes(material.id));
+    const primaryReviewMaterial = reviewMaterials[0] || materials[0];
+    const primaryWeakTopic = resultWeakTopics[0] || "틀린 문제";
+    const makeTutorQuestion = (topic: string) => `${topic} 부분을 요약 기준으로 다시 설명해줘`;
+    const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
+      const materialId = options?.materialId || primaryReviewMaterial?.id;
+      if (!materialId) {
+        navigate(pageRoutes["자료 요약"], {
+          state: { selectedCourse, fromDashboard: fromDashboardRef.current },
+        });
+        return;
+      }
+
       navigate(pageRoutes["자료 요약"], {
         state: {
           selectedCourse,
-          openSummary: true,
+          viewMaterial: true,
+          materialId,
           materialIds: selectedMaterialIds,
+          materialDetailTab: "summary",
           fromDashboard: fromDashboardRef.current,
-          tutorQuestion,
+          tutorQuestion: options?.tutorQuestion,
         },
       });
+    };
+    const retryQuiz = () => {
+      setCurrent(0);
+      setAnswers({});
+      setSubjectiveGrades({});
+      setShortAnswerInput("");
+      setShowExplanation(false);
+      setRemainingSeconds(examMode ? examMinutes * 60 : null);
+      setQuizStartedAt(Date.now());
+      setTimedOut(false);
+      setAttemptSavedKey("");
+      setAttemptSaveNotice("");
+      setDifficulty(nextDifficulty);
+      setView("quiz");
     };
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
-        <div style={{ padding: 24, maxWidth: 680, margin: "40px auto", textAlign: "center" }}>
+        <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
           <Card style={{ padding: 40 }}>
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
@@ -1158,50 +1172,39 @@ export default function Quiz() {
               {resultWeakTopics.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {resultWeakTopics.map(topic => (
-                    <div key={topic} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>약점 후보: <strong>{topic}</strong></span>
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: "flex",
-                          gap: 6,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => goToSummary(`${topic} 부분을 요약 기준으로 다시 설명해줘`)}
-                          style={{
-                            padding: "7px 10px",
-                            borderRadius: 9,
-                            background: "#FFF0F6",
-                            border: "1px solid #f3c3da",
-                            color: PINK,
-                            fontSize: 12,
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
-                        >
-                          튜터 질문
-                        </button>
-                        <a
-                          href={youtubeSearchUrl(selectedCourse, topic)}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            padding: "7px 10px",
-                            borderRadius: 9,
-                            background: "#fff",
-                            border: "1px solid #e8e8e8",
-                            color: CYAN,
-                            fontSize: 12,
-                            fontWeight: 800,
-                            textDecoration: "none",
-                          }}
-                        >
-                          영상 찾기
-                        </a>
-                      </div>
-                    </div>
+                    <button
+                      key={topic}
+                      type="button"
+                      onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(topic) })}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid #E8FAFE",
+                        background: "#fff",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ minWidth: 0, fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+                        약점 후보: <strong>{topic}</strong>
+                      </span>
+                      <span style={{
+                        flexShrink: 0,
+                        padding: "7px 10px",
+                        borderRadius: 9,
+                        background: "#FFF0F6",
+                        color: PINK,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}>
+                        요약과 튜터로 보기
+                      </span>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -1211,29 +1214,59 @@ export default function Quiz() {
               )}
             </div>
 
+            {reviewMaterials.length > 1 && (
+              <div style={{
+                margin: "0 0 24px",
+                padding: 18,
+                borderRadius: 14,
+                background: "#fff",
+                border: `1px solid ${BORDER_COLOR}`,
+                textAlign: "left",
+              }}>
+                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "#222" }}>
+                  이 퀴즈에 사용한 자료
+                </h3>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {reviewMaterials.map(material => (
+                    <button
+                      key={material.id}
+                      type="button"
+                      onClick={() => goToMaterialReview({ materialId: material.id })}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: `1px solid ${BORDER_COLOR}`,
+                        background: "#fafafa",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ minWidth: 0, color: "#444", fontSize: 13, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {material.name}
+                      </span>
+                      <span style={{ flexShrink: 0, color: CYAN, fontSize: 12, fontWeight: 850 }}>
+                        요약 탭 열기
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={() => goToSummary()} style={{
+              <button onClick={() => goToMaterialReview()} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid #f3c3da",
                 background: "#FFF0F6", fontSize: 14, fontWeight: 700, cursor: "pointer", color: PINK
-              }}>요약 다시 보기</button>
-              <button onClick={resetCourseSelection} style={{
+              }}>약점 요약 보기</button>
+              <button onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(primaryWeakTopic) })} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid #e0e0e0",
-                background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#555"
-              }}>새 퀴즈</button>
-              <button onClick={() => {
-                setCurrent(0);
-                setAnswers({});
-                setSubjectiveGrades({});
-                setShortAnswerInput("");
-                setShowExplanation(false);
-                setRemainingSeconds(examMode ? examMinutes * 60 : null);
-                setQuizStartedAt(Date.now());
-                setTimedOut(false);
-                setAttemptSavedKey("");
-                setAttemptSaveNotice("");
-                setDifficulty(nextDifficulty);
-                setView("quiz");
-              }} style={{
+                background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "#555"
+              }}>AI 튜터로 복습</button>
+              <button onClick={retryQuiz} style={{
                 padding: "12px 24px", borderRadius: 12, border: "none",
                 background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#fff"
               }}>다시 풀기</button>

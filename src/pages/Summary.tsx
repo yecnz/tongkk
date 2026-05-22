@@ -32,6 +32,7 @@ import { AITutorDrawer } from "../components/AITutorDrawer";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
+type MaterialDetailTab = "original" | "summary" | "quiz";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
@@ -47,6 +48,7 @@ type LocationState = {
   materialIds?: string[];
   openSummary?: boolean;
   tutorQuestion?: string;
+  materialDetailTab?: MaterialDetailTab;
 } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
@@ -59,6 +61,10 @@ type MaterialDetailViewProps = {
   onGoQuiz: () => void;
   onOpenSummary: (summary: SavedSummary) => void;
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
+  initialTab?: MaterialDetailTab;
+  initialTutorQuestion?: string;
+  relatedMaterials?: CourseMaterial[];
+  onSelectRelatedMaterial?: (material: CourseMaterial) => void;
 };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
@@ -723,8 +729,20 @@ const formatHubDate = (timestamp?: number) => {
 
 const LOW_QUIZ_SCORE_THRESHOLD = 70;
 
-const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onGoQuiz, onOpenSummary, onOpenQuiz }: MaterialDetailViewProps) => {
-  const [activeTab, setActiveTab] = useState<"original" | "summary" | "quiz">("original");
+const MaterialDetailView = ({
+  material,
+  selectedCourse,
+  onBack,
+  onGoSummary,
+  onGoQuiz,
+  onOpenSummary,
+  onOpenQuiz,
+  initialTab = "original",
+  initialTutorQuestion = "",
+  relatedMaterials = [],
+  onSelectRelatedMaterial,
+}: MaterialDetailViewProps) => {
+  const [activeTab, setActiveTab] = useState<MaterialDetailTab>(initialTab);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState("");
@@ -734,7 +752,7 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
   const [hubLoading, setHubLoading] = useState(false);
   const [hubError, setHubError] = useState("");
   const [activeSummaryId, setActiveSummaryId] = useState<string>("");
-  const [tutorPrompt, setTutorPrompt] = useState("");
+  const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
   const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
   const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
@@ -767,6 +785,11 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
       ignore = true;
     };
   }, [material]);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+    setTutorPrompt(initialTutorQuestion);
+  }, [material.id, initialTab, initialTutorQuestion]);
 
   useEffect(() => {
     let ignore = false;
@@ -930,7 +953,7 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
     };
   };
 
-  const tabButtonStyle = (tab: "original" | "summary" | "quiz"): CSSProperties => ({
+  const tabButtonStyle = (tab: MaterialDetailTab): CSSProperties => ({
     height: 42,
     borderRadius: 10,
     border: activeTab === tab ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
@@ -1053,6 +1076,47 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
           </div>
         </div>
         <div style={{ padding: 18, borderBottom: "1px solid #f0f0f0", background: "#fff" }}>
+          {relatedMaterials.length > 1 && (
+            <div style={{
+              marginBottom: 14,
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: `1px solid ${BORDER_COLOR}`,
+              background: "#fff",
+            }}>
+              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
+                이 퀴즈에 연결된 자료
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {relatedMaterials.map(related => {
+                  const isActive = related.id === material.id;
+                  return (
+                    <button
+                      key={related.id}
+                      type="button"
+                      onClick={() => onSelectRelatedMaterial?.(related)}
+                      style={{
+                        maxWidth: 280,
+                        padding: "7px 10px",
+                        borderRadius: 999,
+                        border: isActive ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                        background: isActive ? "#FFF0F6" : "#fafafa",
+                        color: isActive ? PINK : "#666",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: isActive ? "default" : "pointer",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {related.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div style={{
             display: "flex",
             flexWrap: "wrap",
@@ -1327,7 +1391,18 @@ export default function Summary() {
   const shouldRestoreLocationView = !isReloadNavigationRef.current;
   const initialCourse = (locationState?.selectedCourse || "").trim();
   const fromDashboardRef = useRef(Boolean(initialCourse && locationState?.fromDashboard));
-  const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialId || "" : "");
+  const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial
+    ? locationState.materialId || locationState.materialIds?.[0] || ""
+    : "");
+  const pendingMaterialDetailTabRef = useRef<MaterialDetailTab>(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialDetailTab || "original" : "original"
+  );
+  const pendingMaterialTutorQuestionRef = useRef(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.tutorQuestion || "" : "",
+  );
+  const pendingMaterialIdsRef = useRef<string[]>(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialIds || [] : [],
+  );
   const pendingSummaryRef = useRef(shouldRestoreLocationView && locationState?.openSummary ? {
     id: locationState.summaryId || "",
     template: locationState.summaryTemplate,
@@ -1359,6 +1434,8 @@ export default function Summary() {
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
+  const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
@@ -1400,8 +1477,14 @@ export default function Summary() {
           pendingMaterialIdRef.current = "";
           const material = nextMaterials.find(item => item.id === pendingMaterialId);
           if (material) {
+            const validMaterialIds = pendingMaterialIdsRef.current.filter(id => nextMaterials.some(item => item.id === id));
+            pendingMaterialIdsRef.current = [];
             setActiveMaterial(material);
-            setSelectedMaterialIds([material.id]);
+            setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : [material.id]);
+            setMaterialDetailInitialTab(pendingMaterialDetailTabRef.current);
+            setMaterialDetailTutorQuestion(pendingMaterialTutorQuestionRef.current);
+            pendingMaterialDetailTabRef.current = "original";
+            pendingMaterialTutorQuestionRef.current = "";
             setSearched(true);
             setView("materialDetail");
             return;
@@ -1759,6 +1842,8 @@ export default function Summary() {
   const handleCreateSummaryForMaterial = (material: CourseMaterial) => {
     setSelectedMaterialIds([material.id]);
     setSelectedTemplate(null);
+    setMaterialDetailInitialTab("original");
+    setMaterialDetailTutorQuestion("");
     setResultBackView("materialDetail");
     setView("templates");
   };
@@ -1789,6 +1874,12 @@ export default function Summary() {
     navigate(pageRoutes["퀴즈 생성"], {
       state: { course: selectedCourse, quizSetId: quizSet.id, openQuiz: true, fromDashboard: fromDashboardRef.current },
     });
+  };
+
+  const handleSelectRelatedMaterial = (material: CourseMaterial) => {
+    setActiveMaterial(material);
+    setMaterialDetailInitialTab("summary");
+    setMaterialDetailTutorQuestion("");
   };
 
   return (
@@ -1944,6 +2035,10 @@ export default function Summary() {
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
             onOpenSummary={handleOpenMaterialSummary}
             onOpenQuiz={handleOpenMaterialQuiz}
+            initialTab={materialDetailInitialTab}
+            initialTutorQuestion={materialDetailTutorQuestion}
+            relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
+            onSelectRelatedMaterial={handleSelectRelatedMaterial}
           />
         )}
 
@@ -2113,6 +2208,8 @@ export default function Summary() {
                             e.stopPropagation();
                             setActiveMaterial(material);
                             setSelectedMaterialIds([material.id]);
+                            setMaterialDetailInitialTab("original");
+                            setMaterialDetailTutorQuestion("");
                             setView("materialDetail");
                           }}
                           style={{
