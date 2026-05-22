@@ -4,14 +4,19 @@ import remarkGfm from "remark-gfm";
 import { PINK } from "../common";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
+  createSummaryChatSession,
+  createSummaryChatTitle,
+  loadSummaryChatSessions,
   loadSummaryChatMessages,
   saveSummaryChatMessage,
+  type SummaryChatSession,
 } from "../services/summaryChats";
 
 type AITutorDrawerProps = {
   contextTitle: string;
   contextMarkdown: string;
   summaryId?: string | null;
+  materialId?: string | null;
   threadId?: string;
   suggestedQuestions?: string[];
   initialQuestion?: string;
@@ -126,10 +131,19 @@ const parseAiSuggestions = (content: string): { mainContent: string; suggestions
   };
 };
 
+const formatSessionDate = (timestamp: number) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+
 export const AITutorDrawer = ({
   contextTitle,
   contextMarkdown,
   summaryId,
+  materialId,
   threadId = "",
   suggestedQuestions = [],
   initialQuestion,
@@ -140,6 +154,9 @@ export const AITutorDrawer = ({
   const [localThreadId, setLocalThreadId] = useState(threadId);
   const [agentInput, setAgentInput] = useState("");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<SummaryChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -148,6 +165,8 @@ export const AITutorDrawer = ({
   const skipNextScrollRef = useRef(false);
   const initialQuestionRef = useRef("");
   const canUseAgent = Boolean(contextMarkdown.trim());
+  const canPersistChat = Boolean(summaryId || materialId);
+  const chatTarget = { summaryId, materialId };
 
   const scrollToBottom = () => {
     const el = chatContainerRef.current;
@@ -165,19 +184,32 @@ export const AITutorDrawer = ({
     setLocalThreadId(threadId);
     setAgentInput("");
     setAgentError("");
-    setChatLoading(false);
+    setActiveSessionId(null);
+    setAgentMessages([]);
+    setChatSessions([]);
 
-    if (!summaryId || resetHistory) {
-      setAgentMessages([]);
+    if (!canPersistChat || resetHistory) {
+      setChatLoading(false);
       return () => {
         ignore = true;
       };
     }
 
     setChatLoading(true);
-    loadSummaryChatMessages(summaryId)
-      .then(messages => {
-        if (!ignore) setAgentMessages(messages);
+    loadSummaryChatSessions({ summaryId, materialId })
+      .then(sessions => {
+        if (ignore) return;
+        setChatSessions(sessions);
+        const firstSession = sessions[0];
+        if (!firstSession) {
+          setChatLoading(false);
+          return;
+        }
+
+        setActiveSessionId(firstSession.id);
+        return loadSummaryChatMessages(firstSession.id).then(messages => {
+          if (!ignore) setAgentMessages(messages);
+        });
       })
       .catch(err => {
         if (!ignore) {
@@ -195,7 +227,7 @@ export const AITutorDrawer = ({
     return () => {
       ignore = true;
     };
-  }, [summaryId, threadId, contextMarkdown, resetHistory]);
+  }, [summaryId, materialId, threadId, contextMarkdown, resetHistory, canPersistChat]);
 
   useEffect(() => {
     if (skipNextScrollRef.current) {
@@ -219,6 +251,37 @@ export const AITutorDrawer = ({
     setAgentInput(question);
   }, [initialQuestion, canUseAgent]);
 
+  const startNewConversation = () => {
+    setActiveSessionId(null);
+    setAgentMessages([]);
+    setLocalThreadId("");
+    setAgentInput("");
+    setAgentError("");
+    setShowScrollBtn(false);
+  };
+
+  const openChatSession = async (sessionId: string) => {
+    if (sessionId === activeSessionId || chatLoading || agentLoading) return;
+
+    setActiveSessionId(sessionId);
+    setAgentMessages([]);
+    setLocalThreadId("");
+    setAgentInput("");
+    setAgentError("");
+    setShowScrollBtn(false);
+    setChatLoading(true);
+
+    try {
+      const messages = await loadSummaryChatMessages(sessionId);
+      setAgentMessages(messages);
+      requestAnimationFrame(() => scrollToBottom());
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : "AI 튜터 대화 불러오기 실패");
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const sendAgentQuestion = async (question: string) => {
     const content = question.trim();
     if (!content || !canUseAgent || chatLoading || agentLoading) return;
@@ -233,9 +296,22 @@ export const AITutorDrawer = ({
 
     try {
       let persistenceError = "";
-      if (summaryId) {
+      let sessionId = activeSessionId;
+
+      if (!sessionId && canPersistChat) {
         try {
-          await saveSummaryChatMessage(summaryId, userMessage);
+          const createdSession = await createSummaryChatSession(chatTarget, createSummaryChatTitle(content));
+          sessionId = createdSession.id;
+          setActiveSessionId(createdSession.id);
+          setChatSessions(prev => [createdSession, ...prev]);
+        } catch (err) {
+          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 세션 생성 실패";
+        }
+      }
+
+      if (sessionId) {
+        try {
+          await saveSummaryChatMessage(sessionId, chatTarget, userMessage);
         } catch (err) {
           persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
         }
@@ -249,9 +325,13 @@ export const AITutorDrawer = ({
       const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
       setLocalThreadId(response.threadId);
       setAgentMessages(prev => [...prev, assistantMessage]);
-      if (summaryId) {
+      if (sessionId) {
         try {
-          await saveSummaryChatMessage(summaryId, assistantMessage);
+          await saveSummaryChatMessage(sessionId, chatTarget, assistantMessage);
+          const updatedAt = Date.now();
+          setChatSessions(prev => prev.map(session =>
+            session.id === sessionId ? { ...session, updatedAt } : session
+          ).sort((a, b) => b.updatedAt - a.updatedAt));
         } catch (err) {
           persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
         }
@@ -319,13 +399,13 @@ export const AITutorDrawer = ({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>AI 튜터</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {agentMessages.length > 0 && (
+            {canUseAgent && (
               <button
                 type="button"
-                onClick={() => { setAgentMessages([]); setLocalThreadId(""); setAgentError(""); }}
+                onClick={startNewConversation}
                 style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e0e0e0", background: "#fafafa", color: "#999", fontSize: 12, cursor: "pointer" }}
               >
-                새 대화
+                새 대화 시작
               </button>
             )}
             <button
@@ -344,6 +424,64 @@ export const AITutorDrawer = ({
             {contextTitle}
           </div>
         </div>
+
+        {canPersistChat && chatSessions.length > 0 && (
+          <div style={{ marginBottom: 14, border: "1px solid #eeeeee", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setSessionsCollapsed(prev => !prev)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                border: "none",
+                background: "#fafafa",
+                color: "#666",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 850,
+              }}
+            >
+              <span>대화 목록 {chatSessions.length}</span>
+              <span style={{ color: "#aaa", fontSize: 13 }}>{sessionsCollapsed ? "펼치기" : "접기"}</span>
+            </button>
+            {!sessionsCollapsed && (
+              <div style={{ maxHeight: 132, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {chatSessions.map(session => {
+                  const isActive = session.id === activeSessionId;
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => void openChatSession(session.id)}
+                      disabled={chatLoading || agentLoading}
+                      style={{
+                        padding: "9px 10px",
+                        borderRadius: 9,
+                        border: isActive ? `1px solid ${PINK}55` : "1px solid transparent",
+                        background: isActive ? "#FFF0F6" : "#fff",
+                        color: isActive ? PINK : "#555",
+                        textAlign: "left",
+                        cursor: chatLoading || agentLoading ? "default" : "pointer",
+                        opacity: chatLoading || agentLoading ? 0.65 : 1,
+                      }}
+                    >
+                      <span style={{ display: "block", marginBottom: 3, fontSize: 12, fontWeight: 850, lineHeight: 1.35, wordBreak: "break-word" }}>
+                        {session.title}
+                      </span>
+                      <span style={{ display: "block", fontSize: 10, color: "#aaa", fontWeight: 700 }}>
+                        {formatSessionDate(session.updatedAt)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {canUseAgent && suggestedQuestions.length > 0 && (
           <div style={{ marginBottom: 14 }}>

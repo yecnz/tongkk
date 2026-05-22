@@ -53,8 +53,34 @@ create table if not exists public.summary_chat_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.summary_chat_sessions (
+  id uuid primary key default gen_random_uuid(),
+  summary_id uuid references public.summaries(id) on delete cascade,
+  material_id text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (summary_id is not null or material_id is not null)
+);
+
+alter table public.summary_chat_messages
+add column if not exists session_id uuid references public.summary_chat_sessions(id) on delete cascade;
+
+alter table public.summary_chat_messages
+alter column summary_id drop not null;
+
 create index if not exists summary_chat_messages_summary_created_idx
 on public.summary_chat_messages (summary_id, created_at);
+
+create index if not exists summary_chat_sessions_summary_updated_idx
+on public.summary_chat_sessions (summary_id, updated_at desc);
+
+create index if not exists summary_chat_sessions_material_updated_idx
+on public.summary_chat_sessions (material_id, updated_at desc);
+
+create index if not exists summary_chat_messages_session_created_idx
+on public.summary_chat_messages (session_id, created_at);
 
 create table if not exists public.quiz_sets (
   id uuid primary key default gen_random_uuid(),
@@ -147,6 +173,11 @@ create trigger set_summaries_updated_at
 before update on public.summaries
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_summary_chat_sessions_updated_at on public.summary_chat_sessions;
+create trigger set_summary_chat_sessions_updated_at
+before update on public.summary_chat_sessions
+for each row execute function public.set_updated_at();
+
 drop trigger if exists set_quiz_sets_updated_at on public.quiz_sets;
 create trigger set_quiz_sets_updated_at
 before update on public.quiz_sets
@@ -168,6 +199,7 @@ for each row execute function public.set_updated_at();
 alter table public.courses enable row level security;
 alter table public.materials enable row level security;
 alter table public.summaries enable row level security;
+alter table public.summary_chat_sessions enable row level security;
 alter table public.summary_chat_messages enable row level security;
 alter table public.quiz_sets enable row level security;
 alter table public.quiz_attempts enable row level security;
@@ -191,6 +223,13 @@ with check (auth.uid() = user_id);
 drop policy if exists "users can manage own summaries" on public.summaries;
 create policy "users can manage own summaries"
 on public.summaries
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "users can manage own summary chat sessions" on public.summary_chat_sessions;
+create policy "users can manage own summary chat sessions"
+on public.summary_chat_sessions
 for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);

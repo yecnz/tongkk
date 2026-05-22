@@ -16,6 +16,7 @@ import {
   type SavedSummary,
 } from "../services/summaries";
 import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
 import {
@@ -720,6 +721,8 @@ const formatHubDate = (timestamp?: number) => {
   }).format(new Date(timestamp));
 };
 
+const LOW_QUIZ_SCORE_THRESHOLD = 70;
+
 const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onGoQuiz, onOpenSummary, onOpenQuiz }: MaterialDetailViewProps) => {
   const [activeTab, setActiveTab] = useState<"original" | "summary" | "quiz">("original");
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -727,9 +730,11 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
   const [fileError, setFileError] = useState("");
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
+  const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [hubLoading, setHubLoading] = useState(false);
   const [hubError, setHubError] = useState("");
   const [activeSummaryId, setActiveSummaryId] = useState<string>("");
+  const [tutorPrompt, setTutorPrompt] = useState("");
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
   const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
   const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
@@ -769,13 +774,15 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
     setHubError("");
     setSummaries([]);
     setQuizSets([]);
+    setQuizAttempts([]);
     setActiveSummaryId("");
 
     Promise.all([
       loadSummariesFromServer(selectedCourse),
       loadQuizSetsFromServer(selectedCourse),
+      loadQuizAttemptsFromServer(selectedCourse),
     ])
-      .then(([nextSummaries, nextQuizSets]) => {
+      .then(([nextSummaries, nextQuizSets, nextQuizAttempts]) => {
         if (ignore) return;
         const materialSummaries = nextSummaries
           .filter(summary => (summary.materialIds || []).includes(material.id))
@@ -783,10 +790,18 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
         const materialQuizSets = nextQuizSets
           .filter(quizSet => (quizSet.materialIds || []).includes(material.id))
           .sort((a, b) => b.createdAt - a.createdAt);
+        const materialQuizSetIds = new Set(materialQuizSets.map(quizSet => quizSet.id));
+        const materialQuizAttempts = nextQuizAttempts
+          .filter(attempt =>
+            (attempt.materialIds || []).includes(material.id) ||
+            (attempt.quizSetId ? materialQuizSetIds.has(attempt.quizSetId) : false)
+          )
+          .sort((a, b) => b.createdAt - a.createdAt);
         const defaultSummary = materialSummaries.find(summary => summary.template === "GENERAL") || materialSummaries[0];
 
         setSummaries(materialSummaries);
         setQuizSets(materialQuizSets);
+        setQuizAttempts(materialQuizAttempts);
         setActiveSummaryId(defaultSummary?.id || "");
       })
       .catch(err => {
@@ -802,6 +817,119 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
   }, [selectedCourse, material.id]);
 
   const activeSummary = summaries.find(summary => summary.id === activeSummaryId) || summaries[0];
+  const recentQuizAttempt = quizAttempts[0];
+  const hasSummaries = summaries.length > 0;
+  const hasQuizSets = quizSets.length > 0;
+  const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
+
+  const openSummaryTab = () => {
+    if (activeSummary) setActiveSummaryId(activeSummary.id || "");
+    setActiveTab("summary");
+  };
+
+  const openTutor = (question: string) => {
+    if (activeSummary) setActiveSummaryId(activeSummary.id || "");
+    setActiveTab("summary");
+    setTutorPrompt(question);
+  };
+
+  const learningCta = (() => {
+    if (!hasSummaries) {
+      return {
+        message: "먼저 이 자료를 요약해 학습 흐름을 잡아보세요.",
+        actions: [
+          { label: "요약 생성하기", onClick: onGoSummary, tone: "primary" as const },
+        ],
+      };
+    }
+
+    if (hasLowRecentScore) {
+      return {
+        message: "점수가 낮았던 부분을 요약과 함께 다시 볼까요?",
+        actions: [
+          { label: "약점 요약 보기", onClick: openSummaryTab, tone: "primary" as const },
+          {
+            label: "AI 튜터로 복습",
+            onClick: () => openTutor("최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
+            tone: "secondary" as const,
+          },
+        ],
+      };
+    }
+
+    if (hasQuizSets) {
+      return {
+        message: "최근 요약을 이어서 보고, 퀴즈 결과를 복습하세요.",
+        actions: [
+          { label: "요약 보기", onClick: openSummaryTab, tone: "primary" as const },
+          { label: "퀴즈 다시 풀기", onClick: () => onOpenQuiz(quizSets[0]), tone: "secondary" as const },
+          {
+            label: "AI 튜터",
+            onClick: () => openTutor("이 요약에서 시험에 다시 나올 만한 부분을 짚어줘"),
+            tone: "quiet" as const,
+          },
+        ],
+      };
+    }
+
+    return {
+      message: "요약은 완료됐어요. 이제 이해도를 확인해볼 차례입니다.",
+      actions: [
+        { label: "퀴즈 만들기", onClick: onGoQuiz, tone: "primary" as const },
+        {
+          label: "AI 튜터에게 질문",
+          onClick: () => openTutor("이 요약을 바탕으로 내가 이해했는지 확인 질문을 해줘"),
+          tone: "secondary" as const,
+        },
+      ],
+    };
+  })();
+
+  const ctaButtonStyle = (tone: "primary" | "secondary" | "quiet"): CSSProperties => {
+    if (tone === "primary") {
+      return {
+        height: 36,
+        padding: "0 14px",
+        borderRadius: 9,
+        border: "none",
+        background: PINK,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 850,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      };
+    }
+
+    if (tone === "secondary") {
+      return {
+        height: 36,
+        padding: "0 14px",
+        borderRadius: 9,
+        border: `1px solid ${CYAN}33`,
+        background: "#E8FAFE",
+        color: CYAN,
+        fontSize: 13,
+        fontWeight: 850,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      };
+    }
+
+    return {
+      height: 36,
+      padding: "0 12px",
+      borderRadius: 9,
+      border: `1px solid ${BORDER_COLOR}`,
+      background: "#fff",
+      color: "#777",
+      fontSize: 13,
+      fontWeight: 800,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    };
+  };
+
   const tabButtonStyle = (tab: "original" | "summary" | "quiz"): CSSProperties => ({
     height: 42,
     borderRadius: 10,
@@ -922,17 +1050,61 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
                 textDecoration: "none",
               }}>새 창</a>
             )}
-            <button onClick={onGoSummary} style={{
-              height: 34, padding: "0 12px", borderRadius: 8, border: "none",
-              background: "#FFF0F6", color: PINK, fontSize: 13, fontWeight: 800, cursor: "pointer"
-            }}>요약 생성하기</button>
-            <button onClick={onGoQuiz} style={{
-              height: 34, padding: "0 12px", borderRadius: 8, border: "none",
-              background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer"
-            }}>새 퀴즈 만들기</button>
           </div>
         </div>
         <div style={{ padding: 18, borderBottom: "1px solid #f0f0f0", background: "#fff" }}>
+          <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 14,
+            padding: 16,
+            borderRadius: 12,
+            border: `1px solid ${BORDER_COLOR}`,
+            background: "#fafafa",
+          }}>
+            <div style={{ minWidth: 260, flex: "1 1 360px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 9 }}>
+                <span style={{ padding: "5px 9px", borderRadius: 999, background: "#FFF0F6", color: PINK, fontSize: 12, fontWeight: 850 }}>
+                  요약 {summaries.length}개
+                </span>
+                <span style={{ padding: "5px 9px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 12, fontWeight: 850 }}>
+                  퀴즈 {quizSets.length}개
+                </span>
+                {recentQuizAttempt && (
+                  <span style={{
+                    padding: "5px 9px",
+                    borderRadius: 999,
+                    background: hasLowRecentScore ? "#FFF5F5" : "#F1FFF5",
+                    color: hasLowRecentScore ? "#E53E3E" : "#2F9E44",
+                    fontSize: 12,
+                    fontWeight: 850,
+                  }}>
+                    최근 점수 {recentQuizAttempt.scorePercent}%
+                  </span>
+                )}
+              </div>
+              <p style={{ margin: 0, color: "#444", fontSize: 14, fontWeight: 750, lineHeight: 1.5 }}>
+                {hubLoading ? "학습 상태를 불러오는 중입니다." : learningCta.message}
+              </p>
+            </div>
+            {!hubLoading && (
+              <div style={{ display: "flex", flex: "0 1 auto", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 }}>
+                {learningCta.actions.map(action => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={action.onClick}
+                    style={ctaButtonStyle(action.tone)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
             <button type="button" onClick={() => setActiveTab("original")} style={tabButtonStyle("original")}>원본</button>
             <button type="button" onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
@@ -1050,7 +1222,9 @@ const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onG
           contextTitle={activeSummary ? `${material.name} · ${templateLabels[activeSummary.template]}` : `${material.name} · 요약`}
           contextMarkdown={activeSummary?.content || ""}
           summaryId={activeSummary?.id || null}
+          materialId={material.id}
           suggestedQuestions={activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL}
+          initialQuestion={tutorPrompt}
           disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
         />
       )}
