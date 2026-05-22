@@ -263,12 +263,14 @@ export const AITutorDrawer = ({
   }, [initialQuestion, canUseAgent, setOpen]);
 
   const startNewConversation = () => {
+    if (chatLoading || agentLoading) return;
     setActiveSessionId(null);
     setAgentMessages([]);
     setLocalThreadId("");
     setAgentInput("");
     setAgentError("");
     setShowScrollBtn(false);
+    setSessionsCollapsed(false);
   };
 
   const openChatSession = async (sessionId: string) => {
@@ -315,6 +317,7 @@ export const AITutorDrawer = ({
           sessionId = createdSession.id;
           setActiveSessionId(createdSession.id);
           setChatSessions(prev => [createdSession, ...prev]);
+          setSessionsCollapsed(false);
         } catch (err) {
           persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 세션 생성 실패";
         }
@@ -417,7 +420,20 @@ export const AITutorDrawer = ({
               <button
                 type="button"
                 onClick={startNewConversation}
-                style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e0e0e0", background: "#fafafa", color: "#999", fontSize: 12, cursor: "pointer" }}
+                disabled={chatLoading || agentLoading}
+                aria-label="기존 대화를 보존하고 새 대화 시작"
+                title="기존 대화를 보존하고 새 대화를 시작합니다"
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #e0e0e0",
+                  background: "#fafafa",
+                  color: chatLoading || agentLoading ? "#bbb" : "#777",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: chatLoading || agentLoading ? "default" : "pointer",
+                  opacity: chatLoading || agentLoading ? 0.6 : 1,
+                }}
               >
                 새 대화 시작
               </button>

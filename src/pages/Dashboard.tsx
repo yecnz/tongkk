@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -12,8 +12,10 @@ import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/q
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
 type DeleteCourseModalProps = { course: string; onClose: () => void; onDelete: (name: string) => void };
+type CourseDetailSection = "materials" | "summaries" | "quizzes";
 type CourseDetailModalProps = {
   course: string;
+  initialSection?: CourseDetailSection;
   onClose: () => void;
   onGoSummary: () => void;
   onGoQuiz: () => void;
@@ -245,6 +247,7 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 
 const CourseDetailModal = ({
   course,
+  initialSection,
   onClose,
   onGoSummary,
   onGoQuiz,
@@ -258,6 +261,9 @@ const CourseDetailModal = ({
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const materialSectionRef = useRef<HTMLDivElement | null>(null);
+  const summarySectionRef = useRef<HTMLDivElement | null>(null);
+  const quizSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -288,8 +294,27 @@ const CourseDetailModal = ({
     };
   }, [course]);
 
+  useEffect(() => {
+    if (!initialSection) return;
+    const refBySection = {
+      materials: materialSectionRef,
+      summaries: summarySectionRef,
+      quizzes: quizSectionRef,
+    };
+    requestAnimationFrame(() => {
+      refBySection[initialSection].current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, [initialSection]);
+
   const emptyText = loading ? "불러오는 중..." : "아직 기록이 없습니다";
   const preview = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 120);
+  const sectionStyle = (section: CourseDetailSection) => ({
+    border: initialSection === section ? `1px solid ${section === "quizzes" ? CYAN : PINK}66` : "1px solid #f0f0f0",
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 250,
+    background: initialSection === section ? (section === "quizzes" ? "#F7FDFF" : "#FFF9FC") : "#fff",
+  });
 
   return (
     <div style={{
@@ -335,7 +360,7 @@ const CourseDetailModal = ({
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-          <div style={{ border: "1px solid #f0f0f0", borderRadius: 12, padding: 16, minHeight: 250 }}>
+          <div ref={materialSectionRef} style={sectionStyle("materials")}>
             <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>강의 자료</h3>
             {materials.length === 0 ? (
               <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
@@ -368,7 +393,7 @@ const CourseDetailModal = ({
             )}
           </div>
 
-          <div style={{ border: "1px solid #f0f0f0", borderRadius: 12, padding: 16, minHeight: 250 }}>
+          <div ref={summarySectionRef} style={sectionStyle("summaries")}>
             <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>요약 내역</h3>
             {summaries.length === 0 ? (
               <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
@@ -402,7 +427,7 @@ const CourseDetailModal = ({
             )}
           </div>
 
-          <div style={{ border: "1px solid #f0f0f0", borderRadius: 12, padding: 16, minHeight: 250 }}>
+          <div ref={quizSectionRef} style={sectionStyle("quizzes")}>
             <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>퀴즈 내역</h3>
             {quizSets.length === 0 ? (
               <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
@@ -494,6 +519,7 @@ export default function Dashboard() {
   const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
   const [detailCourse, setDetailCourse] = useState<string | null>(null);
+  const [detailSection, setDetailSection] = useState<CourseDetailSection | undefined>(undefined);
 
   useEffect(() => {
     let ignore = false;
@@ -572,7 +598,11 @@ export default function Dashboard() {
       {detailCourse && (
         <CourseDetailModal
           course={detailCourse}
-          onClose={() => setDetailCourse(null)}
+          initialSection={detailSection}
+          onClose={() => {
+            setDetailCourse(null);
+            setDetailSection(undefined);
+          }}
           onGoSummary={() => {
             navigate(pageRoutes["자료 요약"], { state: { selectedCourse: detailCourse, fromDashboard: true } });
           }}
@@ -643,7 +673,10 @@ export default function Dashboard() {
                       }}>
                         <button
                           type="button"
-                          onClick={() => setDetailCourse(c)}
+                          onClick={() => {
+                            setDetailSection(undefined);
+                            setDetailCourse(c);
+                          }}
                           style={{
                             border: "none",
                             background: "none",
@@ -660,17 +693,26 @@ export default function Dashboard() {
                           {c}
                         </button>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          {["요약", "퀴즈"].map(btn => (
-                            <button key={btn} onClick={() => {
-                              if (btn === "요약") navigate(pageRoutes["자료 요약"], { state: { selectedCourse: c, fromDashboard: true } });
-                              else if (btn === "퀴즈") navigate(pageRoutes["퀴즈 생성"], { state: { course: c, fromDashboard: true } });
-                            }} style={{
+                          {([
+                            { label: "강의자료", section: "materials", color: "#666", background: "#f7f7f7" },
+                            { label: "요약 내역", section: "summaries", color: PINK, background: "#FFF0F6" },
+                            { label: "퀴즈 내역", section: "quizzes", color: CYAN, background: "#E8FAFE" },
+                          ] as const).map(btn => (
+                            <button
+                              key={btn.label}
+                              type="button"
+                              onClick={() => {
+                                setOpenCourseMenu(null);
+                                setDetailSection(btn.section);
+                                setDetailCourse(c);
+                              }}
+                              style={{
                               padding: "6px 14px", borderRadius: 8,
                               border: "none",
-                              background: btn === "요약" ? "#FFF0F6" : btn === "퀴즈" ? "#E8FAFE" : "#fff",
-                              color: btn === "요약" ? PINK : btn === "퀴즈" ? CYAN : "#666",
+                              background: btn.background,
+                              color: btn.color,
                               fontSize: 13, fontWeight: 600, cursor: "pointer"
-                            }}>{btn}</button>
+                            }}>{btn.label}</button>
                           ))}
                           <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
                           <button
