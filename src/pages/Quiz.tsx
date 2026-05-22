@@ -110,6 +110,38 @@ const uniqueWeakTopics = (questions: QuizQuestion[]) =>
 const normalizeAnswer = (value: string) =>
   value.toLowerCase().replace(/\s+/g, "").replace(/[.,:;!?()[\]{}'"`]/g, "");
 
+const buildAnswersFromAttempt = (quizSet: SavedQuizSet, attempt: SavedQuizAttempt) => {
+  const answers: Record<number, number | string> = {};
+  const subjectiveGrades: Record<number, SubjectiveGradeResult> = {};
+
+  quizSet.questions.forEach((question, index) => {
+    const attemptAnswer = attempt.answers[index];
+    if (!attemptAnswer) return;
+
+    const type = question.type || quizSet.questionType;
+    if (type === "객관식" || type === "OX") {
+      const answerIndex = question.options?.findIndex(option => option === attemptAnswer.studentAnswer);
+      if (answerIndex !== undefined && answerIndex >= 0) answers[index] = answerIndex;
+      return;
+    }
+
+    if (typeof attemptAnswer.studentAnswer === "string") {
+      answers[index] = attemptAnswer.studentAnswer;
+    }
+
+    if (type === "주관식") {
+      subjectiveGrades[index] = {
+        score: attemptAnswer.score ?? (attemptAnswer.isCorrect ? 100 : 0),
+        isCorrect: attemptAnswer.isCorrect,
+        feedback: attemptAnswer.feedback || (attemptAnswer.isCorrect ? "저장된 풀이 기록에서 정답으로 채점되었습니다." : "저장된 풀이 기록에서 오답으로 채점되었습니다."),
+        referenceAnswer: String(attemptAnswer.correctAnswer || question.answerText || question.explanation),
+      };
+    }
+  });
+
+  return { answers, subjectiveGrades };
+};
+
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
@@ -176,6 +208,7 @@ export default function Quiz() {
   const [timedOut, setTimedOut] = useState(false);
   const [attemptSavedKey, setAttemptSavedKey] = useState("");
   const [attemptSaveNotice, setAttemptSaveNotice] = useState("");
+  const [reviewAttempt, setReviewAttempt] = useState<SavedQuizAttempt | null>(null);
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
@@ -277,26 +310,32 @@ export default function Quiz() {
         pendingQuizSetIdRef.current = null;
         const savedQuizSet = quizSets.find(item => item.id === pendingQuizSetId);
         if (savedQuizSet) {
+          const latestAttempt = attempts.find(attempt => attempt.quizSetId === savedQuizSet.id);
+          const restored = latestAttempt ? buildAnswersFromAttempt(savedQuizSet, latestAttempt) : null;
           setDifficulty(savedQuizSet.difficulty);
           setQuestionType(savedQuizSet.questionType);
           setCount(savedQuizSet.count);
           setSelectedMaterialIds(savedQuizSet.materialIds.filter(id => courseMaterials.some(material => material.id === id)));
           setQuizzes(savedQuizSet.questions);
           setCurrent(0);
-          setAnswers({});
+          setAnswers(restored?.answers || {});
           setShortAnswerInput("");
           setShowExplanation(false);
           setOpenedQuizTitle(savedQuizSet.title);
           setActiveQuizSetId(savedQuizSet.id);
-          setSubjectiveGrades({});
+          setSubjectiveGrades(restored?.subjectiveGrades || {});
           setRemainingSeconds(null);
-          setQuizStartedAt(Date.now());
-          setTimedOut(false);
-          setView("quiz");
+          setQuizStartedAt(latestAttempt ? null : Date.now());
+          setTimedOut(latestAttempt?.timedOut || false);
+          setAttemptSavedKey(latestAttempt ? `review:${latestAttempt.id}` : "");
+          setAttemptSaveNotice(latestAttempt ? "저장된 풀이 기록을 불러왔습니다." : "");
+          setReviewAttempt(latestAttempt || null);
+          setView(latestAttempt ? "result" : "quiz");
         }
       } else {
         setOpenedQuizTitle("");
         setActiveQuizSetId(null);
+        setReviewAttempt(null);
         const recommended = getRecommendedDifficulty(attempts);
         if (recommended) setDifficulty(recommended);
       }
@@ -551,6 +590,7 @@ export default function Quiz() {
       setTimedOut(false);
       setAttemptSavedKey("");
       setAttemptSaveNotice("");
+      setReviewAttempt(null);
       setView("quiz");
     } catch (err) {
       if (controller.signal.aborted) {
@@ -656,6 +696,7 @@ export default function Quiz() {
 
   useEffect(() => {
     if (view !== "result" || quizzes.length === 0 || !selectedCourse) return;
+    if (reviewAttempt) return;
     const durationSeconds = quizStartedAt ? Math.max(0, Math.round((Date.now() - quizStartedAt) / 1000)) : null;
     const key = `${activeQuizSetId || openedQuizTitle}:${quizStartedAt || "no-start"}:${scorePercent}:${Object.keys(answers).length}:${timedOut}`;
     if (attemptSavedKey === key) return;
@@ -722,6 +763,7 @@ export default function Quiz() {
     resultWeakTopics,
     selectedMaterialIds,
     subjectiveGrades,
+    reviewAttempt,
   ]);
 
   const handleNav = (item: PageRouteLabel) => {
@@ -1132,6 +1174,7 @@ export default function Quiz() {
       setTimedOut(false);
       setAttemptSavedKey("");
       setAttemptSaveNotice("");
+      setReviewAttempt(null);
       setDifficulty(nextDifficulty);
       setView("quiz");
     };
@@ -1155,6 +1198,32 @@ export default function Quiz() {
               <p style={{ margin: "0 0 20px", fontSize: 12, color: attemptSaveNotice.includes("실패") ? PINK : "#999" }}>
                 {attemptSaveNotice}
               </p>
+            )}
+            {reviewAttempt && (
+              <div style={{
+                margin: "0 0 24px",
+                padding: 16,
+                borderRadius: 14,
+                background: "#fafafa",
+                border: `1px solid ${BORDER_COLOR}`,
+                textAlign: "left",
+              }}>
+                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "#222" }}>분석 리포트</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
+                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>풀이 시간</div>
+                    <div style={{ fontSize: 15, color: "#333", fontWeight: 850 }}>{reviewAttempt.durationSeconds === null ? "-" : formatSeconds(reviewAttempt.durationSeconds)}</div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
+                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>오답</div>
+                    <div style={{ fontSize: 15, color: PINK, fontWeight: 850 }}>{Math.max(0, reviewAttempt.count - reviewAttempt.correctCount)}문항</div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
+                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>약점</div>
+                    <div style={{ fontSize: 15, color: CYAN, fontWeight: 850 }}>{reviewAttempt.weakTopics.length || resultWeakTopics.length}개</div>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div style={{
@@ -1253,6 +1322,48 @@ export default function Quiz() {
                       </span>
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {wrongQuestions.length > 0 && (
+              <div style={{
+                margin: "0 0 24px",
+                padding: 18,
+                borderRadius: 14,
+                background: "#fff",
+                border: `1px solid ${BORDER_COLOR}`,
+                textAlign: "left",
+              }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: "#222" }}>
+                  오답 복습
+                </h3>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {wrongQuestions.map((quiz, wrongIndex) => {
+                    const questionIndex = quizzes.indexOf(quiz);
+                    const attemptAnswer = reviewAttempt?.answers[questionIndex];
+                    const type = quiz.type || questionType;
+                    const userAnswer = attemptAnswer?.studentAnswer ??
+                      (type === "객관식" || type === "OX"
+                        ? typeof answers[questionIndex] === "number" ? quiz.options?.[answers[questionIndex] as number] : null
+                        : answers[questionIndex]);
+                    const correctAnswer = attemptAnswer?.correctAnswer ??
+                      (type === "객관식" || type === "OX"
+                        ? typeof quiz.answer === "number" ? quiz.options?.[quiz.answer] : null
+                        : quiz.answerText);
+                    return (
+                      <div key={`${quiz.question}-${wrongIndex}`} style={{ padding: 14, borderRadius: 12, background: "#fafafa", border: "1px solid #f0f0f0" }}>
+                        <div style={{ marginBottom: 8, fontSize: 13, color: "#333", fontWeight: 800, lineHeight: 1.5 }}>
+                          Q{questionIndex + 1}. {quiz.question}
+                        </div>
+                        <div style={{ display: "grid", gap: 5, fontSize: 12, color: "#666", lineHeight: 1.6 }}>
+                          <span>내 답: <strong style={{ color: PINK }}>{userAnswer ?? "미응답"}</strong></span>
+                          <span>정답: <strong style={{ color: CYAN }}>{correctAnswer ?? "정답 정보 없음"}</strong></span>
+                          <span>틀린 이유: {attemptAnswer?.feedback || quiz.explanation}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

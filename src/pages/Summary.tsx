@@ -753,6 +753,7 @@ const MaterialDetailView = ({
   const [hubError, setHubError] = useState("");
   const [activeSummaryId, setActiveSummaryId] = useState<string>("");
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
+  const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
   const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
   const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
@@ -789,6 +790,7 @@ const MaterialDetailView = ({
   useEffect(() => {
     setActiveTab(initialTab);
     setTutorPrompt(initialTutorQuestion);
+    setIsOriginalTutorOpen(false);
   }, [material.id, initialTab, initialTutorQuestion]);
 
   useEffect(() => {
@@ -841,9 +843,18 @@ const MaterialDetailView = ({
 
   const activeSummary = summaries.find(summary => summary.id === activeSummaryId) || summaries[0];
   const recentQuizAttempt = quizAttempts[0];
+  const latestAttemptByQuizSetId = quizAttempts.reduce<Map<string, SavedQuizAttempt>>((map, attempt) => {
+    if (attempt.quizSetId && !map.has(attempt.quizSetId)) map.set(attempt.quizSetId, attempt);
+    return map;
+  }, new Map());
   const hasSummaries = summaries.length > 0;
   const hasQuizSets = quizSets.length > 0;
   const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
+  const tutorContextMarkdown = activeSummary?.content || material.markdown || "";
+  const tutorContextTitle = activeSummary
+    ? `${material.name} · ${templateLabels[activeSummary.template]}`
+    : `${material.name} · 원본 자료`;
+  const tutorSuggestions = activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL;
 
   const openSummaryTab = () => {
     if (activeSummary) setActiveSummaryId(activeSummary.id || "");
@@ -852,7 +863,11 @@ const MaterialDetailView = ({
 
   const openTutor = (question: string) => {
     if (activeSummary) setActiveSummaryId(activeSummary.id || "");
-    setActiveTab("summary");
+    if (activeTab === "original") {
+      setIsOriginalTutorOpen(true);
+    } else {
+      setActiveTab("summary");
+    }
     setTutorPrompt(question);
   };
 
@@ -982,7 +997,7 @@ const MaterialDetailView = ({
   const renderOriginalTab = () => {
     if (fileLoading) {
       return (
-        <div style={{ minHeight: 520, display: "grid", placeItems: "center", background: "#2b2b2b", color: "#ddd", fontSize: 14 }}>
+        <div style={{ height: "calc(100vh - 292px)", minHeight: 620, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
           원본 PDF를 불러오는 중입니다.
         </div>
       );
@@ -998,7 +1013,7 @@ const MaterialDetailView = ({
             height: "calc(100vh - 292px)",
             minHeight: 620,
             border: "none",
-            background: "#2b2b2b",
+            background: "#f2f2f2",
             display: "block",
           }}
         />
@@ -1007,7 +1022,7 @@ const MaterialDetailView = ({
 
     return (
       <div style={{
-        background: "#fafafa",
+        background: "#f7f7f7",
         padding: 24,
         fontSize: 14,
         color: "#444",
@@ -1041,37 +1056,38 @@ const MaterialDetailView = ({
         <div style={{
           padding: "14px 18px",
           borderBottom: "1px solid #f0f0f0",
-          background: "#202020",
-          color: "#fff",
+          background: "#f2f2f2",
+          color: "#222",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
         }}>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#fff", wordBreak: "break-word" }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#222", wordBreak: "break-word" }}>
               {material.name}
             </h2>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#b7b7b7" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#777" }}>
               <span>{fileTypeLabel}</span>
               <span>{pageInfo}</span>
               <span>업데이트 {formatHubDate(material.updatedAt)}</span>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            {fileUrl && (
-              <a href={fileUrl} target="_blank" rel="noreferrer" style={{
+            {activeTab === "original" && (
+              <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
                 height: 34,
                 padding: "0 12px",
                 borderRadius: 8,
-                background: "#333",
-                color: CYAN,
+                border: isOriginalTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                background: isOriginalTutorOpen ? "#FFF0F6" : "#fff",
+                color: isOriginalTutorOpen ? PINK : "#555",
                 fontSize: 13,
                 fontWeight: 800,
                 display: "inline-flex",
                 alignItems: "center",
-                textDecoration: "none",
-              }}>새 창</a>
+                cursor: "pointer",
+              }}>{isOriginalTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
             )}
           </div>
         </div>
@@ -1177,7 +1193,31 @@ const MaterialDetailView = ({
           {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
         </div>
 
-        {activeTab === "original" && renderOriginalTab()}
+        {activeTab === "original" && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isOriginalTutorOpen ? "minmax(0, 1fr) minmax(360px, 1fr)" : "minmax(0, 1fr)",
+            alignItems: "stretch",
+          }}>
+            <div style={{ minWidth: 0, borderRight: isOriginalTutorOpen ? `1px solid ${BORDER_COLOR}` : "none" }}>
+              {renderOriginalTab()}
+            </div>
+            {isOriginalTutorOpen && (
+              <AITutorDrawer
+                layout="embedded"
+                open={isOriginalTutorOpen}
+                onOpenChange={setIsOriginalTutorOpen}
+                contextTitle={tutorContextTitle}
+                contextMarkdown={tutorContextMarkdown}
+                summaryId={activeSummary?.id || null}
+                materialId={material.id}
+                suggestedQuestions={tutorSuggestions}
+                initialQuestion={tutorPrompt}
+                disabledReason="원본 자료 내용을 불러온 뒤 AI 튜터를 사용할 수 있습니다"
+              />
+            )}
+          </div>
+        )}
 
         {activeTab === "summary" && (
           <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
@@ -1254,25 +1294,40 @@ const MaterialDetailView = ({
               </div>
             ) : (
               <div style={{ display: "grid", gap: 12 }}>
-                {quizSets.map(quizSet => (
-                  <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                        <h3 style={{ margin: 0, fontSize: 16, color: "#222", wordBreak: "break-word" }}>{quizSet.title}</h3>
-                        {multiSourceBadge(quizSet.materialIds)}
+                {quizSets.map(quizSet => {
+                  const latestAttempt = latestAttemptByQuizSetId.get(quizSet.id);
+                  return (
+                    <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                          <h3 style={{ margin: 0, fontSize: 16, color: "#222", wordBreak: "break-word" }}>{quizSet.title}</h3>
+                          {multiSourceBadge(quizSet.materialIds)}
+                          {latestAttempt && (
+                            <span style={{
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              background: latestAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD ? "#FFF5F5" : "#F1FFF5",
+                              color: latestAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD ? "#E53E3E" : "#2F9E44",
+                              fontSize: 11,
+                              fontWeight: 850,
+                            }}>
+                              풀이 {latestAttempt.scorePercent}%
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#888", fontWeight: 700 }}>
+                          <span>난이도 {quizSet.difficulty}</span>
+                          <span>{quizSet.questionType}</span>
+                          <span>{quizSet.count || quizSet.questions.length}문항</span>
+                          <span>{formatHubDate(quizSet.createdAt)}</span>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#888", fontWeight: 700 }}>
-                        <span>난이도 {quizSet.difficulty}</span>
-                        <span>{quizSet.questionType}</span>
-                        <span>{quizSet.count || quizSet.questions.length}문항</span>
-                        <span>{formatHubDate(quizSet.createdAt)}</span>
-                      </div>
+                      <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                        {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
+                      </button>
                     </div>
-                    <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
-                      퀴즈 풀기
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
                 <button onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: `1px solid ${CYAN}33`, background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                   새 퀴즈 만들기
                 </button>

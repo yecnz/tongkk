@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PINK } from "../common";
@@ -22,6 +22,9 @@ type AITutorDrawerProps = {
   initialQuestion?: string;
   disabledReason?: string;
   resetHistory?: boolean;
+  layout?: "drawer" | "embedded";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 const markdownStyles = {
@@ -149,8 +152,11 @@ export const AITutorDrawer = ({
   initialQuestion,
   disabledReason = "요약 생성 후 AI 튜터를 사용할 수 있습니다",
   resetHistory = false,
+  layout = "drawer",
+  open,
+  onOpenChange,
 }: AITutorDrawerProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [localThreadId, setLocalThreadId] = useState(threadId);
   const [agentInput, setAgentInput] = useState("");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
@@ -167,6 +173,11 @@ export const AITutorDrawer = ({
   const canUseAgent = Boolean(contextMarkdown.trim());
   const canPersistChat = Boolean(summaryId || materialId);
   const chatTarget = { summaryId, materialId };
+  const isOpen = open ?? internalOpen;
+  const setOpen = useCallback((nextOpen: boolean) => {
+    if (open === undefined) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }, [open, onOpenChange]);
 
   const scrollToBottom = () => {
     const el = chatContainerRef.current;
@@ -247,9 +258,9 @@ export const AITutorDrawer = ({
     const question = initialQuestion?.trim();
     if (!question || initialQuestionRef.current === question || !canUseAgent) return;
     initialQuestionRef.current = question;
-    setIsOpen(true);
+    setOpen(true);
     setAgentInput(question);
-  }, [initialQuestion, canUseAgent]);
+  }, [initialQuestion, canUseAgent, setOpen]);
 
   const startNewConversation = () => {
     setActiveSessionId(null);
@@ -286,7 +297,7 @@ export const AITutorDrawer = ({
     const content = question.trim();
     if (!content || !canUseAgent || chatLoading || agentLoading) return;
 
-    setIsOpen(true);
+    setOpen(true);
     const userMessage: AgentMessage = { role: "user", content };
     const nextMessages = [...agentMessages, userMessage];
     setAgentMessages(nextMessages);
@@ -375,26 +386,29 @@ export const AITutorDrawer = ({
 
   return (
     <>
-      <button type="button" onClick={() => setIsOpen(true)} aria-label="AI 튜터 열기" title="AI 튜터" style={toggleButtonStyle}>
-        AI 튜터
-      </button>
+      {layout === "drawer" && (
+        <button type="button" onClick={() => setOpen(true)} aria-label="AI 튜터 열기" title="AI 튜터" style={toggleButtonStyle}>
+          AI 튜터
+        </button>
+      )}
       <aside style={{
-        position: "fixed",
-        top: 0,
-        right: 0,
-        width: "min(420px, 100vw)",
-        height: "100vh",
-        zIndex: 190,
+        position: layout === "embedded" ? "relative" : "fixed",
+        top: layout === "embedded" ? "auto" : 0,
+        right: layout === "embedded" ? "auto" : 0,
+        width: layout === "embedded" ? "100%" : "min(420px, 100vw)",
+        height: layout === "embedded" ? "calc(100vh - 292px)" : "100vh",
+        minHeight: layout === "embedded" ? 620 : undefined,
+        zIndex: layout === "embedded" ? "auto" : 190,
         border: "1px solid #f0f0f0",
-        borderRight: "none",
-        borderRadius: "16px 0 0 16px",
+        borderRight: layout === "embedded" ? "1px solid #f0f0f0" : "none",
+        borderRadius: layout === "embedded" ? 0 : "16px 0 0 16px",
         padding: 20,
         display: "flex",
         flexDirection: "column",
         background: "#fff",
-        boxShadow: isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
-        transform: isOpen ? "translateX(0)" : "translateX(104%)",
-        transition: "transform 0.22s ease, box-shadow 0.22s ease",
+        boxShadow: layout === "drawer" && isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
+        transform: layout === "embedded" || isOpen ? "translateX(0)" : "translateX(104%)",
+        transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>AI 튜터</h3>
@@ -410,7 +424,7 @@ export const AITutorDrawer = ({
             )}
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={() => setOpen(false)}
               aria-label="AI 튜터 닫기"
               style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", color: "#999", cursor: "pointer", fontSize: 18, lineHeight: "28px", padding: 0 }}
             >

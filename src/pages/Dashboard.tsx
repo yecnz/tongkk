@@ -7,6 +7,7 @@ import { loadDashboardState, saveDashboardState } from "../services/dashboardSta
 import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -254,6 +255,7 @@ const CourseDetailModal = ({
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
+  const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -263,15 +265,17 @@ const CourseDetailModal = ({
       setLoading(true);
       setError("");
       try {
-        const [nextMaterials, nextSummaries, nextQuizSets] = await Promise.all([
+        const [nextMaterials, nextSummaries, nextQuizSets, nextQuizAttempts] = await Promise.all([
           loadCourseMaterialsFromServer(course),
           loadSummariesFromServer(course),
           loadQuizSetsFromServer(course),
+          loadQuizAttemptsFromServer(course),
         ]);
         if (ignore) return;
         setMaterials(nextMaterials);
         setSummaries(nextSummaries);
         setQuizSets(nextQuizSets);
+        setQuizAttempts(nextQuizAttempts);
       } catch (err) {
         if (!ignore) setError(err instanceof Error ? err.message : "과목 상세 정보를 불러오지 못했습니다.");
       } finally {
@@ -404,30 +408,44 @@ const CourseDetailModal = ({
               <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {quizSets.map(quizSet => (
-                  <button
-                    key={quizSet.id}
-                    type="button"
-                    onClick={() => onOpenQuiz(quizSet)}
-                    style={{
-                      width: "100%",
-                      padding: "0 0 10px",
-                      border: "none",
-                      borderBottom: "1px solid #f5f5f5",
-                      background: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
-                      {quizSet.title}
-                    </div>
-                    <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
-                      {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
-                    </div>
-                    <div style={{ marginTop: 3, fontSize: 11, color: "#aaa" }}>{formatDate(quizSet.createdAt)}</div>
-                  </button>
-                ))}
+                {quizSets.map(quizSet => {
+                  const latestAttempt = quizAttempts.find(attempt => attempt.quizSetId === quizSet.id);
+                  return (
+                    <button
+                      key={quizSet.id}
+                      type="button"
+                      onClick={() => onOpenQuiz(quizSet)}
+                      style={{
+                        width: "100%",
+                        padding: "0 0 10px",
+                        border: "none",
+                        borderBottom: "1px solid #f5f5f5",
+                        background: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                        {quizSet.title}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
+                        {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
+                      </div>
+                      <div style={{ marginTop: 5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 11, color: "#aaa" }}>{formatDate(quizSet.createdAt)}</span>
+                        {latestAttempt ? (
+                          <span style={{ flexShrink: 0, fontSize: 11, color: latestAttempt.scorePercent < 70 ? PINK : CYAN, fontWeight: 850 }}>
+                            리포트 {latestAttempt.scorePercent}%
+                          </span>
+                        ) : (
+                          <span style={{ flexShrink: 0, fontSize: 11, color: "#aaa", fontWeight: 800 }}>
+                            풀이 전
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
