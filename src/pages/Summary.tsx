@@ -9,16 +9,13 @@ import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
-import { sendAgentMessage, type AgentMessage } from "../services/agent";
-import {
-  loadSummaryChatMessages,
-  saveSummaryChatMessage,
-} from "../services/summaryChats";
 import {
   deleteSummariesByMaterialId,
   loadSummariesFromServer,
   saveSummaryToServer,
+  type SavedSummary,
 } from "../services/summaries";
+import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
 import {
@@ -30,6 +27,7 @@ import {
   uploadCourseMaterialFile,
   type CourseMaterial,
 } from "../services/materials";
+import { AITutorDrawer } from "../components/AITutorDrawer";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -43,14 +41,24 @@ type LocationState = {
   viewMaterial?: boolean;
   summaryId?: string;
   summaryTemplate?: SummaryTemplate;
+  summaryContent?: string;
+  summaryCreatedAt?: number;
   materialIds?: string[];
   openSummary?: boolean;
   tutorQuestion?: string;
 } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
-type MaterialDetailViewProps = { material: CourseMaterial; onBack: () => void; onGoSummary: () => void; onGoQuiz: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
+type MaterialDetailViewProps = {
+  material: CourseMaterial;
+  selectedCourse: string;
+  onBack: () => void;
+  onGoSummary: () => void;
+  onGoQuiz: () => void;
+  onOpenSummary: (summary: SavedSummary) => void;
+  onOpenQuiz: (quizSet: SavedQuizSet) => void;
+};
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
 const templateLabels: Record<SummaryTemplate, string> = {
@@ -410,154 +418,16 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
-const SUGGESTION_TRIGGER = /원하시면|다음으로는|해드릴게요|알려드릴게요|다음 단계로|중 하나로|바꿔드릴게요|골라주세요|선택해주세요/;
-
-const parseAiSuggestions = (content: string): { mainContent: string; suggestions: string[] } => {
-  const lines = content.split("\n");
-
-  // Step 1: collect trailing bullet block (skip blank lines at the end)
-  let tail = lines.length - 1;
-  while (tail >= 0 && !lines[tail].trim()) tail--;
-
-  const bulletItems: string[] = [];
-  let bulletStart = tail + 1;
-  let i = tail;
-  while (i >= 0) {
-    const line = lines[i].trim();
-    if (!line) { i--; continue; }
-    const m = line.match(/^[-•*]\s+(.{4,80})$/);
-    if (m) { bulletItems.unshift(m[1].replace(/\*\*/g, "")); bulletStart = i; i--; }
-    else break;
-  }
-
-  // Also collect quoted suggestions from the last few lines if no bullets found
-  if (bulletItems.length === 0) {
-    let cutIndex = lines.length;
-    let inSection = false;
-    for (let j = lines.length - 1; j >= 0; j--) {
-      const line = lines[j].trim();
-      if (!line) continue;
-      const quotedMatches = [...line.matchAll(/[“”“”]([^””“”]{4,60})[“”“”]/g)].map(m => m[1]);
-      if (quotedMatches.length > 0) {
-        bulletItems.unshift(...quotedMatches);
-        cutIndex = j;
-        inSection = true;
-      } else if (SUGGESTION_TRIGGER.test(line)) {
-        cutIndex = j;
-        inSection = true;
-      } else if (inSection) {
-        break;
-      } else {
-        break;
-      }
-    }
-    if (bulletItems.length > 0) {
-      return { mainContent: lines.slice(0, cutIndex).join("\n").trim(), suggestions: bulletItems };
-    }
-    return { mainContent: content, suggestions: [] };
-  }
-
-  // Step 2: require at least 2 bullets to treat as suggestions
-  if (bulletItems.length < 2) return { mainContent: content, suggestions: [] };
-
-  // Step 3: look for a trigger phrase before the bullet block (within 6 lines)
-  let cutIdx = bulletStart;
-  let j = bulletStart - 1;
-  while (j >= 0 && bulletStart - j <= 6) {
-    const line = lines[j].trim();
-    if (!line) { j--; continue; }
-    if (SUGGESTION_TRIGGER.test(line)) { cutIdx = j; }
-    j--;
-  }
-
-  return {
-    mainContent: lines.slice(0, cutIdx).join("\n").trim(),
-    suggestions: bulletItems,
-  };
-};
-
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
-  const [localThreadId, setLocalThreadId] = useState(threadId);
-  const [agentInput, setAgentInput] = useState("");
-  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
-  const [agentLoading, setAgentLoading] = useState(false);
-  const [agentError, setAgentError] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [isTutorOpen, setIsTutorOpen] = useState(false);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
-  const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const skipNextScrollRef = useRef(false);
-  const initialTutorQuestionRef = useRef("");
-  const canUseAgent = Boolean(displayContent.trim());
-
-  const scrollToBottom = () => {
-    const el = chatContainerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-
-  const handleChatScroll = () => {
-    const el = chatContainerRef.current;
-    if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollBtn(distFromBottom > 60);
-  };
   const questions = suggestedTutorQuestions[template];
 
   const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
-
-  useEffect(() => {
-    let ignore = false;
-    setLocalThreadId(threadId);
-    setAgentInput("");
-    setAgentError("");
-    setChatLoading(false);
-
-    if (!summaryId || resetTutorHistory) {
-      setAgentMessages([]);
-      return () => {
-        ignore = true;
-      };
-    }
-
-    setChatLoading(true);
-    loadSummaryChatMessages(summaryId)
-      .then(messages => {
-        if (!ignore) setAgentMessages(messages);
-      })
-      .catch(err => {
-        if (!ignore) {
-          setAgentMessages([]);
-          setAgentError(err instanceof Error ? err.message : "AI 튜터 대화 불러오기 실패");
-        }
-      })
-      .finally(() => {
-        if (!ignore) {
-          setChatLoading(false);
-          requestAnimationFrame(() => scrollToBottom());
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [summaryId, threadId, displayContent, resetTutorHistory]);
-
-  useEffect(() => {
-    if (skipNextScrollRef.current) { skipNextScrollRef.current = false; return; }
-    const lastMsg = agentMessages[agentMessages.length - 1];
-    if (!lastMsg || lastMsg.role !== "user") return;
-    const el = chatContainerRef.current;
-    if (!el) return;
-    const userDivs = el.querySelectorAll<HTMLElement>("[data-msg-role='user']");
-    const last = userDivs[userDivs.length - 1];
-    if (last) last.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [agentMessages]);
 
   const handleDownload = async () => {
     if (!pdfExportRef.current || pdfSaving) return;
@@ -661,66 +531,6 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     }
   };
 
-  const sendAgentQuestion = async (question: string) => {
-    const content = question.trim();
-    if (!content || !canUseAgent || chatLoading || agentLoading) return;
-
-    setIsTutorOpen(true);
-    const userMessage: AgentMessage = { role: "user", content };
-    const nextMessages = [...agentMessages, userMessage];
-    setAgentMessages(nextMessages);
-    setAgentInput("");
-    setAgentError("");
-    setAgentLoading(true);
-
-    try {
-      let persistenceError = "";
-      if (summaryId) {
-        try {
-          await saveSummaryChatMessage(summaryId, userMessage);
-        } catch (err) {
-          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
-        }
-      }
-
-      const response = await sendAgentMessage(
-        localThreadId,
-        localThreadId ? [userMessage] : nextMessages,
-        localThreadId ? undefined : agentContext || displayContent,
-      );
-      const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
-      setLocalThreadId(response.threadId);
-      setAgentMessages(prev => [...prev, assistantMessage]);
-      if (summaryId) {
-        try {
-          await saveSummaryChatMessage(summaryId, assistantMessage);
-        } catch (err) {
-          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
-        }
-      }
-      if (persistenceError) {
-        setAgentError(`대화 저장 실패: ${persistenceError}`);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Agent 요청 실패";
-      setAgentError(message);
-    } finally {
-      setAgentLoading(false);
-    }
-  };
-
-  const handleAgentSubmit = async () => {
-    await sendAgentQuestion(agentInput);
-  };
-
-  useEffect(() => {
-    const question = initialTutorQuestion?.trim();
-    if (!question || initialTutorQuestionRef.current === question || !canUseAgent || isLoading) return;
-    initialTutorQuestionRef.current = question;
-    setIsTutorOpen(true);
-    setAgentInput(question);
-  }, [initialTutorQuestion, canUseAgent, isLoading]);
-
   return (
     <div>
       <button onClick={onBack} style={{
@@ -766,12 +576,6 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                   cursor: pdfSaving ? "default" : "pointer",
                   opacity: pdfSaving ? 0.75 : 1,
                 }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
-                <button onClick={() => setIsTutorOpen(true)} disabled={!canUseAgent} style={{
-                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #f3c3da",
-                  background: canUseAgent ? "#FFF0F6" : "#f2f2f2",
-                  color: canUseAgent ? PINK : "#aaa", fontSize: 13, fontWeight: 800,
-                  cursor: canUseAgent ? "pointer" : "default",
-                }}>AI 튜터에게 물어보기</button>
                 {realContent && !error && onGoToQuiz && (
                   <button onClick={onGoToQuiz} style={{
                     height: 34, padding: "0 14px", borderRadius: 10, border: "none",
@@ -888,260 +692,16 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
               )}
             </div>
 
-            {canUseAgent && (
-              <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</span>
-                {questions.slice(0, 3).map(question => (
-                  <button
-                    key={question}
-                    type="button"
-                    onClick={() => sendAgentQuestion(question)}
-                    disabled={chatLoading || agentLoading}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 999,
-                      border: "1px solid #eeeeee",
-                      background: "#fafafa",
-                      color: "#555",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: chatLoading || agentLoading ? "default" : "pointer",
-                      opacity: chatLoading || agentLoading ? 0.55 : 1,
-                    }}
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {isTutorOpen && (
-              <div
-                onClick={() => setIsTutorOpen(false)}
-                style={{ position: "fixed", inset: 0, zIndex: 180, background: "rgba(20,20,20,0.18)" }}
-              />
-            )}
-            <div style={{
-              position: "fixed",
-              top: 0,
-              right: 0,
-              width: "min(420px, 100vw)",
-              height: "100vh",
-              zIndex: 190,
-              border: "1px solid #f0f0f0",
-              borderRight: "none",
-              borderRadius: "16px 0 0 16px",
-              padding: 20,
-              display: "flex",
-              flexDirection: "column",
-              background: "#fff",
-              boxShadow: "-18px 0 44px rgba(0,0,0,0.18)",
-              transform: isTutorOpen ? "translateX(0)" : "translateX(104%)",
-              transition: "transform 0.22s ease",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#222" }}>AI 튜터</h3>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {agentMessages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => { setAgentMessages([]); setLocalThreadId(""); setAgentError(""); }}
-                    style={{
-                      padding: "4px 10px", borderRadius: 8, border: "1px solid #e0e0e0",
-                      background: "#fafafa", color: "#999", fontSize: 12, cursor: "pointer",
-                    }}
-                  >새 대화</button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsTutorOpen(false)}
-                  aria-label="AI 튜터 닫기"
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 10,
-                    border: "1px solid #e0e0e0",
-                    background: "#fff",
-                    color: "#999",
-                    cursor: "pointer",
-                    fontSize: 18,
-                    lineHeight: "28px",
-                    padding: 0,
-                  }}
-                >×</button>
-                </div>
-              </div>
-              <p style={{ margin: "0 0 14px", fontSize: 12, lineHeight: 1.6, color: "#888" }}>
-                요약본을 기준으로 헷갈리는 개념을 이어서 질문하세요.
-              </p>
-
-              {canUseAgent && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {questions.map(question => (
-                      <button
-                        key={question}
-                        type="button"
-                        onClick={() => sendAgentQuestion(question)}
-                        disabled={chatLoading || agentLoading}
-                        style={{
-                          padding: "7px 10px",
-                          borderRadius: 999,
-                          border: "1px solid #eeeeee",
-                          background: "#fafafa",
-                          color: "#555",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          lineHeight: 1.35,
-                          cursor: chatLoading || agentLoading ? "default" : "pointer",
-                          opacity: chatLoading || agentLoading ? 0.55 : 1,
-                          textAlign: "left",
-                        }}
-                      >
-                        {question}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ flex: 1, minHeight: 0, position: "relative", marginBottom: 14 }}>
-              <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-                {!canUseAgent ? (
-                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
-                    새로 생성한 요약에서 AI 튜터 대화를 시작할 수 있습니다.
-                  </div>
-                ) : chatLoading ? (
-                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
-                    이전 AI 튜터 대화를 불러오는 중입니다.
-                  </div>
-                ) : agentMessages.length === 0 ? (
-                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
-                    예: “이 개념을 쉬운 예시로 설명해줘” 또는 “시험에 나올 만한 포인트를 알려줘”
-                  </div>
-                ) : (
-                  <>
-                    {agentMessages.map((msg, i) => {
-                      const isLastAssistant = msg.role === "assistant" && i === agentMessages.length - 1 && !agentLoading;
-                      const { mainContent, suggestions } = msg.role === "assistant"
-                        ? parseAiSuggestions(msg.content)
-                        : { mainContent: msg.content, suggestions: [] };
-                      return (
-                        <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div style={{
-                            padding: "10px 14px",
-                            borderRadius: 12,
-                            background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
-                            color: "#444",
-                            fontSize: 13,
-                            lineHeight: 1.6
-                          }}>
-                            <FormattedAiText content={mainContent} />
-                          </div>
-                          {isLastAssistant && suggestions.length > 0 && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", letterSpacing: "0.04em" }}>바로 이어서</span>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {suggestions.map(suggestion => (
-                                  <button
-                                    key={suggestion}
-                                    type="button"
-                                    onClick={() => { skipNextScrollRef.current = true; sendAgentQuestion(suggestion); }}
-                                    disabled={agentLoading}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: 999,
-                                      border: `1px solid ${PINK}33`,
-                                      background: "#FFF0F6",
-                                      color: PINK,
-                                      fontSize: 12,
-                                      fontWeight: 400,
-                                      lineHeight: 1.35,
-                                      cursor: agentLoading ? "default" : "pointer",
-                                      opacity: agentLoading ? 0.55 : 1,
-                                      textAlign: "left",
-                                    }}
-                                  >
-                                    {suggestion.replace(/\*\*/g, "")}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {agentLoading && (
-                      <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: 12, background: "#fafafa", color: "#aaa", fontSize: 13 }}>
-                        응답 중...
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-                {showScrollBtn && (
-                  <button
-                    type="button"
-                    onClick={scrollToBottom}
-                    title="맨 아래로"
-                    style={{
-                      position: "absolute",
-                      bottom: 8,
-                      right: 8,
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      border: "1px solid #e0e0e0",
-                      background: "#fff",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-                      color: "#888",
-                      fontSize: 16,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 10,
-                    }}
-                  >↓</button>
-                )}
-              </div>
-
-              {agentError && (
-                <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>
-              )}
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={agentInput}
-                  onChange={e => setAgentInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleAgentSubmit(); }}
-                  disabled={!canUseAgent || chatLoading || agentLoading}
-                  placeholder="요약본에 대해 질문하기"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: "11px 13px",
-                    borderRadius: 10,
-                    border: "1px solid #e0e0e0",
-                    fontSize: 13,
-                    outline: "none"
-                  }}
-                />
-                <button
-                  onClick={handleAgentSubmit}
-                  disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
-                  style={{
-                    padding: "0 14px", borderRadius: 10, border: "none",
-                    background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff",
-                    fontSize: 13, fontWeight: 800,
-                    cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  {agentLoading ? "응답 중" : "전송"}
-                </button>
-              </div>
-            </div>
+            <AITutorDrawer
+              contextTitle={contextTitle}
+              contextMarkdown={realContent}
+              summaryId={summaryId}
+              threadId={threadId}
+              suggestedQuestions={questions}
+              initialQuestion={!isLoading ? initialTutorQuestion : undefined}
+              disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+              resetHistory={resetTutorHistory}
+            />
           </div>
         )}
       </Card>
@@ -1149,11 +709,30 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   );
 };
 
-const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: MaterialDetailViewProps) => {
+const formatHubDate = (timestamp?: number) => {
+  if (!timestamp) return "업데이트 정보 없음";
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+};
+
+const MaterialDetailView = ({ material, selectedCourse, onBack, onGoSummary, onGoQuiz, onOpenSummary, onOpenQuiz }: MaterialDetailViewProps) => {
+  const [activeTab, setActiveTab] = useState<"original" | "summary" | "quiz">("original");
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [summaries, setSummaries] = useState<SavedSummary[]>([]);
+  const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
+  const [hubLoading, setHubLoading] = useState(false);
+  const [hubError, setHubError] = useState("");
+  const [activeSummaryId, setActiveSummaryId] = useState<string>("");
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
+  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
+  const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
 
   useEffect(() => {
     let ignore = false;
@@ -1184,6 +763,124 @@ const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: Materia
     };
   }, [material]);
 
+  useEffect(() => {
+    let ignore = false;
+    setHubLoading(true);
+    setHubError("");
+    setSummaries([]);
+    setQuizSets([]);
+    setActiveSummaryId("");
+
+    Promise.all([
+      loadSummariesFromServer(selectedCourse),
+      loadQuizSetsFromServer(selectedCourse),
+    ])
+      .then(([nextSummaries, nextQuizSets]) => {
+        if (ignore) return;
+        const materialSummaries = nextSummaries
+          .filter(summary => (summary.materialIds || []).includes(material.id))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const materialQuizSets = nextQuizSets
+          .filter(quizSet => (quizSet.materialIds || []).includes(material.id))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const defaultSummary = materialSummaries.find(summary => summary.template === "GENERAL") || materialSummaries[0];
+
+        setSummaries(materialSummaries);
+        setQuizSets(materialQuizSets);
+        setActiveSummaryId(defaultSummary?.id || "");
+      })
+      .catch(err => {
+        if (!ignore) setHubError(err instanceof Error ? err.message : "학습 기록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setHubLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedCourse, material.id]);
+
+  const activeSummary = summaries.find(summary => summary.id === activeSummaryId) || summaries[0];
+  const tabButtonStyle = (tab: "original" | "summary" | "quiz"): CSSProperties => ({
+    height: 42,
+    borderRadius: 10,
+    border: activeTab === tab ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+    background: activeTab === tab ? "#FFF0F6" : "#fff",
+    color: activeTab === tab ? PINK : "#777",
+    fontSize: 14,
+    fontWeight: 800,
+    cursor: "pointer",
+  });
+  const multiSourceBadge = (materialIds: string[] = []) => materialIds.length > 1 && (
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "4px 8px",
+      borderRadius: 999,
+      background: "#F3FBFD",
+      color: CYAN,
+      fontSize: 11,
+      fontWeight: 800,
+      whiteSpace: "nowrap",
+    }}>
+      여러 자료를 함께 사용함
+    </span>
+  );
+
+  const renderOriginalTab = () => {
+    if (fileLoading) {
+      return (
+        <div style={{ minHeight: 520, display: "grid", placeItems: "center", background: "#2b2b2b", color: "#ddd", fontSize: 14 }}>
+          원본 PDF를 불러오는 중입니다.
+        </div>
+      );
+    }
+
+    if (fileUrl && isPdf) {
+      return (
+        <iframe
+          title={material.name}
+          src={`${fileUrl}#toolbar=1&navpanes=0`}
+          style={{
+            width: "100%",
+            height: "calc(100vh - 292px)",
+            minHeight: 620,
+            border: "none",
+            background: "#2b2b2b",
+            display: "block",
+          }}
+        />
+      );
+    }
+
+    return (
+      <div style={{
+        background: "#fafafa",
+        padding: 24,
+        fontSize: 14,
+        color: "#444",
+        lineHeight: 1.8,
+        minHeight: 520,
+        maxHeight: "calc(100vh - 320px)",
+        overflowY: "auto",
+      }}>
+        <div style={{
+          marginBottom: 18,
+          padding: "12px 14px",
+          borderRadius: 10,
+          background: fileError ? "#FFF5F5" : "#FFF8E8",
+          color: fileError ? "#E53E3E" : "#9A6B00",
+          fontSize: 13,
+          fontWeight: 700,
+        }}>
+          {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
+        </div>
+        <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
+      </div>
+    );
+  };
+
   return (
     <div>
       <button onClick={onBack} style={{
@@ -1204,9 +901,11 @@ const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: Materia
             <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#fff", wordBreak: "break-word" }}>
               {material.name}
             </h2>
-            <p style={{ margin: 0, fontSize: 12, color: "#b7b7b7" }}>
-              {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : material.type.toUpperCase()} · PDF 원본 보기
-            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#b7b7b7" }}>
+              <span>{fileTypeLabel}</span>
+              <span>{pageInfo}</span>
+              <span>업데이트 {formatHubDate(material.updatedAt)}</span>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             {fileUrl && (
@@ -1226,57 +925,135 @@ const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: Materia
             <button onClick={onGoSummary} style={{
               height: 34, padding: "0 12px", borderRadius: 8, border: "none",
               background: "#FFF0F6", color: PINK, fontSize: 13, fontWeight: 800, cursor: "pointer"
-            }}>요약</button>
+            }}>요약 생성하기</button>
             <button onClick={onGoQuiz} style={{
               height: 34, padding: "0 12px", borderRadius: 8, border: "none",
               background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer"
-            }}>퀴즈</button>
+            }}>새 퀴즈 만들기</button>
           </div>
         </div>
-
-        {fileLoading ? (
-          <div style={{ minHeight: 520, display: "grid", placeItems: "center", background: "#2b2b2b", color: "#ddd", fontSize: 14 }}>
-            원본 PDF를 불러오는 중입니다.
+        <div style={{ padding: 18, borderBottom: "1px solid #f0f0f0", background: "#fff" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            <button type="button" onClick={() => setActiveTab("original")} style={tabButtonStyle("original")}>원본</button>
+            <button type="button" onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
+            <button type="button" onClick={() => setActiveTab("quiz")} style={tabButtonStyle("quiz")}>퀴즈 {quizSets.length > 0 ? quizSets.length : ""}</button>
           </div>
-        ) : fileUrl && isPdf ? (
-          <iframe
-            title={material.name}
-            src={`${fileUrl}#toolbar=1&navpanes=0`}
-            style={{
-              width: "100%",
-              height: "calc(100vh - 190px)",
-              minHeight: 620,
-              border: "none",
-              background: "#2b2b2b",
-              display: "block",
-            }}
-          />
-        ) : (
-          <div style={{
-            background: "#fafafa",
-            padding: 24,
-            fontSize: 14,
-            color: "#444",
-            lineHeight: 1.8,
-            minHeight: 520,
-            maxHeight: "calc(100vh - 220px)",
-            overflowY: "auto",
-          }}>
-            <div style={{
-              marginBottom: 18,
-              padding: "12px 14px",
-              borderRadius: 10,
-              background: fileError ? "#FFF5F5" : "#FFF8E8",
-              color: fileError ? "#E53E3E" : "#9A6B00",
-              fontSize: 13,
-              fontWeight: 700,
-            }}>
-              {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
-            </div>
-            <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
+          {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
+        </div>
+
+        {activeTab === "original" && renderOriginalTab()}
+
+        {activeTab === "summary" && (
+          <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
+            {hubLoading ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "#888", fontSize: 14 }}>연결된 요약을 불러오는 중입니다.</div>
+            ) : summaries.length === 0 ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
+                <div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "#222" }}>아직 요약이 없습니다</h3>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "#888" }}>이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.</p>
+                  <button onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                    요약 생성하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 18, alignItems: "start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {summaries.map(summary => (
+                    <button
+                      key={summary.id || `${summary.template}-${summary.createdAt}`}
+                      type="button"
+                      onClick={() => setActiveSummaryId(summary.id || "")}
+                      style={{
+                        padding: "12px 13px",
+                        borderRadius: 10,
+                        border: activeSummary?.id === summary.id ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                        background: activeSummary?.id === summary.id ? "#FFF0F6" : "#fff",
+                        color: activeSummary?.id === summary.id ? PINK : "#555",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
+                      <span style={{ display: "block", fontSize: 11, color: "#999" }}>{formatHubDate(summary.createdAt)}</span>
+                    </button>
+                  ))}
+                </div>
+                {activeSummary && (
+                  <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 18 }}>
+                      <div>
+                        <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
+                        <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {multiSourceBadge(activeSummary.materialIds)}
+                        <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                          자세히 보기
+                        </button>
+                      </div>
+                    </div>
+                    <FormattedAiText content={activeSummary.content} template={activeSummary.template} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "quiz" && (
+          <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
+            {hubLoading ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "#888", fontSize: 14 }}>연결된 퀴즈를 불러오는 중입니다.</div>
+            ) : quizSets.length === 0 ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
+                <div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "#222" }}>아직 퀴즈가 없습니다</h3>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "#888" }}>이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.</p>
+                  <button onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                    퀴즈 생성하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {quizSets.map(quizSet => (
+                  <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                        <h3 style={{ margin: 0, fontSize: 16, color: "#222", wordBreak: "break-word" }}>{quizSet.title}</h3>
+                        {multiSourceBadge(quizSet.materialIds)}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#888", fontWeight: 700 }}>
+                        <span>난이도 {quizSet.difficulty}</span>
+                        <span>{quizSet.questionType}</span>
+                        <span>{quizSet.count || quizSet.questions.length}문항</span>
+                        <span>{formatHubDate(quizSet.createdAt)}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                      퀴즈 풀기
+                    </button>
+                  </div>
+                ))}
+                <button onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: `1px solid ${CYAN}33`, background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                  새 퀴즈 만들기
+                </button>
+              </div>
+            )}
           </div>
         )}
       </Card>
+      {activeTab === "summary" && (
+        <AITutorDrawer
+          contextTitle={activeSummary ? `${material.name} · ${templateLabels[activeSummary.template]}` : `${material.name} · 요약`}
+          contextMarkdown={activeSummary?.content || ""}
+          summaryId={activeSummary?.id || null}
+          suggestedQuestions={activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL}
+          disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+        />
+      )}
     </div>
   );
 };
@@ -1380,6 +1157,8 @@ export default function Summary() {
   const pendingSummaryRef = useRef(shouldRestoreLocationView && locationState?.openSummary ? {
     id: locationState.summaryId || "",
     template: locationState.summaryTemplate,
+    content: locationState.summaryContent || "",
+    createdAt: locationState.summaryCreatedAt || Date.now(),
     materialIds: locationState.materialIds || [],
   } : null);
   const { courses } = useCourses();
@@ -1468,7 +1247,17 @@ export default function Summary() {
               )
             )
             .sort((a, b) => b.createdAt - a.createdAt);
-          const summary = matchingSummaries[0];
+          const summary = matchingSummaries[0] || (
+            pendingSummary.template && pendingSummary.content
+              ? {
+                  id: pendingSummary.id,
+                  template: pendingSummary.template,
+                  content: pendingSummary.content,
+                  createdAt: pendingSummary.createdAt,
+                  materialIds: pendingSummary.materialIds,
+                }
+              : null
+          );
           if (summary) {
             const validMaterialIds = (summary.materialIds || []).filter(id =>
               nextMaterials.some(material => material.id === id)
@@ -1793,6 +1582,41 @@ export default function Summary() {
     });
   };
 
+  const handleCreateSummaryForMaterial = (material: CourseMaterial) => {
+    setSelectedMaterialIds([material.id]);
+    setSelectedTemplate(null);
+    setResultBackView("materialDetail");
+    setView("templates");
+  };
+
+  const handleCreateQuizForMaterial = (material: CourseMaterial) => {
+    setSelectedMaterialIds([material.id]);
+    navigate(pageRoutes["퀴즈 생성"], {
+      state: { course: selectedCourse, materialIds: [material.id], fromDashboard: fromDashboardRef.current },
+    });
+  };
+
+  const handleOpenMaterialSummary = (summary: SavedSummary) => {
+    const validMaterialIds = (summary.materialIds || []).filter(id => materials.some(material => material.id === id));
+    setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : activeMaterial ? [activeMaterial.id] : []);
+    setSelectedTemplate(summary.template);
+    setActiveSummaryId(summary.id || null);
+    setSummaryText(summary.content);
+    setIsSummarizing(false);
+    setSummaryError("");
+    setElapsedTime(null);
+    setLoadingStep("");
+    setAgentThreadId("");
+    setResultBackView("materialDetail");
+    setView("summaryResult");
+  };
+
+  const handleOpenMaterialQuiz = (quizSet: SavedQuizSet) => {
+    navigate(pageRoutes["퀴즈 생성"], {
+      state: { course: selectedCourse, quizSetId: quizSet.id, openQuiz: true, fromDashboard: fromDashboardRef.current },
+    });
+  };
+
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
@@ -1923,6 +1747,7 @@ export default function Summary() {
           <SummaryResultView
             template={selectedTemplate}
             onBack={() => setView(resultBackView)}
+            contextTitle={`${selectedMaterials.map(material => material.name).join(", ") || "현재 자료"} · ${templateLabels[selectedTemplate]}`}
             realContent={summaryText}
             isLoading={isSummarizing}
             error={summaryError}
@@ -1930,7 +1755,6 @@ export default function Summary() {
             elapsedTime={elapsedTime}
             threadId={agentThreadId}
             summaryId={activeSummaryId}
-            agentContext={selectedMarkdown || summaryText}
             resetTutorHistory={isReloadNavigationRef.current}
             initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
@@ -1940,9 +1764,12 @@ export default function Summary() {
         {view === "materialDetail" && activeMaterial && (
           <MaterialDetailView
             material={activeMaterial}
+            selectedCourse={selectedCourse}
             onBack={() => setView("upload")}
-            onGoSummary={() => setView("templates")}
-            onGoQuiz={handleGoToQuiz}
+            onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
+            onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
+            onOpenSummary={handleOpenMaterialSummary}
+            onOpenQuiz={handleOpenMaterialQuiz}
           />
         )}
 
@@ -2106,6 +1933,29 @@ export default function Summary() {
                         <span style={{ fontSize: 12, color: "#aaa" }}>
                           {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : ""}
                         </span>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setActiveMaterial(material);
+                            setSelectedMaterialIds([material.id]);
+                            setView("materialDetail");
+                          }}
+                          style={{
+                            height: 26,
+                            padding: "0 8px",
+                            borderRadius: 8,
+                            border: `1px solid ${CYAN}33`,
+                            background: "#E8FAFE",
+                            color: CYAN,
+                            cursor: "pointer",
+                            fontSize: 11,
+                            fontWeight: 800,
+                            flexShrink: 0,
+                          }}
+                        >
+                          학습
+                        </button>
                         <button
                           type="button"
                           onClick={e => { e.stopPropagation(); handleDeleteMaterial(material); }}

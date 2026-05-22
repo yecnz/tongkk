@@ -572,6 +572,8 @@ export default function Dashboard() {
                 selectedCourse: detailCourse,
                 summaryId: summary.id,
                 summaryTemplate: summary.template,
+                summaryContent: summary.content,
+                summaryCreatedAt: summary.createdAt,
                 materialIds: summary.materialIds || [],
                 openSummary: true,
                 fromDashboard: true,
