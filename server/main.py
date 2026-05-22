@@ -28,7 +28,15 @@ from agent import run_study_agent, build_llm
 app = FastAPI()
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-ALLOWED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:3000", "http://localhost:3001"]
+ALLOWED_ORIGINS = [
+    FRONTEND_ORIGIN,
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
 ALLOWED_ORIGIN_REGEX = r"https://.*\.trycloudflare\.com"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
