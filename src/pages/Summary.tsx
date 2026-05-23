@@ -131,13 +131,7 @@ const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
-const isPageReload = () => {
-  if (typeof window === "undefined") return false;
-  const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-  if (navigationEntry?.type === "reload") return true;
-  const legacyNavigation = window.performance as Performance & { navigation?: { type: number; TYPE_RELOAD: number } };
-  return legacyNavigation.navigation?.type === legacyNavigation.navigation?.TYPE_RELOAD;
-};
+const isInitialRouteEntry = (locationKey: string) => locationKey === "default";
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -159,12 +153,32 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
 };
 
 const renderInlineText = (text: string): ReactNode[] => {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+  return text.split(/(\*\*[^*]+\*\*|==[^=]+==)/g).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index} style={{ fontWeight: 700, color: "#222" }}>{part.slice(2, -2)}</strong>;
+      return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("==") && part.endsWith("==")) {
+      return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
     }
     return part;
   });
+};
+
+const renderHighlightSyntax = (children: ReactNode): ReactNode => {
+  if (typeof children === "string") {
+    return children.split(/(==[^=]+==)/g).map((part, index) => {
+      if (part.startsWith("==") && part.endsWith("==")) {
+        return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
+      }
+      return part;
+    });
+  }
+
+  if (Array.isArray(children)) {
+    return children.map((child, index) => <span key={index}>{renderHighlightSyntax(child)}</span>);
+  }
+
+  return children;
 };
 
 const markdownStyles = {
@@ -180,22 +194,22 @@ const markdownComponents: Components = {
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 style={{ margin: "26px 0 12px", paddingTop: 18, borderTop: "1px solid #f0f0f0", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "#222" }}>
+    <h2 style={{ margin: "26px 0 12px", padding: "9px 12px", borderRadius: 8, background: "#f3f4f6", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "#222" }}>
       {children}
     </h2>
   ),
-  h3: ({ children }) => <h3 style={{ margin: "20px 0 10px", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{children}</h3>,
+  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "20px 0 10px", padding: "4px 8px", borderRadius: 6, background: "#f6f6f6", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{children}</h3>,
   h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "#333" }}>{children}</h4>,
   h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "#444" }}>{children}</h5>,
   h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "#555" }}>{children}</h6>,
-  p: ({ children }) => <p style={markdownStyles.paragraph}>{children}</p>,
+  p: ({ children }) => <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>,
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
-  li: ({ children }) => <li style={{ marginBottom: 6, paddingLeft: 4 }}>{children}</li>,
-  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{children}</strong>,
+  li: ({ children }) => <li style={{ marginBottom: 6, paddingLeft: 4 }}>{renderHighlightSyntax(children)}</li>,
+  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{renderHighlightSyntax(children)}</strong>,
   em: ({ children }) => <em style={{ color: "#555" }}>{children}</em>,
   blockquote: ({ children }) => (
-    <blockquote style={{ margin: "14px 0", padding: "10px 14px", borderLeft: `4px solid ${PINK}`, borderRadius: 8, background: "#FFF7FB", color: "#555" }}>
+    <blockquote style={{ margin: "14px 0", padding: "13px 15px", border: "1px solid #e8e8e8", borderRadius: 12, background: "#fafafa", color: "#555", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
       {children}
     </blockquote>
   ),
@@ -204,7 +218,7 @@ const markdownComponents: Components = {
       return <code className={className} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 13 }}>{children}</code>;
     }
     return (
-      <code style={{ padding: "2px 6px", borderRadius: 6, background: "#f3f4f6", color: "#d6336c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
+      <code style={{ padding: "2px 6px", borderRadius: 6, background: "#f3f4f6", color: "#555", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em", fontWeight: 700 }}>
         {children}
       </code>
     );
@@ -228,27 +242,36 @@ const markdownComponents: Components = {
   td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>{children}</td>,
 };
 
-const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
-
-const splitCheatSheetSections = (content: string) => {
-  const lines = normalizeMarkdownContent(content).split("\n");
-  const sections: string[] = [];
-  let current: string[] = [];
-
-  lines.forEach((line, index) => {
-    const isSectionStart = /^(#{1,3}\s+|\*\*[^*]+\*\*\s*$)/.test(line.trim());
-    if (isSectionStart && current.some(item => item.trim())) {
-      sections.push(current.join("\n").trim());
-      current = [];
-    }
-    current.push(line);
-    if (index === lines.length - 1 && current.some(item => item.trim())) {
-      sections.push(current.join("\n").trim());
-    }
-  });
-
-  return sections.length > 1 ? sections : [normalizeMarkdownContent(content)];
+const cheatSheetMarkdownComponents: Components = {
+  ...markdownComponents,
+  h1: ({ children }) => (
+    <h1 style={{ margin: "0 0 14px", paddingBottom: 10, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222", breakInside: "avoid" }}>
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 style={{ margin: "20px 0 10px", padding: "8px 10px", borderRadius: 8, background: "#f3f4f6", fontSize: 18, lineHeight: 1.4, fontWeight: 850, color: "#222", breakInside: "avoid" }}>
+      {children}
+    </h2>
+  ),
+  p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "#444" }}>{renderHighlightSyntax(children)}</p>,
+  ul: ({ children }) => <ul style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "disc" }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "decimal" }}>{children}</ol>,
+  li: ({ children }) => <li style={{ marginBottom: 4, paddingLeft: 3 }}>{renderHighlightSyntax(children)}</li>,
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "10px 0 14px", breakInside: "avoid" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 0, fontSize: 12 }}>{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: "8px 9px", background: "#FFF0F6", color: "#333", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left" }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
+
+const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
   const cleaned = normalizeMarkdownContent(content);
@@ -256,14 +279,15 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
 
   if (template === "CHEAT_SHEET") {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
-        {splitCheatSheetSections(cleaned).map((section, index) => (
-          <div key={index} style={{ padding: 18, borderRadius: 12, border: "1px solid #eeeeee", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {section}
-            </ReactMarkdown>
-          </div>
-        ))}
+      <div style={{
+        columnCount: 2,
+        columnWidth: 420,
+        columnGap: 34,
+        columnRule: "1px solid #f1f1f1",
+      }}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={cheatSheetMarkdownComponents}>
+          {cleaned}
+        </ReactMarkdown>
       </div>
     );
   }
@@ -850,10 +874,10 @@ const MaterialDetailView = ({
   const hasSummaries = summaries.length > 0;
   const hasQuizSets = quizSets.length > 0;
   const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
-  const tutorContextMarkdown = activeSummary?.content || material.markdown || "";
+  const tutorContextMarkdown = activeSummary?.content || "";
   const tutorContextTitle = activeSummary
     ? `${material.name} · ${templateLabels[activeSummary.template]}`
-    : `${material.name} · 원본 자료`;
+    : `${material.name} · 요약 없음`;
   const tutorSuggestions = activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL;
 
   const openSummaryTab = () => {
@@ -863,11 +887,8 @@ const MaterialDetailView = ({
 
   const openTutor = (question: string) => {
     if (activeSummary) setActiveSummaryId(activeSummary.id || "");
-    if (activeTab === "original") {
-      setIsOriginalTutorOpen(true);
-    } else {
-      setActiveTab("summary");
-    }
+    setIsOriginalTutorOpen(false);
+    setActiveTab("summary");
     setTutorPrompt(question);
   };
 
@@ -1074,7 +1095,7 @@ const MaterialDetailView = ({
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            {activeTab === "original" && (
+            {activeTab === "original" && hasSummaries && (
               <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
                 height: 34,
                 padding: "0 12px",
@@ -1213,7 +1234,7 @@ const MaterialDetailView = ({
                 materialId={material.id}
                 suggestedQuestions={tutorSuggestions}
                 initialQuestion={tutorPrompt}
-                disabledReason="원본 자료 내용을 불러온 뒤 AI 튜터를 사용할 수 있습니다"
+                disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
               />
             )}
           </div>
@@ -1442,8 +1463,8 @@ export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state as LocationState) || null;
-  const isReloadNavigationRef = useRef(isPageReload());
-  const shouldRestoreLocationView = !isReloadNavigationRef.current;
+  const isInitialRouteEntryRef = useRef(isInitialRouteEntry(location.key));
+  const shouldRestoreLocationView = !isInitialRouteEntryRef.current;
   const initialCourse = (locationState?.selectedCourse || "").trim();
   const fromDashboardRef = useRef(Boolean(initialCourse && locationState?.fromDashboard));
   const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial
@@ -2075,7 +2096,7 @@ export default function Summary() {
             elapsedTime={elapsedTime}
             threadId={agentThreadId}
             summaryId={activeSummaryId}
-            resetTutorHistory={isReloadNavigationRef.current}
+            resetTutorHistory={isInitialRouteEntryRef.current}
             initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
           />

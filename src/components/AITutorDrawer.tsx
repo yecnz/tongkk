@@ -198,6 +198,7 @@ export const AITutorDrawer = ({
     setActiveSessionId(null);
     setAgentMessages([]);
     setChatSessions([]);
+    initialQuestionRef.current = "";
 
     if (!canPersistChat || resetHistory) {
       setChatLoading(false);
