@@ -190,6 +190,12 @@ export const AITutorDrawer = ({
     setShowScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 60);
   };
 
+  const refreshChatSessions = useCallback(async () => {
+    if (!canPersistChat) return;
+    const sessions = await loadSummaryChatSessions({ summaryId, materialId });
+    setChatSessions(sessions);
+  }, [canPersistChat, summaryId, materialId]);
+
   useEffect(() => {
     let ignore = false;
     setLocalThreadId(threadId);
@@ -263,7 +269,7 @@ export const AITutorDrawer = ({
     setAgentInput(question);
   }, [initialQuestion, canUseAgent, setOpen]);
 
-  const startNewConversation = () => {
+  const startNewConversation = async () => {
     if (chatLoading || agentLoading) return;
     setActiveSessionId(null);
     setAgentMessages([]);
@@ -272,6 +278,16 @@ export const AITutorDrawer = ({
     setAgentError("");
     setShowScrollBtn(false);
     setSessionsCollapsed(false);
+
+    if (!canPersistChat) return;
+    setChatLoading(true);
+    try {
+      await refreshChatSessions();
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : "AI 튜터 대화 목록을 불러오지 못했습니다.");
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const openChatSession = async (sessionId: string) => {
@@ -420,7 +436,7 @@ export const AITutorDrawer = ({
             {canUseAgent && (
               <button
                 type="button"
-                onClick={startNewConversation}
+                onClick={() => void startNewConversation()}
                 disabled={chatLoading || agentLoading}
                 aria-label="기존 대화를 보존하고 새 대화 시작"
                 title="기존 대화를 보존하고 새 대화를 시작합니다"
@@ -456,7 +472,7 @@ export const AITutorDrawer = ({
           </div>
         </div>
 
-        {canPersistChat && chatSessions.length > 0 && (
+        {canPersistChat && (chatSessions.length > 0 || !activeSessionId) && (
           <div style={{ marginBottom: 14, border: "1px solid #eeeeee", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <button
               type="button"
@@ -481,6 +497,20 @@ export const AITutorDrawer = ({
             </button>
             {!sessionsCollapsed && (
               <div style={{ maxHeight: 132, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                {!activeSessionId && (
+                  <div style={{
+                    padding: "9px 10px",
+                    borderRadius: 9,
+                    border: `1px solid ${PINK}55`,
+                    background: "#FFF0F6",
+                    color: PINK,
+                    fontSize: 12,
+                    fontWeight: 850,
+                    lineHeight: 1.35,
+                  }}>
+                    새 대화 작성 중
+                  </div>
+                )}
                 {chatSessions.map(session => {
                   const isActive = session.id === activeSessionId;
                   return (

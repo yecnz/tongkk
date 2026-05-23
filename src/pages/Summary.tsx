@@ -455,10 +455,15 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
+  const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   const questions = suggestedTutorQuestions[template];
 
   const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
+
+  useEffect(() => {
+    if (initialTutorQuestion?.trim()) setIsTutorOpen(true);
+  }, [initialTutorQuestion]);
 
   const handleDownload = async () => {
     if (!pdfExportRef.current || pdfSaving) return;
@@ -613,6 +618,17 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
                     background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
                   }}>퀴즈 생성하기</button>
                 )}
+                <button onClick={() => setIsTutorOpen(prev => !prev)} style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 10,
+                  border: isTutorOpen ? `1px solid ${PINK}55` : "1px solid #e0e0e0",
+                  background: isTutorOpen ? "#FFF0F6" : "#fff",
+                  color: isTutorOpen ? PINK : "#555",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}>{isTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
               </>
             )}
           </div>
@@ -709,12 +725,18 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
             <strong>요약 실패:</strong> {error}
           </div>
         ) : (
-          <div style={{ position: "relative" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+            gap: isTutorOpen ? 12 : 0,
+            alignItems: "stretch",
+          }}>
             <div style={{
               background: "#fff", borderRadius: 12, padding: 28,
               border: "1px solid #f0f0f0",
               fontSize: 15, color: "#444", lineHeight: 1.85,
               overflowX: "auto",
+              minWidth: 0,
             }}>
               {mindmapData ? (
                 <MindmapView key={displayContent} data={mindmapData} />
@@ -723,16 +745,21 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
               )}
             </div>
 
-            <AITutorDrawer
-              contextTitle={contextTitle}
-              contextMarkdown={realContent}
-              summaryId={summaryId}
-              threadId={threadId}
-              suggestedQuestions={questions}
-              initialQuestion={!isLoading ? initialTutorQuestion : undefined}
-              disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
-              resetHistory={resetTutorHistory}
-            />
+            {isTutorOpen && (
+              <AITutorDrawer
+                layout="embedded"
+                open={isTutorOpen}
+                onOpenChange={setIsTutorOpen}
+                contextTitle={contextTitle}
+                contextMarkdown={realContent}
+                summaryId={summaryId}
+                threadId={threadId}
+                suggestedQuestions={questions}
+                initialQuestion={!isLoading ? initialTutorQuestion : undefined}
+                disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                resetHistory={resetTutorHistory}
+              />
+            )}
           </div>
         )}
       </Card>
@@ -778,6 +805,7 @@ const MaterialDetailView = ({
   const [activeSummaryId, setActiveSummaryId] = useState<string>("");
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
+  const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
   const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
   const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
@@ -815,6 +843,7 @@ const MaterialDetailView = ({
     setActiveTab(initialTab);
     setTutorPrompt(initialTutorQuestion);
     setIsOriginalTutorOpen(false);
+    setIsSummaryTutorOpen(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
   }, [material.id, initialTab, initialTutorQuestion]);
 
   useEffect(() => {
@@ -890,6 +919,7 @@ const MaterialDetailView = ({
     setIsOriginalTutorOpen(false);
     setActiveTab("summary");
     setTutorPrompt(question);
+    setIsSummaryTutorOpen(true);
   };
 
   const learningCta = (() => {
@@ -1217,10 +1247,11 @@ const MaterialDetailView = ({
         {activeTab === "original" && (
           <div style={{
             display: "grid",
-            gridTemplateColumns: isOriginalTutorOpen ? "minmax(0, 1fr) minmax(360px, 1fr)" : "minmax(0, 1fr)",
+            gridTemplateColumns: isOriginalTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+            gap: isOriginalTutorOpen ? 12 : 0,
             alignItems: "stretch",
           }}>
-            <div style={{ minWidth: 0, borderRight: isOriginalTutorOpen ? `1px solid ${BORDER_COLOR}` : "none" }}>
+            <div style={{ minWidth: 0 }}>
               {renderOriginalTab()}
             </div>
             {isOriginalTutorOpen && (
@@ -1255,7 +1286,12 @@ const MaterialDetailView = ({
                 </div>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 18, alignItems: "start" }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: isSummaryTutorOpen ? "220px minmax(0, 1fr) 400px" : "220px minmax(0, 1fr)",
+                gap: 18,
+                alignItems: "start",
+              }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {summaries.map(summary => (
                     <button
@@ -1278,7 +1314,7 @@ const MaterialDetailView = ({
                   ))}
                 </div>
                 {activeSummary && (
-                  <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}` }}>
+                  <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 18 }}>
                       <div>
                         <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
@@ -1289,10 +1325,36 @@ const MaterialDetailView = ({
                         <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                           자세히 보기
                         </button>
+                        <button onClick={() => setIsSummaryTutorOpen(prev => !prev)} style={{
+                          padding: "9px 12px",
+                          borderRadius: 8,
+                          border: isSummaryTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                          background: isSummaryTutorOpen ? "#FFF0F6" : "#fff",
+                          color: isSummaryTutorOpen ? PINK : "#555",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          cursor: "pointer",
+                        }}>
+                          {isSummaryTutorOpen ? "튜터 닫기" : "AI 튜터"}
+                        </button>
                       </div>
                     </div>
                     <FormattedAiText content={activeSummary.content} template={activeSummary.template} />
                   </div>
+                )}
+                {isSummaryTutorOpen && activeSummary && (
+                  <AITutorDrawer
+                    layout="embedded"
+                    open={isSummaryTutorOpen}
+                    onOpenChange={setIsSummaryTutorOpen}
+                    contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
+                    contextMarkdown={activeSummary.content}
+                    summaryId={activeSummary.id || null}
+                    materialId={material.id}
+                    suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
+                    initialQuestion={tutorPrompt}
+                    disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                  />
                 )}
               </div>
             )}
@@ -1357,17 +1419,6 @@ const MaterialDetailView = ({
           </div>
         )}
       </Card>
-      {activeTab === "summary" && (
-        <AITutorDrawer
-          contextTitle={activeSummary ? `${material.name} · ${templateLabels[activeSummary.template]}` : `${material.name} · 요약`}
-          contextMarkdown={activeSummary?.content || ""}
-          summaryId={activeSummary?.id || null}
-          materialId={material.id}
-          suggestedQuestions={activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL}
-          initialQuestion={tutorPrompt}
-          disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
-        />
-      )}
     </div>
   );
 };
@@ -2035,7 +2086,11 @@ export default function Summary() {
         <span style={{ color: "#bbb", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{
+        padding: view === "summaryResult" || view === "materialDetail" ? "18px 20px" : 24,
+        maxWidth: view === "summaryResult" || view === "materialDetail" ? 1480 : 1100,
+        margin: "0 auto",
+      }}>
         {courses.length > 0 && view === "upload" && !selectedCourse && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ marginBottom: 12 }}>

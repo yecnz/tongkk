@@ -27,6 +27,42 @@ type SummaryChatSessionRow = {
   updated_at: string;
 };
 
+type SupabaseLikeError = {
+  code?: string;
+  message?: string;
+  details?: string;
+};
+
+const LEGACY_SUMMARY_SESSION_PREFIX = 'legacy-summary:';
+const CHAT_SESSION_SCHEMA_MISSING_KEY = 'tongkk-summary-chat-session-schema-missing';
+
+const isChatSessionSchemaMarkedMissing = () =>
+  typeof window !== 'undefined' && window.sessionStorage.getItem(CHAT_SESSION_SCHEMA_MISSING_KEY) === '1';
+
+const markChatSessionSchemaMissing = () => {
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.setItem(CHAT_SESSION_SCHEMA_MISSING_KEY, '1');
+  }
+};
+
+const isMissingChatSessionSchemaError = (error: SupabaseLikeError | null) => {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+  return (
+    text.includes('summary_chat_sessions') ||
+    text.includes('session_id') ||
+    text.includes('could not find') ||
+    text.includes('does not exist') ||
+    text.includes('schema cache')
+  );
+};
+
+const legacySummarySessionId = (summaryId: string) => `${LEGACY_SUMMARY_SESSION_PREFIX}${summaryId}`;
+
+const getLegacySummaryId = (sessionId: string) =>
+  sessionId.startsWith(LEGACY_SUMMARY_SESSION_PREFIX)
+    ? sessionId.slice(LEGACY_SUMMARY_SESSION_PREFIX.length)
+    : null;
+
 const toAgentMessage = (row: SummaryChatMessageRow): AgentMessage => ({
   role: row.role,
   content: row.content,
@@ -50,6 +86,33 @@ const requireChatTarget = (target: SummaryChatTarget) => {
     throw new Error('AI 튜터 대화 저장 기준이 없습니다.');
   }
 };
+
+async function loadLegacySummaryMessages(summaryId: string): Promise<SummaryChatMessageRow[]> {
+  const { data, error } = await supabase
+    .from('summary_chat_messages')
+    .select('role, content, created_at')
+    .eq('summary_id', summaryId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw new Error(formatSupabaseError(error));
+  return data || [];
+}
+
+async function createLegacySummarySession(summaryId: string): Promise<SummaryChatSession | null> {
+  const messages = await loadLegacySummaryMessages(summaryId);
+  if (messages.length === 0) return null;
+
+  const firstUserMessage = messages.find(message => message.role === 'user');
+  const firstCreatedAt = messages[0]?.created_at ? new Date(messages[0].created_at).getTime() : Date.now();
+  const lastCreatedAt = messages[messages.length - 1]?.created_at ? new Date(messages[messages.length - 1].created_at).getTime() : firstCreatedAt;
+
+  return {
+    id: legacySummarySessionId(summaryId),
+    title: createSummaryChatTitle(firstUserMessage?.content || '기존 튜터 대화'),
+    createdAt: firstCreatedAt,
+    updatedAt: lastCreatedAt,
+  };
+}
 
 async function migrateLegacySummaryMessages(summaryId: string): Promise<void> {
   const user = await requireSupabaseUser();
@@ -92,30 +155,55 @@ export async function loadSummaryChatSessions(target: SummaryChatTarget): Promis
   await requireSupabaseUser();
   requireChatTarget(target);
 
-  if (target.summaryId) {
-    await migrateLegacySummaryMessages(target.summaryId);
+  if (isChatSessionSchemaMarkedMissing()) {
+    if (!target.summaryId) return [];
+    const legacySession = await createLegacySummarySession(target.summaryId);
+    return legacySession ? [legacySession] : [];
   }
 
-  let query = supabase
-    .from('summary_chat_sessions')
-    .select('id, title, created_at, updated_at')
-    .order('updated_at', { ascending: false });
+  try {
+    if (target.summaryId) {
+      await migrateLegacySummaryMessages(target.summaryId);
+    }
 
-  if (target.summaryId) {
-    query = query.eq('summary_id', target.summaryId);
-  } else {
-    query = query.eq('material_id', target.materialId);
+    let query = supabase
+      .from('summary_chat_sessions')
+      .select('id, title, created_at, updated_at')
+      .order('updated_at', { ascending: false });
+
+    if (target.summaryId) {
+      query = query.eq('summary_id', target.summaryId);
+    } else {
+      query = query.eq('material_id', target.materialId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return (data || []).map(toChatSession);
+  } catch (error) {
+    if (isMissingChatSessionSchemaError(error as SupabaseLikeError | null) && target.summaryId) {
+      markChatSessionSchemaMissing();
+      const legacySession = await createLegacySummarySession(target.summaryId);
+      return legacySession ? [legacySession] : [];
+    }
+    throw new Error(formatSupabaseError(error as SupabaseLikeError | null));
   }
-
-  const { data, error } = await query;
-
-  if (error) throw new Error(formatSupabaseError(error));
-  return (data || []).map(toChatSession);
 }
 
 export async function createSummaryChatSession(target: SummaryChatTarget, title: string): Promise<SummaryChatSession> {
   const user = await requireSupabaseUser();
   requireChatTarget(target);
+
+  if (isChatSessionSchemaMarkedMissing() && target.summaryId) {
+    const now = Date.now();
+    return {
+      id: legacySummarySessionId(target.summaryId),
+      title: title || '새 튜터 대화',
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
 
   const { data, error } = await supabase
     .from('summary_chat_sessions')
@@ -128,12 +216,28 @@ export async function createSummaryChatSession(target: SummaryChatTarget, title:
     .select('id, title, created_at, updated_at')
     .single();
 
-  if (error) throw new Error(formatSupabaseError(error));
+  if (error) {
+    if (isMissingChatSessionSchemaError(error) && target.summaryId) {
+      markChatSessionSchemaMissing();
+      const now = Date.now();
+      return {
+        id: legacySummarySessionId(target.summaryId),
+        title: title || '새 튜터 대화',
+        createdAt: now,
+        updatedAt: now,
+      };
+    }
+    throw new Error(formatSupabaseError(error));
+  }
   return toChatSession(data);
 }
 
 export async function loadSummaryChatMessages(sessionId: string): Promise<AgentMessage[]> {
   await requireSupabaseUser();
+  const legacySummaryId = getLegacySummaryId(sessionId);
+  if (legacySummaryId) {
+    return (await loadLegacySummaryMessages(legacySummaryId)).map(toAgentMessage);
+  }
 
   const { data, error } = await supabase
     .from('summary_chat_messages')
@@ -147,6 +251,21 @@ export async function loadSummaryChatMessages(sessionId: string): Promise<AgentM
 
 export async function saveSummaryChatMessage(sessionId: string, target: SummaryChatTarget, message: AgentMessage): Promise<void> {
   const user = await requireSupabaseUser();
+  const legacySummaryId = getLegacySummaryId(sessionId);
+
+  if (legacySummaryId) {
+    const { error } = await supabase
+      .from('summary_chat_messages')
+      .insert({
+        summary_id: legacySummaryId,
+        user_id: user.id,
+        role: message.role,
+        content: message.content,
+      });
+
+    if (error && !isMissingChatSessionSchemaError(error)) throw new Error(formatSupabaseError(error));
+    return;
+  }
 
   const { error } = await supabase
     .from('summary_chat_messages')
@@ -158,12 +277,30 @@ export async function saveSummaryChatMessage(sessionId: string, target: SummaryC
       content: message.content,
     });
 
-  if (error) throw new Error(formatSupabaseError(error));
+  if (error) {
+    if (isMissingChatSessionSchemaError(error) && target.summaryId) {
+      markChatSessionSchemaMissing();
+      const { error: legacyError } = await supabase
+        .from('summary_chat_messages')
+        .insert({
+          summary_id: target.summaryId,
+          user_id: user.id,
+          role: message.role,
+          content: message.content,
+        });
+
+      if (legacyError) throw new Error(formatSupabaseError(legacyError));
+      return;
+    }
+    throw new Error(formatSupabaseError(error));
+  }
 
   const { error: sessionError } = await supabase
     .from('summary_chat_sessions')
     .update({ updated_at: new Date().toISOString() })
     .eq('id', sessionId);
 
-  if (sessionError) throw new Error(formatSupabaseError(sessionError));
+  if (sessionError && !isMissingChatSessionSchemaError(sessionError)) {
+    throw new Error(formatSupabaseError(sessionError));
+  }
 }

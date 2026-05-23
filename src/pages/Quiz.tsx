@@ -1537,7 +1537,7 @@ export default function Quiz() {
             </div>
           )}
           {showExplanation && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#FAFAFA", borderLeft: `3px solid ${CYAN}`, fontSize: 13, color: "#555", lineHeight: 1.6 }}>
+            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#FAFAFA", fontSize: 13, color: "#555", lineHeight: 1.6 }}>
               <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
             </div>
           )}
