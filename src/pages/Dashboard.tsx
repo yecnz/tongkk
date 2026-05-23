@@ -8,6 +8,7 @@ import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
+import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -24,12 +25,23 @@ type CourseDetailModalProps = {
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
 };
 type CustomCalendarProps = { value: string; onChange: (value: string) => void };
-type AddDdayModalProps = { onClose: () => void; onAdd: (subject: string, date: string) => void };
+type DdayType = "assignment" | "event";
+type AddDdayModalProps = { onClose: () => void; onAdd: (type: DdayType, subject: string, date: string) => void };
 type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
-type Dday = { id?: string; subj: string; date: string };
-type Plan = { id?: string; text: string; done: boolean };
+type Dday = { id?: string; type?: DdayType; subj: string; date: string };
+type Plan = { id?: string; text: string; done: boolean; minutes?: number; sourceType?: DdayType | "carryover" };
+type PlanSource = {
+  key: string;
+  label: string;
+  meta: string;
+  kind: DdayType | "carryover";
+  daysLeft?: number;
+  dday?: Dday;
+  plan?: Plan;
+};
 
 const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정" };
 
 const templateLabels: Record<SavedSummary["template"], string> = {
   GENERAL: "일반 요약",
@@ -196,13 +208,37 @@ const CustomCalendar = ({ value, onChange }: CustomCalendarProps) => {
 };
 
 const AddDdayModal = ({ onClose, onAdd }: AddDdayModalProps) => {
+  const [type, setType] = useState<DdayType>("assignment");
   const [subj, setSubj] = useState("");
   const [date, setDate] = useState("");
+  const title = type === "assignment" ? "과제 추가" : "일정 추가";
+  const placeholder = type === "assignment" ? "과제명" : "일정명";
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: 380, background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid rgba(255,255,255,0.9)" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>D-day 추가</h3>
-        <input value={subj} onChange={e => setSubj(e.target.value)} placeholder="과목명" style={{
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+          {(["assignment", "event"] as const).map(item => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setType(item)}
+              style={{
+                padding: "9px 0",
+                borderRadius: 10,
+                border: type === item ? `1px solid ${PINK}` : "1px solid #e0e0e0",
+                background: type === item ? "#FFF0F6" : "rgba(255,255,255,0.8)",
+                color: type === item ? PINK : "#666",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              {ddayTypeLabels[item]}
+            </button>
+          ))}
+        </div>
+        <input value={subj} onChange={e => setSubj(e.target.value)} placeholder={placeholder} aria-label={title} style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
           fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 14,
           background: "rgba(255,255,255,0.8)"
@@ -215,7 +251,7 @@ const AddDdayModal = ({ onClose, onAdd }: AddDdayModalProps) => {
         <CustomCalendar value={date} onChange={setDate} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
           <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={() => { if (subj && date) { onAdd(subj, date); onClose(); }}} style={{
+          <button onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
@@ -226,17 +262,31 @@ const AddDdayModal = ({ onClose, onAdd }: AddDdayModalProps) => {
 
 const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   const [txt, setTxt] = useState("");
+  const handleAdd = () => {
+    const planText = txt.trim();
+    if (!planText) return;
+    onAdd(planText);
+    onClose();
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Card style={{ padding: 28, width: 340 }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
-        <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="학습 계획 입력" style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
-        }}/>
+        <input
+          value={txt}
+          onChange={e => setTxt(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
+          placeholder="학습 계획을 입력하세요"
+          autoFocus
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+            fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
+          }}
+        />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={() => { if (txt.trim()) { onAdd(txt.trim()); onClose(); }}} style={{
+          <button onClick={handleAdd} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
@@ -515,6 +565,16 @@ export default function Dashboard() {
   const [showAddDday, setShowAddDday] = useState(false);
   const [showAllDdays, setShowAllDdays] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
+  const [showStudyPlanOptions, setShowStudyPlanOptions] = useState(false);
+  const [showPlanSourcePicker, setShowPlanSourcePicker] = useState(false);
+  const [pendingStudyPlanMode, setPendingStudyPlanMode] = useState<StudyPlanMode>("balanced");
+  const [selectedPlanSourceKeys, setSelectedPlanSourceKeys] = useState<string[]>([]);
+  const [planSourceMessage, setPlanSourceMessage] = useState("");
+  const [studyPlanMessage, setStudyPlanMessage] = useState("");
+  const [studyPlanLoading, setStudyPlanLoading] = useState(false);
+  const [studyPlanError, setStudyPlanError] = useState("");
+  const [editingPlanKey, setEditingPlanKey] = useState<string | null>(null);
+  const [editingPlanText, setEditingPlanText] = useState("");
   const [openCourseMenu, setOpenCourseMenu] = useState<string | null>(null);
   const [renamingCourse, setRenamingCourse] = useState<string | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
@@ -529,7 +589,7 @@ export default function Dashboard() {
     ])
       .then(([nextDdays, nextPlans]) => {
         if (ignore) return;
-        setDdays(nextDdays);
+        setDdays(nextDdays.map(item => ({ ...item, type: item.type || "assignment" })));
         setPlans(nextPlans);
         setDashboardStateLoaded(true);
       })
@@ -567,6 +627,111 @@ export default function Dashboard() {
   // 날짜 가까운 순 자동 정렬
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
+  const incompletePlans = plans.filter(plan => !plan.done);
+  const makeDdaySourceKey = (dday: Dday, index: number) => `dday-${dday.id || `${dday.subj}-${dday.date}-${index}`}`;
+  const makePlanSourceKey = (plan: Plan, index: number) => `plan-${plan.id || `${plan.text}-${index}`}`;
+  const formatDdayLabel = (daysLeft: number) => daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? "D-Day" : `D+${Math.abs(daysLeft)}`;
+  const planSources: PlanSource[] = [
+    ...sortedDdays.map((dday, index) => {
+      const daysLeft = getDaysLeft(dday.date);
+      const type = dday.type || "assignment";
+      return {
+        key: makeDdaySourceKey(dday, index),
+        label: dday.subj,
+        meta: `${ddayTypeLabels[type]} ${formatDdayLabel(daysLeft)}`,
+        kind: type,
+        daysLeft,
+        dday,
+      };
+    }),
+    ...incompletePlans.map((plan, index) => ({
+      key: makePlanSourceKey(plan, index),
+      label: plan.text,
+      meta: "미완료",
+      kind: "carryover" as const,
+      plan,
+    })),
+  ];
+  const canGenerateStudyPlan = planSources.length > 0;
+  const selectedPlanSources = planSources.filter(source => selectedPlanSourceKeys.includes(source.key));
+  const carryoverPlanSources = planSources.filter(source => source.kind === "carryover");
+  const ddayPlanSources = planSources.filter(source => source.kind !== "carryover");
+
+  const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode) => {
+    const carryoverCount = sources.filter(source => source.kind === "carryover").length;
+    const assignmentCount = sources.filter(source => source.kind === "assignment").length;
+    const eventCount = sources.filter(source => source.kind === "event").length;
+    const parts = [
+      carryoverCount ? `미완료 계획 ${carryoverCount}개` : "",
+      assignmentCount ? `가까운 과제 ${assignmentCount}개` : "",
+      eventCount ? `가까운 일정 ${eventCount}개` : "",
+    ].filter(Boolean);
+    if (parts.length === 0) return "자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.";
+    if (mode === "lighter") return `${parts.join("와 ")}만 가볍게 반영할게요.`;
+    if (mode === "harder") return `${parts.join("와 ")}를 조금 빡세게 반영할게요.`;
+    if (mode === "assignment") return `과제 중심으로 ${parts.join("와 ")}를 골라뒀어요.`;
+    if (mode === "event") return `일정 위주로 ${parts.join("와 ")}를 골라뒀어요.`;
+    return `${parts.join("와 ")}를 반영할게요.`;
+  };
+
+  const getRecommendedPlanSourceKeys = (mode: StudyPlanMode) => {
+    const carryoverLimit = mode === "harder" ? 5 : mode === "lighter" ? 1 : mode === "event" ? 1 : 2;
+    const ddayLimit = mode === "harder" ? 5 : mode === "lighter" ? 1 : 3;
+    const carryoverSources = planSources
+      .filter(source => source.kind === "carryover")
+      .slice(0, carryoverLimit);
+    const ddaySources = planSources
+      .filter(source => {
+        const daysLeft = source.daysLeft ?? 999;
+        if (mode === "assignment") return source.kind === "assignment" && daysLeft <= 10;
+        if (mode === "event") return source.kind === "event" && daysLeft <= 7;
+        if (mode === "lighter") return source.kind === "assignment" ? daysLeft <= 3 : daysLeft <= 1;
+        if (mode === "harder") return source.kind === "assignment" ? daysLeft <= 14 : daysLeft <= 2;
+        return source.kind === "assignment" ? daysLeft <= 7 : daysLeft <= 1;
+      })
+      .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0))
+      .slice(0, ddayLimit);
+    return [...carryoverSources, ...ddaySources].map(source => source.key);
+  };
+
+  const openPlanSourcePicker = (mode: StudyPlanMode) => {
+    if (!canGenerateStudyPlan) return;
+    const recommendedKeys = getRecommendedPlanSourceKeys(mode);
+    const recommendedSources = planSources.filter(source => recommendedKeys.includes(source.key));
+    setPendingStudyPlanMode(mode);
+    setSelectedPlanSourceKeys(recommendedKeys);
+    setPlanSourceMessage(summarizePlanSources(recommendedSources, mode));
+    setStudyPlanError("");
+    setShowPlanSourcePicker(true);
+  };
+
+  const requestStudyPlan = async () => {
+    if (selectedPlanSources.length === 0 || studyPlanLoading) return;
+    setStudyPlanLoading(true);
+    setStudyPlanError("");
+    try {
+      const selectedDdays = selectedPlanSources
+        .map(source => source.dday)
+        .filter((dday): dday is Dday => Boolean(dday));
+      const selectedIncompletePlans = selectedPlanSources
+        .map(source => source.plan)
+        .filter((plan): plan is Plan => Boolean(plan));
+      const result = await generateStudyPlan(selectedDdays, selectedIncompletePlans, pendingStudyPlanMode);
+      setStudyPlanMessage(result.message);
+      setPlans(result.items.map(item => ({
+        id: createClientId(),
+        text: `${item.text} ${item.minutes}분`,
+        done: false,
+        minutes: item.minutes,
+        sourceType: item.sourceType,
+      })));
+      setShowPlanSourcePicker(false);
+    } catch (err) {
+      setStudyPlanError(err instanceof Error ? err.message : "학습 계획 생성 실패");
+    } finally {
+      setStudyPlanLoading(false);
+    }
+  };
 
   const deleteDday = (target: Dday) => {
     setDdays(prev => {
@@ -582,6 +747,30 @@ export default function Dashboard() {
     setPlans(prev => prev.filter((item, index) =>
       target.id ? item.id !== target.id : index !== targetIndex
     ));
+  };
+
+  const togglePlanSource = (sourceKey: string) => {
+    setSelectedPlanSourceKeys(prev =>
+      prev.includes(sourceKey)
+        ? prev.filter(key => key !== sourceKey)
+        : [...prev, sourceKey]
+    );
+  };
+
+  const startEditPlan = (plan: Plan, index: number) => {
+    setEditingPlanKey(plan.id || `index-${index}`);
+    setEditingPlanText(plan.text);
+  };
+
+  const finishEditPlan = (target: Plan, targetIndex: number) => {
+    const nextText = editingPlanText.trim();
+    setEditingPlanKey(null);
+    setEditingPlanText("");
+    if (!nextText) return;
+    setPlans(prev => prev.map((item, index) => {
+      const isTarget = target.id ? item.id === target.id : index === targetIndex;
+      return isTarget ? { ...item, text: nextText } : item;
+    }));
   };
 
   return (
@@ -631,8 +820,8 @@ export default function Dashboard() {
           }}
         />
       )}
-      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays(prev => [...prev, { id: createClientId(), subj: s, date: d }])} />}
-      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { id: createClientId(), text: t, done: false }])} />}
+      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
+      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
 
       {/* Header */}
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
@@ -824,12 +1013,24 @@ export default function Dashboard() {
                 <>
                   {displayDdays.map((d, i) => {
                     const left = getDaysLeft(d.date);
+                    const type = d.type || "assignment";
                     return (
                       <div key={d.id || `${d.subj}-${d.date}-${i}`} style={{
                         display: "flex", justifyContent: "space-between", alignItems: "center",
                         padding: "10px 0", borderBottom: i < displayDdays.length - 1 ? "1px solid #f5f5f5" : "none"
                       }}>
-                        <span style={{ fontSize: 14, fontWeight: 500, color: "#333" }}>{d.subj}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <span style={{
+                            flexShrink: 0,
+                            padding: "3px 7px",
+                            borderRadius: 999,
+                            background: type === "assignment" ? "#FFF0F6" : "#E8FAFE",
+                            color: type === "assignment" ? PINK : CYAN,
+                            fontSize: 11,
+                            fontWeight: 800,
+                          }}>{ddayTypeLabels[type]}</span>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "#333", wordBreak: "break-word" }}>{d.subj}</span>
+                        </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
                             {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
@@ -871,54 +1072,292 @@ export default function Dashboard() {
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#222" }}>오늘의 학습계획</h3>
-                <button onClick={() => setShowAddPlan(true)} style={{
-                  background: "none", border: "none", fontSize: 20, color: CYAN, cursor: "pointer", lineHeight: 1
-                }}>+</button>
               </div>
-              {plans.length === 0 ? (
-                <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "10px 0" }}>학습 계획을 추가해보세요</p>
+              {studyPlanMessage ? (
+                <p style={{ margin: "0 0 12px", color: "#555", fontSize: 13, lineHeight: 1.6 }}>{studyPlanMessage}</p>
               ) : (
-                plans.map((p, i) => (
-                  <div key={p.id || `${p.text}-${i}`} style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-                    borderBottom: i < plans.length - 1 ? "1px solid #f5f5f5" : "none"
-                  }}>
-                    <button onClick={() => {
-                      const np = [...plans]; np[i] = { ...np[i], done: !np[i].done }; setPlans(np);
-                    }} style={{
-                      width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "#ddd"}`,
-                      background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
-                      alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
-                    }}>
-                      {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
-                    </button>
-                    <span style={{
+                <p style={{ margin: "0 0 12px", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+                  D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
+                </p>
+              )}
+              <div style={{ display: "flex", gap: 8, marginBottom: showStudyPlanOptions ? 8 : 14 }}>
+                <div style={{ display: "flex", gap: 4, minWidth: 0, flex: 1 }}>
+                  <button
+                    type="button"
+                    onClick={() => openPlanSourcePicker(plans.length ? "reroll" : "balanced")}
+                    disabled={!canGenerateStudyPlan || studyPlanLoading}
+                    style={{
                       flex: 1,
-                      fontSize: 14, color: p.done ? "#bbb" : "#444",
-                      textDecoration: p.done ? "line-through" : "none"
-                    }}>{p.text}</span>
+                      minWidth: 0,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "#e5e5e5" : CYAN}`,
+                      background: "#fff",
+                      color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : CYAN,
+                      cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
+                      fontSize: 13,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {studyPlanLoading ? "생성 중..." : "AI가 짜기"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowStudyPlanOptions(prev => !prev)}
+                    aria-label="AI 계획 옵션 열기"
+                    title="AI 계획 옵션"
+                    style={{
+                      width: 30,
+                      flexShrink: 0,
+                      borderRadius: 8,
+                      border: "1px solid #eaf7fa",
+                      background: "#fff",
+                      color: CYAN,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      padding: 0,
+                    }}
+                  >
+                    {showStudyPlanOptions ? "⌃" : "⌄"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPlan(true)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: `1px solid ${CYAN}`,
+                    background: "#fff",
+                    color: CYAN,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 800,
+                  }}
+                >
+                  직접 추가하기
+                </button>
+              </div>
+              {showStudyPlanOptions && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                  {([
+                    { label: "더 가볍게", mode: "lighter" },
+                    { label: "더 빡세게", mode: "harder" },
+                    { label: "과제 위주", mode: "assignment" },
+                    { label: "일정 위주", mode: "event" },
+                  ] as const).map(action => (
                     <button
-                      onClick={() => deletePlan(p, i)}
-                      aria-label={`${p.text} 학습 계획 삭제`}
-                      title="삭제"
+                      key={action.label}
+                      type="button"
+                      onClick={() => openPlanSourcePicker(action.mode)}
+                      disabled={!canGenerateStudyPlan || studyPlanLoading}
                       style={{
-                        width: 24,
-                        height: 24,
+                        padding: "6px 9px",
+                        borderRadius: 8,
+                        border: "1px solid #f0f0f0",
+                        background: !canGenerateStudyPlan || studyPlanLoading ? "#f2f2f2" : "#fff",
+                        color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : "#666",
+                        cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showPlanSourcePicker && (
+                <div style={{
+                  marginBottom: 14,
+                  padding: 12,
+                  borderRadius: 12,
+                  border: "1px solid #eef7f9",
+                  background: "#fbfeff",
+                }}>
+                  <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "#555" }}>
+                    {planSourceMessage}
+                  </p>
+                  {([
+                    { title: "남아있는 학습계획", sources: carryoverPlanSources },
+                    { title: "D-day", sources: ddayPlanSources },
+                  ] as const).map(group => (
+                    group.sources.length > 0 && (
+                      <div key={group.title} style={{ marginBottom: 12 }}>
+                        <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "#999" }}>{group.title}</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                          {group.sources.map(source => {
+                            const selected = selectedPlanSourceKeys.includes(source.key);
+                            const accent = source.kind === "event" ? CYAN : source.kind === "assignment" ? PINK : "#777";
+                            return (
+                              <button
+                                key={source.key}
+                                type="button"
+                                onClick={() => togglePlanSource(source.key)}
+                                style={{
+                                  maxWidth: "100%",
+                                  padding: "6px 9px",
+                                  borderRadius: 999,
+                                  border: `1px solid ${selected ? accent : "#eeeeee"}`,
+                                  background: selected ? (source.kind === "event" ? "#E8FAFE" : source.kind === "assignment" ? "#FFF0F6" : "#f7f7f7") : "#fff",
+                                  color: selected ? accent : "#777",
+                                  cursor: "pointer",
+                                  fontSize: 12,
+                                  fontWeight: selected ? 800 : 650,
+                                  textAlign: "left",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {selected ? "✓ " : ""}{source.label} {source.meta}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )
+                  ))}
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlanSourcePicker(false)}
+                      style={{
+                        padding: "7px 11px",
                         borderRadius: 8,
                         border: "1px solid #eeeeee",
                         background: "#fff",
-                        color: "#bbb",
+                        color: "#777",
                         cursor: "pointer",
-                        fontSize: 15,
-                        lineHeight: "22px",
-                        padding: 0,
-                        flexShrink: 0,
+                        fontSize: 12,
+                        fontWeight: 750,
                       }}
                     >
-                      ×
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={requestStudyPlan}
+                      disabled={selectedPlanSources.length === 0 || studyPlanLoading}
+                      style={{
+                        padding: "7px 11px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: selectedPlanSources.length === 0 || studyPlanLoading ? "#ddd" : CYAN,
+                        color: "#fff",
+                        cursor: selectedPlanSources.length === 0 || studyPlanLoading ? "default" : "pointer",
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {studyPlanLoading ? "생성 중..." : "이대로 짜기"}
                     </button>
                   </div>
-                ))
+                </div>
+              )}
+              {studyPlanError && (
+                <p style={{ margin: "0 0 12px", padding: 10, borderRadius: 9, background: "#FFF5F5", color: "#E53E3E", fontSize: 12, lineHeight: 1.5 }}>
+                  {studyPlanError}
+                </p>
+              )}
+              {!canGenerateStudyPlan && (
+                <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "6px 0 12px", margin: 0 }}>
+                  먼저 D-day에 과제나 일정을 추가해보세요
+                </p>
+              )}
+              {plans.length === 0 ? (
+                <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "6px 0", margin: 0 }}>아직 생성된 계획이 없습니다</p>
+              ) : (
+                plans.map((p, i) => {
+                  const planKey = p.id || `index-${i}`;
+                  const isEditing = editingPlanKey === planKey;
+                  return (
+                    <div key={p.id || `${p.text}-${i}`} style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                      borderBottom: i < plans.length - 1 ? "1px solid #f5f5f5" : "none"
+                    }}>
+                      <button onClick={() => {
+                        setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));
+                      }} style={{
+                        width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "#ddd"}`,
+                        background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
+                        alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
+                      }}>
+                        {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                      </button>
+                      {isEditing ? (
+                        <input
+                          value={editingPlanText}
+                          onChange={e => setEditingPlanText(e.target.value)}
+                          onBlur={() => finishEditPlan(p, i)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") finishEditPlan(p, i);
+                            if (e.key === "Escape") {
+                              setEditingPlanKey(null);
+                              setEditingPlanText("");
+                            }
+                          }}
+                          autoFocus
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            padding: "7px 9px",
+                            borderRadius: 8,
+                            border: `1px solid ${CYAN}`,
+                            outline: "none",
+                            fontSize: 14,
+                            color: "#333",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEditPlan(p, i)}
+                          title="클릭해서 수정"
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            border: "none",
+                            background: "none",
+                            padding: 0,
+                            cursor: "text",
+                            textAlign: "left",
+                            fontSize: 14,
+                            color: p.done ? "#bbb" : "#444",
+                            textDecoration: p.done ? "line-through" : "none",
+                            lineHeight: 1.45,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {p.text}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deletePlan(p, i)}
+                        aria-label={`${p.text} 학습 계획 삭제`}
+                        title="삭제"
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 8,
+                          border: "1px solid #eeeeee",
+                          background: "#fff",
+                          color: "#bbb",
+                          cursor: "pointer",
+                          fontSize: 15,
+                          lineHeight: "22px",
+                          padding: 0,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </Card>
           </div>

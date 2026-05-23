@@ -104,17 +104,21 @@ def build_llm(model: AgentModel):
     return _build_model(model)
 
 
+def build_openai_llm(model_name: str, max_tokens: int | None = None):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("서버에 OPENAI_API_KEY가 설정되지 않았습니다.")
+    return ChatOpenAI(
+        model=model_name,
+        temperature=0.3,
+        max_tokens=max_tokens or _env_int("OPENAI_MAX_TOKENS", 8192),
+        api_key=api_key,
+    )
+
+
 def _build_model(model: AgentModel):
     if model == "GPT":
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("서버에 OPENAI_API_KEY가 설정되지 않았습니다.")
-        return ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini"),
-            temperature=0.3,
-            max_tokens=_env_int("OPENAI_MAX_TOKENS", 8192),
-            api_key=api_key,
-        )
+        return build_openai_llm(os.getenv("OPENAI_MODEL", "gpt-5.4-mini"))
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:

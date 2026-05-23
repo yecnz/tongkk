@@ -4,6 +4,7 @@ import base64
 import zipfile
 import tempfile
 from pathlib import Path
+from datetime import date
 from typing import Literal
 
 import httpx
@@ -22,7 +23,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
-from agent import run_study_agent, build_llm
+from agent import run_study_agent, build_llm, build_openai_llm
 
 
 app = FastAPI()
@@ -232,6 +233,25 @@ class SubjectiveGradeRequest(BaseModel):
     markdown: str | None = None
 
 
+class StudyPlanDday(BaseModel):
+    id: str | None = None
+    type: Literal["assignment", "event"] = "assignment"
+    subj: str = Field(min_length=1)
+    date: str = Field(min_length=1)
+
+
+class StudyPlanItem(BaseModel):
+    id: str | None = None
+    text: str = Field(min_length=1)
+    done: bool = False
+
+
+class StudyPlanRequest(BaseModel):
+    ddays: list[StudyPlanDday] = Field(default_factory=list)
+    incomplete_plans: list[StudyPlanItem] = Field(default_factory=list)
+    mode: Literal["balanced", "lighter", "harder", "assignment", "event", "reroll"] = "balanced"
+
+
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
 
 
@@ -251,6 +271,37 @@ QUIZ_USER_PROMPT = """과목: {subject}
 문항 유형: {question_type}
 {markdown_section}
 위 조건에 맞는 문제 {count}개를 JSON 배열로만 출력해."""
+
+STUDY_PLAN_MODEL = "gpt-5.4-nano"
+
+STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항목을 보고 오늘 할 일을 작게 쪼개는 학습 계획 코치다.
+반드시 순수 JSON 객체만 출력해. 설명, 마크다운, 코드 블록, 기타 텍스트 없이 JSON만 출력한다.
+
+판단 기준:
+- assignment는 과제다. 요구사항 확인, 자료 정리, 목차 잡기, 초안 작성, 제출 전 검토처럼 실행 가능한 작업으로 쪼갠다.
+- event는 일정이다. 오늘 준비가 필요한 경우에만 준비물 확인, 장소/시간 확인, 연락, 이동 계획 같은 리마인드 작업으로 만든다.
+- 미완료 항목은 우선 반영하되, 너무 무거우면 더 작게 쪼갠다.
+- 오늘 할 일은 1~5개로 제한한다.
+- 각 항목은 사용자가 바로 실행할 수 있게 8~22자 정도의 한국어 동사형 문장으로 쓴다.
+- 시간은 5분 단위, 10~90분 사이로 제안한다.
+- mode가 lighter면 총량을 줄이고 쉬운 작업 위주로 둔다.
+- mode가 harder면 더 깊은 작업을 포함하되 과하지 않게 한다.
+- mode가 assignment면 과제 작업을 우선한다.
+- mode가 event면 일정 준비 작업을 우선한다.
+
+출력 형식:
+{"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment 또는 event 또는 carryover"}]}"""
+
+STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
+조정 모드: {mode}
+
+[D-day 목록]
+{ddays_json}
+
+[미완료 항목]
+{incomplete_json}
+
+위 정보를 보고 오늘의 학습계획을 JSON으로만 생성해."""
 
 
 def quiz_format_instruction(question_type: str) -> str:
@@ -386,6 +437,41 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
         result.append(normalized)
 
     return result
+
+
+def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
+    raw_message = parsed.get("message")
+    raw_items = parsed.get("items")
+    if not isinstance(raw_items, list):
+        raise ValueError("학습 계획 items가 배열 형식이 아닙니다.")
+
+    items: list[dict[str, object]] = []
+    for raw_item in raw_items[:5]:
+        if not isinstance(raw_item, dict):
+            continue
+        text = raw_item.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        raw_minutes = raw_item.get("minutes", 30)
+        minutes = raw_minutes if isinstance(raw_minutes, (int, float)) and not isinstance(raw_minutes, bool) else 30
+        minutes = max(10, min(90, int(round(minutes / 5) * 5)))
+        source_type = raw_item.get("source_type")
+        source_id = raw_item.get("source_id")
+        items.append({
+            "text": text.strip()[:80],
+            "minutes": minutes,
+            "source_id": source_id if isinstance(source_id, str) and source_id else None,
+            "source_type": source_type if source_type in {"assignment", "event", "carryover"} else "assignment",
+        })
+
+    if not items:
+        raise ValueError("생성된 학습 계획 항목이 없습니다.")
+
+    return {
+        "model": STUDY_PLAN_MODEL,
+        "message": raw_message.strip()[:140] if isinstance(raw_message, str) and raw_message.strip() else "오늘 할 일을 작게 나눠봤어요.",
+        "items": items,
+    }
 
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
@@ -810,6 +896,39 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"주관식 채점 실패: {str(e)}") from e
+
+
+@app.post("/study-plan")
+async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_user)):
+    if not req.ddays and not req.incomplete_plans:
+        raise HTTPException(status_code=400, detail="D-day나 미완료 학습 계획이 필요합니다.")
+
+    prompt = STUDY_PLAN_USER_PROMPT.format(
+        today=date.today().isoformat(),
+        mode=req.mode,
+        ddays_json=json.dumps([item.model_dump() for item in req.ddays], ensure_ascii=False),
+        incomplete_json=json.dumps([item.model_dump() for item in req.incomplete_plans], ensure_ascii=False),
+    )
+
+    def _call_llm():
+        llm = build_openai_llm(STUDY_PLAN_MODEL, max_tokens=900)
+        response = llm.invoke([
+            SystemMessage(content=STUDY_PLAN_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+        parsed = _parse_json_object(_message_content_to_text(response.content))
+        return _validate_study_plan(parsed)
+
+    try:
+        return await run_in_threadpool(_call_llm)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"학습 계획 파싱 실패: {str(e)}") from e
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"학습 계획 응답 형식 오류: {str(e)}") from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"학습 계획 생성 실패: {str(e)}") from e
 
 
 @app.get("/health")
