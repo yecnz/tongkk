@@ -569,17 +569,13 @@ export default function Dashboard() {
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
 
   const deleteDday = (target: Dday) => {
-    let removed = false;
-    setDdays(prev => prev.filter(item => {
-      const sameItem = target.id
-        ? item.id === target.id
-        : item.subj === target.subj && item.date === target.date && !removed;
-      if (sameItem) {
-        removed = true;
-        return false;
-      }
-      return true;
-    }));
+    setDdays(prev => {
+      if (target.id) return prev.filter(item => item.id !== target.id);
+
+      const targetIndex = prev.findIndex(item => item.subj === target.subj && item.date === target.date);
+      if (targetIndex < 0) return prev;
+      return prev.filter((_, index) => index !== targetIndex);
+    });
   };
 
   const deletePlan = (target: Plan, targetIndex: number) => {
@@ -635,7 +631,7 @@ export default function Dashboard() {
           }}
         />
       )}
-      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays([...ddays, { id: createClientId(), subj: s, date: d }])} />}
+      {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(s, d) => setDdays(prev => [...prev, { id: createClientId(), subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans([...plans, { id: createClientId(), text: t, done: false }])} />}
 
       {/* Header */}
