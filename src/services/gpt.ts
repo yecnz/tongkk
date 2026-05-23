@@ -177,7 +177,7 @@ export async function summarizeWithTemplate(
   template: SummaryTemplate,
 ): Promise<SummaryResponse> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 95_000);
+  const timeoutId = setTimeout(() => controller.abort(), 150_000);
 
   try {
     const response = await fetch(`${BACKEND_URL}/summarize`, {

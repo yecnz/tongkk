@@ -5,8 +5,8 @@ type ConvertApiResponse = {
 };
 
 /**
- * PDF/PPT/PPTX 파일을 Markdown 문자열로 변환 (전처리 단계)
- * FastAPI 서버의 markitdown 사용
+ * PDF/PPT/PPTX/이미지 파일을 Markdown 문자열로 변환 (전처리 단계)
+ * FastAPI 서버의 markitdown 및 OCR 분기 사용
  */
 export async function extractMarkdownFromPDF(file: File): Promise<string> {
   const formData = new FormData();

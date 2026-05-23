@@ -15,6 +15,13 @@ from typing_extensions import TypedDict
 
 AgentModel = Literal["GPT", "Gemini"]
 
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
 SYSTEM_PROMPT = """너는 Tongkk의 대학 강의자료 학습 에이전트다.
 
 우선순위:
@@ -47,6 +54,12 @@ def study_summary_format(task: str) -> str:
 - 열거형 항목은 개수와 항목명을 보존한다.
 - 정의, 특징, 구성요소, 종류, 장단점, 비교 항목을 분리한다.
 - 원문에 없는 내용을 추가하지 않는다.
+- 템플릿별 목적을 구분한다: 일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표다.
+- 텍스트 상자가 필요하면 '>' 인용문을 사용한다. 화면에서는 왼쪽 색 선 없이 둥근 박스로 렌더링된다.
+- HTML aside, 이모지, 색상 지시는 사용하지 않는다.
+- 강의 노트에서 시험 관련 강조가 필요하면 '**시험 포인트:**', '**헷갈림 주의:**'처럼 굵은 문구로 표시한다.
+- 형광펜 강조는 기본적으로 사용하지 않는다. 전체 답변에서 가장 중요한 핵심 내용 5개 이하에만 `==핵심 내용==` 형식으로 표시한다.
+- 절차는 번호 목록으로, 비교는 Markdown 표로 정리한다.
 - 코드, 수식, 파일명, 날짜, 숫자, 좌표, 함수명, 변수명은 가능한 한 원문 그대로 보존한다.
 - 코드가 있는 자료는 개념 설명보다 코드 흐름을 우선 정리하되, 원문 코드 전체를 나열하지 않고 핵심 코드/수식 12~20개 bullet로 압축한다.
 - 섹션 하위 제목은 자료에 실제로 등장한 제목이나 주제만 사용하고, 예시 제목이나 이전 자료의 제목을 재사용하지 않는다.
@@ -54,10 +67,9 @@ def study_summary_format(task: str) -> str:
 - built-in 항목은 가능하면 uniform과 attribute처럼 역할별로 나눠 정리한다.
 - 행렬 곱 순서, 좌표계, local/global 기준처럼 결과를 바꾸는 조건은 별도 bullet로 강조한다.
 - 자료에서 불확실한 내용은 추측하지 않고 [확인 필요]라고 표시한다.
-- 출력은 제목, 학습 목표, 슬라이드별 핵심 흐름, 코드/수식 핵심, 핵심 개념 정리, 연습문제/과제, 시험 포인트, 복습 질문 순서로 구성한다.
-- 제목 섹션에는 자료의 실제 제목을 반드시 적고 비워두지 않는다.
+- 강의 노트는 마지막에 '핵심 암기 사항'을 추가하고, 치트시트는 1~2페이지 분량의 용어-설명 압축표처럼 정리한다.
 - 코드/수식 핵심 섹션은 반드시 20개 bullet 이하로 제한하고, 연속된 설정 코드는 한 bullet로 묶는다.
-- 다른 최상위 제목을 추가하지 않고, 섹션 하위 내용만 필요한 만큼 bullet로 정리한다."""
+- 섹션 하위 내용은 필요한 만큼 bullet로 정리한다."""
 
 
 @tool
@@ -92,17 +104,21 @@ def build_llm(model: AgentModel):
     return _build_model(model)
 
 
+def build_openai_llm(model_name: str, max_tokens: int | None = None):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("서버에 OPENAI_API_KEY가 설정되지 않았습니다.")
+    return ChatOpenAI(
+        model=model_name,
+        temperature=0.3,
+        max_tokens=max_tokens or _env_int("OPENAI_MAX_TOKENS", 8192),
+        api_key=api_key,
+    )
+
+
 def _build_model(model: AgentModel):
     if model == "GPT":
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("서버에 OPENAI_API_KEY가 설정되지 않았습니다.")
-        return ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini"),
-            temperature=0.3,
-            max_tokens=4096,
-            api_key=api_key,
-        )
+        return build_openai_llm(os.getenv("OPENAI_MODEL", "gpt-5.4-mini"))
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -110,7 +126,7 @@ def _build_model(model: AgentModel):
     return ChatGoogleGenerativeAI(
         model=os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
         temperature=0.3,
-        max_output_tokens=4096,
+        max_output_tokens=_env_int("GEMINI_MAX_OUTPUT_TOKENS", 8192),
         google_api_key=api_key,
     )
 

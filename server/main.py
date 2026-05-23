@@ -4,6 +4,7 @@ import base64
 import zipfile
 import tempfile
 from pathlib import Path
+from datetime import date
 from typing import Literal
 
 import httpx
@@ -22,13 +23,21 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
-from agent import run_study_agent, build_llm
+from agent import run_study_agent, build_llm, build_openai_llm
 
 
 app = FastAPI()
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-ALLOWED_ORIGINS = [FRONTEND_ORIGIN, "http://localhost:3000", "http://localhost:3001"]
+ALLOWED_ORIGINS = [
+    FRONTEND_ORIGIN,
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
 ALLOWED_ORIGIN_REGEX = r"https://.*\.trycloudflare\.com"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
@@ -105,33 +114,34 @@ TEMPLATE_LABELS: dict[str, str] = {
 }
 
 TEMPLATE_INSTRUCTIONS: dict[str, str] = {
-    "GENERAL": """일반 요약 형식으로 작성해.
-- 제목, 핵심 결론, 주요 내용, 중요 키워드, 한 줄 요약 순서로 구성해.
-- 전체 내용을 처음 보는 사람도 빠르게 이해할 수 있게 간결하게 정리해.
-- 세부 설명보다 핵심 흐름과 결론을 우선해.""",
-    "LECTURE_NOTE": """시험 대비용 강의 노트 형식으로 작성해.
-- 아래 Markdown 제목을 정확히 이 순서와 이름으로만 사용해. '전체 흐름', '세부 설명' 같은 다른 최상위 제목은 만들지 마.
-  # 제목
-  ## 1. 학습 목표
-  ## 2. 슬라이드별 핵심 흐름
-  ## 3. 코드/수식 핵심
-  ## 4. 핵심 개념 정리
-  ## 5. 연습문제/과제
-  ## 6. 시험 포인트
-  ## 7. 복습 질문
-- '# 제목' 바로 아래에는 자료의 실제 제목을 반드시 한 줄로 적어. 제목을 비워두지 마.
-- 원문의 대단원/소단원 순서를 최대한 유지하고, 같은 제목이나 같은 설명을 반복하지 마.
-- '슬라이드별 핵심 흐름'의 하위 제목은 자료에 실제로 등장한 제목이나 주제만 사용하고, 예시 제목이나 이전 자료의 제목을 재사용하지 마.
-- '코드/수식 핵심'은 원문 코드 목록이 아니라 시험/구현에 필요한 핵심 원리만 요약해. 반드시 8~12개 bullet로 제한하고, 12개를 초과하지 마.
-- '코드/수식 핵심'에서는 import, scene/camera/renderer 생성, geometry attribute 설정, controls 설정처럼 연속된 설정 코드를 각각 나열하지 말고 하나의 개념 bullet로 묶어.
-- 개별 코드 줄은 꼭 필요한 대표 예시만 backtick으로 1개까지 인용하고, 같은 bullet 안에서 의미/주의점/시험 포인트를 설명해.
-- 파일명, 제출일, 과제 조건, 좌표 목록은 '## 5. 연습문제/과제'에 정리하고, '코드/수식 핵심'에 섞지 마.
-- 코드가 있는 자료라도 개념 설명과 실행 흐름을 우선 정리해. 함수명, 변수명, 행렬식, import는 필요한 경우에만 대표 표기로 보존해.
-- 셰이더나 변환식처럼 단계가 바뀌는 내용은 초반 예제와 이후 적용 예제를 분리해서 설명해.
-- built-in 항목은 가능하면 uniform과 attribute처럼 역할별로 나눠 정리해.
-- 행렬 곱 순서, 좌표계, local/global 기준처럼 결과를 바꾸는 조건은 반드시 별도 bullet로 강조해.
-- 연습문제와 과제는 요구사항, 위치값, 금지 조건, 제출일, 파일명 등 원문 조건을 빠뜨리지 말고 정확히 적어.
-- 과제가 자료에 있으면 '## 5. 연습문제/과제'에 반드시 포함하고, 자료에 없으면 '과제: 자료에서 확인되지 않음'이라고 적어.""",
+    "GENERAL": """자료 정리본 형식으로 작성해.
+- 목표는 학습 조언이 아니라 원문 내용을 최대한 많이 보존하면서 깔끔하게 정돈하는 것이다.
+- 원문의 대단원/소단원 구조와 흐름을 가능한 유지해.
+- 원문 정보량을 많이 담되, 중복 표현과 불필요한 반복만 줄여.
+- 정의, 특징, 종류, 방법, 주의사항, 공식, 수치, 단위를 분리해서 정리해.
+- 긴 문단은 짧은 문단이나 bullet list로 바꾸되, 세부 내용은 과하게 삭제하지 마.
+- 분류 체계나 방법 종류가 많으면 코드블록 구조도(tree)를 사용해 눈으로 흐름이 보이게 정리해.
+- 절차나 주의사항처럼 따로 묶어야 하는 내용은 '>' 인용문을 사용해 텍스트 상자로 정리해.
+- 원문이 비교 구조일 때만 표를 사용하고, 비교표를 억지로 만들지 마.
+- 시험 포인트, 헷갈림 주의, 핵심 암기 사항, 복습 질문, 학습 조언 섹션은 만들지 마.
+- 제목별 카드 구조는 만들지 마. 텍스트 상자는 꼭 강조가 필요한 부분에만 사용해.""",
+    "LECTURE_NOTE": """학습 보조형 강의 노트로 작성해.
+- 목표는 사용자가 공부하기 쉽게 핵심 개념, 흐름, 용어 설명, 중요 내용, 시험 포인트, 암기 사항을 재구성하는 것이다.
+- 단순 정리본처럼 모든 내용을 같은 밀도로 나열하지 말고, 중요도와 개념 간 관계가 드러나게 정리해.
+- 권장 흐름은 '# 강의 제목' → '## 한눈에 보는 흐름' → '## 핵심 개념' → '## 방법/절차' → '## 주요 용어' → '## 시험 포인트' → '## 핵심 암기 사항' → '## 참고/주의 사항'이다. 자료에 없는 섹션은 억지로 만들지 마.
+- '한눈에 보는 흐름'에서는 강의가 어떤 문제의식에서 시작해 어떤 개념과 방법으로 이어지는지 4~7개 bullet로 정리해.
+- '핵심 개념'에서는 각 개념을 정의, 의미, 중요한 이유, 예시/적용 맥락 순서로 설명해.
+- '방법/절차'에서는 실험법, 계산법, 분석법처럼 순서가 있는 내용을 번호 목록으로 정리하고, 단계별 목적과 결과를 함께 적어.
+- '주요 용어'는 별도 섹션에서 '용어 | 설명 | 헷갈리는 점' 표로 정리해.
+- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 질문-답변 관점으로 정리해.
+- '핵심 암기 사항'은 마지막 복습용으로 반드시 외울 정의, 공식, 절차, 비교 개념만 압축해.
+- '참고/주의 사항'에는 실험 주의점, 예외, 단위, 조건, 흔한 실수를 모아 정리해.
+- 비교가 필요한 개념은 Markdown 표로 정리해.
+- 분류 체계나 분석 방법의 갈래는 코드블록 구조도(tree)로 먼저 보여준 뒤 설명해.
+- 절차, 시험 포인트, 헷갈림 주의, 핵심 암기 묶음은 필요할 때 '>' 인용문을 사용해 텍스트 상자로 정리해.
+- 시험에 나올 가능성이 높은 내용은 '**시험 포인트:**'라는 굵은 문구로 표시해.
+- 헷갈리기 쉬운 내용은 '**헷갈림 주의:**'라는 굵은 문구로 표시해.
+- 제목별 카드 구조는 만들지 말고, 텍스트 상자는 학습상 강조가 필요한 곳에만 사용해.""",
     "MINDMAP": """강의자료의 핵심 구조를 JSON으로만 출력해. 공통 기준은 무시하고 아래 형식만 따라.
 
 출력 형식 (순수 JSON만, 코드 블록·설명 없이):
@@ -144,12 +154,15 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - 최대 2단계 깊이 (root → children → children)
 - label은 15자 이내로 간결하게
 - JSON 외 텍스트·마크다운·코드 블록 절대 금지""",
-    "CHEAT_SHEET": """치트시트 형식으로 작성해.
-- 시험 직전 빠르게 훑을 수 있는 압축 암기표로 구성해.
-- 핵심 공식, 정의, 비교, 조건, 예외, 암기 포인트를 짧은 bullet point로 정리해.
-- 중요한 용어는 반드시 **굵게** 표시해.
-- 긴 문단보다 한 줄 설명과 비교형 bullet을 우선해.
-- 원문에 있는 열거형 항목은 빠뜨리지 말고 개수와 항목명을 보존해.""",
+    "CHEAT_SHEET": """시험 직전 1~2페이지짜리 종이에 적은 압축 암기표처럼 작성해.
+- 제목별 박스나 카드 구조를 만들지 마.
+- 긴 설명, 긴 문단, 세부 해설을 쓰지 마.
+- 용어-설명 중심으로 압축하고, 각 설명은 가능하면 한 줄로 작성해.
+- 핵심 용어, 공식, 조건, 예외, 절차, 비교 포인트만 남겨.
+- 깊은 제목 구조를 쓰지 말고 '# 치트시트' 아래에 '## 핵심 용어', '## 핵심 공식', '## 절차 요약', '## 헷갈리는 비교', '## 마지막 체크' 정도만 사용해.
+- 핵심 용어와 공식은 표 중심으로 정리해.
+- 인용문, 콜아웃, 박스 스타일은 절대 사용하지 마.
+- 원문 전체를 자세히 설명하지 말고 시험 직전에 빠르게 훑을 핵심만 남겨.""",
 }
 
 SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿으로 요약해줘.
@@ -158,22 +171,28 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 {template_instruction}
 
 공통 기준:
-1. 문서의 대단원/소단원 순서를 유지해.
-2. 열거형 항목은 개수와 항목명을 보존해.
-3. 정의, 특징, 구성요소, 종류, 장단점, 비교 항목을 분리해.
-4. 원문에 없는 내용을 추가하지 마.
-5. 시험 직전 복습에 바로 쓸 수 있게 정리해.
-6. 화면 가독성을 위해 핵심 용어는 **굵게** 표시하고, 세부 내용은 bullet point로 정리해.
-7. 코드, 수식, 파일명, 날짜, 숫자, 좌표, 함수명, 변수명은 가능한 한 원문 그대로 보존해.
-8. 자료에서 글자가 흐리거나 내용이 불확실하면 추측하지 말고 **[확인 필요]**라고 표시해.
-9. PDF 변환 결과에 코드가 일부 누락된 것처럼 보이면, 보이는 정보만 정리하고 누락 가능성을 **[확인 필요]**로 남겨.
+1. 반드시 한국어로 작성해.
+2. 원문에 있는 대단원/소단원 흐름을 가능한 유지해.
+3. 원문에 없는 내용을 단정해서 추가하지 마.
+4. 수치, 단위, 공식, 날짜, 파일명, 고유명사, 영어 약어는 가능한 원문 그대로 보존해.
+5. 중요한 용어와 공식은 필요할 때만 **굵게** 표시해. 굵게 표시는 형광펜이 아니라 일반 강조다.
+6. 자료에서 글자가 흐리거나 내용이 불확실하면 **[확인 필요]**라고 표시해.
+7. Markdown만 출력하고, HTML 태그, 색상 지시, 이모지는 사용하지 마.
+8. 형광펜 강조는 기본적으로 사용하지 마. 전체 출력에서 가장 중요한 핵심 내용 5개 이하에만 `==핵심 내용==` 형식으로 표시해.
+9. `==...==`는 반드시 한 문장 또는 짧은 구절에만 사용하고, 제목 전체나 긴 문단에는 사용하지 마.
+10. 공식, 수치, 단위, 매우 짧은 핵심 키워드는 필요할 때만 `inline code`로 감싸. inline code는 형광펜 강조가 아니다.
+11. '>' 인용문은 텍스트 상자가 필요한 경우에만 사용해. 화면에서는 왼쪽 색 선 없이 둥근 박스로 렌더링된다.
+12. 제목별로 카드나 박스를 나누는 형식은 사용하지 마.
+13. 템플릿별 목적을 최우선으로 따르고, 세 템플릿의 출력 스타일이 서로 비슷해지지 않게 해.
 
 [강의자료]
 {markdown}
 
 최종 출력 점검:
 - {template_label} 템플릿 지시와 공통 기준만 따라 작성해.
-- 템플릿 지시에서 허용한 최상위 Markdown 제목 외에는 새 최상위 제목을 만들지 마.
+- 일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
+- 형광펜 표시(`==...==`)는 5개 이하인지 확인해.
+- 필요한 텍스트 상자는 '>' 인용문으로만 만들고, HTML aside는 쓰지 마.
 - 자료 앞뒤에 붙은 앱 UI 문구, 이전 요약 형식, 예시 제목을 출력에 섞지 마.
 """
 
@@ -214,6 +233,25 @@ class SubjectiveGradeRequest(BaseModel):
     markdown: str | None = None
 
 
+class StudyPlanDday(BaseModel):
+    id: str | None = None
+    type: Literal["assignment", "event"] = "assignment"
+    subj: str = Field(min_length=1)
+    date: str = Field(min_length=1)
+
+
+class StudyPlanItem(BaseModel):
+    id: str | None = None
+    text: str = Field(min_length=1)
+    done: bool = False
+
+
+class StudyPlanRequest(BaseModel):
+    ddays: list[StudyPlanDday] = Field(default_factory=list)
+    incomplete_plans: list[StudyPlanItem] = Field(default_factory=list)
+    mode: Literal["balanced", "lighter", "harder", "assignment", "event", "reroll"] = "balanced"
+
+
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
 
 
@@ -233,6 +271,37 @@ QUIZ_USER_PROMPT = """과목: {subject}
 문항 유형: {question_type}
 {markdown_section}
 위 조건에 맞는 문제 {count}개를 JSON 배열로만 출력해."""
+
+STUDY_PLAN_MODEL = "gpt-5.4-nano"
+
+STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항목을 보고 오늘 할 일을 작게 쪼개는 학습 계획 코치다.
+반드시 순수 JSON 객체만 출력해. 설명, 마크다운, 코드 블록, 기타 텍스트 없이 JSON만 출력한다.
+
+판단 기준:
+- assignment는 과제다. 요구사항 확인, 자료 정리, 목차 잡기, 초안 작성, 제출 전 검토처럼 실행 가능한 작업으로 쪼갠다.
+- event는 일정이다. 오늘 준비가 필요한 경우에만 준비물 확인, 장소/시간 확인, 연락, 이동 계획 같은 리마인드 작업으로 만든다.
+- 미완료 항목은 우선 반영하되, 너무 무거우면 더 작게 쪼갠다.
+- 오늘 할 일은 1~5개로 제한한다.
+- 각 항목은 사용자가 바로 실행할 수 있게 8~22자 정도의 한국어 동사형 문장으로 쓴다.
+- 시간은 5분 단위, 10~90분 사이로 제안한다.
+- mode가 lighter면 총량을 줄이고 쉬운 작업 위주로 둔다.
+- mode가 harder면 더 깊은 작업을 포함하되 과하지 않게 한다.
+- mode가 assignment면 과제 작업을 우선한다.
+- mode가 event면 일정 준비 작업을 우선한다.
+
+출력 형식:
+{"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment 또는 event 또는 carryover"}]}"""
+
+STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
+조정 모드: {mode}
+
+[D-day 목록]
+{ddays_json}
+
+[미완료 항목]
+{incomplete_json}
+
+위 정보를 보고 오늘의 학습계획을 JSON으로만 생성해."""
 
 
 def quiz_format_instruction(question_type: str) -> str:
@@ -370,9 +439,60 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
     return result
 
 
-SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
+def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
+    raw_message = parsed.get("message")
+    raw_items = parsed.get("items")
+    if not isinstance(raw_items, list):
+        raise ValueError("학습 계획 items가 배열 형식이 아닙니다.")
+
+    items: list[dict[str, object]] = []
+    for raw_item in raw_items[:5]:
+        if not isinstance(raw_item, dict):
+            continue
+        text = raw_item.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        raw_minutes = raw_item.get("minutes", 30)
+        minutes = raw_minutes if isinstance(raw_minutes, (int, float)) and not isinstance(raw_minutes, bool) else 30
+        minutes = max(10, min(90, int(round(minutes / 5) * 5)))
+        source_type = raw_item.get("source_type")
+        source_id = raw_item.get("source_id")
+        items.append({
+            "text": text.strip()[:80],
+            "minutes": minutes,
+            "source_id": source_id if isinstance(source_id, str) and source_id else None,
+            "source_type": source_type if source_type in {"assignment", "event", "carryover"} else "assignment",
+        })
+
+    if not items:
+        raise ValueError("생성된 학습 계획 항목이 없습니다.")
+
+    return {
+        "model": STUDY_PLAN_MODEL,
+        "message": raw_message.strip()[:140] if isinstance(raw_message, str) and raw_message.strip() else "오늘 할 일을 작게 나눠봤어요.",
+        "items": items,
+    }
+
+
+SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENSIONS}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _extract_image_text_with_tesseract(path: str) -> str:
+    from PIL import Image
+    import pytesseract
+
+    language = os.getenv("TESSERACT_LANG", "kor+eng")
+    with Image.open(path) as image:
+        normalized = image.convert("L")
+        try:
+            return pytesseract.image_to_string(normalized, lang=language).strip()
+        except pytesseract.TesseractError:
+            if language == "eng":
+                raise
+            return pytesseract.image_to_string(normalized, lang="eng").strip()
 
 def _image_data_url(image_bytes: bytes, mime_type: str = "image/png") -> str:
     encoded = base64.b64encode(image_bytes).decode("ascii")
@@ -538,13 +658,20 @@ async def convert_document_to_markdown(
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 지원합니다.")
+        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX, 이미지 파일만 지원합니다.")
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(await file.read())
+        file_bytes = await file.read()
+        if suffix in SUPPORTED_IMAGE_EXTENSIONS and len(file_bytes) > MAX_OCR_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="이미지 파일은 10MB 이하만 OCR할 수 있습니다.")
+        tmp.write(file_bytes)
         tmp_path = tmp.name
 
     try:
+        if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+            text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
+            return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
+
         # 1단계: markitdown으로 텍스트 레이어 추출
         result = await run_in_threadpool(md_converter.convert, tmp_path)
         base_markdown = (result.text_content or "").strip()
@@ -640,7 +767,13 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
         from langchain_core.messages import HumanMessage, SystemMessage
         llm = build_llm(req.model)
         response = llm.invoke([
-            SystemMessage(content="너는 대학 강의자료 요약 전문가다. 지시한 템플릿 형식으로만 요약하고, 후속 질문이나 추가 제안은 절대 붙이지 마."),
+            SystemMessage(content="""너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
+사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.
+일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
+템플릿 간 출력 스타일이 서로 비슷해지지 않도록 각 템플릿 지시를 최우선으로 따라.
+텍스트 상자가 필요하면 '>' 인용문만 사용하고, HTML aside, 이모지, 색상 지시는 사용하지 마.
+중요 용어와 공식은 **굵게** 표시하고, 필요한 경우 제목·bullet list·번호 목록·표·코드블록만 사용해.
+후속 질문, 추가 제안, 작성 완료 멘트는 절대 붙이지 마."""),
             HumanMessage(content=prompt),
         ])
         return {"result": _message_content_to_text(response.content).strip()}
@@ -763,6 +896,39 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"주관식 채점 실패: {str(e)}") from e
+
+
+@app.post("/study-plan")
+async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_user)):
+    if not req.ddays and not req.incomplete_plans:
+        raise HTTPException(status_code=400, detail="D-day나 미완료 학습 계획이 필요합니다.")
+
+    prompt = STUDY_PLAN_USER_PROMPT.format(
+        today=date.today().isoformat(),
+        mode=req.mode,
+        ddays_json=json.dumps([item.model_dump() for item in req.ddays], ensure_ascii=False),
+        incomplete_json=json.dumps([item.model_dump() for item in req.incomplete_plans], ensure_ascii=False),
+    )
+
+    def _call_llm():
+        llm = build_openai_llm(STUDY_PLAN_MODEL, max_tokens=900)
+        response = llm.invoke([
+            SystemMessage(content=STUDY_PLAN_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+        parsed = _parse_json_object(_message_content_to_text(response.content))
+        return _validate_study_plan(parsed)
+
+    try:
+        return await run_in_threadpool(_call_llm)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"학습 계획 파싱 실패: {str(e)}") from e
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"학습 계획 응답 형식 오류: {str(e)}") from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"학습 계획 생성 실패: {str(e)}") from e
 
 
 @app.get("/health")

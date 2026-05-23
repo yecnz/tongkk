@@ -13,7 +13,6 @@ import {
 } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
-import { extractTextWithGoogleVision } from "../services/visionOcr";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, saveQuizSetToServer, type SavedQuizSet } from "../services/quizSets";
 import {
@@ -60,8 +59,7 @@ const getDocumentMaterialType = (file: File): CourseMaterial["type"] =>
       ? "img"
       : "ppt";
 
-const extractMarkdownFromMaterialFile = (file: File) =>
-  getDocumentMaterialType(file) === "img" ? extractTextWithGoogleVision(file) : extractMarkdownFromPDF(file);
+const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
 
 const formatFileNames = (files: Pick<File, "name">[]) =>
   files.length <= 2 ? files.map(file => file.name).join(", ") : `${files[0].name} 외 ${files.length - 1}개`;
@@ -109,11 +107,40 @@ const inferWeakTopic = (question: string) => {
 const uniqueWeakTopics = (questions: QuizQuestion[]) =>
   Array.from(new Set(questions.map(question => inferWeakTopic(question.question)))).slice(0, 4);
 
-const youtubeSearchUrl = (course: string, topic: string) =>
-  `https://www.youtube.com/results?search_query=${encodeURIComponent(`${course} ${topic} 개념 설명`)}`;
-
 const normalizeAnswer = (value: string) =>
   value.toLowerCase().replace(/\s+/g, "").replace(/[.,:;!?()[\]{}'"`]/g, "");
+
+const buildAnswersFromAttempt = (quizSet: SavedQuizSet, attempt: SavedQuizAttempt) => {
+  const answers: Record<number, number | string> = {};
+  const subjectiveGrades: Record<number, SubjectiveGradeResult> = {};
+
+  quizSet.questions.forEach((question, index) => {
+    const attemptAnswer = attempt.answers[index];
+    if (!attemptAnswer) return;
+
+    const type = question.type || quizSet.questionType;
+    if (type === "객관식" || type === "OX") {
+      const answerIndex = question.options?.findIndex(option => option === attemptAnswer.studentAnswer);
+      if (answerIndex !== undefined && answerIndex >= 0) answers[index] = answerIndex;
+      return;
+    }
+
+    if (typeof attemptAnswer.studentAnswer === "string") {
+      answers[index] = attemptAnswer.studentAnswer;
+    }
+
+    if (type === "주관식") {
+      subjectiveGrades[index] = {
+        score: attemptAnswer.score ?? (attemptAnswer.isCorrect ? 100 : 0),
+        isCorrect: attemptAnswer.isCorrect,
+        feedback: attemptAnswer.feedback || (attemptAnswer.isCorrect ? "저장된 풀이 기록에서 정답으로 채점되었습니다." : "저장된 풀이 기록에서 오답으로 채점되었습니다."),
+        referenceAnswer: String(attemptAnswer.correctAnswer || question.answerText || question.explanation),
+      };
+    }
+  });
+
+  return { answers, subjectiveGrades };
+};
 
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
@@ -181,6 +208,7 @@ export default function Quiz() {
   const [timedOut, setTimedOut] = useState(false);
   const [attemptSavedKey, setAttemptSavedKey] = useState("");
   const [attemptSaveNotice, setAttemptSaveNotice] = useState("");
+  const [reviewAttempt, setReviewAttempt] = useState<SavedQuizAttempt | null>(null);
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
@@ -282,26 +310,32 @@ export default function Quiz() {
         pendingQuizSetIdRef.current = null;
         const savedQuizSet = quizSets.find(item => item.id === pendingQuizSetId);
         if (savedQuizSet) {
+          const latestAttempt = attempts.find(attempt => attempt.quizSetId === savedQuizSet.id);
+          const restored = latestAttempt ? buildAnswersFromAttempt(savedQuizSet, latestAttempt) : null;
           setDifficulty(savedQuizSet.difficulty);
           setQuestionType(savedQuizSet.questionType);
           setCount(savedQuizSet.count);
           setSelectedMaterialIds(savedQuizSet.materialIds.filter(id => courseMaterials.some(material => material.id === id)));
           setQuizzes(savedQuizSet.questions);
           setCurrent(0);
-          setAnswers({});
+          setAnswers(restored?.answers || {});
           setShortAnswerInput("");
           setShowExplanation(false);
           setOpenedQuizTitle(savedQuizSet.title);
           setActiveQuizSetId(savedQuizSet.id);
-          setSubjectiveGrades({});
+          setSubjectiveGrades(restored?.subjectiveGrades || {});
           setRemainingSeconds(null);
-          setQuizStartedAt(Date.now());
-          setTimedOut(false);
-          setView("quiz");
+          setQuizStartedAt(latestAttempt ? null : Date.now());
+          setTimedOut(latestAttempt?.timedOut || false);
+          setAttemptSavedKey(latestAttempt ? `review:${latestAttempt.id}` : "");
+          setAttemptSaveNotice(latestAttempt ? "저장된 풀이 기록을 불러왔습니다." : "");
+          setReviewAttempt(latestAttempt || null);
+          setView(latestAttempt ? "result" : "quiz");
         }
       } else {
         setOpenedQuizTitle("");
         setActiveQuizSetId(null);
+        setReviewAttempt(null);
         const recommended = getRecommendedDifficulty(attempts);
         if (recommended) setDifficulty(recommended);
       }
@@ -347,19 +381,6 @@ export default function Quiz() {
   const handleCourseSelect = (course: string) => {
     setSelectedCourse(course);
     setView("courseDetail");
-  };
-
-  const resetCourseSelection = () => {
-    setSelectedCourse("");
-    setView("courseList");
-    setError(null);
-    setOpenedQuizTitle("");
-    setActiveQuizSetId(null);
-    setSubjectiveGrades({});
-    setRemainingSeconds(null);
-    setQuizStartedAt(null);
-    setTimedOut(false);
-    setAttemptSaveNotice("");
   };
 
   const handleCourseBack = () => {
@@ -569,6 +590,7 @@ export default function Quiz() {
       setTimedOut(false);
       setAttemptSavedKey("");
       setAttemptSaveNotice("");
+      setReviewAttempt(null);
       setView("quiz");
     } catch (err) {
       if (controller.signal.aborted) {
@@ -674,6 +696,7 @@ export default function Quiz() {
 
   useEffect(() => {
     if (view !== "result" || quizzes.length === 0 || !selectedCourse) return;
+    if (reviewAttempt) return;
     const durationSeconds = quizStartedAt ? Math.max(0, Math.round((Date.now() - quizStartedAt) / 1000)) : null;
     const key = `${activeQuizSetId || openedQuizTitle}:${quizStartedAt || "no-start"}:${scorePercent}:${Object.keys(answers).length}:${timedOut}`;
     if (attemptSavedKey === key) return;
@@ -740,6 +763,7 @@ export default function Quiz() {
     resultWeakTopics,
     selectedMaterialIds,
     subjectiveGrades,
+    reviewAttempt,
   ]);
 
   const handleNav = (item: PageRouteLabel) => {
@@ -869,7 +893,7 @@ export default function Quiz() {
             {materials.length > 0 && (
               <div style={{
                 padding: "12px 16px", borderRadius: 10, background: "#E8FAFE",
-                fontSize: 13, color: CYAN, marginBottom: 14, fontWeight: 500
+                fontSize: 13, color: CYAN, marginBottom: 14, fontWeight: 800
               }}>
                 저장된 강의자료 {materials.length}개 중 {selectedMaterials.length}개가 퀴즈에 반영됩니다
               </div>
@@ -885,6 +909,10 @@ export default function Quiz() {
 
             {materials.length > 0 && (
               <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 10 }}>
+                  <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 선택</button>
+                  <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 해제</button>
+                </div>
                 {materials.map(material => {
                   const isSelected = selectedMaterialIds.includes(material.id);
                   const materialSummaries = getMaterialSummaries(material);
@@ -969,7 +997,7 @@ export default function Quiz() {
               }}
             >
               <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
-                PDF, PPT 파일을 여러 개 드래그하거나
+                강의자료 파일을 여러 개 드래그하거나
               </p>
               <button style={{
                 padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
@@ -1108,11 +1136,53 @@ export default function Quiz() {
   // ── 결과 ──
   if (view === "result") {
     const nextDifficulty: QuizDifficulty = scorePercent >= 80 ? "어려움" : scorePercent >= 55 ? "보통" : "쉬움";
+    const reviewMaterials = selectedMaterials.length > 0
+      ? selectedMaterials
+      : materials.filter(material => selectedMaterialIds.includes(material.id));
+    const primaryReviewMaterial = reviewMaterials[0] || materials[0];
+    const primaryWeakTopic = resultWeakTopics[0] || "틀린 문제";
+    const makeTutorQuestion = (topic: string) => `${topic} 부분을 요약 기준으로 다시 설명해줘`;
+    const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
+      const materialId = options?.materialId || primaryReviewMaterial?.id;
+      if (!materialId) {
+        navigate(pageRoutes["자료 요약"], {
+          state: { selectedCourse, fromDashboard: fromDashboardRef.current },
+        });
+        return;
+      }
+
+      navigate(pageRoutes["자료 요약"], {
+        state: {
+          selectedCourse,
+          viewMaterial: true,
+          materialId,
+          materialIds: selectedMaterialIds,
+          materialDetailTab: "summary",
+          fromDashboard: fromDashboardRef.current,
+          tutorQuestion: options?.tutorQuestion,
+        },
+      });
+    };
+    const retryQuiz = () => {
+      setCurrent(0);
+      setAnswers({});
+      setSubjectiveGrades({});
+      setShortAnswerInput("");
+      setShowExplanation(false);
+      setRemainingSeconds(examMode ? examMinutes * 60 : null);
+      setQuizStartedAt(Date.now());
+      setTimedOut(false);
+      setAttemptSavedKey("");
+      setAttemptSaveNotice("");
+      setReviewAttempt(null);
+      setDifficulty(nextDifficulty);
+      setView("quiz");
+    };
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
-        <div style={{ padding: 24, maxWidth: 680, margin: "40px auto", textAlign: "center" }}>
+        <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
           <Card style={{ padding: 40 }}>
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
@@ -1128,6 +1198,32 @@ export default function Quiz() {
               <p style={{ margin: "0 0 20px", fontSize: 12, color: attemptSaveNotice.includes("실패") ? PINK : "#999" }}>
                 {attemptSaveNotice}
               </p>
+            )}
+            {reviewAttempt && (
+              <div style={{
+                margin: "0 0 24px",
+                padding: 16,
+                borderRadius: 14,
+                background: "#fafafa",
+                border: `1px solid ${BORDER_COLOR}`,
+                textAlign: "left",
+              }}>
+                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "#222" }}>분석 리포트</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
+                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>풀이 시간</div>
+                    <div style={{ fontSize: 15, color: "#333", fontWeight: 850 }}>{reviewAttempt.durationSeconds === null ? "-" : formatSeconds(reviewAttempt.durationSeconds)}</div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
+                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>오답</div>
+                    <div style={{ fontSize: 15, color: PINK, fontWeight: 850 }}>{Math.max(0, reviewAttempt.count - reviewAttempt.correctCount)}문항</div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
+                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>약점</div>
+                    <div style={{ fontSize: 15, color: CYAN, fontWeight: 850 }}>{reviewAttempt.weakTopics.length || resultWeakTopics.length}개</div>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div style={{
@@ -1145,27 +1241,39 @@ export default function Quiz() {
               {resultWeakTopics.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {resultWeakTopics.map(topic => (
-                    <div key={topic} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>약점 후보: <strong>{topic}</strong></span>
-                      <a
-                        href={youtubeSearchUrl(selectedCourse, topic)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          flexShrink: 0,
-                          padding: "7px 10px",
-                          borderRadius: 9,
-                          background: "#fff",
-                          border: "1px solid #e8e8e8",
-                          color: CYAN,
-                          fontSize: 12,
-                          fontWeight: 800,
-                          textDecoration: "none",
-                        }}
-                      >
-                        영상 찾기
-                      </a>
-                    </div>
+                    <button
+                      key={topic}
+                      type="button"
+                      onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(topic) })}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid #E8FAFE",
+                        background: "#fff",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ minWidth: 0, fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+                        약점 후보: <strong>{topic}</strong>
+                      </span>
+                      <span style={{
+                        flexShrink: 0,
+                        padding: "7px 10px",
+                        borderRadius: 9,
+                        background: "#FFF0F6",
+                        color: PINK,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}>
+                        요약과 튜터로 보기
+                      </span>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -1175,25 +1283,101 @@ export default function Quiz() {
               )}
             </div>
 
+            {reviewMaterials.length > 1 && (
+              <div style={{
+                margin: "0 0 24px",
+                padding: 18,
+                borderRadius: 14,
+                background: "#fff",
+                border: `1px solid ${BORDER_COLOR}`,
+                textAlign: "left",
+              }}>
+                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "#222" }}>
+                  이 퀴즈에 사용한 자료
+                </h3>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {reviewMaterials.map(material => (
+                    <button
+                      key={material.id}
+                      type="button"
+                      onClick={() => goToMaterialReview({ materialId: material.id })}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: `1px solid ${BORDER_COLOR}`,
+                        background: "#fafafa",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ minWidth: 0, color: "#444", fontSize: 13, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {material.name}
+                      </span>
+                      <span style={{ flexShrink: 0, color: CYAN, fontSize: 12, fontWeight: 850 }}>
+                        요약 탭 열기
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {wrongQuestions.length > 0 && (
+              <div style={{
+                margin: "0 0 24px",
+                padding: 18,
+                borderRadius: 14,
+                background: "#fff",
+                border: `1px solid ${BORDER_COLOR}`,
+                textAlign: "left",
+              }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: "#222" }}>
+                  오답 복습
+                </h3>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {wrongQuestions.map((quiz, wrongIndex) => {
+                    const questionIndex = quizzes.indexOf(quiz);
+                    const attemptAnswer = reviewAttempt?.answers[questionIndex];
+                    const type = quiz.type || questionType;
+                    const userAnswer = attemptAnswer?.studentAnswer ??
+                      (type === "객관식" || type === "OX"
+                        ? typeof answers[questionIndex] === "number" ? quiz.options?.[answers[questionIndex] as number] : null
+                        : answers[questionIndex]);
+                    const correctAnswer = attemptAnswer?.correctAnswer ??
+                      (type === "객관식" || type === "OX"
+                        ? typeof quiz.answer === "number" ? quiz.options?.[quiz.answer] : null
+                        : quiz.answerText);
+                    return (
+                      <div key={`${quiz.question}-${wrongIndex}`} style={{ padding: 14, borderRadius: 12, background: "#fafafa", border: "1px solid #f0f0f0" }}>
+                        <div style={{ marginBottom: 8, fontSize: 13, color: "#333", fontWeight: 800, lineHeight: 1.5 }}>
+                          Q{questionIndex + 1}. {quiz.question}
+                        </div>
+                        <div style={{ display: "grid", gap: 5, fontSize: 12, color: "#666", lineHeight: 1.6 }}>
+                          <span>내 답: <strong style={{ color: PINK }}>{userAnswer ?? "미응답"}</strong></span>
+                          <span>정답: <strong style={{ color: CYAN }}>{correctAnswer ?? "정답 정보 없음"}</strong></span>
+                          <span>틀린 이유: {attemptAnswer?.feedback || quiz.explanation}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={resetCourseSelection} style={{
+              <button onClick={() => goToMaterialReview()} style={{
+                padding: "12px 24px", borderRadius: 12, border: "1px solid #f3c3da",
+                background: "#FFF0F6", fontSize: 14, fontWeight: 700, cursor: "pointer", color: PINK
+              }}>약점 요약 보기</button>
+              <button onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(primaryWeakTopic) })} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid #e0e0e0",
-                background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#555"
-              }}>새 퀴즈</button>
-              <button onClick={() => {
-                setCurrent(0);
-                setAnswers({});
-                setSubjectiveGrades({});
-                setShortAnswerInput("");
-                setShowExplanation(false);
-                setRemainingSeconds(examMode ? examMinutes * 60 : null);
-                setQuizStartedAt(Date.now());
-                setTimedOut(false);
-                setAttemptSavedKey("");
-                setAttemptSaveNotice("");
-                setDifficulty(nextDifficulty);
-                setView("quiz");
-              }} style={{
+                background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "#555"
+              }}>AI 튜터로 복습</button>
+              <button onClick={retryQuiz} style={{
                 padding: "12px 24px", borderRadius: 12, border: "none",
                 background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#fff"
               }}>다시 풀기</button>
@@ -1353,7 +1537,7 @@ export default function Quiz() {
             </div>
           )}
           {showExplanation && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#FAFAFA", borderLeft: `3px solid ${CYAN}`, fontSize: 13, color: "#555", lineHeight: 1.6 }}>
+            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#FAFAFA", fontSize: 13, color: "#555", lineHeight: 1.6 }}>
               <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
             </div>
           )}

@@ -1,23 +1,22 @@
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
-import { extractTextWithGoogleVision } from "../services/visionOcr";
-import { sendAgentMessage, type AgentMessage } from "../services/agent";
-import {
-  loadSummaryChatMessages,
-  saveSummaryChatMessage,
-} from "../services/summaryChats";
 import {
   deleteSummariesByMaterialId,
   loadSummariesFromServer,
   saveSummaryToServer,
+  type SavedSummary,
 } from "../services/summaries";
+import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
 import {
@@ -29,9 +28,11 @@ import {
   uploadCourseMaterialFile,
   type CourseMaterial,
 } from "../services/materials";
+import { AITutorDrawer } from "../components/AITutorDrawer";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
+type MaterialDetailTab = "original" | "summary" | "quiz";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
 type SummarySample = { title: string; content: string };
@@ -42,13 +43,29 @@ type LocationState = {
   viewMaterial?: boolean;
   summaryId?: string;
   summaryTemplate?: SummaryTemplate;
+  summaryContent?: string;
+  summaryCreatedAt?: number;
   materialIds?: string[];
   openSummary?: boolean;
+  tutorQuestion?: string;
+  materialDetailTab?: MaterialDetailTab;
 } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; agentContext: string; resetTutorHistory?: boolean; onGoToQuiz?: () => void };
-type MaterialDetailViewProps = { material: CourseMaterial; onBack: () => void; onGoSummary: () => void; onGoQuiz: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
+type MaterialDetailViewProps = {
+  material: CourseMaterial;
+  selectedCourse: string;
+  onBack: () => void;
+  onGoSummary: () => void;
+  onGoQuiz: () => void;
+  onOpenSummary: (summary: SavedSummary) => void;
+  onOpenQuiz: (quizSet: SavedQuizSet) => void;
+  initialTab?: MaterialDetailTab;
+  initialTutorQuestion?: string;
+  relatedMaterials?: CourseMaterial[];
+  onSelectRelatedMaterial?: (material: CourseMaterial) => void;
+};
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
 const templateLabels: Record<SummaryTemplate, string> = {
@@ -108,20 +125,13 @@ const getFileType = (name: string): FileKind => {
 const isSupportedDocumentFile = (file: File) =>
   ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
-const extractMarkdownFromMaterialFile = (file: File) =>
-  getFileType(file.name) === "img" ? extractTextWithGoogleVision(file) : extractMarkdownFromPDF(file);
+const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
-const isPageReload = () => {
-  if (typeof window === "undefined") return false;
-  const navigationEntry = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-  if (navigationEntry?.type === "reload") return true;
-  const legacyNavigation = window.performance as Performance & { navigation?: { type: number; TYPE_RELOAD: number } };
-  return legacyNavigation.navigation?.type === legacyNavigation.navigation?.TYPE_RELOAD;
-};
+const isInitialRouteEntry = (locationKey: string) => locationKey === "default";
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -143,140 +153,149 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
 };
 
 const renderInlineText = (text: string): ReactNode[] => {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+  return text.split(/(\*\*[^*]+\*\*|==[^=]+==)/g).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index} style={{ fontWeight: 700, color: "#222" }}>{part.slice(2, -2)}</strong>;
+      return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("==") && part.endsWith("==")) {
+      return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
     }
     return part;
   });
 };
 
-const isTableRow = (line: string) => /^\|.+\|$/.test(line.trim());
-const isSeparatorRow = (line: string) => /^\|[\s|:-]+\|$/.test(line.trim());
+const renderHighlightSyntax = (children: ReactNode): ReactNode => {
+  if (typeof children === "string") {
+    return children.split(/(==[^=]+==)/g).map((part, index) => {
+      if (part.startsWith("==") && part.endsWith("==")) {
+        return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
+      }
+      return part;
+    });
+  }
 
-const renderTableBlock = (tableLines: string[], key: number) => {
-  const rows = tableLines.filter(l => !isSeparatorRow(l));
-  if (rows.length < 1) return null;
-  const parseRow = (line: string) =>
-    line.trim().replace(/^\||\|$/g, "").split("|").map(cell => cell.trim());
-  const [headerRow, ...bodyRows] = rows;
-  const headers = parseRow(headerRow);
-  return (
-    <div key={key} style={{ overflowX: "auto", margin: "4px 0" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-        <thead>
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} style={{ padding: "7px 12px", background: "#FFF0F6", color: "#444", fontWeight: 700, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
-                {renderInlineText(h)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {bodyRows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? "#fff" : "#fafafa" }}>
-              {parseRow(row).map((cell, ci) => (
-                <td key={ci} style={{ padding: "6px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>
-                  {renderInlineText(cell)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  if (Array.isArray(children)) {
+    return children.map((child, index) => <span key={index}>{renderHighlightSyntax(child)}</span>);
+  }
+
+  return children;
 };
 
-const FormattedAiText = ({ content }: { content: string }) => {
-  const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
+const markdownStyles = {
+  paragraph: { margin: "0 0 10px", lineHeight: 1.8, color: "#444" } satisfies CSSProperties,
+  list: { margin: "6px 0 14px", paddingLeft: 24, lineHeight: 1.75 } satisfies CSSProperties,
+  tableWrap: { overflowX: "auto", margin: "12px 0 16px" } satisfies CSSProperties,
+};
 
-  // Group consecutive table lines into blocks
-  type Block = { type: "table"; lines: string[] } | { type: "line"; raw: string; index: number };
-  const blocks: Block[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    if (isTableRow(lines[i])) {
-      const tableLines: string[] = [];
-      while (i < lines.length && (isTableRow(lines[i]) || isSeparatorRow(lines[i]))) {
-        tableLines.push(lines[i]);
-        i++;
-      }
-      blocks.push({ type: "table", lines: tableLines });
-    } else {
-      blocks.push({ type: "line", raw: lines[i], index: i });
-      i++;
+const markdownComponents: Components = {
+  h1: ({ children }) => (
+    <h1 style={{ margin: "0 0 18px", paddingBottom: 12, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 style={{ margin: "26px 0 12px", padding: "9px 12px", borderRadius: 8, background: "#f3f4f6", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "#222" }}>
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "20px 0 10px", padding: "4px 8px", borderRadius: 6, background: "#f6f6f6", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{children}</h3>,
+  h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "#333" }}>{children}</h4>,
+  h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "#444" }}>{children}</h5>,
+  h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "#555" }}>{children}</h6>,
+  p: ({ children }) => <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>,
+  ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
+  li: ({ children }) => <li style={{ marginBottom: 6, paddingLeft: 4 }}>{renderHighlightSyntax(children)}</li>,
+  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{renderHighlightSyntax(children)}</strong>,
+  em: ({ children }) => <em style={{ color: "#555" }}>{children}</em>,
+  blockquote: ({ children }) => (
+    <blockquote style={{ margin: "14px 0", padding: "13px 15px", border: "1px solid #e8e8e8", borderRadius: 12, background: "#fafafa", color: "#555", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, className }) => {
+    if (className) {
+      return <code className={className} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 13 }}>{children}</code>;
     }
+    return (
+      <code style={{ padding: "2px 6px", borderRadius: 6, background: "#f3f4f6", color: "#555", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em", fontWeight: 700 }}>
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }) => (
+    <pre style={{ margin: "14px 0", padding: 16, borderRadius: 12, background: "#f6f7f9", border: "1px solid #eceff3", overflowX: "auto", lineHeight: 1.6 }}>
+      {children}
+    </pre>
+  ),
+  hr: () => <hr style={{ margin: "22px 0", border: "none", borderTop: "1px solid #ededed" }} />,
+  table: ({ children }) => (
+    <div style={markdownStyles.tableWrap}>
+      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 480, fontSize: 13 }}>{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: "9px 12px", background: "#FFF0F6", color: "#333", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>{children}</td>,
+};
+
+const cheatSheetMarkdownComponents: Components = {
+  ...markdownComponents,
+  h1: ({ children }) => (
+    <h1 style={{ margin: "0 0 14px", paddingBottom: 10, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222", breakInside: "avoid" }}>
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 style={{ margin: "20px 0 10px", padding: "8px 10px", borderRadius: 8, background: "#f3f4f6", fontSize: 18, lineHeight: 1.4, fontWeight: 850, color: "#222", breakInside: "avoid" }}>
+      {children}
+    </h2>
+  ),
+  p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "#444" }}>{renderHighlightSyntax(children)}</p>,
+  ul: ({ children }) => <ul style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "disc" }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "decimal" }}>{children}</ol>,
+  li: ({ children }) => <li style={{ marginBottom: 4, paddingLeft: 3 }}>{renderHighlightSyntax(children)}</li>,
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "10px 0 14px", breakInside: "avoid" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 0, fontSize: 12 }}>{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: "8px 9px", background: "#FFF0F6", color: "#333", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left" }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
+};
+
+const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
+
+const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
+  const cleaned = normalizeMarkdownContent(content);
+  if (!cleaned) return null;
+
+  if (template === "CHEAT_SHEET") {
+    return (
+      <div style={{
+        columnCount: 2,
+        columnWidth: 420,
+        columnGap: 34,
+        columnRule: "1px solid #f1f1f1",
+      }}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={cheatSheetMarkdownComponents}>
+          {cleaned}
+        </ReactMarkdown>
+      </div>
+    );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {blocks.map((block, blockIdx) => {
-        if (block.type === "table") return renderTableBlock(block.lines, blockIdx);
-
-        const { raw: rawLine, index } = block;
-        const line = rawLine.trim();
-        if (!line) return <div key={blockIdx} style={{ height: 8 }} />;
-
-        const heading = line.match(/^(#{1,6})\s+(.+)$/);
-        if (heading) {
-          const level = heading[1].length;
-          return (
-            <div key={blockIdx} style={{
-              fontSize: level <= 2 ? 18 : 16,
-              fontWeight: 800,
-              color: "#222",
-              marginTop: index === 0 ? 0 : 10,
-              lineHeight: 1.45,
-            }}>
-              {renderInlineText(heading[2])}
-            </div>
-          );
-        }
-
-        const boldHeading = line.match(/^\*\*(.+)\*\*$/);
-        if (boldHeading) {
-          return (
-            <div key={blockIdx} style={{
-              fontSize: 15,
-              fontWeight: 800,
-              color: "#222",
-              marginTop: index === 0 ? 0 : 8,
-              lineHeight: 1.45,
-            }}>
-              {renderInlineText(boldHeading[1])}
-            </div>
-          );
-        }
-
-        const bullet = line.match(/^[-*•]\s+(.+)$/);
-        if (bullet) {
-          return (
-            <div key={blockIdx} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: PINK, marginTop: 10, flexShrink: 0 }} />
-              <span>{renderInlineText(bullet[1])}</span>
-            </div>
-          );
-        }
-
-        const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
-        if (numbered) {
-          return (
-            <div key={blockIdx} style={{ display: "flex", gap: 9, alignItems: "flex-start", lineHeight: 1.7 }}>
-              <span style={{ color: PINK, fontWeight: 800, minWidth: 18 }}>{numbered[1]}.</span>
-              <span>{renderInlineText(numbered[2])}</span>
-            </div>
-          );
-        }
-
-        return (
-          <div key={blockIdx} style={{ lineHeight: 1.75 }}>
-            {renderInlineText(line)}
-          </div>
-        );
-      })}
-    </div>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {cleaned}
+    </ReactMarkdown>
   );
 };
 
@@ -430,157 +449,21 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
-const SUGGESTION_TRIGGER = /원하시면|다음으로는|해드릴게요|알려드릴게요|다음 단계로|중 하나로|바꿔드릴게요|골라주세요|선택해주세요/;
-
-const parseAiSuggestions = (content: string): { mainContent: string; suggestions: string[] } => {
-  const lines = content.split("\n");
-
-  // Step 1: collect trailing bullet block (skip blank lines at the end)
-  let tail = lines.length - 1;
-  while (tail >= 0 && !lines[tail].trim()) tail--;
-
-  const bulletItems: string[] = [];
-  let bulletStart = tail + 1;
-  let i = tail;
-  while (i >= 0) {
-    const line = lines[i].trim();
-    if (!line) { i--; continue; }
-    const m = line.match(/^[-•*]\s+(.{4,80})$/);
-    if (m) { bulletItems.unshift(m[1].replace(/\*\*/g, "")); bulletStart = i; i--; }
-    else break;
-  }
-
-  // Also collect quoted suggestions from the last few lines if no bullets found
-  if (bulletItems.length === 0) {
-    let cutIndex = lines.length;
-    let inSection = false;
-    for (let j = lines.length - 1; j >= 0; j--) {
-      const line = lines[j].trim();
-      if (!line) continue;
-      const quotedMatches = [...line.matchAll(/[“”“”]([^””“”]{4,60})[“”“”]/g)].map(m => m[1]);
-      if (quotedMatches.length > 0) {
-        bulletItems.unshift(...quotedMatches);
-        cutIndex = j;
-        inSection = true;
-      } else if (SUGGESTION_TRIGGER.test(line)) {
-        cutIndex = j;
-        inSection = true;
-      } else if (inSection) {
-        break;
-      } else {
-        break;
-      }
-    }
-    if (bulletItems.length > 0) {
-      return { mainContent: lines.slice(0, cutIndex).join("\n").trim(), suggestions: bulletItems };
-    }
-    return { mainContent: content, suggestions: [] };
-  }
-
-  // Step 2: require at least 2 bullets to treat as suggestions
-  if (bulletItems.length < 2) return { mainContent: content, suggestions: [] };
-
-  // Step 3: look for a trigger phrase before the bullet block (within 6 lines)
-  let cutIdx = bulletStart;
-  let j = bulletStart - 1;
-  while (j >= 0 && bulletStart - j <= 6) {
-    const line = lines[j].trim();
-    if (!line) { j--; continue; }
-    if (SUGGESTION_TRIGGER.test(line)) { cutIdx = j; }
-    j--;
-  }
-
-  return {
-    mainContent: lines.slice(0, cutIdx).join("\n").trim(),
-    suggestions: bulletItems,
-  };
-};
-
-const SummaryResultView = ({ template, onBack, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, agentContext, resetTutorHistory = false, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
-  const [localThreadId, setLocalThreadId] = useState(threadId);
-  const [agentInput, setAgentInput] = useState("");
-  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
-  const [agentLoading, setAgentLoading] = useState(false);
-  const [agentError, setAgentError] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
-  const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const tutorSectionRef = useRef<HTMLDivElement | null>(null);
-  const skipNextScrollRef = useRef(false);
-
-  useEffect(() => {
-    tutorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-  const canUseAgent = Boolean(displayContent.trim());
-
-  const scrollToBottom = () => {
-    const el = chatContainerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-
-  const handleChatScroll = () => {
-    const el = chatContainerRef.current;
-    if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollBtn(distFromBottom > 60);
-  };
   const questions = suggestedTutorQuestions[template];
 
   const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
 
   useEffect(() => {
-    let ignore = false;
-    setLocalThreadId(threadId);
-    setAgentInput("");
-    setAgentError("");
-    setChatLoading(false);
-
-    if (!summaryId || resetTutorHistory) {
-      setAgentMessages([]);
-      return () => {
-        ignore = true;
-      };
-    }
-
-    setChatLoading(true);
-    loadSummaryChatMessages(summaryId)
-      .then(messages => {
-        if (!ignore) setAgentMessages(messages);
-      })
-      .catch(err => {
-        if (!ignore) {
-          setAgentMessages([]);
-          setAgentError(err instanceof Error ? err.message : "AI 튜터 대화 불러오기 실패");
-        }
-      })
-      .finally(() => {
-        if (!ignore) {
-          setChatLoading(false);
-          requestAnimationFrame(() => scrollToBottom());
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [summaryId, threadId, displayContent, resetTutorHistory]);
-
-  useEffect(() => {
-    if (skipNextScrollRef.current) { skipNextScrollRef.current = false; return; }
-    const lastMsg = agentMessages[agentMessages.length - 1];
-    if (!lastMsg || lastMsg.role !== "user") return;
-    const el = chatContainerRef.current;
-    if (!el) return;
-    const userDivs = el.querySelectorAll<HTMLElement>("[data-msg-role='user']");
-    const last = userDivs[userDivs.length - 1];
-    if (last) last.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [agentMessages]);
+    if (initialTutorQuestion?.trim()) setIsTutorOpen(true);
+  }, [initialTutorQuestion]);
 
   const handleDownload = async () => {
     if (!pdfExportRef.current || pdfSaving) return;
@@ -684,57 +567,6 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
     }
   };
 
-  const sendAgentQuestion = async (question: string) => {
-    const content = question.trim();
-    if (!content || !canUseAgent || chatLoading || agentLoading) return;
-
-    const userMessage: AgentMessage = { role: "user", content };
-    const nextMessages = [...agentMessages, userMessage];
-    setAgentMessages(nextMessages);
-    setAgentInput("");
-    setAgentError("");
-    setAgentLoading(true);
-
-    try {
-      let persistenceError = "";
-      if (summaryId) {
-        try {
-          await saveSummaryChatMessage(summaryId, userMessage);
-        } catch (err) {
-          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
-        }
-      }
-
-      const response = await sendAgentMessage(
-        localThreadId,
-        localThreadId ? [userMessage] : nextMessages,
-        localThreadId ? undefined : agentContext || displayContent,
-      );
-      const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
-      setLocalThreadId(response.threadId);
-      setAgentMessages(prev => [...prev, assistantMessage]);
-      if (summaryId) {
-        try {
-          await saveSummaryChatMessage(summaryId, assistantMessage);
-        } catch (err) {
-          persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 저장 실패";
-        }
-      }
-      if (persistenceError) {
-        setAgentError(`대화 저장 실패: ${persistenceError}`);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Agent 요청 실패";
-      setAgentError(message);
-    } finally {
-      setAgentLoading(false);
-    }
-  };
-
-  const handleAgentSubmit = async () => {
-    await sendAgentQuestion(agentInput);
-  };
-
   return (
     <div>
       <button onClick={onBack} style={{
@@ -786,6 +618,17 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
                     background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
                   }}>퀴즈 생성하기</button>
                 )}
+                <button onClick={() => setIsTutorOpen(prev => !prev)} style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 10,
+                  border: isTutorOpen ? `1px solid ${PINK}55` : "1px solid #e0e0e0",
+                  background: isTutorOpen ? "#FFF0F6" : "#fff",
+                  color: isTutorOpen ? PINK : "#555",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}>{isTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
               </>
             )}
           </div>
@@ -793,6 +636,32 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
         {actionMessage && !isLoading && (
           <div style={{ margin: "-6px 0 16px", fontSize: 12, color: "#888", textAlign: "right" }}>
             {actionMessage}
+          </div>
+        )}
+        {!isLoading && !error && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, borderBottom: "1px solid #f0f0f0" }}>
+            <button type="button" style={{
+              padding: "10px 4px 12px",
+              border: "none",
+              borderBottom: `2px solid ${PINK}`,
+              background: "transparent",
+              color: "#222",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: "default",
+            }}>요약 결과</button>
+            {onGoToQuiz && (
+              <button type="button" onClick={onGoToQuiz} style={{
+                padding: "10px 4px 12px",
+                border: "none",
+                borderBottom: "2px solid transparent",
+                background: "transparent",
+                color: "#888",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}>퀴즈 풀기</button>
+            )}
           </div>
         )}
 
@@ -856,212 +725,41 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
             <strong>요약 실패:</strong> {error}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 18, alignItems: "start" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+            gap: isTutorOpen ? 12 : 0,
+            alignItems: "stretch",
+          }}>
             <div style={{
-              background: "#fafafa", borderRadius: 12, padding: 24,
-              fontSize: 14, color: "#444", lineHeight: 1.8,
+              background: "#fff", borderRadius: 12, padding: 28,
+              border: "1px solid #f0f0f0",
+              fontSize: 15, color: "#444", lineHeight: 1.85,
               overflowX: "auto",
+              minWidth: 0,
             }}>
               {mindmapData ? (
                 <MindmapView key={displayContent} data={mindmapData} />
               ) : (
-                <FormattedAiText content={displayContent} />
+                <FormattedAiText content={displayContent} template={template} />
               )}
             </div>
 
-            <div ref={tutorSectionRef} style={{
-              border: "1px solid #f0f0f0",
-              borderRadius: 12,
-              padding: 18,
-              height: 720,
-              display: "flex",
-              flexDirection: "column",
-              background: "#fff",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#222" }}>AI 튜터</h3>
-                {agentMessages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => { setAgentMessages([]); setLocalThreadId(""); setAgentError(""); }}
-                    style={{
-                      padding: "4px 10px", borderRadius: 8, border: "1px solid #e0e0e0",
-                      background: "#fafafa", color: "#999", fontSize: 12, cursor: "pointer",
-                    }}
-                  >새 대화</button>
-                )}
-              </div>
-              <p style={{ margin: "0 0 14px", fontSize: 12, lineHeight: 1.6, color: "#888" }}>
-                요약본을 기준으로 헷갈리는 개념을 이어서 질문하세요.
-              </p>
-
-              {canUseAgent && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {questions.map(question => (
-                      <button
-                        key={question}
-                        type="button"
-                        onClick={() => sendAgentQuestion(question)}
-                        disabled={chatLoading || agentLoading}
-                        style={{
-                          padding: "7px 10px",
-                          borderRadius: 999,
-                          border: "1px solid #eeeeee",
-                          background: "#fafafa",
-                          color: "#555",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          lineHeight: 1.35,
-                          cursor: chatLoading || agentLoading ? "default" : "pointer",
-                          opacity: chatLoading || agentLoading ? 0.55 : 1,
-                          textAlign: "left",
-                        }}
-                      >
-                        {question}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ flex: 1, minHeight: 0, position: "relative", marginBottom: 14 }}>
-              <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-                {!canUseAgent ? (
-                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
-                    새로 생성한 요약에서 AI 튜터 대화를 시작할 수 있습니다.
-                  </div>
-                ) : chatLoading ? (
-                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
-                    이전 AI 튜터 대화를 불러오는 중입니다.
-                  </div>
-                ) : agentMessages.length === 0 ? (
-                  <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
-                    예: “이 개념을 쉬운 예시로 설명해줘” 또는 “시험에 나올 만한 포인트를 알려줘”
-                  </div>
-                ) : (
-                  <>
-                    {agentMessages.map((msg, i) => {
-                      const isLastAssistant = msg.role === "assistant" && i === agentMessages.length - 1 && !agentLoading;
-                      const { mainContent, suggestions } = msg.role === "assistant"
-                        ? parseAiSuggestions(msg.content)
-                        : { mainContent: msg.content, suggestions: [] };
-                      return (
-                        <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div style={{
-                            padding: "10px 14px",
-                            borderRadius: 12,
-                            background: msg.role === "user" ? "#E8FAFE" : "#fafafa",
-                            color: "#444",
-                            fontSize: 13,
-                            lineHeight: 1.6
-                          }}>
-                            <FormattedAiText content={mainContent} />
-                          </div>
-                          {isLastAssistant && suggestions.length > 0 && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", letterSpacing: "0.04em" }}>바로 이어서</span>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {suggestions.map(suggestion => (
-                                  <button
-                                    key={suggestion}
-                                    type="button"
-                                    onClick={() => { skipNextScrollRef.current = true; sendAgentQuestion(suggestion); }}
-                                    disabled={agentLoading}
-                                    style={{
-                                      padding: "6px 10px",
-                                      borderRadius: 999,
-                                      border: `1px solid ${PINK}33`,
-                                      background: "#FFF0F6",
-                                      color: PINK,
-                                      fontSize: 12,
-                                      fontWeight: 400,
-                                      lineHeight: 1.35,
-                                      cursor: agentLoading ? "default" : "pointer",
-                                      opacity: agentLoading ? 0.55 : 1,
-                                      textAlign: "left",
-                                    }}
-                                  >
-                                    {suggestion.replace(/\*\*/g, "")}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {agentLoading && (
-                      <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: 12, background: "#fafafa", color: "#aaa", fontSize: 13 }}>
-                        응답 중...
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-                {showScrollBtn && (
-                  <button
-                    type="button"
-                    onClick={scrollToBottom}
-                    title="맨 아래로"
-                    style={{
-                      position: "absolute",
-                      bottom: 8,
-                      right: 8,
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      border: "1px solid #e0e0e0",
-                      background: "#fff",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-                      color: "#888",
-                      fontSize: 16,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 10,
-                    }}
-                  >↓</button>
-                )}
-              </div>
-
-              {agentError && (
-                <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>
-              )}
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={agentInput}
-                  onChange={e => setAgentInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleAgentSubmit(); }}
-                  disabled={!canUseAgent || chatLoading || agentLoading}
-                  placeholder="요약본에 대해 질문하기"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: "11px 13px",
-                    borderRadius: 10,
-                    border: "1px solid #e0e0e0",
-                    fontSize: 13,
-                    outline: "none"
-                  }}
-                />
-                <button
-                  onClick={handleAgentSubmit}
-                  disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
-                  style={{
-                    padding: "0 14px", borderRadius: 10, border: "none",
-                    background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff",
-                    fontSize: 13, fontWeight: 800,
-                    cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  {agentLoading ? "응답 중" : "전송"}
-                </button>
-              </div>
-            </div>
+            {isTutorOpen && (
+              <AITutorDrawer
+                layout="embedded"
+                open={isTutorOpen}
+                onOpenChange={setIsTutorOpen}
+                contextTitle={contextTitle}
+                contextMarkdown={realContent}
+                summaryId={summaryId}
+                threadId={threadId}
+                suggestedQuestions={questions}
+                initialQuestion={!isLoading ? initialTutorQuestion : undefined}
+                disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                resetHistory={resetTutorHistory}
+              />
+            )}
           </div>
         )}
       </Card>
@@ -1069,11 +767,48 @@ const SummaryResultView = ({ template, onBack, realContent, isLoading, error, lo
   );
 };
 
-const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: MaterialDetailViewProps) => {
+const formatHubDate = (timestamp?: number) => {
+  if (!timestamp) return "업데이트 정보 없음";
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+};
+
+const LOW_QUIZ_SCORE_THRESHOLD = 70;
+
+const MaterialDetailView = ({
+  material,
+  selectedCourse,
+  onBack,
+  onGoSummary,
+  onGoQuiz,
+  onOpenSummary,
+  onOpenQuiz,
+  initialTab = "original",
+  initialTutorQuestion = "",
+  relatedMaterials = [],
+  onSelectRelatedMaterial,
+}: MaterialDetailViewProps) => {
+  const [activeTab, setActiveTab] = useState<MaterialDetailTab>(initialTab);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [summaries, setSummaries] = useState<SavedSummary[]>([]);
+  const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
+  const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
+  const [hubLoading, setHubLoading] = useState(false);
+  const [hubError, setHubError] = useState("");
+  const [activeSummaryId, setActiveSummaryId] = useState<string>("");
+  const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
+  const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
+  const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
+  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
+  const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
 
   useEffect(() => {
     let ignore = false;
@@ -1104,6 +839,265 @@ const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: Materia
     };
   }, [material]);
 
+  useEffect(() => {
+    setActiveTab(initialTab);
+    setTutorPrompt(initialTutorQuestion);
+    setIsOriginalTutorOpen(false);
+    setIsSummaryTutorOpen(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
+  }, [material.id, initialTab, initialTutorQuestion]);
+
+  useEffect(() => {
+    let ignore = false;
+    setHubLoading(true);
+    setHubError("");
+    setSummaries([]);
+    setQuizSets([]);
+    setQuizAttempts([]);
+    setActiveSummaryId("");
+
+    Promise.all([
+      loadSummariesFromServer(selectedCourse),
+      loadQuizSetsFromServer(selectedCourse),
+      loadQuizAttemptsFromServer(selectedCourse),
+    ])
+      .then(([nextSummaries, nextQuizSets, nextQuizAttempts]) => {
+        if (ignore) return;
+        const materialSummaries = nextSummaries
+          .filter(summary => (summary.materialIds || []).includes(material.id))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const materialQuizSets = nextQuizSets
+          .filter(quizSet => (quizSet.materialIds || []).includes(material.id))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const materialQuizSetIds = new Set(materialQuizSets.map(quizSet => quizSet.id));
+        const materialQuizAttempts = nextQuizAttempts
+          .filter(attempt =>
+            (attempt.materialIds || []).includes(material.id) ||
+            (attempt.quizSetId ? materialQuizSetIds.has(attempt.quizSetId) : false)
+          )
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const defaultSummary = materialSummaries.find(summary => summary.template === "GENERAL") || materialSummaries[0];
+
+        setSummaries(materialSummaries);
+        setQuizSets(materialQuizSets);
+        setQuizAttempts(materialQuizAttempts);
+        setActiveSummaryId(defaultSummary?.id || "");
+      })
+      .catch(err => {
+        if (!ignore) setHubError(err instanceof Error ? err.message : "학습 기록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setHubLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedCourse, material.id]);
+
+  const activeSummary = summaries.find(summary => summary.id === activeSummaryId) || summaries[0];
+  const recentQuizAttempt = quizAttempts[0];
+  const latestAttemptByQuizSetId = quizAttempts.reduce<Map<string, SavedQuizAttempt>>((map, attempt) => {
+    if (attempt.quizSetId && !map.has(attempt.quizSetId)) map.set(attempt.quizSetId, attempt);
+    return map;
+  }, new Map());
+  const hasSummaries = summaries.length > 0;
+  const hasQuizSets = quizSets.length > 0;
+  const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
+  const tutorContextMarkdown = activeSummary?.content || "";
+  const tutorContextTitle = activeSummary
+    ? `${material.name} · ${templateLabels[activeSummary.template]}`
+    : `${material.name} · 요약 없음`;
+  const tutorSuggestions = activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL;
+
+  const openSummaryTab = () => {
+    if (activeSummary) setActiveSummaryId(activeSummary.id || "");
+    setActiveTab("summary");
+  };
+
+  const openTutor = (question: string) => {
+    if (activeSummary) setActiveSummaryId(activeSummary.id || "");
+    setIsOriginalTutorOpen(false);
+    setActiveTab("summary");
+    setTutorPrompt(question);
+    setIsSummaryTutorOpen(true);
+  };
+
+  const learningCta = (() => {
+    if (!hasSummaries) {
+      return {
+        message: "먼저 이 자료를 요약해 학습 흐름을 잡아보세요.",
+        actions: [
+          { label: "요약 생성하기", onClick: onGoSummary, tone: "primary" as const },
+        ],
+      };
+    }
+
+    if (hasLowRecentScore) {
+      return {
+        message: "점수가 낮았던 부분을 요약과 함께 다시 볼까요?",
+        actions: [
+          { label: "약점 요약 보기", onClick: openSummaryTab, tone: "primary" as const },
+          {
+            label: "AI 튜터로 복습",
+            onClick: () => openTutor("최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
+            tone: "secondary" as const,
+          },
+        ],
+      };
+    }
+
+    if (hasQuizSets) {
+      return {
+        message: "최근 요약을 이어서 보고, 퀴즈 결과를 복습하세요.",
+        actions: [
+          { label: "요약 보기", onClick: openSummaryTab, tone: "primary" as const },
+          { label: "퀴즈 다시 풀기", onClick: () => onOpenQuiz(quizSets[0]), tone: "secondary" as const },
+          {
+            label: "AI 튜터",
+            onClick: () => openTutor("이 요약에서 시험에 다시 나올 만한 부분을 짚어줘"),
+            tone: "quiet" as const,
+          },
+        ],
+      };
+    }
+
+    return {
+      message: "요약은 완료됐어요. 이제 이해도를 확인해볼 차례입니다.",
+      actions: [
+        { label: "퀴즈 만들기", onClick: onGoQuiz, tone: "primary" as const },
+        {
+          label: "AI 튜터에게 질문",
+          onClick: () => openTutor("이 요약을 바탕으로 내가 이해했는지 확인 질문을 해줘"),
+          tone: "secondary" as const,
+        },
+      ],
+    };
+  })();
+
+  const ctaButtonStyle = (tone: "primary" | "secondary" | "quiet"): CSSProperties => {
+    if (tone === "primary") {
+      return {
+        height: 36,
+        padding: "0 14px",
+        borderRadius: 9,
+        border: "none",
+        background: PINK,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 850,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      };
+    }
+
+    if (tone === "secondary") {
+      return {
+        height: 36,
+        padding: "0 14px",
+        borderRadius: 9,
+        border: `1px solid ${CYAN}33`,
+        background: "#E8FAFE",
+        color: CYAN,
+        fontSize: 13,
+        fontWeight: 850,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      };
+    }
+
+    return {
+      height: 36,
+      padding: "0 12px",
+      borderRadius: 9,
+      border: `1px solid ${BORDER_COLOR}`,
+      background: "#fff",
+      color: "#777",
+      fontSize: 13,
+      fontWeight: 800,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    };
+  };
+
+  const tabButtonStyle = (tab: MaterialDetailTab): CSSProperties => ({
+    height: 42,
+    borderRadius: 10,
+    border: activeTab === tab ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+    background: activeTab === tab ? "#FFF0F6" : "#fff",
+    color: activeTab === tab ? PINK : "#777",
+    fontSize: 14,
+    fontWeight: 800,
+    cursor: "pointer",
+  });
+  const multiSourceBadge = (materialIds: string[] = []) => materialIds.length > 1 && (
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "4px 8px",
+      borderRadius: 999,
+      background: "#F3FBFD",
+      color: CYAN,
+      fontSize: 11,
+      fontWeight: 800,
+      whiteSpace: "nowrap",
+    }}>
+      여러 자료를 함께 사용함
+    </span>
+  );
+
+  const renderOriginalTab = () => {
+    if (fileLoading) {
+      return (
+        <div style={{ height: "calc(100vh - 292px)", minHeight: 620, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
+          원본 PDF를 불러오는 중입니다.
+        </div>
+      );
+    }
+
+    if (fileUrl && isPdf) {
+      return (
+        <iframe
+          title={material.name}
+          src={`${fileUrl}#toolbar=1&navpanes=0`}
+          style={{
+            width: "100%",
+            height: "calc(100vh - 292px)",
+            minHeight: 620,
+            border: "none",
+            background: "#f2f2f2",
+            display: "block",
+          }}
+        />
+      );
+    }
+
+    return (
+      <div style={{
+        background: "#f7f7f7",
+        padding: 24,
+        fontSize: 14,
+        color: "#444",
+        lineHeight: 1.8,
+        minHeight: 520,
+        maxHeight: "calc(100vh - 320px)",
+        overflowY: "auto",
+      }}>
+        <div style={{
+          marginBottom: 18,
+          padding: "12px 14px",
+          borderRadius: 10,
+          background: fileError ? "#FFF5F5" : "#FFF8E8",
+          color: fileError ? "#E53E3E" : "#9A6B00",
+          fontSize: 13,
+          fontWeight: 700,
+        }}>
+          {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
+        </div>
+        <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
+      </div>
+    );
+  };
+
   return (
     <div>
       <button onClick={onBack} style={{
@@ -1113,87 +1107,315 @@ const MaterialDetailView = ({ material, onBack, onGoSummary, onGoQuiz }: Materia
         <div style={{
           padding: "14px 18px",
           borderBottom: "1px solid #f0f0f0",
-          background: "#202020",
-          color: "#fff",
+          background: "#f2f2f2",
+          color: "#222",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
         }}>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#fff", wordBreak: "break-word" }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#222", wordBreak: "break-word" }}>
               {material.name}
             </h2>
-            <p style={{ margin: 0, fontSize: 12, color: "#b7b7b7" }}>
-              {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : material.type.toUpperCase()} · PDF 원본 보기
-            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#777" }}>
+              <span>{fileTypeLabel}</span>
+              <span>{pageInfo}</span>
+              <span>업데이트 {formatHubDate(material.updatedAt)}</span>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            {fileUrl && (
-              <a href={fileUrl} target="_blank" rel="noreferrer" style={{
+            {activeTab === "original" && hasSummaries && (
+              <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
                 height: 34,
                 padding: "0 12px",
                 borderRadius: 8,
-                background: "#333",
-                color: CYAN,
+                border: isOriginalTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                background: isOriginalTutorOpen ? "#FFF0F6" : "#fff",
+                color: isOriginalTutorOpen ? PINK : "#555",
                 fontSize: 13,
                 fontWeight: 800,
                 display: "inline-flex",
                 alignItems: "center",
-                textDecoration: "none",
-              }}>새 창</a>
+                cursor: "pointer",
+              }}>{isOriginalTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
             )}
-            <button onClick={onGoSummary} style={{
-              height: 34, padding: "0 12px", borderRadius: 8, border: "none",
-              background: "#FFF0F6", color: PINK, fontSize: 13, fontWeight: 800, cursor: "pointer"
-            }}>요약</button>
-            <button onClick={onGoQuiz} style={{
-              height: 34, padding: "0 12px", borderRadius: 8, border: "none",
-              background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer"
-            }}>퀴즈</button>
           </div>
         </div>
-
-        {fileLoading ? (
-          <div style={{ minHeight: 520, display: "grid", placeItems: "center", background: "#2b2b2b", color: "#ddd", fontSize: 14 }}>
-            원본 PDF를 불러오는 중입니다.
-          </div>
-        ) : fileUrl && isPdf ? (
-          <iframe
-            title={material.name}
-            src={`${fileUrl}#toolbar=1&navpanes=0`}
-            style={{
-              width: "100%",
-              height: "calc(100vh - 190px)",
-              minHeight: 620,
-              border: "none",
-              background: "#2b2b2b",
-              display: "block",
-            }}
-          />
-        ) : (
-          <div style={{
-            background: "#fafafa",
-            padding: 24,
-            fontSize: 14,
-            color: "#444",
-            lineHeight: 1.8,
-            minHeight: 520,
-            maxHeight: "calc(100vh - 220px)",
-            overflowY: "auto",
-          }}>
+        <div style={{ padding: 18, borderBottom: "1px solid #f0f0f0", background: "#fff" }}>
+          {relatedMaterials.length > 1 && (
             <div style={{
-              marginBottom: 18,
+              marginBottom: 14,
               padding: "12px 14px",
-              borderRadius: 10,
-              background: fileError ? "#FFF5F5" : "#FFF8E8",
-              color: fileError ? "#E53E3E" : "#9A6B00",
-              fontSize: 13,
-              fontWeight: 700,
+              borderRadius: 12,
+              border: `1px solid ${BORDER_COLOR}`,
+              background: "#fff",
             }}>
-              {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
+              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
+                이 퀴즈에 연결된 자료
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {relatedMaterials.map(related => {
+                  const isActive = related.id === material.id;
+                  return (
+                    <button
+                      key={related.id}
+                      type="button"
+                      onClick={() => onSelectRelatedMaterial?.(related)}
+                      style={{
+                        maxWidth: 280,
+                        padding: "7px 10px",
+                        borderRadius: 999,
+                        border: isActive ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                        background: isActive ? "#FFF0F6" : "#fafafa",
+                        color: isActive ? PINK : "#666",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: isActive ? "default" : "pointer",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {related.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
+          )}
+          <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 14,
+            padding: 16,
+            borderRadius: 12,
+            border: `1px solid ${BORDER_COLOR}`,
+            background: "#fafafa",
+          }}>
+            <div style={{ minWidth: 260, flex: "1 1 360px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 9 }}>
+                <span style={{ padding: "5px 9px", borderRadius: 999, background: "#FFF0F6", color: PINK, fontSize: 12, fontWeight: 850 }}>
+                  요약 {summaries.length}개
+                </span>
+                <span style={{ padding: "5px 9px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 12, fontWeight: 850 }}>
+                  퀴즈 {quizSets.length}개
+                </span>
+                {recentQuizAttempt && (
+                  <span style={{
+                    padding: "5px 9px",
+                    borderRadius: 999,
+                    background: hasLowRecentScore ? "#FFF5F5" : "#F1FFF5",
+                    color: hasLowRecentScore ? "#E53E3E" : "#2F9E44",
+                    fontSize: 12,
+                    fontWeight: 850,
+                  }}>
+                    최근 점수 {recentQuizAttempt.scorePercent}%
+                  </span>
+                )}
+              </div>
+              <p style={{ margin: 0, color: "#444", fontSize: 14, fontWeight: 750, lineHeight: 1.5 }}>
+                {hubLoading ? "학습 상태를 불러오는 중입니다." : learningCta.message}
+              </p>
+            </div>
+            {!hubLoading && (
+              <div style={{ display: "flex", flex: "0 1 auto", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 }}>
+                {learningCta.actions.map(action => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={action.onClick}
+                    style={ctaButtonStyle(action.tone)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            <button type="button" onClick={() => setActiveTab("original")} style={tabButtonStyle("original")}>원본</button>
+            <button type="button" onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
+            <button type="button" onClick={() => setActiveTab("quiz")} style={tabButtonStyle("quiz")}>퀴즈 {quizSets.length > 0 ? quizSets.length : ""}</button>
+          </div>
+          {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
+        </div>
+
+        {activeTab === "original" && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isOriginalTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+            gap: isOriginalTutorOpen ? 12 : 0,
+            alignItems: "stretch",
+          }}>
+            <div style={{ minWidth: 0 }}>
+              {renderOriginalTab()}
+            </div>
+            {isOriginalTutorOpen && (
+              <AITutorDrawer
+                layout="embedded"
+                open={isOriginalTutorOpen}
+                onOpenChange={setIsOriginalTutorOpen}
+                contextTitle={tutorContextTitle}
+                contextMarkdown={tutorContextMarkdown}
+                summaryId={activeSummary?.id || null}
+                materialId={material.id}
+                suggestedQuestions={tutorSuggestions}
+                initialQuestion={tutorPrompt}
+                disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === "summary" && (
+          <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
+            {hubLoading ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "#888", fontSize: 14 }}>연결된 요약을 불러오는 중입니다.</div>
+            ) : summaries.length === 0 ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
+                <div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "#222" }}>아직 요약이 없습니다</h3>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "#888" }}>이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.</p>
+                  <button onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                    요약 생성하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: isSummaryTutorOpen ? "220px minmax(0, 1fr) 400px" : "220px minmax(0, 1fr)",
+                gap: 18,
+                alignItems: "start",
+              }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {summaries.map(summary => (
+                    <button
+                      key={summary.id || `${summary.template}-${summary.createdAt}`}
+                      type="button"
+                      onClick={() => setActiveSummaryId(summary.id || "")}
+                      style={{
+                        padding: "12px 13px",
+                        borderRadius: 10,
+                        border: activeSummary?.id === summary.id ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                        background: activeSummary?.id === summary.id ? "#FFF0F6" : "#fff",
+                        color: activeSummary?.id === summary.id ? PINK : "#555",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
+                      <span style={{ display: "block", fontSize: 11, color: "#999" }}>{formatHubDate(summary.createdAt)}</span>
+                    </button>
+                  ))}
+                </div>
+                {activeSummary && (
+                  <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 18 }}>
+                      <div>
+                        <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
+                        <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {multiSourceBadge(activeSummary.materialIds)}
+                        <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                          자세히 보기
+                        </button>
+                        <button onClick={() => setIsSummaryTutorOpen(prev => !prev)} style={{
+                          padding: "9px 12px",
+                          borderRadius: 8,
+                          border: isSummaryTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                          background: isSummaryTutorOpen ? "#FFF0F6" : "#fff",
+                          color: isSummaryTutorOpen ? PINK : "#555",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          cursor: "pointer",
+                        }}>
+                          {isSummaryTutorOpen ? "튜터 닫기" : "AI 튜터"}
+                        </button>
+                      </div>
+                    </div>
+                    <FormattedAiText content={activeSummary.content} template={activeSummary.template} />
+                  </div>
+                )}
+                {isSummaryTutorOpen && activeSummary && (
+                  <AITutorDrawer
+                    layout="embedded"
+                    open={isSummaryTutorOpen}
+                    onOpenChange={setIsSummaryTutorOpen}
+                    contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
+                    contextMarkdown={activeSummary.content}
+                    summaryId={activeSummary.id || null}
+                    materialId={material.id}
+                    suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
+                    initialQuestion={tutorPrompt}
+                    disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "quiz" && (
+          <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
+            {hubLoading ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "#888", fontSize: 14 }}>연결된 퀴즈를 불러오는 중입니다.</div>
+            ) : quizSets.length === 0 ? (
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
+                <div>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "#222" }}>아직 퀴즈가 없습니다</h3>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "#888" }}>이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.</p>
+                  <button onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                    퀴즈 생성하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {quizSets.map(quizSet => {
+                  const latestAttempt = latestAttemptByQuizSetId.get(quizSet.id);
+                  return (
+                    <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                          <h3 style={{ margin: 0, fontSize: 16, color: "#222", wordBreak: "break-word" }}>{quizSet.title}</h3>
+                          {multiSourceBadge(quizSet.materialIds)}
+                          {latestAttempt && (
+                            <span style={{
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              background: latestAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD ? "#FFF5F5" : "#F1FFF5",
+                              color: latestAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD ? "#E53E3E" : "#2F9E44",
+                              fontSize: 11,
+                              fontWeight: 850,
+                            }}>
+                              풀이 {latestAttempt.scorePercent}%
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#888", fontWeight: 700 }}>
+                          <span>난이도 {quizSet.difficulty}</span>
+                          <span>{quizSet.questionType}</span>
+                          <span>{quizSet.count || quizSet.questions.length}문항</span>
+                          <span>{formatHubDate(quizSet.createdAt)}</span>
+                        </div>
+                      </div>
+                      <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                        {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
+                      </button>
+                    </div>
+                  );
+                })}
+                <button onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: `1px solid ${CYAN}33`, background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                  새 퀴즈 만들기
+                </button>
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -1292,14 +1514,27 @@ export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state as LocationState) || null;
-  const isReloadNavigationRef = useRef(isPageReload());
-  const shouldRestoreLocationView = !isReloadNavigationRef.current;
+  const isInitialRouteEntryRef = useRef(isInitialRouteEntry(location.key));
+  const shouldRestoreLocationView = !isInitialRouteEntryRef.current;
   const initialCourse = (locationState?.selectedCourse || "").trim();
   const fromDashboardRef = useRef(Boolean(initialCourse && locationState?.fromDashboard));
-  const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialId || "" : "");
+  const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial
+    ? locationState.materialId || locationState.materialIds?.[0] || ""
+    : "");
+  const pendingMaterialDetailTabRef = useRef<MaterialDetailTab>(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialDetailTab || "original" : "original"
+  );
+  const pendingMaterialTutorQuestionRef = useRef(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.tutorQuestion || "" : "",
+  );
+  const pendingMaterialIdsRef = useRef<string[]>(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialIds || [] : [],
+  );
   const pendingSummaryRef = useRef(shouldRestoreLocationView && locationState?.openSummary ? {
     id: locationState.summaryId || "",
     template: locationState.summaryTemplate,
+    content: locationState.summaryContent || "",
+    createdAt: locationState.summaryCreatedAt || Date.now(),
     materialIds: locationState.materialIds || [],
   } : null);
   const { courses } = useCourses();
@@ -1309,6 +1544,9 @@ export default function Summary() {
   const [uploading, setUploading] = useState(false);
   const [searched, setSearched] = useState(Boolean(initialCourse));
   const [selectedCourse, setSelectedCourse] = useState(initialCourse);
+  const [inputMode, setInputMode] = useState<"file" | "text">("file");
+  const [textMaterialTitle, setTextMaterialTitle] = useState("");
+  const [textMaterialContent, setTextMaterialContent] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
   const filesRef = useRef<UploadedFile[]>([]);
 
@@ -1323,11 +1561,16 @@ export default function Summary() {
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
+  const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<"templates" | "upload">("templates");
+  const [pendingTutorQuestion] = useState(
+    shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
+  );
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
 
@@ -1341,6 +1584,8 @@ export default function Summary() {
       replace: true,
       state: initialCourse ? { selectedCourse: initialCourse, fromDashboard: locationState.fromDashboard } : null,
     });
+    // The location handoff should be consumed once on mount so refreshes do not reopen nested views.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1359,8 +1604,14 @@ export default function Summary() {
           pendingMaterialIdRef.current = "";
           const material = nextMaterials.find(item => item.id === pendingMaterialId);
           if (material) {
+            const validMaterialIds = pendingMaterialIdsRef.current.filter(id => nextMaterials.some(item => item.id === id));
+            pendingMaterialIdsRef.current = [];
             setActiveMaterial(material);
-            setSelectedMaterialIds([material.id]);
+            setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : [material.id]);
+            setMaterialDetailInitialTab(pendingMaterialDetailTabRef.current);
+            setMaterialDetailTutorQuestion(pendingMaterialTutorQuestionRef.current);
+            pendingMaterialDetailTabRef.current = "original";
+            pendingMaterialTutorQuestionRef.current = "";
             setSearched(true);
             setView("materialDetail");
             return;
@@ -1370,13 +1621,26 @@ export default function Summary() {
         const pendingSummary = pendingSummaryRef.current;
         if (pendingSummary) {
           pendingSummaryRef.current = null;
-          const summary = summaries.find(item =>
-            (pendingSummary.id && item.id === pendingSummary.id) ||
-            (
-              pendingSummary.template &&
-              item.template === pendingSummary.template &&
-              sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+          const matchingSummaries = summaries
+            .filter(item =>
+              (pendingSummary.id && item.id === pendingSummary.id) ||
+              (
+                pendingSummary.template
+                  ? item.template === pendingSummary.template && sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+                  : sameMaterialIds(item.materialIds, pendingSummary.materialIds)
+              )
             )
+            .sort((a, b) => b.createdAt - a.createdAt);
+          const summary = matchingSummaries[0] || (
+            pendingSummary.template && pendingSummary.content
+              ? {
+                  id: pendingSummary.id,
+                  template: pendingSummary.template,
+                  content: pendingSummary.content,
+                  createdAt: pendingSummary.createdAt,
+                  materialIds: pendingSummary.materialIds,
+                }
+              : null
           );
           if (summary) {
             const validMaterialIds = (summary.materialIds || []).filter(id =>
@@ -1587,6 +1851,43 @@ export default function Summary() {
     }
   };
 
+  const handleAddTextMaterial = async () => {
+    const title = textMaterialTitle.trim();
+    const markdown = textMaterialContent.trim();
+    if (!selectedCourse || !title || !markdown) return;
+
+    const name = title.toLowerCase().endsWith(".txt") ? title : `${title}.txt`;
+    const nameKey = getFileNameKey(name);
+    if (materials.some(material => getFileNameKey(material.name) === nameKey)) {
+      setDuplicateNotice({ names: [name] });
+      return;
+    }
+
+    const material: CourseMaterial = {
+      id: `text:${name}:${Date.now()}`,
+      name,
+      size: markdown.length,
+      type: "file",
+      pages: null,
+      slides: null,
+      markdown,
+      mimeType: "text/plain",
+      updatedAt: Date.now(),
+    };
+
+    try {
+      const nextMaterials = [material, ...materials];
+      await saveCourseMaterials(selectedCourse, nextMaterials);
+      setMaterials(nextMaterials);
+      setSelectedMaterialIds(prev => Array.from(new Set([...prev, material.id])));
+      setTextMaterialTitle("");
+      setTextMaterialContent("");
+      setSearched(true);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : "텍스트 자료 추가 실패");
+    }
+  };
+
   const handleDeleteMaterial = async (material: CourseMaterial) => {
     if (!selectedCourse) return;
 
@@ -1663,6 +1964,49 @@ export default function Summary() {
         ? { course: selectedCourse, template: selectedTemplate, materialIds: selectedMaterialIds, fromDashboard: fromDashboardRef.current }
         : { course: selectedCourse, materialIds: selectedMaterialIds, fromDashboard: fromDashboardRef.current },
     });
+  };
+
+  const handleCreateSummaryForMaterial = (material: CourseMaterial) => {
+    setSelectedMaterialIds([material.id]);
+    setSelectedTemplate(null);
+    setMaterialDetailInitialTab("original");
+    setMaterialDetailTutorQuestion("");
+    setResultBackView("materialDetail");
+    setView("templates");
+  };
+
+  const handleCreateQuizForMaterial = (material: CourseMaterial) => {
+    setSelectedMaterialIds([material.id]);
+    navigate(pageRoutes["퀴즈 생성"], {
+      state: { course: selectedCourse, materialIds: [material.id], fromDashboard: fromDashboardRef.current },
+    });
+  };
+
+  const handleOpenMaterialSummary = (summary: SavedSummary) => {
+    const validMaterialIds = (summary.materialIds || []).filter(id => materials.some(material => material.id === id));
+    setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : activeMaterial ? [activeMaterial.id] : []);
+    setSelectedTemplate(summary.template);
+    setActiveSummaryId(summary.id || null);
+    setSummaryText(summary.content);
+    setIsSummarizing(false);
+    setSummaryError("");
+    setElapsedTime(null);
+    setLoadingStep("");
+    setAgentThreadId("");
+    setResultBackView("materialDetail");
+    setView("summaryResult");
+  };
+
+  const handleOpenMaterialQuiz = (quizSet: SavedQuizSet) => {
+    navigate(pageRoutes["퀴즈 생성"], {
+      state: { course: selectedCourse, quizSetId: quizSet.id, openQuiz: true, fromDashboard: fromDashboardRef.current },
+    });
+  };
+
+  const handleSelectRelatedMaterial = (material: CourseMaterial) => {
+    setActiveMaterial(material);
+    setMaterialDetailInitialTab("summary");
+    setMaterialDetailTutorQuestion("");
   };
 
   return (
@@ -1742,7 +2086,11 @@ export default function Summary() {
         <span style={{ color: "#bbb", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{
+        padding: view === "summaryResult" || view === "materialDetail" ? "18px 20px" : 24,
+        maxWidth: view === "summaryResult" || view === "materialDetail" ? 1480 : 1100,
+        margin: "0 auto",
+      }}>
         {courses.length > 0 && view === "upload" && !selectedCourse && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ marginBottom: 12 }}>
@@ -1795,6 +2143,7 @@ export default function Summary() {
           <SummaryResultView
             template={selectedTemplate}
             onBack={() => setView(resultBackView)}
+            contextTitle={`${selectedMaterials.map(material => material.name).join(", ") || "현재 자료"} · ${templateLabels[selectedTemplate]}`}
             realContent={summaryText}
             isLoading={isSummarizing}
             error={summaryError}
@@ -1802,8 +2151,8 @@ export default function Summary() {
             elapsedTime={elapsedTime}
             threadId={agentThreadId}
             summaryId={activeSummaryId}
-            agentContext={selectedMarkdown || summaryText}
-            resetTutorHistory={isReloadNavigationRef.current}
+            resetTutorHistory={isInitialRouteEntryRef.current}
+            initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
           />
         )}
@@ -1811,9 +2160,16 @@ export default function Summary() {
         {view === "materialDetail" && activeMaterial && (
           <MaterialDetailView
             material={activeMaterial}
+            selectedCourse={selectedCourse}
             onBack={() => setView("upload")}
-            onGoSummary={() => setView("templates")}
-            onGoQuiz={handleGoToQuiz}
+            onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
+            onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
+            onOpenSummary={handleOpenMaterialSummary}
+            onOpenQuiz={handleOpenMaterialQuiz}
+            initialTab={materialDetailInitialTab}
+            initialTutorQuestion={materialDetailTutorQuestion}
+            relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
+            onSelectRelatedMaterial={handleSelectRelatedMaterial}
           />
         )}
 
@@ -1829,26 +2185,82 @@ export default function Summary() {
             <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>
-                <div
-                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-                  onClick={() => fileRef.current?.click()}
-                  style={{
-                    border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
-                    borderRadius: 14, padding: "40px 20px", textAlign: "center",
-                    cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
-                    transition: "all 0.2s", marginBottom: 20
-                  }}
-                >
-                  <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
-                    onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
-                  <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>PDF, PPT, 이미지 파일을 드래그하거나</p>
-                  <button style={{
-                    marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
-                    background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
-                  }}>파일 선택</button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                  {(["file", "text"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setInputMode(mode)}
+                      style={{
+                        padding: "10px 0",
+                        borderRadius: 10,
+                        border: inputMode === mode ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                        background: inputMode === mode ? "#FFF0F6" : "#fff",
+                        color: inputMode === mode ? PINK : "#777",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {mode === "file" ? "파일 업로드" : "텍스트 붙여넣기"}
+                    </button>
+                  ))}
                 </div>
+                {inputMode === "file" ? (
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+                    onClick={() => fileRef.current?.click()}
+                    style={{
+                      border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
+                      borderRadius: 14, padding: "40px 20px", textAlign: "center",
+                      cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
+                      transition: "all 0.2s", marginBottom: 20
+                    }}
+                  >
+                    <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
+                      onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
+                    <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>강의자료 파일을 드래그하거나</p>
+                    <button style={{
+                      marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
+                      background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
+                    }}>파일 선택</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                    <input
+                      value={textMaterialTitle}
+                      onChange={e => setTextMaterialTitle(e.target.value)}
+                      placeholder="자료 이름 (예: 3주차 강의 노트)"
+                      style={{ padding: "12px 13px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, outline: "none" }}
+                    />
+                    <textarea
+                      value={textMaterialContent}
+                      onChange={e => setTextMaterialContent(e.target.value)}
+                      placeholder="강의 스크립트나 노트를 붙여넣으세요..."
+                      rows={8}
+                      style={{ padding: 13, borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, lineHeight: 1.6, resize: "vertical", outline: "none", fontFamily: "inherit" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddTextMaterial}
+                      disabled={!textMaterialTitle.trim() || !textMaterialContent.trim()}
+                      style={{
+                        padding: "11px 0",
+                        borderRadius: 10,
+                        border: "none",
+                        background: textMaterialTitle.trim() && textMaterialContent.trim() ? PINK : "#e5e5e5",
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        cursor: textMaterialTitle.trim() && textMaterialContent.trim() ? "pointer" : "default",
+                      }}
+                    >
+                      자료로 추가
+                    </button>
+                  </div>
+                )}
 
                 <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
                 {uploading && (
@@ -1871,7 +2283,7 @@ export default function Summary() {
                 )}
                 {!isExtracting && selectedMarkdown && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
-                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 500 }}>선택한 자료 {selectedMaterials.length}개 — 요약 생성 가능</span>
+                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 700 }}>선택됨: {selectedMaterials.length}개</span>
                   </div>
                 )}
                 {extractError && (
@@ -1882,9 +2294,15 @@ export default function Summary() {
 
                 {materials.length > 0 && (
                   <div>
-                    <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: "#555" }}>
-                      강의자료 선택
-                    </h4>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
+                      <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#555" }}>
+                        강의자료 선택
+                      </h4>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 선택</button>
+                        <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 해제</button>
+                      </div>
+                    </div>
                     {materials.map(material => {
                       const isSelected = selectedMaterialIds.includes(material.id);
                       return (
@@ -1915,6 +2333,31 @@ export default function Summary() {
                         <span style={{ fontSize: 12, color: "#aaa" }}>
                           {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : ""}
                         </span>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setActiveMaterial(material);
+                            setSelectedMaterialIds([material.id]);
+                            setMaterialDetailInitialTab("original");
+                            setMaterialDetailTutorQuestion("");
+                            setView("materialDetail");
+                          }}
+                          style={{
+                            height: 26,
+                            padding: "0 8px",
+                            borderRadius: 8,
+                            border: `1px solid ${CYAN}33`,
+                            background: "#E8FAFE",
+                            color: CYAN,
+                            cursor: "pointer",
+                            fontSize: 11,
+                            fontWeight: 800,
+                            flexShrink: 0,
+                          }}
+                        >
+                          학습
+                        </button>
                         <button
                           type="button"
                           onClick={e => { e.stopPropagation(); handleDeleteMaterial(material); }}
