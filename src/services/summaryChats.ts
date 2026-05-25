@@ -103,8 +103,10 @@ async function createLegacySummarySession(summaryId: string): Promise<SummaryCha
   if (messages.length === 0) return null;
 
   const firstUserMessage = messages.find(message => message.role === 'user');
-  const firstCreatedAt = messages[0]?.created_at ? new Date(messages[0].created_at).getTime() : Date.now();
-  const lastCreatedAt = messages[messages.length - 1]?.created_at ? new Date(messages[messages.length - 1].created_at).getTime() : firstCreatedAt;
+  const firstMessageCreatedAt = messages[0]?.created_at;
+  const lastMessageCreatedAt = messages[messages.length - 1]?.created_at;
+  const firstCreatedAt = firstMessageCreatedAt ? new Date(firstMessageCreatedAt).getTime() : Date.now();
+  const lastCreatedAt = lastMessageCreatedAt ? new Date(lastMessageCreatedAt).getTime() : firstCreatedAt;
 
   return {
     id: legacySummarySessionId(summaryId),

@@ -62,17 +62,17 @@ export async function generateStudyPlan(
     throw new Error('유효한 학습 계획을 받지 못했습니다.');
   }
 
-  const items = data.items
-    .map(item => {
-      if (!item || typeof item !== 'object') return null;
+  const items: GeneratedStudyPlanItem[] = data.items
+    .flatMap(item => {
+      if (!item || typeof item !== 'object') return [];
       const candidate = item as {
         text?: unknown;
         minutes?: unknown;
         source_id?: unknown;
         source_type?: unknown;
       };
-      if (typeof candidate.text !== 'string' || !candidate.text.trim()) return null;
-      return {
+      if (typeof candidate.text !== 'string' || !candidate.text.trim()) return [];
+      const normalized: GeneratedStudyPlanItem = {
         text: candidate.text.trim(),
         minutes: typeof candidate.minutes === 'number' ? candidate.minutes : 30,
         sourceId: typeof candidate.source_id === 'string' ? candidate.source_id : null,
@@ -80,8 +80,8 @@ export async function generateStudyPlan(
           ? candidate.source_type
           : 'assignment',
       };
-    })
-    .filter((item): item is GeneratedStudyPlanItem => Boolean(item));
+      return [normalized];
+    });
 
   if (items.length === 0) {
     throw new Error('유효한 학습 계획을 받지 못했습니다.');

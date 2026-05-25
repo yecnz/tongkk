@@ -29,6 +29,7 @@ import {
   type CourseMaterial,
 } from "../services/materials";
 import { AITutorDrawer } from "../components/AITutorDrawer";
+import { createPdfPreviewFromUrl } from "../services/documentPreview";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -48,6 +49,8 @@ type LocationState = {
   materialIds?: string[];
   openSummary?: boolean;
   tutorQuestion?: string;
+  quizReviewContext?: string;
+  quizReviewTitle?: string;
   materialDetailTab?: MaterialDetailTab;
 } | null;
 type FileIconProps = { type: FileKind };
@@ -63,6 +66,8 @@ type MaterialDetailViewProps = {
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
   initialTab?: MaterialDetailTab;
   initialTutorQuestion?: string;
+  reviewContext?: string;
+  reviewTitle?: string;
   relatedMaterials?: CourseMaterial[];
   onSelectRelatedMaterial?: (material: CourseMaterial) => void;
 };
@@ -790,6 +795,8 @@ const MaterialDetailView = ({
   onOpenQuiz,
   initialTab = "original",
   initialTutorQuestion = "",
+  reviewContext = "",
+  reviewTitle = "",
   relatedMaterials = [],
   onSelectRelatedMaterial,
 }: MaterialDetailViewProps) => {
@@ -797,6 +804,9 @@ const MaterialDetailView = ({
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
@@ -806,7 +816,12 @@ const MaterialDetailView = ({
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
   const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
-  const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
+  const lowerMaterialName = material.name.toLowerCase();
+  const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || lowerMaterialName.endsWith(".pdf");
+  const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
+  const isLegacyPpt = lowerMaterialName.endsWith(".ppt");
+  const isPresentation = material.type === "ppt" || isPptx || isLegacyPpt;
+  const hasReviewContext = Boolean(reviewContext.trim());
   const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
   const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
 
@@ -838,6 +853,43 @@ const MaterialDetailView = ({
       ignore = true;
     };
   }, [material]);
+
+  useEffect(() => {
+    let ignore = false;
+    let objectUrl = "";
+
+    setPreviewPdfUrl(null);
+    setPreviewError("");
+
+    if (!fileUrl || !isPresentation) {
+      setPreviewLoading(false);
+      return () => {
+        ignore = true;
+      };
+    }
+
+    setPreviewLoading(true);
+    createPdfPreviewFromUrl(fileUrl, material.name)
+      .then(url => {
+        objectUrl = url;
+        if (!ignore) {
+          setPreviewPdfUrl(url);
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      })
+      .catch(err => {
+        if (!ignore) setPreviewError(err instanceof Error ? err.message : "PPT/PPTX 미리보기 변환에 실패했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setPreviewLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fileUrl, isPresentation, material.id, material.name]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -904,6 +956,10 @@ const MaterialDetailView = ({
   const hasQuizSets = quizSets.length > 0;
   const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
   const tutorContextMarkdown = activeSummary?.content || "";
+  const reviewTutorSection = hasReviewContext
+    ? `# ${reviewTitle || "이번 퀴즈 오답 복습"}\n\n${reviewContext.trim()}`
+    : "";
+  const combinedTutorContextMarkdown = [tutorContextMarkdown, reviewTutorSection].filter(Boolean).join("\n\n---\n\n");
   const tutorContextTitle = activeSummary
     ? `${material.name} · ${templateLabels[activeSummary.template]}`
     : `${material.name} · 요약 없음`;
@@ -939,7 +995,9 @@ const MaterialDetailView = ({
           { label: "약점 요약 보기", onClick: openSummaryTab, tone: "primary" as const },
           {
             label: "AI 튜터로 복습",
-            onClick: () => openTutor("최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
+            onClick: () => openTutor(hasReviewContext
+              ? "위의 이번 퀴즈 오답 복습 문맥을 기준으로 내가 틀린 문제들을 순서대로 설명해줘. 각 문제마다 왜 틀렸는지, 어떤 개념을 다시 봐야 하는지, 비슷한 문제를 풀 때 주의할 점을 알려줘."
+              : "최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
             tone: "secondary" as const,
           },
         ],
@@ -1046,10 +1104,10 @@ const MaterialDetailView = ({
   );
 
   const renderOriginalTab = () => {
-    if (fileLoading) {
+    if (fileLoading || previewLoading) {
       return (
         <div style={{ height: "calc(100vh - 292px)", minHeight: 620, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
-          원본 PDF를 불러오는 중입니다.
+          {previewLoading ? "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다." : "원본 파일을 불러오는 중입니다."}
         </div>
       );
     }
@@ -1059,6 +1117,23 @@ const MaterialDetailView = ({
         <iframe
           title={material.name}
           src={`${fileUrl}#toolbar=1&navpanes=0`}
+          style={{
+            width: "100%",
+            height: "calc(100vh - 292px)",
+            minHeight: 620,
+            border: "none",
+            background: "#f2f2f2",
+            display: "block",
+          }}
+        />
+      );
+    }
+
+    if (previewPdfUrl) {
+      return (
+        <iframe
+          title={`${material.name} PDF preview`}
+          src={`${previewPdfUrl}#toolbar=1&navpanes=0`}
           style={{
             width: "100%",
             height: "calc(100vh - 292px)",
@@ -1086,13 +1161,27 @@ const MaterialDetailView = ({
           marginBottom: 18,
           padding: "12px 14px",
           borderRadius: 10,
-          background: fileError ? "#FFF5F5" : "#FFF8E8",
-          color: fileError ? "#E53E3E" : "#9A6B00",
+          background: fileError || previewError ? "#FFF5F5" : "#FFF8E8",
+          color: fileError || previewError ? "#E53E3E" : "#9A6B00",
           fontSize: 13,
           fontWeight: 700,
         }}>
-          {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
+          {previewError || fileError || (isPresentation
+            ? (isLegacyPpt
+              ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
+              : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
+            : "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다.")}
         </div>
+        {fileUrl && isPresentation && (
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: "inline-flex", marginBottom: 16, color: CYAN, fontSize: 13, fontWeight: 800, textDecoration: "none" }}
+          >
+            원본 PPT/PPTX 열기
+          </a>
+        )}
         <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
       </div>
     );
@@ -1125,6 +1214,29 @@ const MaterialDetailView = ({
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {fileUrl && (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${BORDER_COLOR}`,
+                  background: "#fff",
+                  color: "#555",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  textDecoration: "none",
+                  cursor: "pointer",
+                }}
+              >
+                원본 열기
+              </a>
+            )}
             {activeTab === "original" && hasSummaries && (
               <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
                 height: 34,
@@ -1260,11 +1372,12 @@ const MaterialDetailView = ({
                 open={isOriginalTutorOpen}
                 onOpenChange={setIsOriginalTutorOpen}
                 contextTitle={tutorContextTitle}
-                contextMarkdown={tutorContextMarkdown}
+                contextMarkdown={combinedTutorContextMarkdown}
                 summaryId={activeSummary?.id || null}
                 materialId={material.id}
                 suggestedQuestions={tutorSuggestions}
                 initialQuestion={tutorPrompt}
+                onInitialQuestionConsumed={() => setTutorPrompt("")}
                 disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
               />
             )}
@@ -1339,6 +1452,32 @@ const MaterialDetailView = ({
                         </button>
                       </div>
                     </div>
+                    {hasReviewContext && (
+                      <div style={{
+                        marginBottom: 18,
+                        padding: 16,
+                        borderRadius: 12,
+                        border: "1px solid #F8DFA8",
+                        background: "#FFF8E8",
+                      }}>
+                        <h4 style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 850, color: "#7A5200" }}>
+                          {reviewTitle || "이번 퀴즈 오답 복습"}
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          fontFamily: "inherit",
+                          fontSize: 13,
+                          lineHeight: 1.65,
+                          color: "#6A4B00",
+                        }}>
+                          {reviewContext.trim()}
+                        </pre>
+                      </div>
+                    )}
                     <FormattedAiText content={activeSummary.content} template={activeSummary.template} />
                   </div>
                 )}
@@ -1348,11 +1487,12 @@ const MaterialDetailView = ({
                     open={isSummaryTutorOpen}
                     onOpenChange={setIsSummaryTutorOpen}
                     contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
-                    contextMarkdown={activeSummary.content}
+                    contextMarkdown={combinedTutorContextMarkdown}
                     summaryId={activeSummary.id || null}
                     materialId={material.id}
                     suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
                     initialQuestion={tutorPrompt}
+                    onInitialQuestionConsumed={() => setTutorPrompt("")}
                     disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
                   />
                 )}
@@ -1527,6 +1667,12 @@ export default function Summary() {
   const pendingMaterialTutorQuestionRef = useRef(
     shouldRestoreLocationView && locationState?.viewMaterial ? locationState.tutorQuestion || "" : "",
   );
+  const pendingMaterialReviewContextRef = useRef(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.quizReviewContext || "" : "",
+  );
+  const pendingMaterialReviewTitleRef = useRef(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.quizReviewTitle || "" : "",
+  );
   const pendingMaterialIdsRef = useRef<string[]>(
     shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialIds || [] : [],
   );
@@ -1563,11 +1709,13 @@ export default function Summary() {
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
   const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
+  const [materialDetailReviewContext, setMaterialDetailReviewContext] = useState("");
+  const [materialDetailReviewTitle, setMaterialDetailReviewTitle] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   const [agentThreadId, setAgentThreadId] = useState("");
-  const [resultBackView, setResultBackView] = useState<"templates" | "upload">("templates");
+  const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
   const [pendingTutorQuestion] = useState(
     shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
   );
@@ -1610,8 +1758,12 @@ export default function Summary() {
             setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : [material.id]);
             setMaterialDetailInitialTab(pendingMaterialDetailTabRef.current);
             setMaterialDetailTutorQuestion(pendingMaterialTutorQuestionRef.current);
+            setMaterialDetailReviewContext(pendingMaterialReviewContextRef.current);
+            setMaterialDetailReviewTitle(pendingMaterialReviewTitleRef.current);
             pendingMaterialDetailTabRef.current = "original";
             pendingMaterialTutorQuestionRef.current = "";
+            pendingMaterialReviewContextRef.current = "";
+            pendingMaterialReviewTitleRef.current = "";
             setSearched(true);
             setView("materialDetail");
             return;
@@ -1694,6 +1846,8 @@ export default function Summary() {
     setMaterials([]);
     setActiveMaterial(null);
     setSelectedMaterialIds([]);
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
@@ -1719,6 +1873,8 @@ export default function Summary() {
     setMaterials([]);
     setActiveMaterial(null);
     setSelectedMaterialIds([]);
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
@@ -1971,6 +2127,8 @@ export default function Summary() {
     setSelectedTemplate(null);
     setMaterialDetailInitialTab("original");
     setMaterialDetailTutorQuestion("");
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
     setResultBackView("materialDetail");
     setView("templates");
   };
@@ -2007,6 +2165,8 @@ export default function Summary() {
     setActiveMaterial(material);
     setMaterialDetailInitialTab("summary");
     setMaterialDetailTutorQuestion("");
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
   };
 
   return (
@@ -2168,6 +2328,8 @@ export default function Summary() {
             onOpenQuiz={handleOpenMaterialQuiz}
             initialTab={materialDetailInitialTab}
             initialTutorQuestion={materialDetailTutorQuestion}
+            reviewContext={materialDetailReviewContext}
+            reviewTitle={materialDetailReviewTitle}
             relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
             onSelectRelatedMaterial={handleSelectRelatedMaterial}
           />
@@ -2341,6 +2503,8 @@ export default function Summary() {
                             setSelectedMaterialIds([material.id]);
                             setMaterialDetailInitialTab("original");
                             setMaterialDetailTutorQuestion("");
+                            setMaterialDetailReviewContext("");
+                            setMaterialDetailReviewTitle("");
                             setView("materialDetail");
                           }}
                           style={{

@@ -2,6 +2,8 @@ import json
 import os
 import base64
 import zipfile
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from datetime import date
@@ -19,6 +21,7 @@ load_dotenv(SERVER_DIR / ".env")
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
@@ -476,8 +479,66 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENSIONS}
+SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _find_office_binary() -> str | None:
+    configured_path = os.getenv("LIBREOFFICE_PATH", "").strip()
+    if configured_path:
+        return configured_path
+
+    for command in ("soffice", "libreoffice"):
+        resolved = shutil.which(command)
+        if resolved:
+            return resolved
+
+    windows_candidates = [
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+    ]
+    for candidate in windows_candidates:
+        if Path(candidate).exists():
+            return candidate
+
+    return None
+
+
+def _convert_presentation_to_pdf(file_path: str) -> bytes:
+    office_binary = _find_office_binary()
+    if not office_binary:
+        raise RuntimeError("PPT/PPTX 미리보기를 사용하려면 서버에 LibreOffice가 설치되어 있어야 합니다.")
+
+    with tempfile.TemporaryDirectory() as output_dir:
+        command = [
+            office_binary,
+            "--headless",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            output_dir,
+            file_path,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=_env_int("PPT_PREVIEW_TIMEOUT_SECONDS", 120),
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("PPT/PPTX PDF 변환 시간이 초과되었습니다.") from e
+
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(f"PPT/PPTX PDF 변환 실패: {detail or 'LibreOffice 변환 오류'}")
+
+        pdf_files = sorted(Path(output_dir).glob("*.pdf"))
+        if not pdf_files:
+            raise RuntimeError("PPT/PPTX 변환 결과 PDF를 찾지 못했습니다.")
+
+        return pdf_files[0].read_bytes()
 
 
 def _extract_image_text_with_tesseract(path: str) -> str:
@@ -686,6 +747,48 @@ async def convert_document_to_markdown(
         raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
     finally:
         os.unlink(tmp_path)
+
+
+@app.post("/preview/pdf")
+async def convert_document_to_pdf_preview(
+    file: UploadFile = File(...),
+    _user=Depends(require_api_user),
+):
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in SUPPORTED_PREVIEW_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 미리보기를 지원합니다.")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="미리보기 파일이 비어 있습니다.")
+
+    if suffix == ".pdf":
+        return Response(
+            content=file_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        pdf_bytes = await run_in_threadpool(_convert_presentation_to_pdf, tmp_path)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"PPT/PPTX 미리보기 변환 실패: {str(e)}") from e
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
 
 
 @app.post("/vision/ocr")

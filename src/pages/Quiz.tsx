@@ -607,8 +607,8 @@ export default function Quiz() {
   };
 
   const selectAnswer = (idx: number) => {
-    if (answers[current] !== undefined) return;
-    setAnswers({ ...answers, [current]: idx });
+    if (!examMode && answers[current] !== undefined) return;
+    setAnswers(prev => ({ ...prev, [current]: idx }));
     setShowExplanation(!examMode);
   };
 
@@ -1141,7 +1141,62 @@ export default function Quiz() {
       : materials.filter(material => selectedMaterialIds.includes(material.id));
     const primaryReviewMaterial = reviewMaterials[0] || materials[0];
     const primaryWeakTopic = resultWeakTopics[0] || "틀린 문제";
-    const makeTutorQuestion = (topic: string) => `${topic} 부분을 요약 기준으로 다시 설명해줘`;
+    const formatAnswerForReview = (
+      quiz: QuizQuestion,
+      answerValue: number | string | undefined,
+      correct = false,
+    ) => {
+      const type = quiz.type || questionType;
+      if (type === "객관식" || type === "OX") {
+        if (correct && typeof quiz.answer === "number") {
+          return quiz.options?.[quiz.answer] || `${quiz.answer + 1}번 선택지`;
+        }
+        if (typeof answerValue === "number") {
+          return quiz.options?.[answerValue] || `${answerValue + 1}번 선택지`;
+        }
+        return "미응답";
+      }
+      if (correct) return quiz.answerText || quiz.explanation || "정답 정보 없음";
+      return typeof answerValue === "string" && answerValue.trim() ? answerValue : "미응답";
+    };
+    const wrongReviewItems = wrongQuestions.map(quiz => {
+      const questionIndex = quizzes.indexOf(quiz);
+      const answerValue = answers[questionIndex];
+      const type = quiz.type || questionType;
+      const subjectiveGrade = subjectiveGrades[questionIndex];
+      return {
+        questionIndex,
+        question: quiz.question,
+        type,
+        weakTopic: inferWeakTopic(quiz.question),
+        studentAnswer: formatAnswerForReview(quiz, answerValue),
+        correctAnswer: formatAnswerForReview(quiz, answerValue, true),
+        explanation: subjectiveGrade?.feedback || quiz.explanation,
+      };
+    });
+    const quizReviewContext = wrongReviewItems.length > 0
+      ? [
+          `[이번 퀴즈 오답 ${wrongReviewItems.length}문항]`,
+          `과목: ${selectedCourse}`,
+          `퀴즈: ${openedQuizTitle || `${selectedCourse} ${questionType} 퀴즈`}`,
+          `점수: ${scorePercent}% (${correctCount}/${quizzes.length})`,
+          resultWeakTopics.length > 0 ? `약점 후보: ${resultWeakTopics.join(", ")}` : "",
+          "",
+          ...wrongReviewItems.flatMap(item => [
+            `${item.questionIndex + 1}. ${item.question}`,
+            `- 유형: ${item.type}`,
+            `- 약점 후보: ${item.weakTopic}`,
+            `- 내 답: ${item.studentAnswer}`,
+            `- 정답: ${item.correctAnswer}`,
+            `- 해설/피드백: ${item.explanation}`,
+            "",
+          ]),
+        ].filter(Boolean).join("\n")
+      : "";
+    const makeTutorQuestion = (topic: string) => [
+      `${topic} 부분을 중심으로 이번 퀴즈에서 틀린 문제들을 한 문제씩 다시 설명해줘. 설명 뒤에는 내가 다시 풀어볼 수 있는 확인 질문을 이어서 내줘.`,
+      quizReviewContext,
+    ].filter(Boolean).join("\n\n");
     const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
       const materialId = options?.materialId || primaryReviewMaterial?.id;
       if (!materialId) {
@@ -1160,6 +1215,8 @@ export default function Quiz() {
           materialDetailTab: "summary",
           fromDashboard: fromDashboardRef.current,
           tutorQuestion: options?.tutorQuestion,
+          quizReviewContext,
+          quizReviewTitle: `${openedQuizTitle || "퀴즈"} 오답 복습`,
         },
       });
     };

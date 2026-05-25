@@ -11,6 +11,7 @@ import {
   type UserProfile,
 } from "../services/profile";
 import { applyTheme } from "../services/theme";
+import { loadLearningStats, type LearningStats } from "../services/learningStats";
 
 type ToggleProps = { on: boolean; onToggle: () => void };
 type ProfileEditModalProps = {
@@ -202,6 +203,9 @@ export default function MyPage() {
   const [sidebar, setSidebar] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialog>(null);
+  const [learningStats, setLearningStats] = useState<LearningStats | null>(null);
+  const [learningStatsLoading, setLearningStatsLoading] = useState(true);
+  const [learningStatsError, setLearningStatsError] = useState("");
   const [profile, setProfile] = useState<UserProfile>({
     nickname: user?.email?.split("@")[0] || "학생",
     avatarUrl: null,
@@ -240,6 +244,31 @@ export default function MyPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let ignore = false;
+
+    Promise.resolve()
+      .then(() => {
+        if (ignore) return null;
+        setLearningStatsLoading(true);
+        setLearningStatsError("");
+        return loadLearningStats();
+      })
+      .then(stats => {
+        if (!ignore && stats) setLearningStats(stats);
+      })
+      .catch(err => {
+        if (!ignore) setLearningStatsError(err instanceof Error ? err.message : "학습 통계를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setLearningStatsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [courses.length]);
+
   const updateProfile = async (nextProfile: UserProfile) => {
     setProfile(nextProfile);
     applyTheme(nextProfile.darkMode);
@@ -262,6 +291,18 @@ export default function MyPage() {
     await deleteOwnAppData();
     await signOut();
     navigate("/auth", { replace: true });
+  };
+
+  const formatDate = (timestamp: number) =>
+    new Intl.DateTimeFormat("ko-KR", {
+      month: "short",
+      day: "numeric",
+    }).format(new Date(timestamp));
+
+  const scoreTone = (score: number) => {
+    if (score >= 80) return { background: "#E8FAFE", color: CYAN };
+    if (score >= 60) return { background: "#FFF8E8", color: "#B7791F" };
+    return { background: "#FFF0F6", color: PINK };
   };
 
   return (
@@ -347,6 +388,85 @@ export default function MyPage() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Card style={{ padding: "20px 22px", marginBottom: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 16 }}>
+                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#222" }}>학습 요약</h4>
+                  {learningStats?.averageScore !== null && learningStats?.averageScore !== undefined && (
+                    <span style={{
+                      padding: "5px 10px",
+                      borderRadius: 999,
+                      background: scoreTone(learningStats.averageScore).background,
+                      color: scoreTone(learningStats.averageScore).color,
+                      fontSize: 12,
+                      fontWeight: 850,
+                    }}>
+                      평균 {learningStats.averageScore}점
+                    </span>
+                  )}
+                </div>
+                {learningStatsLoading ? (
+                  <p style={{ margin: 0, fontSize: 13, color: "#aaa" }}>학습 현황을 불러오는 중입니다.</p>
+                ) : learningStatsError ? (
+                  <p style={{ margin: 0, fontSize: 12, color: "#E53E3E", lineHeight: 1.55 }}>{learningStatsError}</p>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {[
+                      { label: "과목", value: learningStats?.courseCount ?? courses.length },
+                      { label: "자료", value: learningStats?.materialCount ?? 0 },
+                      { label: "요약", value: learningStats?.summaryCount ?? 0 },
+                      { label: "퀴즈 풀이", value: learningStats?.attemptCount ?? 0 },
+                    ].map(item => (
+                      <div key={item.label} style={{ padding: 12, borderRadius: 12, border: "1px solid #eeeeee", background: "#fafafa" }}>
+                        <div style={{ marginBottom: 5, fontSize: 11, fontWeight: 800, color: "#aaa" }}>{item.label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: "#222" }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card style={{ padding: "20px 22px", marginBottom: 4 }}>
+                <h4 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>최근 퀴즈 성과</h4>
+                {learningStatsLoading ? (
+                  <p style={{ margin: 0, fontSize: 13, color: "#aaa" }}>최근 풀이 기록을 불러오는 중입니다.</p>
+                ) : learningStatsError ? (
+                  <p style={{ margin: 0, fontSize: 12, color: "#E53E3E", lineHeight: 1.55 }}>퀴즈 성과를 표시하려면 Supabase 스키마가 최신이어야 합니다.</p>
+                ) : !learningStats || learningStats.recentAttempts.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: 13, color: "#bbb", lineHeight: 1.6 }}>아직 풀이 기록이 없습니다. 퀴즈를 한 번 풀면 최근 점수와 약점이 표시됩니다.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {learningStats.recentAttempts.map((attempt, index) => {
+                      const tone = scoreTone(attempt.scorePercent);
+                      return (
+                        <div key={`${attempt.courseName}-${attempt.createdAt}-${index}`} style={{ padding: 12, borderRadius: 12, border: "1px solid #eeeeee", background: "#fff" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginBottom: 7 }}>
+                            <strong style={{ fontSize: 13, color: "#222", wordBreak: "break-word" }}>{attempt.courseName}</strong>
+                            <span style={{ flexShrink: 0, padding: "4px 8px", borderRadius: 999, background: tone.background, color: tone.color, fontSize: 12, fontWeight: 850 }}>
+                              {attempt.scorePercent}점
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 8px", fontSize: 11, color: "#999", fontWeight: 700 }}>
+                            <span>{attempt.correctCount}/{attempt.count}문항</span>
+                            <span>{attempt.difficulty}</span>
+                            <span>{attempt.questionType}</span>
+                            <span>{formatDate(attempt.createdAt)}</span>
+                          </div>
+                          {attempt.weakTopics.length > 0 && (
+                            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {attempt.weakTopics.slice(0, 3).map(topic => (
+                                <span key={topic} style={{ padding: "4px 8px", borderRadius: 999, background: "#FFF0F6", color: PINK, fontSize: 11, fontWeight: 800 }}>
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+
               <Card style={{ padding: "18px 22px", marginBottom: 4 }}>
                 <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "#222" }}>수강 중인 강의</h4>
                 {courses.length === 0 ? (
