@@ -526,9 +526,9 @@ const CourseDetailModal = ({
                         {sourceMaterials.map(m => (
                           <span key={m.id} style={{
                             fontSize: 11,
-                            color: "#b06090",
-                            background: "#FFF0F6",
-                            border: "1px solid #f5c6df",
+                            color: "#333",
+                            background: "#f2f2f2",
+                            border: "1px solid #ddd",
                             borderRadius: 4,
                             padding: "1px 6px",
                             maxWidth: 200,
