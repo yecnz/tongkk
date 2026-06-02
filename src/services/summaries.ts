@@ -76,22 +76,49 @@ export async function deleteSummariesByMaterialId(course: string, materialId: st
   if (deleteError) throw new Error(formatSupabaseError(deleteError));
 }
 
+const sortedIds = (ids: string[]) => [...ids].sort();
+const sameIds = (a: string[], b: string[]) => {
+  const sa = sortedIds(a), sb = sortedIds(b);
+  return sa.length === sb.length && sa.every((id, i) => id === sb[i]);
+};
+
 export async function saveSummaryToServer(course: string, summary: SavedSummary): Promise<SavedSummary> {
   const courseId = await getCourseId(course);
   if (!courseId) return summary;
 
   const user = await requireSupabaseUser();
   const materialIds = summary.materialIds || [];
+
+  // Find existing summary with same template + material_ids (array upsert not supported in PG unique constraints)
+  const { data: existing, error: fetchError } = await supabase
+    .from('summaries')
+    .select('id, template, content, material_ids, created_at')
+    .eq('course_id', courseId)
+    .eq('template', summary.template);
+
+  if (fetchError) throw new Error(formatSupabaseError(fetchError));
+
+  const match = (existing || []).find(row => sameIds(row.material_ids || [], materialIds));
+
+  if (match) {
+    const { data, error } = await supabase
+      .from('summaries')
+      .update({ content: summary.content })
+      .eq('id', match.id)
+      .select('id, template, content, material_ids, created_at')
+      .single();
+    if (error) throw new Error(formatSupabaseError(error));
+    return { ...toSavedSummary(data), materialNames: summary.materialNames || [] };
+  }
+
   const { data, error } = await supabase
     .from('summaries')
-    .upsert({
+    .insert({
       course_id: courseId,
       user_id: user.id,
       template: summary.template,
       content: summary.content,
       material_ids: materialIds,
-    }, {
-      onConflict: 'course_id,template,material_ids',
     })
     .select('id, template, content, material_ids, created_at')
     .single();
