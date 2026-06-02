@@ -565,6 +565,20 @@ def _text_length(text: str) -> int:
     return len("".join(text.split()))
 
 
+def _extract_pdf_markdown_with_page_markers(file_path: str) -> str:
+    try:
+        import fitz
+    except ImportError:
+        return ""
+    pages = []
+    with fitz.open(file_path) as doc:
+        for i, page in enumerate(doc):
+            text = page.get_text("text") or ""
+            if text.strip():
+                pages.append(f"<!-- p.{i + 1} -->\n{text.strip()}")
+    return "\n\n".join(pages)
+
+
 def _pdf_page_has_image(page) -> bool:
     page_dict = page.get_text("dict")
     for block in page_dict.get("blocks", []):
@@ -734,9 +748,17 @@ async def convert_document_to_markdown(
             text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
             return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
 
-        # 1단계: markitdown으로 텍스트 레이어 추출
-        result = await run_in_threadpool(md_converter.convert, tmp_path)
-        base_markdown = (result.text_content or "").strip()
+        # 1단계: 텍스트 레이어 추출 (PDF는 페이지 마커 포함)
+        if suffix == ".pdf":
+            pdf_markdown = await run_in_threadpool(_extract_pdf_markdown_with_page_markers, tmp_path)
+            if pdf_markdown:
+                base_markdown = pdf_markdown
+            else:
+                result = await run_in_threadpool(md_converter.convert, tmp_path)
+                base_markdown = (result.text_content or "").strip()
+        else:
+            result = await run_in_threadpool(md_converter.convert, tmp_path)
+            base_markdown = (result.text_content or "").strip()
         visual_markdown = ""
         try:
             visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
