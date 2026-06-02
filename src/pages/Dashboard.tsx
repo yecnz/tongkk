@@ -498,7 +498,11 @@ const CourseDetailModal = ({
               <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {summaries.map((summary, index) => (
+                {summaries.map((summary, index) => {
+                  const sourceMaterials = (summary.materialIds || [])
+                    .map(id => materials.find(m => m.id === id))
+                    .filter(Boolean) as typeof materials;
+                  return (
                   <button
                     key={summary.id || `${summary.template}-${index}`}
                     type="button"
@@ -517,11 +521,30 @@ const CourseDetailModal = ({
                       <span style={{ fontSize: 13, fontWeight: 850, color: PINK }}>{templateLabels[summary.template]}</span>
                       <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0 }}>생성일 {formatDate(summary.createdAt)}</span>
                     </div>
+                    {sourceMaterials.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                        {sourceMaterials.map(m => (
+                          <span key={m.id} style={{
+                            fontSize: 11,
+                            color: "#b06090",
+                            background: "#FFF0F6",
+                            border: "1px solid #f5c6df",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            maxWidth: 200,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>{m.name}</span>
+                        ))}
+                      </div>
+                    )}
                     <p style={{ margin: "7px 0 0", fontSize: 13, lineHeight: 1.55, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {preview(summary) || "요약 내용 없음"}
                     </p>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )
           )}
