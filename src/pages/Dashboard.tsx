@@ -69,7 +69,26 @@ const materialMeta = (material: CourseMaterial) => {
   return material.type.toUpperCase();
 };
 
-const preview = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 120);
+const preview = (summary: SavedSummary): string => {
+  const { content, template } = summary;
+  if (template === "MINDMAP") {
+    try {
+      const parsed = JSON.parse(content) as { root?: string };
+      return parsed.root ? `${parsed.root} 마인드맵` : "마인드맵 요약";
+    } catch {
+      return "마인드맵 요약";
+    }
+  }
+  return content
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, "$1")
+    .replace(/\|[^\n]*/g, "")
+    .replace(/[-=]{2,}/g, "")
+    .replace(/`[^`]*`/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+};
 
 const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
   const [name, setName] = useState("");
@@ -499,7 +518,7 @@ const CourseDetailModal = ({
                       <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0 }}>생성일 {formatDate(summary.createdAt)}</span>
                     </div>
                     <p style={{ margin: "7px 0 0", fontSize: 13, lineHeight: 1.55, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {preview(summary.content) || "요약 내용 없음"}
+                      {preview(summary) || "요약 내용 없음"}
                     </p>
                   </button>
                 ))}
