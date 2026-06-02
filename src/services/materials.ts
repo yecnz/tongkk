@@ -1,5 +1,6 @@
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
+import { deleteSummariesByMaterialId } from './summaries';
 
 export type MaterialKind = "pdf" | "ppt" | "img" | "file";
 
@@ -172,6 +173,8 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
     .eq('id', materialId);
 
   if (error) throw new Error(formatSupabaseError(error));
+
+  await deleteSummariesByMaterialId(course, materialId);
 };
 
 export const syncCourseMaterials = async (course: string, materials: CourseMaterial[]) => {
