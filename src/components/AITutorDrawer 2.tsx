@@ -20,7 +20,6 @@ type AITutorDrawerProps = {
   threadId?: string;
   suggestedQuestions?: string[];
   initialQuestion?: string;
-  onInitialQuestionConsumed?: () => void;
   disabledReason?: string;
   resetHistory?: boolean;
   layout?: "drawer" | "embedded";
@@ -151,7 +150,6 @@ export const AITutorDrawer = ({
   threadId = "",
   suggestedQuestions = [],
   initialQuestion,
-  onInitialQuestionConsumed,
   disabledReason = "요약 생성 후 AI 튜터를 사용할 수 있습니다",
   resetHistory = false,
   layout = "drawer",
@@ -169,7 +167,6 @@ export const AITutorDrawer = ({
   const [agentError, setAgentError] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
   const initialQuestionRef = useRef("");
@@ -177,7 +174,6 @@ export const AITutorDrawer = ({
   const canPersistChat = Boolean(summaryId || materialId);
   const chatTarget = { summaryId, materialId };
   const isOpen = open ?? internalOpen;
-  const isExpanded = expanded && isOpen;
   const setOpen = useCallback((nextOpen: boolean) => {
     if (open === undefined) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -194,12 +190,6 @@ export const AITutorDrawer = ({
     setShowScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 60);
   };
 
-  const refreshChatSessions = useCallback(async () => {
-    if (!canPersistChat) return;
-    const sessions = await loadSummaryChatSessions({ summaryId, materialId });
-    setChatSessions(sessions);
-  }, [canPersistChat, summaryId, materialId]);
-
   useEffect(() => {
     let ignore = false;
     setLocalThreadId(threadId);
@@ -208,7 +198,6 @@ export const AITutorDrawer = ({
     setActiveSessionId(null);
     setAgentMessages([]);
     setChatSessions([]);
-    initialQuestionRef.current = "";
 
     if (!canPersistChat || resetHistory) {
       setChatLoading(false);
@@ -271,14 +260,9 @@ export const AITutorDrawer = ({
     initialQuestionRef.current = question;
     setOpen(true);
     setAgentInput(question);
-    onInitialQuestionConsumed?.();
-  }, [initialQuestion, canUseAgent, setOpen, onInitialQuestionConsumed]);
+  }, [initialQuestion, canUseAgent, setOpen]);
 
-  useEffect(() => {
-    if (!isOpen) setExpanded(false);
-  }, [isOpen]);
-
-  const startNewConversation = async () => {
+  const startNewConversation = () => {
     if (chatLoading || agentLoading) return;
     setActiveSessionId(null);
     setAgentMessages([]);
@@ -287,16 +271,6 @@ export const AITutorDrawer = ({
     setAgentError("");
     setShowScrollBtn(false);
     setSessionsCollapsed(false);
-
-    if (!canPersistChat) return;
-    setChatLoading(true);
-    try {
-      await refreshChatSessions();
-    } catch (err) {
-      setAgentError(err instanceof Error ? err.message : "AI 튜터 대화 목록을 불러오지 못했습니다.");
-    } finally {
-      setChatLoading(false);
-    }
   };
 
   const openChatSession = async (sessionId: string) => {
@@ -420,36 +394,24 @@ export const AITutorDrawer = ({
           AI 튜터
         </button>
       )}
-      {isExpanded && (
-        <div
-          onClick={() => setExpanded(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 259,
-            background: "rgba(0,0,0,0.32)",
-          }}
-        />
-      )}
       <aside style={{
-        position: isExpanded ? "fixed" : layout === "embedded" ? "relative" : "fixed",
-        top: isExpanded ? 24 : layout === "embedded" ? "auto" : 0,
-        left: isExpanded ? "50%" : undefined,
-        right: isExpanded ? "auto" : layout === "embedded" ? "auto" : 0,
-        width: isExpanded ? "min(1080px, calc(100vw - 48px))" : layout === "embedded" ? "100%" : "min(420px, 100vw)",
-        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? "calc(100vh - 292px)" : "100vh",
-        minHeight: isExpanded ? undefined : layout === "embedded" ? 620 : undefined,
-        zIndex: isExpanded ? 260 : layout === "embedded" ? "auto" : 190,
+        position: layout === "embedded" ? "relative" : "fixed",
+        top: layout === "embedded" ? "auto" : 0,
+        right: layout === "embedded" ? "auto" : 0,
+        width: layout === "embedded" ? "100%" : "min(420px, 100vw)",
+        height: layout === "embedded" ? "calc(100vh - 292px)" : "100vh",
+        minHeight: layout === "embedded" ? 620 : undefined,
+        zIndex: layout === "embedded" ? "auto" : 190,
         border: "1px solid #f0f0f0",
-        borderRight: isExpanded || layout === "embedded" ? "1px solid #f0f0f0" : "none",
-        borderRadius: isExpanded ? 16 : layout === "embedded" ? 0 : "16px 0 0 16px",
+        borderRight: layout === "embedded" ? "1px solid #f0f0f0" : "none",
+        borderRadius: layout === "embedded" ? 0 : "16px 0 0 16px",
         padding: 20,
         display: "flex",
         flexDirection: "column",
         background: "#fff",
-        boxShadow: isExpanded ? "0 24px 80px rgba(0,0,0,0.22)" : layout === "drawer" && isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
-        transform: isExpanded ? "translateX(-50%)" : layout === "embedded" || isOpen ? "translateX(0)" : "translateX(104%)",
-        transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease, width 0.18s ease, height 0.18s ease",
+        boxShadow: layout === "drawer" && isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
+        transform: layout === "embedded" || isOpen ? "translateX(0)" : "translateX(104%)",
+        transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>AI 튜터</h3>
@@ -457,7 +419,7 @@ export const AITutorDrawer = ({
             {canUseAgent && (
               <button
                 type="button"
-                onClick={() => void startNewConversation()}
+                onClick={startNewConversation}
                 disabled={chatLoading || agentLoading}
                 aria-label="기존 대화를 보존하고 새 대화 시작"
                 title="기존 대화를 보존하고 새 대화를 시작합니다"
@@ -476,26 +438,6 @@ export const AITutorDrawer = ({
                 새 대화 시작
               </button>
             )}
-            {canUseAgent && (
-              <button
-                type="button"
-                onClick={() => setExpanded(prev => !prev)}
-                aria-label={isExpanded ? "AI 튜터 작게 보기" : "AI 튜터 확대 보기"}
-                title={isExpanded ? "작게 보기" : "확대 보기"}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  border: `1px solid ${isExpanded ? PINK + "55" : "#e0e0e0"}`,
-                  background: isExpanded ? "#FFF0F6" : "#fafafa",
-                  color: isExpanded ? PINK : "#777",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                {isExpanded ? "작게 보기" : "확대 보기"}
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -507,16 +449,13 @@ export const AITutorDrawer = ({
           </div>
         </div>
         <div style={{ margin: "0 0 14px", padding: "10px 12px", borderRadius: 10, background: "#fafafa", border: "1px solid #eeeeee" }}>
-          <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 900, color: "#aaa" }}>근거로 본 자료</div>
+          <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 900, color: "#aaa" }}>기준</div>
           <div style={{ fontSize: 12, lineHeight: 1.45, color: "#555", fontWeight: 800, wordBreak: "break-word" }}>
             {contextTitle}
           </div>
-          <div style={{ marginTop: 5, fontSize: 11, lineHeight: 1.45, color: "#999", fontWeight: 700 }}>
-            답변은 이 자료 범위 안에서만 설명하도록 요청됩니다.
-          </div>
         </div>
 
-        {canPersistChat && (chatSessions.length > 0 || !activeSessionId) && (
+        {canPersistChat && chatSessions.length > 0 && (
           <div style={{ marginBottom: 14, border: "1px solid #eeeeee", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
             <button
               type="button"
@@ -541,20 +480,6 @@ export const AITutorDrawer = ({
             </button>
             {!sessionsCollapsed && (
               <div style={{ maxHeight: 132, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-                {!activeSessionId && (
-                  <div style={{
-                    padding: "9px 10px",
-                    borderRadius: 9,
-                    border: `1px solid ${PINK}55`,
-                    background: "#FFF0F6",
-                    color: PINK,
-                    fontSize: 12,
-                    fontWeight: 850,
-                    lineHeight: 1.35,
-                  }}>
-                    새 대화 작성 중
-                  </div>
-                )}
                 {chatSessions.map(session => {
                   const isActive = session.id === activeSessionId;
                   return (

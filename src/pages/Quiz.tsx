@@ -29,7 +29,7 @@ import {
   type CourseMaterial,
 } from "../services/materials";
 
-type QuizView = "courseList" | "courseDetail" | "generating" | "quiz" | "result";
+type QuizView = "courseList" | "materialList" | "courseDetail" | "generating" | "quiz" | "result";
 type QuizSource = "raw" | SummaryTemplate;
 type QuizLocationState = {
   course?: string;
@@ -191,6 +191,7 @@ export default function Quiz() {
   const [openedQuizTitle, setOpenedQuizTitle] = useState("");
   const [activeQuizSetId, setActiveQuizSetId] = useState<string | null>(null);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
+  const [courseQuizSets, setCourseQuizSets] = useState<SavedQuizSet[]>([]);
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -251,6 +252,7 @@ export default function Quiz() {
       if (ignore) return;
       setMaterials(courseMaterials);
       setQuizAttempts(attempts);
+      setCourseQuizSets(quizSets);
 
       // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
       const usable = summaries.filter(s => s.template !== "MINDMAP");
@@ -380,7 +382,33 @@ export default function Quiz() {
 
   const handleCourseSelect = (course: string) => {
     setSelectedCourse(course);
-    setView("courseDetail");
+    setCourseQuizSets([]);
+    setView("materialList");
+  };
+
+  const openExistingQuizSet = (quizSet: SavedQuizSet) => {
+    const attempts = quizAttempts.filter(a => a.quizSetId === quizSet.id);
+    const latestAttempt = attempts[0] || null;
+    const restored = latestAttempt ? buildAnswersFromAttempt(quizSet, latestAttempt) : null;
+    setDifficulty(quizSet.difficulty);
+    setQuestionType(quizSet.questionType);
+    setCount(quizSet.count);
+    setSelectedMaterialIds(quizSet.materialIds.filter(id => materials.some(m => m.id === id)));
+    setQuizzes(quizSet.questions);
+    setCurrent(0);
+    setAnswers(restored?.answers || {});
+    setShortAnswerInput("");
+    setShowExplanation(false);
+    setOpenedQuizTitle(quizSet.title);
+    setActiveQuizSetId(quizSet.id);
+    setSubjectiveGrades(restored?.subjectiveGrades || {});
+    setRemainingSeconds(null);
+    setQuizStartedAt(latestAttempt ? null : Date.now());
+    setTimedOut(latestAttempt?.timedOut || false);
+    setAttemptSavedKey(latestAttempt ? `review:${latestAttempt.id}` : "");
+    setAttemptSaveNotice(latestAttempt ? "저장된 풀이 기록을 불러왔습니다." : "");
+    setReviewAttempt(latestAttempt);
+    setView(latestAttempt ? "result" : "quiz");
   };
 
   const handleCourseBack = () => {
@@ -607,8 +635,8 @@ export default function Quiz() {
   };
 
   const selectAnswer = (idx: number) => {
-    if (answers[current] !== undefined) return;
-    setAnswers({ ...answers, [current]: idx });
+    if (!examMode && answers[current] !== undefined) return;
+    setAnswers(prev => ({ ...prev, [current]: idx }));
     setShowExplanation(!examMode);
   };
 
@@ -821,6 +849,99 @@ export default function Quiz() {
             <Card style={{ padding: 40, textAlign: "center" }}>
               <p style={{ fontSize: 14, color: "#aaa", margin: 0 }}>등록된 과목이 없습니다. 대시보드에서 과목을 추가해주세요.</p>
             </Card>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── 자료 목록 (퀴즈 현황) ──
+  if (view === "materialList") {
+    return (
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+        {sidebarEl}
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
+        <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <button onClick={() => setView("courseList")} style={{
+              background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, padding: 0
+            }}>← 돌아가기</button>
+            <button
+              onClick={() => setView("courseDetail")}
+              style={{
+                padding: "9px 18px", borderRadius: 10, border: "none",
+                background: CYAN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
+              }}
+            >+ 새 퀴즈 만들기</button>
+          </div>
+          <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 700, color: "#222" }}>{selectedCourse}</h2>
+          {materials.length === 0 ? (
+            <Card style={{ padding: 40, textAlign: "center" }}>
+              <p style={{ fontSize: 14, color: "#aaa", margin: 0 }}>아직 자료가 없습니다. 퀴즈를 만들려면 자료를 먼저 업로드하세요.</p>
+            </Card>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[...materials]
+                .sort((a, b) => {
+                  const aCount = courseQuizSets.filter(q => q.materialIds?.includes(a.id)).length;
+                  const bCount = courseQuizSets.filter(q => q.materialIds?.includes(b.id)).length;
+                  return bCount - aCount;
+                })
+                .map(material => {
+                  const materialQuizSets = courseQuizSets
+                    .filter(q => q.materialIds?.includes(material.id))
+                    .sort((a, b) => b.createdAt - a.createdAt);
+                  const hasQuiz = materialQuizSets.length > 0;
+                  const latestAttempt = hasQuiz
+                    ? quizAttempts.find(a => a.quizSetId === materialQuizSets[0].id)
+                    : null;
+                  return (
+                    <Card key={material.id} style={{ padding: "16px 20px", opacity: hasQuiz ? 1 : 0.55 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasQuiz ? 12 : 0 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#222" }}>{material.name}</span>
+                        {hasQuiz ? (
+                          <span style={{
+                            background: `${CYAN}22`, color: CYAN,
+                            borderRadius: 20, padding: "3px 12px",
+                            fontSize: 12, fontWeight: 700, flexShrink: 0
+                          }}>
+                            퀴즈 {materialQuizSets.length}개
+                            {latestAttempt && ` · 최근 ${latestAttempt.scorePercent}%`}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#bbb", fontSize: 12, flexShrink: 0 }}>퀴즈 없음</span>
+                        )}
+                      </div>
+                      {hasQuiz && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {materialQuizSets.map(quizSet => {
+                            const attempt = quizAttempts.find(a => a.quizSetId === quizSet.id);
+                            return (
+                              <button
+                                key={quizSet.id}
+                                onClick={() => openExistingQuizSet(quizSet)}
+                                style={{
+                                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                                  padding: "10px 14px", borderRadius: 10,
+                                  border: `1px solid ${BORDER_COLOR}`, background: "#fafafa",
+                                  cursor: "pointer", textAlign: "left", width: "100%"
+                                }}
+                              >
+                                <span style={{ fontSize: 13, color: "#444", fontWeight: 600 }}>
+                                  {quizSet.title || `${quizSet.questionType} · ${quizSet.difficulty} · ${quizSet.count}문제`}
+                                </span>
+                                <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0, marginLeft: 12 }}>
+                                  {attempt ? `${attempt.scorePercent}% · ${attempt.questionType}` : "미응시"}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+            </div>
           )}
         </div>
       </div>
@@ -1141,7 +1262,62 @@ export default function Quiz() {
       : materials.filter(material => selectedMaterialIds.includes(material.id));
     const primaryReviewMaterial = reviewMaterials[0] || materials[0];
     const primaryWeakTopic = resultWeakTopics[0] || "틀린 문제";
-    const makeTutorQuestion = (topic: string) => `${topic} 부분을 요약 기준으로 다시 설명해줘`;
+    const formatAnswerForReview = (
+      quiz: QuizQuestion,
+      answerValue: number | string | undefined,
+      correct = false,
+    ) => {
+      const type = quiz.type || questionType;
+      if (type === "객관식" || type === "OX") {
+        if (correct && typeof quiz.answer === "number") {
+          return quiz.options?.[quiz.answer] || `${quiz.answer + 1}번 선택지`;
+        }
+        if (typeof answerValue === "number") {
+          return quiz.options?.[answerValue] || `${answerValue + 1}번 선택지`;
+        }
+        return "미응답";
+      }
+      if (correct) return quiz.answerText || quiz.explanation || "정답 정보 없음";
+      return typeof answerValue === "string" && answerValue.trim() ? answerValue : "미응답";
+    };
+    const wrongReviewItems = wrongQuestions.map(quiz => {
+      const questionIndex = quizzes.indexOf(quiz);
+      const answerValue = answers[questionIndex];
+      const type = quiz.type || questionType;
+      const subjectiveGrade = subjectiveGrades[questionIndex];
+      return {
+        questionIndex,
+        question: quiz.question,
+        type,
+        weakTopic: inferWeakTopic(quiz.question),
+        studentAnswer: formatAnswerForReview(quiz, answerValue),
+        correctAnswer: formatAnswerForReview(quiz, answerValue, true),
+        explanation: subjectiveGrade?.feedback || quiz.explanation,
+      };
+    });
+    const quizReviewContext = wrongReviewItems.length > 0
+      ? [
+          `[이번 퀴즈 오답 ${wrongReviewItems.length}문항]`,
+          `과목: ${selectedCourse}`,
+          `퀴즈: ${openedQuizTitle || `${selectedCourse} ${questionType} 퀴즈`}`,
+          `점수: ${scorePercent}% (${correctCount}/${quizzes.length})`,
+          resultWeakTopics.length > 0 ? `약점 후보: ${resultWeakTopics.join(", ")}` : "",
+          "",
+          ...wrongReviewItems.flatMap(item => [
+            `${item.questionIndex + 1}. ${item.question}`,
+            `- 유형: ${item.type}`,
+            `- 약점 후보: ${item.weakTopic}`,
+            `- 내 답: ${item.studentAnswer}`,
+            `- 정답: ${item.correctAnswer}`,
+            `- 해설/피드백: ${item.explanation}`,
+            "",
+          ]),
+        ].filter(Boolean).join("\n")
+      : "";
+    const makeTutorQuestion = (topic: string) => [
+      `${topic} 부분을 중심으로 이번 퀴즈에서 틀린 문제들을 한 문제씩 다시 설명해줘. 설명 뒤에는 내가 다시 풀어볼 수 있는 확인 질문을 이어서 내줘.`,
+      quizReviewContext,
+    ].filter(Boolean).join("\n\n");
     const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
       const materialId = options?.materialId || primaryReviewMaterial?.id;
       if (!materialId) {
@@ -1160,6 +1336,8 @@ export default function Quiz() {
           materialDetailTab: "summary",
           fromDashboard: fromDashboardRef.current,
           tutorQuestion: options?.tutorQuestion,
+          quizReviewContext,
+          quizReviewTitle: `${openedQuizTitle || "퀴즈"} 오답 복습`,
         },
       });
     };

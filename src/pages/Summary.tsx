@@ -29,18 +29,32 @@ import {
   type CourseMaterial,
 } from "../services/materials";
 import { AITutorDrawer } from "../components/AITutorDrawer";
+import { createPdfPreviewFromUrl } from "../services/documentPreview";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
-type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
+type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
 type MaterialDetailTab = "original" | "summary" | "quiz";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
-type DuplicateFileNotice = { names: string[] };
+type DuplicateFileNotice = { names: string[]; reattached?: boolean };
 type SummarySample = { title: string; content: string };
+type UploadStatusState = "uploading" | "extracting" | "previewing" | "storing" | "done" | "duplicate" | "failed";
+type UploadFailureKind = "unsupported" | "tooLarge" | "serverTool" | "network" | "auth" | "unknown";
+type UploadFileStatus = {
+  id: string;
+  name: string;
+  state: UploadStatusState;
+  label: string;
+  message: string;
+  file?: File;
+  materialId?: string;
+  failureKind?: UploadFailureKind;
+};
 type LocationState = {
   selectedCourse?: string;
   fromDashboard?: boolean;
   materialId?: string;
   viewMaterial?: boolean;
+  createSummary?: boolean;
   summaryId?: string;
   summaryTemplate?: SummaryTemplate;
   summaryContent?: string;
@@ -48,6 +62,8 @@ type LocationState = {
   materialIds?: string[];
   openSummary?: boolean;
   tutorQuestion?: string;
+  quizReviewContext?: string;
+  quizReviewTitle?: string;
   materialDetailTab?: MaterialDetailTab;
 } | null;
 type FileIconProps = { type: FileKind };
@@ -63,6 +79,8 @@ type MaterialDetailViewProps = {
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
   initialTab?: MaterialDetailTab;
   initialTutorQuestion?: string;
+  reviewContext?: string;
+  reviewTitle?: string;
   relatedMaterials?: CourseMaterial[];
   onSelectRelatedMaterial?: (material: CourseMaterial) => void;
 };
@@ -128,6 +146,55 @@ const isSupportedDocumentFile = (file: File) =>
 const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
+const getUploadStatusId = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
+const upsertUploadStatus = (statuses: UploadFileStatus[], nextStatus: UploadFileStatus) => {
+  const index = statuses.findIndex(status => status.id === nextStatus.id);
+  if (index < 0) return [nextStatus, ...statuses].slice(0, 8);
+  return statuses.map(status => status.id === nextStatus.id ? { ...status, ...nextStatus } : status);
+};
+const classifyUploadFailure = (message: string): { kind: UploadFailureKind; label: string; guide: string } => {
+  const lower = message.toLowerCase();
+  if (message.includes("지원") || lower.includes("unsupported")) {
+    return {
+      kind: "unsupported",
+      label: "지원하지 않는 파일",
+      guide: "PDF, PPT/PPTX, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
+    };
+  }
+  if (message.includes("너무 큽") || message.includes("10MB") || message.includes("413") || lower.includes("too large")) {
+    return {
+      kind: "tooLarge",
+      label: "파일이 너무 큼",
+      guide: "파일 크기를 줄이거나 여러 파일로 나눠 업로드해주세요.",
+    };
+  }
+  if (message.includes("로그인") || message.includes("인증") || message.includes("401") || lower.includes("jwt")) {
+    return {
+      kind: "auth",
+      label: "로그인 만료",
+      guide: "다시 로그인한 뒤 같은 파일을 재시도해주세요.",
+    };
+  }
+  if (message.includes("LibreOffice") || message.includes("서버에") || message.includes("설정되지") || lower.includes("converter") || lower.includes("not found")) {
+    return {
+      kind: "serverTool",
+      label: "서버 변환 도구 없음",
+      guide: "원본 파일을 보관하고, 가능하면 텍스트 추출 결과나 텍스트 붙여넣기로 이어가세요.",
+    };
+  }
+  if (message.includes("네트워크") || lower.includes("failed to fetch") || lower.includes("network") || message.includes("시간 초과")) {
+    return {
+      kind: "network",
+      label: "네트워크 오류",
+      guide: "잠시 후 다시 시도해주세요. 큰 파일이면 페이지 수를 줄이면 성공률이 높아집니다.",
+    };
+  }
+  return {
+    kind: "unknown",
+    label: "분석 실패",
+    guide: "다시 시도하거나 텍스트만 붙여넣어 자료로 추가할 수 있습니다.",
+  };
+};
 const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
@@ -153,12 +220,15 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
 };
 
 const renderInlineText = (text: string): ReactNode[] => {
-  return text.split(/(\*\*[^*]+\*\*|==[^=]+==)/g).map((part, index) => {
+  return text.split(/(\*\*[^*]+\*\*|==[^=]+==|\(출처:\s*[^)]+\))/g).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith("==") && part.endsWith("==")) {
       return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
+    }
+    if (part.match(/^\(출처:\s*[^)]+\)$/)) {
+      return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1)}</span>;
     }
     return part;
   });
@@ -166,9 +236,12 @@ const renderInlineText = (text: string): ReactNode[] => {
 
 const renderHighlightSyntax = (children: ReactNode): ReactNode => {
   if (typeof children === "string") {
-    return children.split(/(==[^=]+==)/g).map((part, index) => {
+    return children.split(/(==[^=]+==|\(출처:\s*[^)]+\))/g).map((part, index) => {
       if (part.startsWith("==") && part.endsWith("==")) {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
+      }
+      if (part.match(/^\(출처:\s*[^)]+\)$/)) {
+        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1)}</span>;
       }
       return part;
     });
@@ -790,6 +863,8 @@ const MaterialDetailView = ({
   onOpenQuiz,
   initialTab = "original",
   initialTutorQuestion = "",
+  reviewContext = "",
+  reviewTitle = "",
   relatedMaterials = [],
   onSelectRelatedMaterial,
 }: MaterialDetailViewProps) => {
@@ -797,6 +872,9 @@ const MaterialDetailView = ({
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
@@ -806,9 +884,15 @@ const MaterialDetailView = ({
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
   const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
-  const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || material.name.toLowerCase().endsWith(".pdf");
+  const lowerMaterialName = material.name.toLowerCase();
+  const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || lowerMaterialName.endsWith(".pdf");
+  const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
+  const isLegacyPpt = lowerMaterialName.endsWith(".ppt");
+  const isPresentation = material.type === "ppt" || isPptx || isLegacyPpt;
+  const hasReviewContext = Boolean(reviewContext.trim());
   const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
   const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
+  const previewFailure = previewError ? classifyUploadFailure(previewError) : null;
 
   useEffect(() => {
     let ignore = false;
@@ -838,6 +922,43 @@ const MaterialDetailView = ({
       ignore = true;
     };
   }, [material]);
+
+  useEffect(() => {
+    let ignore = false;
+    let objectUrl = "";
+
+    setPreviewPdfUrl(null);
+    setPreviewError("");
+
+    if (!fileUrl || !isPresentation) {
+      setPreviewLoading(false);
+      return () => {
+        ignore = true;
+      };
+    }
+
+    setPreviewLoading(true);
+    createPdfPreviewFromUrl(fileUrl, material.name)
+      .then(url => {
+        objectUrl = url;
+        if (!ignore) {
+          setPreviewPdfUrl(url);
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      })
+      .catch(err => {
+        if (!ignore) setPreviewError(err instanceof Error ? err.message : "PPT/PPTX 미리보기 변환에 실패했습니다.");
+      })
+      .finally(() => {
+        if (!ignore) setPreviewLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fileUrl, isPresentation, material.id, material.name]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -904,10 +1025,24 @@ const MaterialDetailView = ({
   const hasQuizSets = quizSets.length > 0;
   const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
   const tutorContextMarkdown = activeSummary?.content || "";
+  const reviewTutorSection = hasReviewContext
+    ? `# ${reviewTitle || "이번 퀴즈 오답 복습"}\n\n${reviewContext.trim()}`
+    : "";
+  const combinedTutorContextMarkdown = [tutorContextMarkdown, reviewTutorSection].filter(Boolean).join("\n\n---\n\n");
   const tutorContextTitle = activeSummary
     ? `${material.name} · ${templateLabels[activeSummary.template]}`
     : `${material.name} · 요약 없음`;
   const tutorSuggestions = activeSummary ? suggestedTutorQuestions[activeSummary.template] : suggestedTutorQuestions.GENERAL;
+  const materialProgressSteps = [
+    { label: "자료 업로드 완료", done: true, current: false },
+    { label: hasSummaries ? "요약 완료" : "요약 생성 필요", done: hasSummaries, current: !hasSummaries },
+    { label: hasQuizSets ? "퀴즈 준비됨" : "퀴즈 생성 필요", done: hasQuizSets, current: hasSummaries && !hasQuizSets },
+    {
+      label: recentQuizAttempt ? (hasLowRecentScore ? "오답 복습 대기" : "복습 완료") : "복습 대기",
+      done: Boolean(recentQuizAttempt && !hasLowRecentScore),
+      current: Boolean(hasQuizSets && (!recentQuizAttempt || hasLowRecentScore)),
+    },
+  ];
 
   const openSummaryTab = () => {
     if (activeSummary) setActiveSummaryId(activeSummary.id || "");
@@ -939,7 +1074,9 @@ const MaterialDetailView = ({
           { label: "약점 요약 보기", onClick: openSummaryTab, tone: "primary" as const },
           {
             label: "AI 튜터로 복습",
-            onClick: () => openTutor("최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
+            onClick: () => openTutor(hasReviewContext
+              ? "위의 이번 퀴즈 오답 복습 문맥을 기준으로 내가 틀린 문제들을 순서대로 설명해줘. 각 문제마다 왜 틀렸는지, 어떤 개념을 다시 봐야 하는지, 비슷한 문제를 풀 때 주의할 점을 알려줘."
+              : "최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
             tone: "secondary" as const,
           },
         ],
@@ -1046,10 +1183,10 @@ const MaterialDetailView = ({
   );
 
   const renderOriginalTab = () => {
-    if (fileLoading) {
+    if (fileLoading || previewLoading) {
       return (
         <div style={{ height: "calc(100vh - 292px)", minHeight: 620, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
-          원본 PDF를 불러오는 중입니다.
+          {previewLoading ? "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다." : "원본 파일을 불러오는 중입니다."}
         </div>
       );
     }
@@ -1059,6 +1196,23 @@ const MaterialDetailView = ({
         <iframe
           title={material.name}
           src={`${fileUrl}#toolbar=1&navpanes=0`}
+          style={{
+            width: "100%",
+            height: "calc(100vh - 292px)",
+            minHeight: 620,
+            border: "none",
+            background: "#f2f2f2",
+            display: "block",
+          }}
+        />
+      );
+    }
+
+    if (previewPdfUrl) {
+      return (
+        <iframe
+          title={`${material.name} PDF preview`}
+          src={`${previewPdfUrl}#toolbar=1&navpanes=0`}
           style={{
             width: "100%",
             height: "calc(100vh - 292px)",
@@ -1086,13 +1240,28 @@ const MaterialDetailView = ({
           marginBottom: 18,
           padding: "12px 14px",
           borderRadius: 10,
-          background: fileError ? "#FFF5F5" : "#FFF8E8",
-          color: fileError ? "#E53E3E" : "#9A6B00",
+          background: fileError || previewError ? "#FFF5F5" : "#FFF8E8",
+          color: fileError || previewError ? "#E53E3E" : "#9A6B00",
           fontSize: 13,
           fontWeight: 700,
+          lineHeight: 1.55,
         }}>
-          {fileError || "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다."}
+          {previewFailure ? `${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.` : fileError || (isPresentation
+            ? (isLegacyPpt
+              ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
+              : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
+            : "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다.")}
         </div>
+        {fileUrl && isPresentation && (
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: "inline-flex", marginBottom: 16, color: CYAN, fontSize: 13, fontWeight: 800, textDecoration: "none" }}
+          >
+            원본 PPT/PPTX 열기
+          </a>
+        )}
         <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
       </div>
     );
@@ -1125,6 +1294,29 @@ const MaterialDetailView = ({
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {fileUrl && (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${BORDER_COLOR}`,
+                  background: "#fff",
+                  color: "#555",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  textDecoration: "none",
+                  cursor: "pointer",
+                }}
+              >
+                원본 열기
+              </a>
+            )}
             {activeTab === "original" && hasSummaries && (
               <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
                 height: 34,
@@ -1184,6 +1376,33 @@ const MaterialDetailView = ({
               </div>
             </div>
           )}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 8,
+            marginBottom: 14,
+          }}>
+            {materialProgressSteps.map((step, index) => {
+              const color = step.done ? "#2F9E44" : step.current ? PINK : "#aaa";
+              const bg = step.done ? "#F1FFF5" : step.current ? "#FFF0F6" : "#f7f7f7";
+              return (
+                <div key={step.label} style={{
+                  padding: "9px 10px",
+                  borderRadius: 10,
+                  border: `1px solid ${step.current ? PINK + "44" : "#eeeeee"}`,
+                  background: bg,
+                  minWidth: 0,
+                }}>
+                  <div style={{ marginBottom: 3, fontSize: 10, fontWeight: 900, color: "#aaa" }}>
+                    {index + 1}
+                  </div>
+                  <div style={{ fontSize: 12, lineHeight: 1.35, color, fontWeight: 850, wordBreak: "keep-all" }}>
+                    {step.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           <div style={{
             display: "flex",
             flexWrap: "wrap",
@@ -1260,11 +1479,12 @@ const MaterialDetailView = ({
                 open={isOriginalTutorOpen}
                 onOpenChange={setIsOriginalTutorOpen}
                 contextTitle={tutorContextTitle}
-                contextMarkdown={tutorContextMarkdown}
+                contextMarkdown={combinedTutorContextMarkdown}
                 summaryId={activeSummary?.id || null}
                 materialId={material.id}
                 suggestedQuestions={tutorSuggestions}
                 initialQuestion={tutorPrompt}
+                onInitialQuestionConsumed={() => setTutorPrompt("")}
                 disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
               />
             )}
@@ -1339,6 +1559,32 @@ const MaterialDetailView = ({
                         </button>
                       </div>
                     </div>
+                    {hasReviewContext && (
+                      <div style={{
+                        marginBottom: 18,
+                        padding: 16,
+                        borderRadius: 12,
+                        border: "1px solid #F8DFA8",
+                        background: "#FFF8E8",
+                      }}>
+                        <h4 style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 850, color: "#7A5200" }}>
+                          {reviewTitle || "이번 퀴즈 오답 복습"}
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          fontFamily: "inherit",
+                          fontSize: 13,
+                          lineHeight: 1.65,
+                          color: "#6A4B00",
+                        }}>
+                          {reviewContext.trim()}
+                        </pre>
+                      </div>
+                    )}
                     <FormattedAiText content={activeSummary.content} template={activeSummary.template} />
                   </div>
                 )}
@@ -1348,11 +1594,12 @@ const MaterialDetailView = ({
                     open={isSummaryTutorOpen}
                     onOpenChange={setIsSummaryTutorOpen}
                     contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
-                    contextMarkdown={activeSummary.content}
+                    contextMarkdown={combinedTutorContextMarkdown}
                     summaryId={activeSummary.id || null}
                     materialId={material.id}
                     suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
                     initialQuestion={tutorPrompt}
+                    onInitialQuestionConsumed={() => setTutorPrompt("")}
                     disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
                   />
                 )}
@@ -1521,14 +1768,23 @@ export default function Summary() {
   const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial
     ? locationState.materialId || locationState.materialIds?.[0] || ""
     : "");
+  const pendingCreateSummaryRef = useRef(Boolean(shouldRestoreLocationView && locationState?.createSummary));
   const pendingMaterialDetailTabRef = useRef<MaterialDetailTab>(
     shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialDetailTab || "original" : "original"
   );
   const pendingMaterialTutorQuestionRef = useRef(
     shouldRestoreLocationView && locationState?.viewMaterial ? locationState.tutorQuestion || "" : "",
   );
+  const pendingMaterialReviewContextRef = useRef(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.quizReviewContext || "" : "",
+  );
+  const pendingMaterialReviewTitleRef = useRef(
+    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.quizReviewTitle || "" : "",
+  );
   const pendingMaterialIdsRef = useRef<string[]>(
-    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialIds || [] : [],
+    shouldRestoreLocationView && (locationState?.viewMaterial || locationState?.createSummary)
+      ? locationState.materialIds || (locationState.materialId ? [locationState.materialId] : [])
+      : [],
   );
   const pendingSummaryRef = useRef(shouldRestoreLocationView && locationState?.openSummary ? {
     id: locationState.summaryId || "",
@@ -1559,15 +1815,19 @@ export default function Summary() {
   const [loadingStep, setLoadingStep] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [courseSummaries, setCourseSummaries] = useState<SavedSummary[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
   const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
+  const [materialDetailReviewContext, setMaterialDetailReviewContext] = useState("");
+  const [materialDetailReviewTitle, setMaterialDetailReviewTitle] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
+  const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
-  const [resultBackView, setResultBackView] = useState<"templates" | "upload">("templates");
+  const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
   const [pendingTutorQuestion] = useState(
     shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
   );
@@ -1579,7 +1839,7 @@ export default function Summary() {
   }, [files]);
 
   useEffect(() => {
-    if (!locationState?.openSummary && !locationState?.viewMaterial) return;
+    if (!locationState?.openSummary && !locationState?.viewMaterial && !locationState?.createSummary) return;
     navigate(pageRoutes["자료 요약"], {
       replace: true,
       state: initialCourse ? { selectedCourse: initialCourse, fromDashboard: locationState.fromDashboard } : null,
@@ -1599,6 +1859,7 @@ export default function Summary() {
       .then(([nextMaterials, summaries]) => {
         if (ignore) return;
         setMaterials(nextMaterials);
+        setCourseSummaries(summaries);
         const pendingMaterialId = pendingMaterialIdRef.current;
         if (pendingMaterialId) {
           pendingMaterialIdRef.current = "";
@@ -1610,12 +1871,34 @@ export default function Summary() {
             setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : [material.id]);
             setMaterialDetailInitialTab(pendingMaterialDetailTabRef.current);
             setMaterialDetailTutorQuestion(pendingMaterialTutorQuestionRef.current);
+            setMaterialDetailReviewContext(pendingMaterialReviewContextRef.current);
+            setMaterialDetailReviewTitle(pendingMaterialReviewTitleRef.current);
             pendingMaterialDetailTabRef.current = "original";
             pendingMaterialTutorQuestionRef.current = "";
+            pendingMaterialReviewContextRef.current = "";
+            pendingMaterialReviewTitleRef.current = "";
             setSearched(true);
             setView("materialDetail");
             return;
           }
+        }
+
+        if (pendingCreateSummaryRef.current) {
+          pendingCreateSummaryRef.current = false;
+          const validMaterialIds = pendingMaterialIdsRef.current.filter(id => nextMaterials.some(material => material.id === id));
+          pendingMaterialIdsRef.current = [];
+          setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : nextMaterials.map(material => material.id));
+          setSelectedTemplate(null);
+          setActiveSummaryId(null);
+          setSummaryText("");
+          setSummaryError("");
+          setElapsedTime(null);
+          setLoadingStep("");
+          setAgentThreadId("");
+          setResultBackView("upload");
+          setSearched(true);
+          setView("templates");
+          return;
         }
 
         const pendingSummary = pendingSummaryRef.current;
@@ -1694,9 +1977,12 @@ export default function Summary() {
     setMaterials([]);
     setActiveMaterial(null);
     setSelectedMaterialIds([]);
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
+    setUploadStatuses([]);
     setActiveSummaryId(null);
     navigate(pageRoutes["자료 요약"], { replace: true, state: null });
   };
@@ -1717,17 +2003,51 @@ export default function Summary() {
     setUploading(false);
     setSearched(true);
     setMaterials([]);
+    setCourseSummaries([]);
     setActiveMaterial(null);
     setSelectedMaterialIds([]);
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
     setIsExtracting(false);
     setExtractError("");
     setDuplicateNotice(null);
+    setUploadStatuses([]);
     setActiveSummaryId(null);
+    setView("materialList");
   };
 
-  const handleFiles = async (fileList: FileList | null) => {
-    if (!fileList) return;
-    const arr = Array.from(fileList).filter(isSupportedDocumentFile);
+  const updateUploadStatus = (file: File, nextStatus: Omit<UploadFileStatus, "id" | "name" | "file">) => {
+    setUploadStatuses(prev => upsertUploadStatus(prev, {
+      id: getUploadStatusId(file),
+      name: file.name,
+      file,
+      ...nextStatus,
+    }));
+  };
+
+  const failUploadStatus = (file: File, message: string) => {
+    const failure = classifyUploadFailure(message);
+    updateUploadStatus(file, {
+      state: "failed",
+      label: failure.label,
+      message: `${message} ${failure.guide}`,
+      failureKind: failure.kind,
+    });
+  };
+
+  const handleSelectedFiles = async (incomingFiles: File[]) => {
+    const unsupportedFiles = incomingFiles.filter(file => !isSupportedDocumentFile(file));
+    unsupportedFiles.forEach(file => {
+      const failure = classifyUploadFailure("지원하지 않는 파일 형식입니다.");
+      updateUploadStatus(file, {
+        state: "failed",
+        label: failure.label,
+        message: failure.guide,
+        failureKind: failure.kind,
+      });
+    });
+
+    const arr = incomingFiles.filter(isSupportedDocumentFile);
     if (arr.length === 0) return;
     if (!selectedCourse) return;
 
@@ -1759,6 +2079,11 @@ export default function Summary() {
     setDuplicateNotice(duplicateNames.length > 0
       ? { names: Array.from(new Set(duplicateNames)) }
       : null);
+    duplicateFiles.forEach(file => updateUploadStatus(file, {
+      state: "duplicate",
+      label: "이미 등록된 파일",
+      message: "기존 자료를 확인하고, 원본 파일 연결이 없으면 다시 연결합니다.",
+    }));
     if (duplicateFiles.length > 0) {
       const duplicatePageCounts = await Promise.all(duplicateFiles.map(async file => ({
         id: getFileMaterialId(file),
@@ -1779,12 +2104,33 @@ export default function Summary() {
           nextMaterial = { ...nextMaterial, pages: match.pages };
         }
         if (match && !nextMaterial.filePath) {
+          updateUploadStatus(match.file, {
+            state: "storing",
+            label: "원본 다시 연결 중",
+            message: "기존 자료에 원본 파일을 다시 연결하고 있습니다.",
+            materialId: nextMaterial.id,
+          });
           try {
             nextMaterial = await uploadCourseMaterialFile(selectedCourse, nextMaterial, match.file);
             didAttachFiles = true;
+            updateUploadStatus(match.file, {
+              state: "done",
+              label: "원본 연결 완료",
+              message: "기존 자료에 원본 파일만 다시 연결됐습니다.",
+              materialId: nextMaterial.id,
+            });
           } catch (err) {
-            setExtractError(err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패");
+            const message = err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패";
+            setExtractError(message);
+            failUploadStatus(match.file, message);
           }
+        } else if (match) {
+          updateUploadStatus(match.file, {
+            state: "duplicate",
+            label: "기존 자료 사용",
+            message: "이미 등록된 자료입니다. 기존 자료를 그대로 사용합니다.",
+            materialId: nextMaterial.id,
+          });
         }
         nextMaterials.push(nextMaterial);
       }
@@ -1792,11 +2138,19 @@ export default function Summary() {
       if (didUpdatePages || didAttachFiles) {
         await saveCourseMaterials(selectedCourse, nextMaterials);
         setMaterials(nextMaterials);
+        if (didAttachFiles) {
+          setDuplicateNotice({ names: Array.from(new Set(duplicateNames)), reattached: true });
+        }
       }
     }
     if (newFiles.length === 0) return;
 
     setUploading(true);
+    newFiles.forEach(file => updateUploadStatus(file, {
+      state: "uploading",
+      label: "업로드 중",
+      message: "파일 정보를 읽고 저장 준비를 하고 있습니다.",
+    }));
 
     const nf = await Promise.all(newFiles.map(async f => ({
       name: f.name, size: f.size, type: getFileType(f.name),
@@ -1815,6 +2169,11 @@ export default function Summary() {
     try {
       for (const documentFile of newFiles) {
         try {
+          updateUploadStatus(documentFile, {
+            state: "extracting",
+            label: "텍스트 추출 중",
+            message: "자료 내용을 Markdown으로 변환하고 있습니다.",
+          });
           const markdown = await extractMarkdownFromMaterialFile(documentFile);
           const uploadedMaterial = nf.find(f => f.rawFile === documentFile) || nf.find(f => f.name === documentFile.name);
           if (uploadedMaterial) {
@@ -1828,15 +2187,37 @@ export default function Summary() {
               markdown,
               updatedAt: Date.now(),
             };
+            updateUploadStatus(documentFile, {
+              state: "storing",
+              label: "원본 저장 중",
+              message: "추출된 텍스트와 원본 파일을 저장하고 있습니다.",
+              materialId: baseMaterial.id,
+            });
             try {
-              uploadedMaterials.push(await uploadCourseMaterialFile(selectedCourse, baseMaterial, documentFile));
+              const savedMaterial = await uploadCourseMaterialFile(selectedCourse, baseMaterial, documentFile);
+              uploadedMaterials.push(savedMaterial);
+              updateUploadStatus(documentFile, {
+                state: "done",
+                label: "완료",
+                message: "업로드와 텍스트 추출이 완료됐습니다.",
+                materialId: savedMaterial.id,
+              });
             } catch (err) {
-              setExtractError(err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패");
+              const message = err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패";
+              setExtractError(message);
               uploadedMaterials.push(baseMaterial);
+              updateUploadStatus(documentFile, {
+                state: "done",
+                label: "텍스트만 완료",
+                message: `${message} 그래도 텍스트 추출 결과는 저장되어 요약과 퀴즈에 사용할 수 있습니다.`,
+                materialId: baseMaterial.id,
+              });
             }
           }
         } catch (err) {
-          setExtractError(err instanceof Error ? err.message : "파일 분석 실패");
+          const message = err instanceof Error ? err.message : "파일 분석 실패";
+          setExtractError(message);
+          failUploadStatus(documentFile, message);
         }
       }
 
@@ -1849,6 +2230,11 @@ export default function Summary() {
     } finally {
       setIsExtracting(false);
     }
+  };
+
+  const handleFiles = async (fileList: FileList | null) => {
+    if (!fileList) return;
+    await handleSelectedFiles(Array.from(fileList));
   };
 
   const handleAddTextMaterial = async () => {
@@ -1971,6 +2357,8 @@ export default function Summary() {
     setSelectedTemplate(null);
     setMaterialDetailInitialTab("original");
     setMaterialDetailTutorQuestion("");
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
     setResultBackView("materialDetail");
     setView("templates");
   };
@@ -2007,6 +2395,8 @@ export default function Summary() {
     setActiveMaterial(material);
     setMaterialDetailInitialTab("summary");
     setMaterialDetailTutorQuestion("");
+    setMaterialDetailReviewContext("");
+    setMaterialDetailReviewTitle("");
   };
 
   return (
@@ -2043,7 +2433,7 @@ export default function Summary() {
             }} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 800, color: "#222", marginBottom: 4 }}>
-                이미 등록된 파일입니다
+                {duplicateNotice.reattached ? "기존 자료에 원본 파일을 다시 연결했어요" : "이미 등록된 파일입니다"}
               </div>
               <div style={{
                 fontSize: 12,
@@ -2053,6 +2443,11 @@ export default function Summary() {
                 wordBreak: "break-word",
               }}>
                 {duplicateNotice.names.join(", ")}
+              </div>
+              <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.45, color: "#777" }}>
+                {duplicateNotice.reattached
+                  ? "요약 내용은 그대로 두고, 원본 미리보기에 필요한 파일만 연결했습니다."
+                  : "기존 자료를 그대로 사용할게요. 원본 파일 연결이 없던 자료는 다시 연결을 시도합니다."}
               </div>
             </div>
             <button
@@ -2161,13 +2556,15 @@ export default function Summary() {
           <MaterialDetailView
             material={activeMaterial}
             selectedCourse={selectedCourse}
-            onBack={() => setView("upload")}
+            onBack={() => setView(selectedCourse ? "materialList" : "upload")}
             onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
             onOpenSummary={handleOpenMaterialSummary}
             onOpenQuiz={handleOpenMaterialQuiz}
             initialTab={materialDetailInitialTab}
             initialTutorQuestion={materialDetailTutorQuestion}
+            reviewContext={materialDetailReviewContext}
+            reviewTitle={materialDetailReviewTitle}
             relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
             onSelectRelatedMaterial={handleSelectRelatedMaterial}
           />
@@ -2177,11 +2574,83 @@ export default function Summary() {
           <QuizCreateView fileName={selectedMaterials.map(material => material.name).join(", ")} onBack={() => setView("upload")} onCreate={handleGoToQuiz} />
         )}
 
+        {view === "materialList" && selectedCourse && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <button onClick={handleCourseBack} style={{
+                background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, padding: 0
+              }}>← 돌아가기</button>
+              <button
+                onClick={() => setView("upload")}
+                style={{
+                  padding: "9px 18px", borderRadius: 10, border: "none",
+                  background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
+                }}
+              >+ 새 자료 업로드</button>
+            </div>
+            <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 700, color: "#222" }}>{selectedCourse}</h2>
+            {materials.length === 0 ? (
+              <Card style={{ padding: 40, textAlign: "center" }}>
+                <p style={{ fontSize: 14, color: "#aaa", margin: 0 }}>
+                  아직 업로드된 자료가 없습니다.<br />새 자료를 업로드해보세요.
+                </p>
+              </Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[...materials]
+                  .sort((a, b) => {
+                    const aCount = courseSummaries.filter(s => s.materialIds?.includes(a.id)).length;
+                    const bCount = courseSummaries.filter(s => s.materialIds?.includes(b.id)).length;
+                    return bCount - aCount;
+                  })
+                  .map(material => {
+                    const summaryCount = courseSummaries.filter(s => s.materialIds?.includes(material.id)).length;
+                    const hasSummary = summaryCount > 0;
+                    return (
+                      <Card
+                        key={material.id}
+                        style={{
+                          padding: "16px 20px", cursor: "pointer",
+                          opacity: hasSummary ? 1 : 0.55,
+                          transition: "box-shadow 0.15s",
+                        }}
+                        onClick={() => {
+                          setActiveMaterial(material);
+                          setSelectedMaterialIds([material.id]);
+                          setMaterialDetailInitialTab(hasSummary ? "summary" : "original");
+                          setMaterialDetailTutorQuestion("");
+                          setMaterialDetailReviewContext("");
+                          setMaterialDetailReviewTitle("");
+                          setView("materialDetail");
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#222" }}>{material.name}</span>
+                          {hasSummary ? (
+                            <span style={{
+                              background: `${PINK}22`, color: PINK,
+                              borderRadius: 20, padding: "3px 12px",
+                              fontSize: 12, fontWeight: 700, flexShrink: 0
+                            }}>
+                              요약 {summaryCount}개
+                            </span>
+                          ) : (
+                            <span style={{ color: "#bbb", fontSize: 12, flexShrink: 0 }}>요약 없음</span>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
         {view === "upload" && selectedCourse && (
           <div>
-            <button onClick={handleCourseBack} style={{
+            <button onClick={() => setView("materialList")} style={{
               background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-            }}>← 돌아가기</button>
+            }}>← 자료 목록으로</button>
             <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>
@@ -2292,6 +2761,95 @@ export default function Summary() {
                   </div>
                 )}
 
+                {uploadStatuses.length > 0 && (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
+                      파일별 처리 상태
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {uploadStatuses.map(status => {
+                        const isFailed = status.state === "failed";
+                        const isDone = status.state === "done";
+                        const isDuplicate = status.state === "duplicate";
+                        const tone = isFailed ? "#E53E3E" : isDone ? "#2F9E44" : isDuplicate ? "#B7791F" : status.state === "previewing" ? CYAN : PINK;
+                        const background = isFailed ? "#FFF5F5" : isDone ? "#F1FFF5" : isDuplicate ? "#FFF8E8" : "#FFF7FB";
+                        const linkedMaterial = status.materialId ? materials.find(material => material.id === status.materialId) : null;
+
+                        return (
+                          <div key={status.id} style={{
+                            padding: 12,
+                            borderRadius: 12,
+                            border: `1px solid ${isFailed ? "#FED7D7" : "#eeeeee"}`,
+                            background: "#fff",
+                          }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5, flexWrap: "wrap" }}>
+                                  <span style={{ padding: "4px 8px", borderRadius: 999, background, color: tone, fontSize: 11, fontWeight: 850 }}>
+                                    {status.label}
+                                  </span>
+                                  <strong style={{ fontSize: 13, color: "#333", wordBreak: "break-word" }}>{status.name}</strong>
+                                </div>
+                                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "#777" }}>
+                                  {status.message}
+                                </p>
+                              </div>
+                            </div>
+                            {(isFailed || linkedMaterial) && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+                                {isFailed && status.file && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSelectedFiles([status.file as File])}
+                                    style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid #eeeeee", background: "#fff", color: "#555", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                  >
+                                    다시 시도
+                                  </button>
+                                )}
+                                {linkedMaterial && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMaterial(linkedMaterial);
+                                      setSelectedMaterialIds([linkedMaterial.id]);
+                                      setMaterialDetailInitialTab("original");
+                                      setMaterialDetailTutorQuestion("");
+                                      setMaterialDetailReviewContext("");
+                                      setMaterialDetailReviewTitle("");
+                                      setView("materialDetail");
+                                    }}
+                                    style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${CYAN}33`, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                  >
+                                    자료 열기
+                                  </button>
+                                )}
+                                {isFailed && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => fileRef.current?.click()}
+                                      style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid #eeeeee", background: "#fff", color: "#777", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                    >
+                                      다른 파일 업로드
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setInputMode("text")}
+                                      style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${PINK}33`, background: "#FFF0F6", color: PINK, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                    >
+                                      텍스트 붙여넣기
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {materials.length > 0 && (
                   <div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
@@ -2341,6 +2899,8 @@ export default function Summary() {
                             setSelectedMaterialIds([material.id]);
                             setMaterialDetailInitialTab("original");
                             setMaterialDetailTutorQuestion("");
+                            setMaterialDetailReviewContext("");
+                            setMaterialDetailReviewTitle("");
                             setView("materialDetail");
                           }}
                           style={{
