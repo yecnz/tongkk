@@ -401,6 +401,14 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
   );
 };
 
+// 요약 내용 렌더: MINDMAP은 JSON을 파싱해 시각화하고, 그 외 템플릿은 마크다운으로 렌더한다.
+const SummaryContentView = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
+  const mindmap = template === "MINDMAP" ? parseMindmapJson(content) : null;
+  return mindmap
+    ? <MindmapView data={mindmap} />
+    : <FormattedAiText content={content} template={template} />;
+};
+
 const PdfFormattedAiText = ({ content }: { content: string }) => {
   const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
 
@@ -1618,7 +1626,7 @@ const MaterialDetailView = ({
                         </pre>
                       </div>
                     )}
-                    <FormattedAiText content={activeSummary.content} template={activeSummary.template} />
+                    <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
                   </div>
                 )}
                 {isSummaryTutorOpen && activeSummary && (
