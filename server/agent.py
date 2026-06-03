@@ -101,8 +101,8 @@ class StudyAgentState(TypedDict):
     model: AgentModel
 
 
-def build_llm(model: AgentModel):
-    return _build_model(model)
+def build_llm(model: AgentModel, max_tokens: int | None = None):
+    return _build_model(model, max_tokens=max_tokens)
 
 
 def build_openai_llm(model_name: str, max_tokens: int | None = None):
@@ -117,9 +117,9 @@ def build_openai_llm(model_name: str, max_tokens: int | None = None):
     )
 
 
-def _build_model(model: AgentModel):
+def _build_model(model: AgentModel, max_tokens: int | None = None):
     if model == "GPT":
-        return build_openai_llm(os.getenv("OPENAI_MODEL", "gpt-5.4-mini"))
+        return build_openai_llm(os.getenv("OPENAI_MODEL", "gpt-5.4-mini"), max_tokens=max_tokens)
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -127,7 +127,7 @@ def _build_model(model: AgentModel):
     return ChatGoogleGenerativeAI(
         model=os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
         temperature=0.3,
-        max_output_tokens=_env_int("GEMINI_MAX_OUTPUT_TOKENS", 8192),
+        max_output_tokens=max_tokens or _env_int("GEMINI_MAX_OUTPUT_TOKENS", 8192),
         google_api_key=api_key,
     )
 

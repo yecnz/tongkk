@@ -76,6 +76,10 @@ PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 90)
 PDF_VISUAL_TEXT_PAGE_CHARS = _env_int("PDF_VISUAL_TEXT_PAGE_CHARS", 180)
 PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
+# 요약 출력 토큰 한도. 기본 8192로는 긴 강의자료(예: 100p+) 요약이 중간에 잘리므로 넉넉히 둔다.
+# gpt-5.4-mini 출력 하드 상한은 128000이라 32768은 안전한 헤드룸(약 300p+ 커버).
+SUMMARY_MAX_TOKENS = _env_int("SUMMARY_MAX_TOKENS", 32768)
+
 
 async def require_api_user(authorization: str | None = Header(default=None)):
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
@@ -891,7 +895,7 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
-        llm = build_llm(req.model)
+        llm = build_llm(req.model, max_tokens=SUMMARY_MAX_TOKENS)
         response = llm.invoke([
             SystemMessage(content="""너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
 사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.
