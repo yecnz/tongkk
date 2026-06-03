@@ -278,7 +278,10 @@ const markdownComponents: Components = {
   p: ({ children }) => <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>,
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
-  li: ({ children }) => <li style={{ marginBottom: 6, paddingLeft: 4 }}>{renderHighlightSyntax(children)}</li>,
+  li: ({ children }) => {
+    const isAnswerLabel = getNodeText(children).trimStart().startsWith("답:");
+    return <li style={{ marginBottom: 6, paddingLeft: 4, ...(isAnswerLabel ? { listStyleType: "none" } : {}) }}>{renderHighlightSyntax(children)}</li>;
+  },
   strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{renderHighlightSyntax(children)}</strong>,
   em: ({ children }) => <em style={{ color: "#555" }}>{children}</em>,
   blockquote: ({ children }) => (
@@ -346,6 +349,84 @@ const cheatSheetMarkdownComponents: Components = {
 
 const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
 
+// 한 섹션에 흩어진 여러 (출처: ...)를 파일별로 묶어 하나로 합친다. (페이지/슬라이드 중복 제거)
+const mergeSourceCitations = (sources: string[]): string => {
+  const byFile = new Map<string, string[]>();
+  for (const src of sources) {
+    const inner = src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
+    const commaIdx = inner.indexOf(",");
+    const file = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+    const locText = commaIdx === -1 ? "" : inner.slice(commaIdx + 1);
+    if (!byFile.has(file)) byFile.set(file, []);
+    const locs = byFile.get(file)!;
+    locText.split(",").map(s => s.trim()).filter(Boolean).forEach(loc => {
+      if (!locs.includes(loc)) locs.push(loc);
+    });
+  }
+  const parts = [...byFile.entries()].map(([file, locs]) => (locs.length ? `${file}, ${locs.join(", ")}` : file));
+  return parts.length ? `(출처: ${parts.join("; ")})` : "";
+};
+
+// 시험 포인트 섹션을 항목별로 재구성한다.
+// - 질문만 '>' 인용문 박스 안에 넣고(출처는 질문 줄 끝으로 모음)
+// - '답:'과 답 내용은 박스 밖에서 리스트로 들여쓴다. ('답:'은 렌더 시 글머리 숨김)
+const formatExamCards = (sectionLines: string[]): string[] => {
+  const SRC = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/;
+  type Item = { question: string; answer: string[] };
+  const items: Item[] = [];
+  let cur: Item | null = null;
+  for (const raw of sectionLines) {
+    const content = raw.replace(/^>\s*/, "").trim();
+    if (content.trim() === "") continue;
+    const deBullet = content.replace(/^-\s*/, "");
+    const isAnswer = /^답\s*:/.test(deBullet);
+    const isBullet = /^-\s*/.test(content);
+    if (!isAnswer && !isBullet) {
+      cur = { question: content, answer: [] };
+      items.push(cur);
+    } else if (cur) {
+      cur.answer.push(deBullet);
+    }
+  }
+  if (!items.length) return sectionLines;
+  const out: string[] = [];
+  items.forEach((it, idx) => {
+    let question = it.question;
+    const answerLines = it.answer.filter(a => a.trim() !== "");
+    if (!SRC.test(question)) {
+      for (let a = 0; a < answerLines.length; a++) {
+        const m = answerLines[a].match(SRC);
+        if (m) {
+          question = `${question} ${m[0]}`;
+          answerLines[a] = answerLines[a].replace(SRC, "").replace(/\s+$/, "");
+          break;
+        }
+      }
+    }
+    if (idx > 0) out.push("");
+    out.push(`> ${question}`);
+    if (answerLines.length) {
+      out.push("");
+      const labelIdx = answerLines.findIndex(a => /^답\s*:/.test(a));
+      const label = labelIdx >= 0 ? answerLines[labelIdx] : "답:";
+      const points = answerLines.filter((_, k) => k !== labelIdx);
+      out.push(`- ${label}`);          // '답:' (렌더 시 글머리 숨김)
+      for (const p of points) out.push(`  - ${p}`);  // 답 내용은 한 단계 들여쓰기(중첩)
+    }
+  });
+  return out;
+};
+
+// 마크다운 자식 노드에서 순수 텍스트만 추출한다. (li가 '답:'으로 시작하는지 판별용)
+const getNodeText = (node: unknown): string => {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(getNodeText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return getNodeText((node as { props?: { children?: unknown } }).props?.children);
+  }
+  return "";
+};
+
 const hoistSourceToHeadings = (markdown: string): string => {
   const lines = markdown.split("\n");
   const result: string[] = [];
@@ -359,10 +440,19 @@ const hoistSourceToHeadings = (markdown: string): string => {
         sectionLines.push(lines[j]);
         j++;
       }
-      const isFlowSection = /흐름/.test(line);
-      const firstSource = !isFlowSection ? sectionLines.join("\n").match(/\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/)?.[0] : undefined;
-      result.push(firstSource ? `${line} ${firstSource}` : line);
-      sectionLines.forEach(l => result.push(l.replace(SOURCE_PATTERN, "").trimEnd()));
+      // '한눈에 보는 흐름', '주요 용어', '핵심 암기 사항', '참고/주의 사항'은 출처를 달지 않는다.
+      const isNoSourceSection = /흐름|주요\s*용어|핵심\s*암기|참고\s*\/?\s*주의/.test(line);
+      // '시험 포인트'는 헤딩에 모으지 않고 각 문제 옆 인라인 출처를 그대로 둔다.
+      const isInlineSourceSection = /시험\s*포인트/.test(line);
+      if (isInlineSourceSection) {
+        result.push(line);
+        formatExamCards(sectionLines).forEach(l => result.push(l));
+      } else {
+        const sources = isNoSourceSection ? [] : (sectionLines.join("\n").match(SOURCE_PATTERN) || []);
+        const mergedSource = sources.length ? mergeSourceCitations(sources) : "";
+        result.push(mergedSource ? `${line} ${mergedSource}` : line);
+        sectionLines.forEach(l => result.push(l.replace(SOURCE_PATTERN, "").trimEnd()));
+      }
       i = j;
     } else {
       result.push(line);
