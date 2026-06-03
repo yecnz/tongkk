@@ -561,7 +561,11 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   const questions = suggestedTutorQuestions[template];
 
-  const exportText = `${templateLabels[template]} 요약\n\n${displayContent}`;
+  // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
+  const exportContent = template === "MINDMAP"
+    ? displayContent
+    : hoistSourceToHeadings(normalizeMarkdownContent(displayContent));
+  const exportText = `${templateLabels[template]} 요약\n\n${exportContent}`;
 
   useEffect(() => {
     if (initialTutorQuestion?.trim()) setIsTutorOpen(true);
