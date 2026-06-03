@@ -220,14 +220,14 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
 };
 
 const renderInlineText = (text: string): ReactNode[] => {
-  return text.split(/(\*\*[^*]+\*\*|==[^=]+==|\(출처:\s*[^)]+\))/g).map((part, index) => {
+  return text.split(/(\*\*[^*]+\*\*|==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\))/g).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith("==") && part.endsWith("==")) {
       return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
     }
-    if (part.match(/^\(출처:\s*[^)]+\)$/)) {
+    if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
       return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1)}</span>;
     }
     return part;
@@ -236,11 +236,11 @@ const renderInlineText = (text: string): ReactNode[] => {
 
 const renderHighlightSyntax = (children: ReactNode): ReactNode => {
   if (typeof children === "string") {
-    return children.split(/(==[^=]+==|\(출처:\s*[^)]+\))/g).map((part, index) => {
+    return children.split(/(==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\))/g).map((part, index) => {
       if (part.startsWith("==") && part.endsWith("==")) {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
-      if (part.match(/^\(출처:\s*[^)]+\)$/)) {
+      if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
         return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1)}</span>;
       }
       return part;
@@ -263,18 +263,18 @@ const markdownStyles = {
 const markdownComponents: Components = {
   h1: ({ children }) => (
     <h1 style={{ margin: "0 0 18px", paddingBottom: 12, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>
-      {children}
+      {renderHighlightSyntax(children)}
     </h1>
   ),
   h2: ({ children }) => (
     <h2 style={{ margin: "26px 0 12px", padding: "9px 12px", borderRadius: 8, background: "#f3f4f6", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "#222" }}>
-      {children}
+      {renderHighlightSyntax(children)}
     </h2>
   ),
-  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "20px 0 10px", padding: "4px 8px", borderRadius: 6, background: "#f6f6f6", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{children}</h3>,
-  h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "#333" }}>{children}</h4>,
-  h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "#444" }}>{children}</h5>,
-  h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "#555" }}>{children}</h6>,
+  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "20px 0 10px", padding: "4px 8px", borderRadius: 6, background: "#f6f6f6", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{renderHighlightSyntax(children)}</h3>,
+  h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "#333" }}>{renderHighlightSyntax(children)}</h4>,
+  h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "#444" }}>{renderHighlightSyntax(children)}</h5>,
+  h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "#555" }}>{renderHighlightSyntax(children)}</h6>,
   p: ({ children }) => <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>,
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
@@ -344,10 +344,39 @@ const cheatSheetMarkdownComponents: Components = {
   td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
 
+const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
+
+const hoistSourceToHeadings = (markdown: string): string => {
+  const lines = markdown.split("\n");
+  const result: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^#{1,6}\s/.test(line)) {
+      const sectionLines: string[] = [];
+      let j = i + 1;
+      while (j < lines.length && !/^#{1,6}\s/.test(lines[j])) {
+        sectionLines.push(lines[j]);
+        j++;
+      }
+      const isFlowSection = /흐름/.test(line);
+      const firstSource = !isFlowSection ? sectionLines.join("\n").match(/\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/)?.[0] : undefined;
+      result.push(firstSource ? `${line} ${firstSource}` : line);
+      sectionLines.forEach(l => result.push(l.replace(SOURCE_PATTERN, "").trimEnd()));
+      i = j;
+    } else {
+      result.push(line);
+      i++;
+    }
+  }
+  return result.join("\n");
+};
+
 const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
-  const cleaned = normalizeMarkdownContent(content);
+  const normalized = normalizeMarkdownContent(content);
+  const cleaned = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
   if (!cleaned) return null;
 
   if (template === "CHEAT_SHEET") {
@@ -2303,6 +2332,21 @@ export default function Summary() {
     setSummaryError("");
 
     if (selectedMarkdown) {
+      // 같은 자료 + 템플릿으로 이미 저장된 요약이 있으면 재사용
+      const existing = courseSummaries.find(
+        s => s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)
+      );
+      if (existing) {
+        setSummaryText(existing.content);
+        setActiveSummaryId(existing.id || null);
+        setElapsedTime(null);
+        setAgentThreadId("");
+        setSummaryError("");
+        setResultBackView("templates");
+        setView("summaryResult");
+        return;
+      }
+
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
@@ -2328,6 +2372,10 @@ export default function Summary() {
           };
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
           setActiveSummaryId(persistedSummary.id || null);
+          setCourseSummaries(prev => {
+            const filtered = prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)));
+            return [persistedSummary, ...filtered];
+          });
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
