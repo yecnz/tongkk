@@ -349,6 +349,12 @@ const cheatSheetMarkdownComponents: Components = {
 
 const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
 
+// 출처 표기 안의 '~'(페이지 범위 표기, 예: p.3~7)를 하이픈으로 바꾼다.
+// remark-gfm가 '~...~'를 취소선(<del>)으로 해석하면 출처 문자열이 쪼개져
+// 출처 배지가 깨지고 페이지 번호가 줄줄이 합쳐 보이는 문제를 막는다.
+const sanitizeCitationTildes = (markdown: string): string =>
+  markdown.replace(/\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g, (m) => m.replace(/~/g, "-"));
+
 // 한 섹션에 흩어진 여러 (출처: ...)를 파일별로 묶어 하나로 합친다. (페이지/슬라이드 중복 제거)
 const mergeSourceCitations = (sources: string[]): string => {
   const byFile = new Map<string, string[]>();
@@ -410,7 +416,11 @@ const formatExamCards = (sectionLines: string[]): string[] => {
       const labelIdx = answerLines.findIndex(a => /^답\s*:/.test(a));
       const label = labelIdx >= 0 ? answerLines[labelIdx] : "답:";
       const points = answerLines.filter((_, k) => k !== labelIdx);
-      out.push(`- ${label}`);          // '답:' (렌더 시 글머리 숨김)
+      // '답:' 라벨 줄에 답 내용이 같은 줄에 붙어 있으면(예: '답: RWM이다') 분리해서
+      // '답:'은 라벨로만 두고 내용은 하위 bullet로 내린다. (단답·목록답 모두 같은 카드 형태로 통일)
+      const inlineAnswer = label.replace(/^답\s*:\s*/, "").trim();
+      if (inlineAnswer) points.unshift(inlineAnswer);
+      out.push("- 답:");               // '답:' (렌더 시 글머리 숨김)
       for (const p of points) out.push(`  - ${p}`);  // 답 내용은 한 단계 들여쓰기(중첩)
     }
   });
@@ -428,7 +438,7 @@ const getNodeText = (node: unknown): string => {
 };
 
 const hoistSourceToHeadings = (markdown: string): string => {
-  const lines = markdown.split("\n");
+  const lines = sanitizeCitationTildes(markdown).split("\n");
   const result: string[] = [];
   let i = 0;
   while (i < lines.length) {
