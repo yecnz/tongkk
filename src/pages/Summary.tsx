@@ -2313,6 +2313,7 @@ export default function Summary() {
         deleteSummariesByMaterialId(selectedCourse, material.id),
       ]);
       setMaterials(nextMaterials);
+      setCourseSummaries(prev => prev.filter(s => !(s.materialIds || []).includes(material.id)));
       setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
       setFiles(prev => {
         const nextFiles = prev.filter(file =>
