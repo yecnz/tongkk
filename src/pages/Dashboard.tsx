@@ -58,9 +58,10 @@ type PacerSession = {
   taskLabel: string;
   durationMin: number;
   startedAt: number;
-  status: "running" | "paused" | "done";
   planId: string;
   creditUnits: number;
+  daysLeft: number | null;
+  paceStatus: PaceStatus;
 };
 type PacerStartModalProps = {
   defaultCourse: string;
@@ -70,8 +71,12 @@ type PacerStartModalProps = {
 };
 type PacerOverlayProps = {
   session: PacerSession;
-  onComplete: () => void;
+  helpOpen: boolean;
   onStuck: () => void;
+  onCredit: () => void;
+  onClose: () => void;
+  onAbandon: () => void;
+  onRestart: () => void;
 };
 type Dday = { id?: string; type?: DdayType; subj: string; date: string };
 type Plan = { id?: string; text: string; done: boolean; minutes?: number; sourceType?: DdayType | "carryover" };
@@ -518,8 +523,8 @@ const PacerStartModal = ({ defaultCourse, defaultTask, onClose, onStart }: Pacer
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30">
       <Card className="w-[340px] p-7">
-        <h3 className="m-0 mb-1 text-[17px] font-bold text-[#222] dark:text-slate-100">같이 달릴까요?</h3>
-        <p className="m-0 mb-4 text-sm text-muted">{defaultCourse} · 집중 세션을 시작해요.</p>
+        <h3 className="m-0 mb-1 text-[17px] font-bold text-[#222] dark:text-slate-100">집중 타이머 시작</h3>
+        <p className="m-0 mb-4 text-sm text-muted">{defaultCourse} · 정한 시간 동안 학습하고 오늘 목표에 반영해요.</p>
         <label className="block mb-1.5 text-xs font-bold text-muted">할 일</label>
         <input
           value={task}
@@ -551,67 +556,201 @@ const PacerStartModal = ({ defaultCourse, defaultTask, onClose, onStart }: Pacer
   );
 };
 
-const formatClock = (totalSeconds: number) => {
-  const mm = Math.floor(totalSeconds / 60);
-  const ss = totalSeconds % 60;
-  return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+const PACER_RING_RADIUS = 96;
+const PACER_RING_CIRC = 2 * Math.PI * PACER_RING_RADIUS;
+
+const paceChip: Record<PaceStatus, { label: string; color: string }> = {
+  on: { label: "페이스 좋음", color: CYAN },
+  slightly: { label: "조금 뒤처짐", color: "#f59e0b" },
+  behind: { label: "따라잡는 중", color: PINK },
 };
 
-const PacerOverlay = ({ session, onComplete, onStuck }: PacerOverlayProps) => {
+// phase(시작/흐름/막판) × pace(뒤처짐/순항)로 멘트를 고르고, ~1.5분마다 회전시켜 살아있게.
+const pacerCoach = (
+  secondsLeft: number,
+  totalSeconds: number,
+  status: PaceStatus,
+  creditUnits: number,
+): string => {
+  if (secondsLeft === 0) return "끝까지 왔어요. 오늘 몫을 해냈어요.";
+  const elapsed = totalSeconds - secondsLeft;
+  const progress = totalSeconds > 0 ? elapsed / totalSeconds : 0;
+  const rotate = Math.floor(elapsed / 90);
+  const goal = creditUnits > 0 ? `이 세션이면 오늘 목표 ${creditUnits}개를 끝내요. ` : "";
+  let pool: string[];
+  if (progress >= 0.7) {
+    pool = status === "behind"
+      ? ["막판이에요. 여기서 멈추면 밀린 게 그대로예요. 조금만 더!", "거의 다 왔어요. 이 구간만 넘기면 따라잡아요."]
+      : ["막판이에요. 여기서 멈추면 아까워요.", "거의 다 왔어요. 끝까지 같은 페이스로."];
+  } else if (progress >= 0.15) {
+    pool = status === "behind"
+      ? [`조금 밀렸지만 흐름 탔어요. ${goal}딴 데 보지 말고 같이 가요.`, "지금 페이스면 충분히 따라잡아요. 계속 가요."]
+      : ["페이스 좋아요. 딴 데 보지 말고 이대로.", `좋은 흐름이에요. ${goal}쭉 가요.`];
+  } else {
+    pool = status === "behind"
+      ? [`조금 밀렸어요. 그래도 ${goal}시작이 반이에요.`, "딴 길로 새지 말고 같이 가요."]
+      : [`시작이 반이에요. ${goal}같이 가요.`, "자, 집중 모드. 딴 데 보지 말고 가봅시다."];
+  }
+  return pool[rotate % pool.length];
+};
+
+const PacerOverlay = ({ session, helpOpen, onStuck, onCredit, onClose, onAbandon, onRestart }: PacerOverlayProps) => {
   const totalSeconds = session.durationMin * 60;
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
   const [paused, setPaused] = useState(false);
-  const completedRef = useRef(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [done, setDone] = useState(false);
+  const deadlineRef = useRef(Date.now() + totalSeconds * 1000);
+  const creditedRef = useRef(false);
 
+  // 새 세션(한 세션 더)으로 startedAt이 바뀌면 시계를 리셋한다.
   useEffect(() => {
-    if (paused) return;
+    deadlineRef.current = Date.now() + totalSeconds * 1000;
+    creditedRef.current = false;
+    setSecondsLeft(totalSeconds);
+    setPaused(false);
+    setConfirmEnd(false);
+    setDone(false);
+  }, [session.startedAt, totalSeconds]);
+
+  // 시각 기반 카운트다운 — 백그라운드 탭 throttling/드리프트에도 정확.
+  useEffect(() => {
+    if (paused || done) return;
     const id = setInterval(() => {
-      setSecondsLeft(prev => Math.max(prev - 1, 0));
-    }, 1000);
+      setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+    }, 250);
     return () => clearInterval(id);
-  }, [paused]);
+  }, [paused, done]);
 
+  // 0 도달 → 완료 화면 + 단 한 번만 적립.
   useEffect(() => {
-    if (secondsLeft > 0 || completedRef.current) return;
-    completedRef.current = true;
-    onComplete();
-  }, [secondsLeft, onComplete]);
+    if (done || secondsLeft > 0) return;
+    setDone(true);
+    if (!creditedRef.current) {
+      creditedRef.current = true;
+      onCredit();
+    }
+  }, [secondsLeft, done, onCredit]);
 
-  const progress = totalSeconds > 0 ? (totalSeconds - secondsLeft) / totalSeconds : 1;
-  const coachMent = secondsLeft === 0
-    ? "끝났어요! 오늘 한 걸음 또 나아갔어요 👏"
-    : progress >= 0.5
-      ? "절반 왔어요. 페이스 좋아요, 이대로 쭉 가요!"
-      : "시작이 반이에요. 딴 길로 새지 말고 같이 가요.";
+  // AI 튜터 도움 드로어가 열리면 시계를 자동 정지. 닫아도 자동 재개하지 않고 재개 버튼으로 잇는다.
+  useEffect(() => {
+    if (helpOpen) setPaused(true);
+  }, [helpOpen]);
+
+  // 키보드: Space=일시정지/재개, Esc=끝내기 확인.
+  useEffect(() => {
+    if (done) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (helpOpen) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        setPaused(prev => {
+          if (prev) deadlineRef.current = Date.now() + secondsLeft * 1000;
+          return !prev;
+        });
+      } else if (e.code === "Escape") {
+        e.preventDefault();
+        setConfirmEnd(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [helpOpen, done, secondsLeft]);
+
+  const togglePause = () => {
+    setPaused(prev => {
+      if (prev) deadlineRef.current = Date.now() + secondsLeft * 1000;
+      return !prev;
+    });
+  };
+
+  const chip = paceChip[session.paceStatus];
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+  const ringOffset = PACER_RING_CIRC * (1 - (totalSeconds > 0 ? secondsLeft / totalSeconds : 0));
+  const coach = paused
+    ? "준비되면 다시 이어가요. ‘재개’를 누르세요."
+    : pacerCoach(secondsLeft, totalSeconds, session.paceStatus, session.creditUnits);
+
+  const cyanBtn = "px-5 py-2 rounded-xl bg-cyan text-white text-sm font-semibold cursor-pointer hover:brightness-95";
+  const slateBtn = "px-5 py-2 rounded-xl bg-slate-200 text-[#444] text-sm font-semibold cursor-pointer hover:brightness-95 dark:bg-slate-700 dark:text-slate-100";
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30">
-      <Card className="w-[min(420px,92vw)] p-8 text-center">
-        <p className="m-0 mb-1 text-sm font-semibold text-muted">{session.course}</p>
-        <p className="m-0 mb-5 text-base font-bold text-[#333] dark:text-slate-100">{session.taskLabel}</p>
-        <div className="text-5xl font-bold tabular-nums text-[#222] dark:text-slate-100">{formatClock(secondsLeft)}</div>
-        <div className="mt-5 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
-          <div className="h-2 rounded-full bg-cyan" style={{ width: `${Math.round(progress * 100)}%` }} />
-        </div>
-        <p className="mt-4 text-sm text-muted">{coachMent}</p>
-        <div className="mt-7 flex gap-2 justify-center">
-          <button
-            type="button"
-            onClick={() => setPaused(prev => !prev)}
-            disabled={secondsLeft === 0}
-            className="px-4 py-2 rounded-xl bg-slate-200 text-[#444] text-sm font-semibold cursor-pointer hover:brightness-95 disabled:opacity-50 dark:bg-slate-700 dark:text-slate-100"
-          >{paused ? "재개" : "일시정지"}</button>
-          <button
-            type="button"
-            onClick={onStuck}
-            className="px-4 py-2 rounded-xl bg-cyan text-white text-sm font-semibold cursor-pointer hover:brightness-95"
-          >막힘</button>
-          <button
-            type="button"
-            onClick={onComplete}
-            className="px-4 py-2 rounded-xl bg-pink text-white text-sm font-semibold cursor-pointer hover:brightness-95"
-          >종료</button>
-        </div>
+    <div
+      role="dialog"
+      aria-modal="true"
+      className={`fixed inset-0 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm transition-opacity ${helpOpen ? "z-[180] opacity-60 pointer-events-none" : "z-[200] opacity-100"}`}
+    >
+      <Card className="w-[min(520px,94vw)] p-8 text-center">
+        {done ? (
+          <div className="py-6">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cyan/15 text-sm font-extrabold text-cyan">완료</div>
+            <p className="m-0 mb-1 text-lg font-bold text-[#222] dark:text-slate-100">잘했어요! 한 구간 완주</p>
+            <p className="m-0 mb-6 text-sm text-muted">
+              {session.creditUnits > 0 ? `+${session.creditUnits}개 적립 · 오늘 목표 달성` : "복습 한 세션 완료"}
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button type="button" onClick={onRestart} className={cyanBtn}>한 세션 더</button>
+              <button type="button" onClick={onClose} className={slateBtn}>닫기</button>
+            </div>
+          </div>
+        ) : confirmEnd ? (
+          <div className="py-6">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink/10 text-xs font-extrabold text-pink">중단</div>
+            <p className="m-0 mb-1 text-base font-bold text-[#222] dark:text-slate-100">지금 끝낼까요?</p>
+            <p className="m-0 mb-6 text-sm text-muted">아직 시간이 남았어요. 지금 그만두면 이번 세션은 기록되지 않아요.</p>
+            <div className="flex gap-2 justify-center">
+              <button type="button" onClick={() => setConfirmEnd(false)} className={cyanBtn}>계속하기</button>
+              <button type="button" onClick={onAbandon} className={slateBtn}>그만두기</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-1">
+              <span className="text-sm font-semibold text-muted">{session.course}</span>
+              {session.daysLeft !== null && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-[#555] dark:bg-slate-700 dark:text-slate-200">
+                  {session.daysLeft <= 0 ? "D-DAY" : `D-${session.daysLeft}`}
+                </span>
+              )}
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: chip.color }}>{chip.label}</span>
+            </div>
+            <p className="m-0 mb-5 text-sm text-muted">
+              {session.creditUnits > 0 ? `이 세션이면 오늘 목표 ${session.creditUnits}개 완료` : "오늘은 약점 복습 세션이에요"}
+            </p>
+
+            <div className="relative mx-auto" style={{ width: 240, height: 240 }}>
+              <svg width="240" height="240" viewBox="0 0 240 240" className="-rotate-90">
+                <circle cx="120" cy="120" r={PACER_RING_RADIUS} fill="none" strokeWidth="12" className="stroke-slate-100 dark:stroke-slate-700" />
+                <circle
+                  cx="120" cy="120" r={PACER_RING_RADIUS} fill="none" strokeWidth="12" strokeLinecap="round"
+                  stroke={chip.color}
+                  strokeDasharray={PACER_RING_CIRC}
+                  strokeDashoffset={ringOffset}
+                  className="transition-[stroke-dashoffset] duration-300 ease-linear motion-reduce:transition-none"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center" aria-live="off">
+                <div className="font-bold tabular-nums leading-none text-[#222] dark:text-slate-100">
+                  <span className="text-5xl">{mm}</span><span className="text-2xl text-muted">:{ss}</span>
+                </div>
+                {paused && <span className="mt-2 text-xs font-bold text-muted">일시정지됨</span>}
+              </div>
+            </div>
+
+            <p className="mt-5 min-h-[20px] text-sm text-muted" aria-live="polite">{coach}</p>
+
+            <div className="mt-6 flex gap-2 justify-center">
+              <button type="button" onClick={togglePause} className={slateBtn}>{paused ? "재개" : "일시정지"}</button>
+              <button type="button" onClick={onStuck} className={cyanBtn}>AI 튜터에게 질문</button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmEnd(true)}
+              className="mt-4 border-none bg-transparent text-xs font-semibold text-muted cursor-pointer underline-offset-2 hover:underline"
+            >세션 끝내기</button>
+          </>
+        )}
       </Card>
     </div>
   );
@@ -1351,6 +1490,31 @@ export default function Dashboard() {
   const weekStats = paceWeekStats(paceLog);
   const totalRemaining = pacePlanViews.reduce((sum, view) => sum + view.remaining, 0);
   const weeklyGoal = paceWeeklyGoal(weekStats.units, totalRemaining);
+  const hasWeeklyActivity = weekStats.units > 0 || weekStats.activeDays > 0;
+  const weekPaceBadge = !hasWeeklyActivity
+    ? { label: "아직 시작 전", className: "bg-slate-100 text-[#667085] dark:bg-slate-800 dark:text-slate-300" }
+    : stepView
+      ? { label: streak.days >= 2 ? "좋은 흐름" : "기록 진행 중", className: "bg-cyan/10 text-cyan" }
+      : { label: "오늘 목표 완료", className: "bg-pink/10 text-pink" };
+  const weekPaceMessage = !hasWeeklyActivity
+    ? "오늘의 한 걸음을 완료하면 이번 주 학습량과 연속 학습일이 표시됩니다."
+    : streak.restUsed
+      ? "어제는 쉬었지만 연속 학습은 유지돼요. 오늘 다시 완료하면 흐름을 이어갈 수 있어요."
+      : streak.days === 0
+        ? "오늘 목표를 완료하면 이번 주 페이스 기록이 시작됩니다."
+        : stepView
+          ? "오늘 목표를 완료하면 연속 학습이 이어집니다."
+          : "오늘 목표를 모두 완료했어요. 이 흐름을 유지해보세요.";
+  const weekGoalMessage = !hasWeeklyActivity
+    ? "첫 목표는 오늘 목표 완료부터 시작해요."
+    : totalRemaining > 0
+      ? `이번 주 흐름을 기준으로 다음 주에는 ${weeklyGoal}개 정도를 목표로 잡아볼 수 있어요.`
+      : "";
+  const weekActionLabel = stepView
+    ? stepView.reviewOnly
+      ? "복습 완료하기"
+      : `오늘 목표 ${stepView.todayTarget}개 완료하기`
+    : "";
   // P5: 시험 준비도 — D-day 연결된 플랜만, 임박 순
   const readinessViews = pacePlanViews
     .filter(view => view.dday)
@@ -1372,16 +1536,29 @@ export default function Dashboard() {
       taskLabel,
       durationMin,
       startedAt: Date.now(),
-      status: "running",
       planId: stepView.plan.id,
       creditUnits: stepView.todayTarget,
+      daysLeft: stepView.dday ? stepView.daysLeft : null,
+      paceStatus: stepView.status,
     });
+    setPacerStuckOpen(false);
   };
 
-  const completePacer = () => {
+  // 시간을 끝까지 채웠을 때만 적립(완료 화면은 유지). 중단은 적립하지 않는다.
+  const creditPacer = () => {
     if (pacerSession) completePaceStep(pacerSession.planId, pacerSession.creditUnits);
+  };
+
+  const closePacer = () => {
     setPacerSession(null);
     setPacerStuckOpen(false);
+  };
+
+  // "한 세션 더": 현재 페이스 기준으로 새 세션을 다시 띄운다(목표 달성 시 닫기).
+  const restartPacer = () => {
+    setPacerStuckOpen(false);
+    if (stepView) startPacer(pacerSession?.taskLabel ?? stepView.plan.course, pacerSession?.durationMin ?? 25);
+    else closePacer();
   };
 
   return (
@@ -1442,8 +1619,16 @@ export default function Dashboard() {
           onStart={startPacer}
         />
       )}
-      {pacerSession && !pacerStuckOpen && (
-        <PacerOverlay session={pacerSession} onComplete={completePacer} onStuck={() => setPacerStuckOpen(true)} />
+      {pacerSession && (
+        <PacerOverlay
+          session={pacerSession}
+          helpOpen={pacerStuckOpen}
+          onStuck={() => setPacerStuckOpen(true)}
+          onCredit={creditPacer}
+          onClose={closePacer}
+          onAbandon={closePacer}
+          onRestart={restartPacer}
+        />
       )}
       {pacerSession && (
         <AITutorDrawer
@@ -1468,7 +1653,7 @@ export default function Dashboard() {
         {stepView?.sprint && (
           <div className="mb-5 flex flex-wrap items-center gap-3 rounded-card bg-pink/10 px-4 py-3 text-sm text-[#234] dark:text-slate-200">
             <span className="font-semibold text-pink">
-              🏁 {stepView.plan.course} D-{stepView.daysLeft} 막판 스퍼트
+              {stepView.plan.course} D-{stepView.daysLeft} 막판 스퍼트
             </span>
             <span>새 분량은 멈추고, 틀린 문제 다시 풀고 시험모드로 마지막 점검해요.</span>
             <div className="ml-auto flex gap-2">
@@ -1492,10 +1677,10 @@ export default function Dashboard() {
               ? "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300"
               : "bg-cyan/10 text-cyan";
           const ment = stepView.status === "behind"
-            ? `⚠️ 알고리즘이 페이스보다 뒤처졌어요. 오늘 ${stepView.catchUpTarget}개로 나눠 따라잡을게요.`
+            ? `조금 더 힘을 내볼까요? 오늘 ${stepView.catchUpTarget}개로 나눠 따라잡을게요.`
             : stepView.status === "slightly"
-              ? "🙂 거의 페이스에 맞아요. 오늘 한 걸음만 더 가면 돼요."
-              : "✅ 페이스 양호. 지금 속도면 충분해요.";
+              ? "오늘 한 걸음만 더 가면 돼요. 조금만 더 힘내봐요!"
+              : "지금 속도면 충분해요. 오늘도 꾸준히 가봅시다!";
           return (
             <div className={`mb-5 flex flex-wrap items-center gap-2 rounded-card px-4 py-3 text-sm font-semibold ${tone}`}>
               <span>{ment}</span>
@@ -1665,7 +1850,7 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => setShowPacerStart(true)}
                       className="px-4 py-2 rounded-xl bg-cyan text-white text-sm font-semibold cursor-pointer hover:brightness-95"
-                    >같이 하기</button>
+                    >집중 타이머</button>
                     <button
                       type="button"
                       onClick={() => deletePacePlan(stepView.plan.id)}
@@ -1749,28 +1934,56 @@ export default function Dashboard() {
               <Card className="p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="m-0 text-base font-bold text-[#222] dark:text-slate-100">이번 주 페이스</h3>
-                  <span className="rounded-full bg-pink/10 px-2.5 py-1 text-sm font-extrabold text-pink">
-                    🔥 {streak.days}일
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${weekPaceBadge.className}`}>
+                    {weekPaceBadge.label}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                    <span className="block text-[11px] font-bold text-muted">이번 주 학습</span>
-                    <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.units}개</strong>
+                {!hasWeeklyActivity ? (
+                  <div className="rounded-[14px] border border-dashed border-border bg-white px-4 py-4 text-center dark:bg-slate-900/30">
+                    <p className="m-0 text-sm font-bold text-[#333] dark:text-slate-100">아직 이번 주 학습 기록이 없어요</p>
+                    <p className="m-0 mt-1 text-sm leading-6 text-muted">{weekPaceMessage}</p>
+                    {stepView && stepView.todayTarget > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
+                        className="mt-4 w-full rounded-[10px] bg-pink px-3 py-2.5 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
+                      >
+                        {weekActionLabel}
+                      </button>
+                    )}
+                    <p className="m-0 mt-3 text-xs leading-5 text-muted">{weekGoalMessage}</p>
                   </div>
-                  <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                    <span className="block text-[11px] font-bold text-muted">학습한 날</span>
-                    <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.activeDays}일</strong>
-                  </div>
-                </div>
-                <p className="m-0 mt-3 text-xs leading-5 text-muted">
-                  {streak.restUsed
-                    ? "휴식권을 한 번 썼어요. 하루 쉬어도 스트릭은 유지돼요."
-                    : streak.days === 0
-                      ? "오늘 한 걸음으로 스트릭을 시작해 봐요."
-                      : "꾸준해요! 주 1회 휴식권으로 하루쯤은 쉬어도 괜찮아요."}
-                  {totalRemaining > 0 && ` 다음 주 목표는 ${weeklyGoal}개 정도가 적당해요.`}
-                </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
+                        <span className="block text-[11px] font-bold text-muted">이번 주 완료</span>
+                        <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.units}개</strong>
+                      </div>
+                      <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
+                        <span className="block text-[11px] font-bold text-muted">학습한 날</span>
+                        <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.activeDays}일</strong>
+                      </div>
+                      <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
+                        <span className="block text-[11px] font-bold text-muted">연속 학습</span>
+                        <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{streak.days}일</strong>
+                      </div>
+                    </div>
+                    <p className="m-0 mt-3 text-xs leading-5 text-muted">
+                      {weekPaceMessage}
+                      {weekGoalMessage && ` ${weekGoalMessage}`}
+                    </p>
+                    {stepView && stepView.todayTarget > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
+                        className="mt-3 w-full rounded-[10px] border border-pink bg-white px-3 py-2 text-sm font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
+                      >
+                        {weekActionLabel}
+                      </button>
+                    )}
+                  </>
+                )}
               </Card>
             )}
 

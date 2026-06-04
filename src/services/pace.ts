@@ -132,7 +132,7 @@ export const paceStreak = (
       continue;
     }
     if (i === 0) continue; // 오늘은 아직 진행 중일 수 있으니 끊지 않는다
-    if (!restUsed) {
+    if (days > 0 && !restUsed) {
       restUsed = true; // 휴식권 1회 사용, streak 유지
       continue;
     }
