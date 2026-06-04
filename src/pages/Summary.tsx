@@ -31,11 +31,10 @@ import {
 import { AITutorDrawer } from "../components/AITutorDrawer";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
-type SummaryView = "upload" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
+type SummaryView = "upload" | "templates" | "summaryResult" | "materialDetail";
 type MaterialDetailTab = "original" | "summary" | "quiz";
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 type DuplicateFileNotice = { names: string[] };
-type SummarySample = { title: string; content: string };
 type LocationState = {
   selectedCourse?: string;
   fromDashboard?: boolean;
@@ -66,8 +65,6 @@ type MaterialDetailViewProps = {
   relatedMaterials?: CourseMaterial[];
   onSelectRelatedMaterial?: (material: CourseMaterial) => void;
 };
-type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
-
 const templateLabels: Record<SummaryTemplate, string> = {
   GENERAL: "일반 요약",
   LECTURE_NOTE: "강의 노트",
@@ -132,25 +129,6 @@ const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
 const isInitialRouteEntry = (locationKey: string) => locationKey === "default";
-
-const summaryData: Record<SummaryTemplate, SummarySample> = {
-  GENERAL: {
-    title: "일반 요약",
-    content: "핵심 결론\n이 자료는 **동적 프로그래밍**의 개념, 적용 조건, 구현 방식을 설명합니다.\n\n주요 내용\n- **동적 프로그래밍**은 반복되는 하위 문제의 결과를 저장해 재사용합니다.\n- 적용 조건은 **최적 부분 구조**와 **중복 부분 문제**입니다.\n- 구현 방식은 **메모이제이션**과 **타뷸레이션**으로 나뉩니다.\n\n한 줄 요약\n동적 프로그래밍은 중복 계산을 줄여 복잡한 문제를 효율적으로 푸는 방법입니다.",
-  },
-  LECTURE_NOTE: {
-    title: "강의 노트",
-    content: "핵심 개념\n**동적 프로그래밍**은 큰 문제를 작은 하위 문제로 나누고, 이미 계산한 결과를 저장해 재사용하는 알고리즘 설계 기법입니다.\n\n주요 내용\n- **최적 부분 구조**: 전체 문제의 최적해가 부분 문제의 최적해로 구성됩니다.\n- **중복 부분 문제**: 같은 하위 문제가 반복해서 등장합니다.\n\n시험 포인트\n1. **메모이제이션**과 **타뷸레이션**의 차이를 구분합니다.\n2. DP가 적용되기 위한 조건을 설명할 수 있어야 합니다.",
-  },
-  MINDMAP: {
-    title: "마인드맵",
-    content: "중심 주제\n**동적 프로그래밍**\n\n주요 가지\n- **적용 조건**\n  - 최적 부분 구조\n  - 중복 부분 문제\n- **구현 방식**\n  - 메모이제이션\n  - 타뷸레이션\n- **대표 문제**\n  - 피보나치\n  - 배낭 문제\n  - LCS\n\n핵심 연결\n- 반복 계산을 줄이면 시간 복잡도를 개선할 수 있습니다.",
-  },
-  CHEAT_SHEET: {
-    title: "치트시트",
-    content: "빠른 암기표\n- **DP 적용 조건**: 최적 부분 구조, 중복 부분 문제\n- **Top-down**: 재귀 + 메모이제이션\n- **Bottom-up**: 반복문 + 테이블\n\n자주 나오는 비교\n- **메모이제이션**: 필요한 값만 계산, 재귀 호출 사용\n- **타뷸레이션**: 작은 문제부터 순서대로 계산, 반복문 사용\n\n시험 직전 체크\n- DP 조건 2가지를 말할 수 있는가?\n- 대표 문제와 구현 방식을 연결할 수 있는가?",
-  },
-};
 
 const renderInlineText = (text: string): ReactNode[] => {
   return text.split(/(\*\*[^*]+\*\*|==[^=]+==)/g).map((part, index) => {
@@ -450,8 +428,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
 };
 
 const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
-  const data = summaryData[template];
-  const displayContent = realContent || data.content;
+  const displayContent = realContent;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
@@ -738,7 +715,12 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
               overflowX: "auto",
               minWidth: 0,
             }}>
-              {mindmapData ? (
+              {!displayContent ? (
+                <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa", fontSize: 14, lineHeight: 1.8 }}>
+                  아직 생성된 요약이 없습니다.<br />
+                  자료를 선택하고 요약을 만들어보세요.
+                </div>
+              ) : mindmapData ? (
                 <MindmapView key={displayContent} data={mindmapData} />
               ) : (
                 <FormattedAiText content={displayContent} template={template} />
@@ -1423,93 +1405,6 @@ const MaterialDetailView = ({
   );
 };
 
-const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => {
-  const [difficulty, setDifficulty] = useState("보통");
-  const [count, setCount] = useState(10);
-  const [types, setTypes] = useState<string[]>(["객관식"]);
-
-  const toggleType = (t: string) => {
-    setTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
-  };
-
-  return (
-    <div>
-      <button onClick={onBack} style={{
-        background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-      }}>← 돌아가기</button>
-      <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "#222" }}>퀴즈 생성</h2>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f0f0f0" }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#888" }}>요약된 파일 미리보기</span>
-          </div>
-          <div style={{
-            padding: 24, minHeight: 360, background: "#fafafa",
-            fontSize: 13, color: "#555", lineHeight: 1.8
-          }}>
-            <p style={{ fontWeight: 600, color: "#333", marginTop: 0 }}>{fileName || "업로드된 파일"} - 요약본</p>
-            <p>이번 강의에서는 동적 프로그래밍(DP)의 핵심 개념을 다루었습니다. DP는 큰 문제를 작은 하위 문제로 나누어 해결하는 알고리즘 설계 기법입니다.</p>
-            <p>메모이제이션과 타뷸레이션 두 가지 접근 방식이 있으며, 최적 부분 구조와 중복 부분 문제라는 두 가지 조건이 필요합니다.</p>
-            <p>피보나치 수열, 배낭 문제, 최장 공통 부분 수열(LCS) 등의 대표적인 예제를 통해 DP의 적용 방법을 학습했습니다.</p>
-          </div>
-        </Card>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "#222" }}>난이도</h3>
-            <div style={{ display: "flex", gap: 10 }}>
-              {["낮음", "보통", "높음"].map(d => (
-                <button key={d} onClick={() => setDifficulty(d)} style={{
-                  padding: "10px 24px", borderRadius: 10,
-                  border: difficulty === d ? "none" : "1px solid #e0e0e0",
-                  background: difficulty === d ? PINK : "#fff",
-                  color: difficulty === d ? "#fff" : "#555",
-                  fontSize: 14, fontWeight: 600, cursor: "pointer"
-                }}>{d}</button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "#222" }}>문항수</h3>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value) || 1))}
-                style={{
-                  width: 80, padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  fontSize: 14, textAlign: "center", outline: "none"
-                }}
-              />
-              <span style={{ fontSize: 14, color: "#888" }}>개</span>
-            </div>
-          </div>
-
-          <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "#222" }}>문제 유형</h3>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {["O/X", "객관식", "단답형", "주관식"].map(t => (
-                <button key={t} onClick={() => toggleType(t)} style={{
-                  padding: "10px 20px", borderRadius: 10,
-                  border: types.includes(t) ? "none" : "1px solid #e0e0e0",
-                  background: types.includes(t) ? CYAN : "#fff",
-                  color: types.includes(t) ? "#fff" : "#555",
-                  fontSize: 14, fontWeight: 600, cursor: "pointer"
-                }}>{t}</button>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={onCreate} style={{
-            padding: "16px 0", borderRadius: 14, border: "none",
-            background: PINK, color: "#fff", fontSize: 16, fontWeight: 700,
-            cursor: "pointer", marginTop: 8
-          }}>퀴즈 생성하기</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -2171,10 +2066,6 @@ export default function Summary() {
             relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
             onSelectRelatedMaterial={handleSelectRelatedMaterial}
           />
-        )}
-
-        {view === "quizCreate" && (
-          <QuizCreateView fileName={selectedMaterials.map(material => material.name).join(", ")} onBack={() => setView("upload")} onCreate={handleGoToQuiz} />
         )}
 
         {view === "upload" && selectedCourse && (

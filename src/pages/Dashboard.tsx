@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
@@ -555,7 +556,8 @@ const CourseDetailModal = ({
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
+  const { courses, addCourse, renameCourse, deleteCourse, courseSyncError } = useCourses();
+  const { showToast } = useToast();
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [ddays, setDdays] = useState<Dday[]>([]);
@@ -580,6 +582,11 @@ export default function Dashboard() {
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
   const [detailCourse, setDetailCourse] = useState<string | null>(null);
   const [detailSection, setDetailSection] = useState<CourseDetailSection | undefined>(undefined);
+  const [ddayToDelete, setDdayToDelete] = useState<Dday | null>(null);
+
+  useEffect(() => {
+    if (courseSyncError) showToast(courseSyncError, "error");
+  }, [courseSyncError, showToast]);
 
   useEffect(() => {
     let ignore = false;
@@ -820,6 +827,23 @@ export default function Dashboard() {
           }}
         />
       )}
+      {ddayToDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Card style={{ padding: 28, width: "min(360px, 100%)" }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#222" }}>D-day를 삭제할까요?</h3>
+            <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "#666" }}>
+              '{ddayToDelete.subj}' 일정이 삭제됩니다.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setDdayToDelete(null)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+              <button onClick={() => { deleteDday(ddayToDelete); setDdayToDelete(null); }} style={{
+                padding: "8px 18px", borderRadius: 10, border: "none",
+                background: "#E53E3E", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700
+              }}>삭제</button>
+            </div>
+          </Card>
+        </div>
+      )}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
 
@@ -1036,7 +1060,7 @@ export default function Dashboard() {
                             {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                           </span>
                           <button
-                            onClick={() => deleteDday(d)}
+                            onClick={() => setDdayToDelete(d)}
                             aria-label={`${d.subj} D-day 삭제`}
                             title="삭제"
                             style={{

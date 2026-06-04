@@ -305,7 +305,6 @@ export default function MyPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#222", marginBottom: 4 }}>{profile.nickname}</div>
-                    <div style={{ fontSize: 13, color: "#888", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
                     <div style={{ fontSize: 13, color: "#aaa" }}>{user?.email}</div>
                   </div>
                 </div>

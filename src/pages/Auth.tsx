@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, SOFT_SHADOW } from "../common";
 import { useAuth } from "../AuthContext";
+import { useToast } from "../ToastContext";
 
 type AuthMode = "signIn" | "signUp";
 
@@ -28,7 +29,8 @@ const linkStyle: CSSProperties = {
 };
 
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, resetPassword } = useAuth();
+  const { showToast } = useToast();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [email, setEmail] = useState("");
@@ -58,6 +60,21 @@ export default function Auth() {
     setMode(nextMode);
     setError("");
     setShowLoginModal(true);
+  };
+
+  const handlePasswordReset = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("비밀번호를 재설정할 이메일을 입력해주세요.");
+      return;
+    }
+    setError("");
+    try {
+      await resetPassword(trimmed);
+      showToast("비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해주세요.", "success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "비밀번호 재설정 메일 전송에 실패했습니다.");
+    }
   };
 
   return (
@@ -132,7 +149,7 @@ export default function Auth() {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
-                아이디
+                이메일
               </label>
               <input
                 type="email"
@@ -140,7 +157,7 @@ export default function Auth() {
                 onChange={event => setEmail(event.target.value)}
                 onFocus={() => setEmailFocus(true)}
                 onBlur={() => setEmailFocus(false)}
-                placeholder="아이디를 입력하세요"
+                placeholder="이메일을 입력하세요"
                 autoComplete="email"
                 required
                 style={inputStyle(emailFocus)}
@@ -192,10 +209,7 @@ export default function Auth() {
             </button>
 
             <div style={{ display: "flex", justifyContent: "center", gap: 20 }}>
-              <button type="button" onClick={() => setError("아이디 찾기는 준비 중입니다.")} style={linkStyle}>
-                아이디 찾기
-              </button>
-              <button type="button" onClick={() => setError("비밀번호 찾기는 준비 중입니다.")} style={linkStyle}>
+              <button type="button" onClick={handlePasswordReset} style={linkStyle}>
                 비밀번호 찾기
               </button>
               <button
