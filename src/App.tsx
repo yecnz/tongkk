@@ -6,6 +6,8 @@ import { ToastProvider } from "./ToastContext";
 import Dashboard from "./pages/Dashboard";
 import Summary from "./pages/Summary";
 import Quiz from "./pages/Quiz";
+import ReviewNotes from "./pages/ReviewNotes";
+import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import { loadUserProfile } from "./services/profile";
@@ -50,6 +52,8 @@ function ProtectedApp() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/summary" element={<Summary />} />
         <Route path="/quiz" element={<Quiz />} />
+        <Route path="/review" element={<ReviewNotes />} />
+        <Route path="/stats" element={<Stats />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

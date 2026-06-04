@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
-import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
@@ -41,6 +40,16 @@ type PlanSource = {
   plan?: Plan;
 };
 
+type CourseStats = {
+  materials: number;
+  summaries: number;
+  quizzes: number;
+  loading: boolean;
+  error: string;
+};
+
+const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
+
 const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정" };
 
@@ -53,6 +62,33 @@ const templateLabels: Record<SavedSummary["template"], string> = {
 
 const formatDate = (timestamp: number) =>
   new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
+
+const materialMeta = (material: CourseMaterial) => {
+  if (material.pages) return `${material.pages}페이지`;
+  if (material.slides) return `${material.slides}슬라이드`;
+  return material.type.toUpperCase();
+};
+
+const preview = (summary: SavedSummary): string => {
+  const { content, template } = summary;
+  if (template === "MINDMAP") {
+    try {
+      const parsed = JSON.parse(content) as { root?: string };
+      return parsed.root ? `${parsed.root} 마인드맵` : "마인드맵 요약";
+    } catch {
+      return "마인드맵 요약";
+    }
+  }
+  return content
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, "$1")
+    .replace(/\|[^\n]*/g, "")
+    .replace(/[-=]{2,}/g, "")
+    .replace(/`[^`]*`/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+};
 
 const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
   const [name, setName] = useState("");
@@ -130,7 +166,7 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
     <Card style={{ padding: 28, width: 360 }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#222" }}>강의를 삭제할까요?</h3>
       <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "#666" }}>
-        {course}의 저장된 강의자료와 요약도 함께 삭제됩니다.
+        {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
       </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
@@ -298,7 +334,7 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 
 const CourseDetailModal = ({
   course,
-  initialSection,
+  initialSection = "materials",
   onClose,
   onGoSummary,
   onGoQuiz,
@@ -306,15 +342,17 @@ const CourseDetailModal = ({
   onOpenSummary,
   onOpenQuiz,
 }: CourseDetailModalProps) => {
+  const [activeTab, setActiveTab] = useState<CourseDetailSection>(initialSection);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const materialSectionRef = useRef<HTMLDivElement | null>(null);
-  const summarySectionRef = useRef<HTMLDivElement | null>(null);
-  const quizSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setActiveTab(initialSection);
+  }, [initialSection]);
 
   useEffect(() => {
     let ignore = false;
@@ -334,7 +372,7 @@ const CourseDetailModal = ({
         setQuizSets(nextQuizSets);
         setQuizAttempts(nextQuizAttempts);
       } catch (err) {
-        if (!ignore) setError(err instanceof Error ? err.message : "과목 상세 정보를 불러오지 못했습니다.");
+        if (!ignore) setError(err instanceof Error ? err.message : "강의 상세 정보를 불러오지 못했습니다.");
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -345,27 +383,31 @@ const CourseDetailModal = ({
     };
   }, [course]);
 
-  useEffect(() => {
-    if (!initialSection) return;
-    const refBySection = {
-      materials: materialSectionRef,
-      summaries: summarySectionRef,
-      quizzes: quizSectionRef,
-    };
-    requestAnimationFrame(() => {
-      refBySection[initialSection].current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    });
-  }, [initialSection]);
-
   const emptyText = loading ? "불러오는 중..." : "아직 기록이 없습니다";
-  const preview = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 120);
-  const sectionStyle = (section: CourseDetailSection) => ({
-    border: initialSection === section ? `1px solid ${section === "quizzes" ? CYAN : PINK}66` : "1px solid #f0f0f0",
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 250,
-    background: initialSection === section ? (section === "quizzes" ? "#F7FDFF" : "#FFF9FC") : "#fff",
-  });
+  const tabCount = {
+    materials: materials.length,
+    summaries: summaries.length,
+    quizzes: quizSets.length,
+  };
+  const tabs: Array<{ key: CourseDetailSection; label: string; accent: string }> = [
+    { key: "materials", label: "자료", accent: "#555" },
+    { key: "summaries", label: "요약", accent: PINK },
+    { key: "quizzes", label: "퀴즈", accent: CYAN },
+  ];
+
+  const tabButtonStyle = (tab: CourseDetailSection, accent: string) => {
+    const selected = activeTab === tab;
+    return {
+      padding: "10px 16px",
+      borderRadius: 999,
+      border: selected ? `1px solid ${accent}` : "1px solid #eeeeee",
+      background: selected ? (tab === "quizzes" ? "#E8FAFE" : tab === "summaries" ? "#FFF0F6" : "#f8f8f8") : "#fff",
+      color: selected ? accent : "#777",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: selected ? 850 : 700,
+    };
+  };
 
   return (
     <div style={{
@@ -379,17 +421,17 @@ const CourseDetailModal = ({
       padding: 24,
     }}>
       <Card style={{
-        width: "min(980px, 100%)",
+        width: "min(900px, 100%)",
         maxHeight: "calc(100vh - 56px)",
         overflowY: "auto",
         padding: 28,
       }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 22 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
-            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 800, color: "#222" }}>{course}</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>강의 자료, 요약 내역, 퀴즈 내역을 한 번에 확인합니다.</p>
+            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "#222" }}>{course}</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>탭을 선택해 강의별 자료, 요약, 퀴즈 내역을 확인하세요.</p>
           </div>
-          <button onClick={onClose} aria-label="과목 상세 닫기" style={{
+          <button onClick={onClose} aria-label="강의 상세 닫기" style={{
             width: 32,
             height: 32,
             borderRadius: 9,
@@ -410,81 +452,109 @@ const CourseDetailModal = ({
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-          <div ref={materialSectionRef} style={sectionStyle("materials")}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>강의 자료</h3>
-            {materials.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+          {tabs.map(tab => (
+            <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} style={tabButtonStyle(tab.key, tab.accent)}>
+              {tab.label} {tabCount[tab.key] > 0 ? tabCount[tab.key] : ""}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ border: "1px solid #eeeeee", borderRadius: 14, background: "#fff", minHeight: 320, padding: 18 }}>
+          {activeTab === "materials" && (
+            materials.length === 0 ? (
+              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {materials.map(material => (
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {materials.map((material, index) => (
                   <button
                     key={material.id}
                     type="button"
                     onClick={() => onOpenMaterial(material)}
                     style={{
                       width: "100%",
-                      padding: "0 0 10px",
+                      padding: "14px 0",
                       border: "none",
-                      borderBottom: "1px solid #f5f5f5",
+                      borderBottom: index < materials.length - 1 ? "1px solid #f3f3f3" : "none",
                       background: "none",
                       cursor: "pointer",
                       textAlign: "left",
                     }}
                   >
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
                       {material.name}
                     </div>
-                    <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
-                      {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : material.type.toUpperCase()} · {formatDate(material.updatedAt)}
+                    <div style={{ marginTop: 5, fontSize: 12, color: "#999" }}>
+                      {materialMeta(material)} · 수정일 {formatDate(material.updatedAt)}
                     </div>
                   </button>
                 ))}
               </div>
-            )}
-          </div>
+            )
+          )}
 
-          <div ref={summarySectionRef} style={sectionStyle("summaries")}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>요약 내역</h3>
-            {summaries.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
+          {activeTab === "summaries" && (
+            summaries.length === 0 ? (
+              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {summaries.map((summary, index) => (
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {summaries.map((summary, index) => {
+                  const sourceMaterials = (summary.materialIds || [])
+                    .map(id => materials.find(m => m.id === id))
+                    .filter(Boolean) as typeof materials;
+                  return (
                   <button
                     key={summary.id || `${summary.template}-${index}`}
                     type="button"
                     onClick={() => onOpenSummary(summary)}
                     style={{
                       width: "100%",
-                      padding: "0 0 10px",
+                      padding: "14px 0",
                       border: "none",
-                      borderBottom: "1px solid #f5f5f5",
+                      borderBottom: index < summaries.length - 1 ? "1px solid #f3f3f3" : "none",
                       background: "none",
                       cursor: "pointer",
                       textAlign: "left",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: PINK }}>{templateLabels[summary.template]}</span>
-                      <span style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>{formatDate(summary.createdAt)}</span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 850, color: PINK }}>{templateLabels[summary.template]}</span>
+                      <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0 }}>생성일 {formatDate(summary.createdAt)}</span>
                     </div>
-                    <p style={{ margin: "7px 0 0", fontSize: 12, lineHeight: 1.6, color: "#666" }}>
-                      {preview(summary.content) || "요약 내용 없음"}
+                    {sourceMaterials.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                        {sourceMaterials.map(m => (
+                          <span key={m.id} style={{
+                            fontSize: 11,
+                            color: "#333",
+                            background: "#f2f2f2",
+                            border: "1px solid #ddd",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            maxWidth: 200,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>{m.name}</span>
+                        ))}
+                      </div>
+                    )}
+                    <p style={{ margin: "7px 0 0", fontSize: 13, lineHeight: 1.55, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {preview(summary) || "요약 내용 없음"}
                     </p>
                   </button>
-                ))}
+                  );
+                })}
               </div>
-            )}
-          </div>
+            )
+          )}
 
-          <div ref={quizSectionRef} style={sectionStyle("quizzes")}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#222" }}>퀴즈 내역</h3>
-            {quizSets.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "#aaa", lineHeight: 1.6 }}>{emptyText}</p>
+          {activeTab === "quizzes" && (
+            quizSets.length === 0 ? (
+              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {quizSets.map(quizSet => {
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {quizSets.map((quizSet, index) => {
                   const latestAttempt = quizAttempts.find(attempt => attempt.quizSetId === quizSet.id);
                   return (
                     <button
@@ -493,28 +563,27 @@ const CourseDetailModal = ({
                       onClick={() => onOpenQuiz(quizSet)}
                       style={{
                         width: "100%",
-                        padding: "0 0 10px",
+                        padding: "14px 0",
                         border: "none",
-                        borderBottom: "1px solid #f5f5f5",
+                        borderBottom: index < quizSets.length - 1 ? "1px solid #f3f3f3" : "none",
                         background: "none",
                         cursor: "pointer",
                         textAlign: "left",
                       }}
                     >
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
                         {quizSet.title}
                       </div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
-                        {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
-                      </div>
-                      <div style={{ marginTop: 5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 11, color: "#aaa" }}>{formatDate(quizSet.createdAt)}</span>
+                      <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
+                        </span>
                         {latestAttempt ? (
-                          <span style={{ flexShrink: 0, fontSize: 11, color: latestAttempt.scorePercent < 70 ? PINK : CYAN, fontWeight: 850 }}>
-                            리포트 {latestAttempt.scorePercent}%
+                          <span style={{ flexShrink: 0, fontSize: 12, color: latestAttempt.scorePercent < 70 ? PINK : CYAN, fontWeight: 850 }}>
+                            최근 점수 {latestAttempt.scorePercent}%
                           </span>
                         ) : (
-                          <span style={{ flexShrink: 0, fontSize: 11, color: "#aaa", fontWeight: 800 }}>
+                          <span style={{ flexShrink: 0, fontSize: 12, color: "#aaa", fontWeight: 800 }}>
                             풀이 전
                           </span>
                         )}
@@ -523,8 +592,8 @@ const CourseDetailModal = ({
                   );
                 })}
               </div>
-            )}
-          </div>
+            )
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -556,8 +625,7 @@ const CourseDetailModal = ({
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { courses, addCourse, renameCourse, deleteCourse, courseSyncError } = useCourses();
-  const { showToast } = useToast();
+  const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [ddays, setDdays] = useState<Dday[]>([]);
@@ -582,11 +650,43 @@ export default function Dashboard() {
   const [deletingCourse, setDeletingCourse] = useState<string | null>(null);
   const [detailCourse, setDetailCourse] = useState<string | null>(null);
   const [detailSection, setDetailSection] = useState<CourseDetailSection | undefined>(undefined);
-  const [ddayToDelete, setDdayToDelete] = useState<Dday | null>(null);
+  const [courseStats, setCourseStats] = useState<Record<string, CourseStats>>({});
 
   useEffect(() => {
-    if (courseSyncError) showToast(courseSyncError, "error");
-  }, [courseSyncError, showToast]);
+    let ignore = false;
+    if (courses.length === 0) {
+      setCourseStats({});
+      return () => { ignore = true; };
+    }
+    setCourseStats(prev => {
+      const next: Record<string, CourseStats> = {};
+      courses.forEach(course => { next[course] = prev[course] || { ...defaultStats }; });
+      return next;
+    });
+    const loadStats = async () => {
+      await Promise.all(courses.map(async course => {
+        try {
+          const [materials, summaries, quizSets] = await Promise.all([
+            loadCourseMaterialsFromServer(course),
+            loadSummariesFromServer(course),
+            loadQuizSetsFromServer(course),
+          ]);
+          if (ignore) return;
+          setCourseStats(prev => ({ ...prev, [course]: { materials: materials.length, summaries: summaries.length, quizzes: quizSets.length, loading: false, error: "" } }));
+        } catch (err) {
+          if (ignore) return;
+          setCourseStats(prev => ({ ...prev, [course]: { ...(prev[course] || defaultStats), loading: false, error: err instanceof Error ? err.message : "오류" } }));
+        }
+      }));
+    };
+    void loadStats();
+    return () => { ignore = true; };
+  }, [courses]);
+
+  const openCourseDetail = (course: string, section?: CourseDetailSection) => {
+    setDetailSection(section);
+    setDetailCourse(course);
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -631,7 +731,6 @@ export default function Dashboard() {
     return Math.ceil((t.getTime() - n.getTime()) / 86400000);
   };
 
-  // 날짜 가까운 순 자동 정렬
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
   const incompletePlans = plans.filter(plan => !plan.done);
@@ -743,7 +842,6 @@ export default function Dashboard() {
   const deleteDday = (target: Dday) => {
     setDdays(prev => {
       if (target.id) return prev.filter(item => item.id !== target.id);
-
       const targetIndex = prev.findIndex(item => item.subj === target.subj && item.date === target.date);
       if (targetIndex < 0) return prev;
       return prev.filter((_, index) => index !== targetIndex);
@@ -827,27 +925,9 @@ export default function Dashboard() {
           }}
         />
       )}
-      {ddayToDelete && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <Card style={{ padding: 28, width: "min(360px, 100%)" }}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#222" }}>D-day를 삭제할까요?</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "#666" }}>
-              '{ddayToDelete.subj}' 일정이 삭제됩니다.
-            </p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setDdayToDelete(null)} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
-              <button onClick={() => { deleteDday(ddayToDelete); setDdayToDelete(null); }} style={{
-                padding: "8px 18px", borderRadius: 10, border: "none",
-                background: "#E53E3E", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700
-              }}>삭제</button>
-            </div>
-          </Card>
-        </div>
-      )}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
 
-      {/* Header */}
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
@@ -855,173 +935,84 @@ export default function Dashboard() {
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       </div>
 
-      {/* Content */}
       <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
-          {/* Left */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* 강의 목록 */}
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 14px", color: "#222" }}>강의 목록</h2>
-              <Card style={{ padding: 20 }}>
-                {courses.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "30px 0", color: "#aaa" }}>
-                    <p style={{ margin: "0 0 16px", fontSize: 14 }}>등록된 강의가 없습니다</p>
-                    <button onClick={() => setShowAddCourse(true)} style={{
-                      padding: "10px 22px", borderRadius: 12, border: "none", background: PINK, color: "#fff",
-                      fontSize: 14, fontWeight: 600, cursor: "pointer"
-                    }}>+ 강의 추가하기</button>
-                  </div>
-                ) : (
-                  <div>
-                    {courses.map((c, i) => (
-                      <div key={c} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "14px 0", borderBottom: i < courses.length - 1 ? "1px solid #f5f5f5" : "none",
-                        position: "relative",
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDetailSection(undefined);
-                            setDetailCourse(c);
-                          }}
-                          style={{
-                            border: "none",
-                            background: "none",
-                            padding: 0,
-                            fontSize: 15,
-                            fontWeight: 700,
-                            color: "#333",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            lineHeight: 1.4,
-                            minWidth: 0,
-                          }}
-                        >
-                          {c}
-                        </button>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          {([
-                            { label: "강의자료", section: "materials", color: "#666", background: "#f7f7f7" },
-                            { label: "요약 내역", section: "summaries", color: PINK, background: "#FFF0F6" },
-                            { label: "퀴즈 내역", section: "quizzes", color: CYAN, background: "#E8FAFE" },
-                          ] as const).map(btn => (
-                            <button
-                              key={btn.label}
-                              type="button"
-                              onClick={() => {
-                                setOpenCourseMenu(null);
-                                setDetailSection(btn.section);
-                                setDetailCourse(c);
-                              }}
-                              style={{
-                              padding: "6px 14px", borderRadius: 8,
-                              border: "none",
-                              background: btn.background,
-                              color: btn.color,
-                              fontSize: 13, fontWeight: 600, cursor: "pointer"
-                            }}>{btn.label}</button>
-                          ))}
-                          <div style={{ width: 1, height: 18, background: "#d1d1d1", margin: "0 2px 0 4px" }} />
-                          <button
-                            type="button"
-                            aria-label={`${c} 관리 메뉴`}
-                            title="강의 관리"
-                            onClick={e => {
-                              e.stopPropagation();
-                              setOpenCourseMenu(prev => prev === c ? null : c);
-                            }}
-                            style={{
-                              width: 30,
-                              height: 30,
-                              borderRadius: 9,
-                              border: "1px solid #eeeeee",
-                              background: openCourseMenu === c ? "#fafafa" : "#fff",
-                              color: "#999",
-                              cursor: "pointer",
-                              fontSize: 18,
-                              lineHeight: "26px",
-                              padding: 0,
-                            }}
-                          >
-                            ⋯
-                          </button>
-                          {openCourseMenu === c && (
-                            <div
-                              onClick={e => e.stopPropagation()}
-                              style={{
-                                position: "absolute",
-                                right: 0,
-                                top: 50,
-                                width: 128,
-                                padding: 6,
-                                borderRadius: 12,
-                                border: "1px solid #eeeeee",
-                                background: "#fff",
-                                boxShadow: "0 12px 28px rgba(0,0,0,0.12)",
-                                zIndex: 20,
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenCourseMenu(null);
-                                  setRenamingCourse(c);
-                                }}
-                                style={{
-                                  width: "100%",
-                                  padding: "9px 10px",
-                                  borderRadius: 8,
-                                  border: "none",
-                                  background: "#fff",
-                                  color: "#333",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                }}
-                              >
-                                이름 변경
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenCourseMenu(null);
-                                  setDeletingCourse(c);
-                                }}
-                                style={{
-                                  width: "100%",
-                                  padding: "9px 10px",
-                                  borderRadius: 8,
-                                  border: "none",
-                                  background: "#fff",
-                                  color: "#E53E3E",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                삭제
-                              </button>
-                            </div>
-                          )}
-                        </div>
+          {/* 강의 목록 카드 그리드 */}
+          <div>
+            {courses.length === 0 ? (
+              <div style={{
+                minHeight: 300, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", textAlign: "center", color: "#777",
+              }}>
+                <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 850, color: "#222" }}>아직 등록된 강의가 없습니다.</h2>
+                <p style={{ margin: "0 0 20px", fontSize: 14, color: "#888" }}>강의를 추가하면 자료, 요약, 퀴즈를 관리할 수 있어요.</p>
+                <button onClick={() => setShowAddCourse(true)} style={{
+                  padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
+                  color: "#fff", fontSize: 14, fontWeight: 850, cursor: "pointer",
+                  boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+                }}>+ 강의 추가하기</button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                {courses.map(course => {
+                  const stats = courseStats[course] || defaultStats;
+                  const statsLabel = stats.loading
+                    ? "자료 - · 요약 - · 퀴즈 -"
+                    : `자료 ${stats.materials} · 요약 ${stats.summaries} · 퀴즈 ${stats.quizzes}`;
+                  return (
+                    <Card
+                      key={course}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openCourseDetail(course)}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCourseDetail(course); } }}
+                      style={{
+                        minHeight: 120, padding: 20, cursor: "pointer", position: "relative",
+                        display: "flex", flexDirection: "column", justifyContent: "space-between",
+                        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                      }}
+                    >
+                      <div>
+                        <h2 style={{ margin: "0 34px 10px 0", fontSize: 17, fontWeight: 850, color: "#222", lineHeight: 1.35, wordBreak: "break-word" }}>
+                          {course}
+                        </h2>
+                        <p style={{ margin: 0, fontSize: 13, color: stats.error ? "#E53E3E" : "#777", fontWeight: 700 }}>
+                          {stats.error ? "정보를 불러오지 못했습니다" : statsLabel}
+                        </p>
                       </div>
-                    ))}
-                    <button onClick={() => setShowAddCourse(true)} style={{
-                      marginTop: 14, padding: "10px 0", width: "100%", borderRadius: 10,
-                      border: "1px dashed #ddd", background: "#fafafa", color: "#999",
-                      fontSize: 14, cursor: "pointer"
-                    }}>+ 강의 추가하기</button>
-                  </div>
-                )}
-              </Card>
-            </div>
+                      <button
+                        type="button"
+                        aria-label={`${course} 관리 메뉴`}
+                        onClick={e => { e.stopPropagation(); setOpenCourseMenu(prev => prev === course ? null : course); }}
+                        style={{
+                          position: "absolute", top: 14, right: 14,
+                          width: 30, height: 30, borderRadius: 9, border: "1px solid #eeeeee",
+                          background: openCourseMenu === course ? "#fafafa" : "#fff",
+                          color: "#999", cursor: "pointer", fontSize: 18, lineHeight: "26px", padding: 0,
+                        }}
+                      >...</button>
+                      {openCourseMenu === course && (
+                        <div onClick={e => e.stopPropagation()} style={{
+                          position: "absolute", right: 14, top: 48, width: 128, padding: 6,
+                          borderRadius: 12, border: "1px solid #eeeeee", background: "#fff",
+                          boxShadow: "0 12px 28px rgba(0,0,0,0.12)", zIndex: 20,
+                        }}>
+                          <button type="button" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "#fff", color: "#333", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
+                          <button type="button" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "#fff", color: "#E53E3E", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+                <button onClick={() => setShowAddCourse(true)} style={{
+                  minHeight: 120, borderRadius: 18, border: "1px dashed #d8dde8",
+                  background: "#fbfcfe", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
+                }}>+ 강의 추가하기</button>
+              </div>
+            )}
           </div>
 
-          {/* Right */}
+          {/* D-day + 학습 계획 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* D-day */}
             <Card style={{ padding: 20 }}>
@@ -1045,13 +1036,10 @@ export default function Dashboard() {
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <span style={{
-                            flexShrink: 0,
-                            padding: "3px 7px",
-                            borderRadius: 999,
+                            flexShrink: 0, padding: "3px 7px", borderRadius: 999,
                             background: type === "assignment" ? "#FFF0F6" : "#E8FAFE",
                             color: type === "assignment" ? PINK : CYAN,
-                            fontSize: 11,
-                            fontWeight: 800,
+                            fontSize: 11, fontWeight: 800,
                           }}>{ddayTypeLabels[type]}</span>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "#333", wordBreak: "break-word" }}>{d.subj}</span>
                         </div>
@@ -1060,24 +1048,15 @@ export default function Dashboard() {
                             {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                           </span>
                           <button
-                            onClick={() => setDdayToDelete(d)}
+                            onClick={() => deleteDday(d)}
                             aria-label={`${d.subj} D-day 삭제`}
                             title="삭제"
                             style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 8,
-                              border: "1px solid #eeeeee",
-                              background: "#fff",
-                              color: "#bbb",
-                              cursor: "pointer",
-                              fontSize: 15,
-                              lineHeight: "22px",
-                              padding: 0,
+                              width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
+                              background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                              lineHeight: "22px", padding: 0,
                             }}
-                          >
-                            ×
-                          </button>
+                          >×</button>
                         </div>
                       </div>
                     );
@@ -1111,16 +1090,12 @@ export default function Dashboard() {
                     onClick={() => openPlanSourcePicker(plans.length ? "reroll" : "balanced")}
                     disabled={!canGenerateStudyPlan || studyPlanLoading}
                     style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: "8px 10px",
-                      borderRadius: 8,
+                      flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 8,
                       border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "#e5e5e5" : CYAN}`,
                       background: "#fff",
                       color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : CYAN,
                       cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
-                      fontSize: 13,
-                      fontWeight: 800,
+                      fontSize: 13, fontWeight: 800,
                     }}
                   >
                     {studyPlanLoading ? "생성 중..." : "AI가 짜기"}
@@ -1131,16 +1106,9 @@ export default function Dashboard() {
                     aria-label="AI 계획 옵션 열기"
                     title="AI 계획 옵션"
                     style={{
-                      width: 30,
-                      flexShrink: 0,
-                      borderRadius: 8,
-                      border: "1px solid #eaf7fa",
-                      background: "#fff",
-                      color: CYAN,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      padding: 0,
+                      width: 30, flexShrink: 0, borderRadius: 8,
+                      border: "1px solid #eaf7fa", background: "#fff",
+                      color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
                     }}
                   >
                     {showStudyPlanOptions ? "⌃" : "⌄"}
@@ -1150,15 +1118,9 @@ export default function Dashboard() {
                   type="button"
                   onClick={() => setShowAddPlan(true)}
                   style={{
-                    flex: 1,
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    border: `1px solid ${CYAN}`,
-                    background: "#fff",
-                    color: CYAN,
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 800,
+                    flex: 1, padding: "8px 10px", borderRadius: 8,
+                    border: `1px solid ${CYAN}`, background: "#fff",
+                    color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800,
                   }}
                 >
                   직접 추가하기
@@ -1178,14 +1140,11 @@ export default function Dashboard() {
                       onClick={() => openPlanSourcePicker(action.mode)}
                       disabled={!canGenerateStudyPlan || studyPlanLoading}
                       style={{
-                        padding: "6px 9px",
-                        borderRadius: 8,
-                        border: "1px solid #f0f0f0",
+                        padding: "6px 9px", borderRadius: 8, border: "1px solid #f0f0f0",
                         background: !canGenerateStudyPlan || studyPlanLoading ? "#f2f2f2" : "#fff",
                         color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : "#666",
                         cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
-                        fontSize: 12,
-                        fontWeight: 700,
+                        fontSize: 12, fontWeight: 700,
                       }}
                     >
                       {action.label}
@@ -1195,11 +1154,8 @@ export default function Dashboard() {
               )}
               {showPlanSourcePicker && (
                 <div style={{
-                  marginBottom: 14,
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #eef7f9",
-                  background: "#fbfeff",
+                  marginBottom: 14, padding: 12, borderRadius: 12,
+                  border: "1px solid #eef7f9", background: "#fbfeff",
                 }}>
                   <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "#555" }}>
                     {planSourceMessage}
@@ -1221,19 +1177,12 @@ export default function Dashboard() {
                                 type="button"
                                 onClick={() => togglePlanSource(source.key)}
                                 style={{
-                                  maxWidth: "100%",
-                                  padding: "6px 9px",
-                                  borderRadius: 999,
+                                  maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
                                   border: `1px solid ${selected ? accent : "#eeeeee"}`,
                                   background: selected ? (source.kind === "event" ? "#E8FAFE" : source.kind === "assignment" ? "#FFF0F6" : "#f7f7f7") : "#fff",
                                   color: selected ? accent : "#777",
-                                  cursor: "pointer",
-                                  fontSize: 12,
-                                  fontWeight: selected ? 800 : 650,
-                                  textAlign: "left",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
+                                  cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
+                                  textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                 }}
                               >
                                 {selected ? "✓ " : ""}{source.label} {source.meta}
@@ -1249,31 +1198,20 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => setShowPlanSourcePicker(false)}
                       style={{
-                        padding: "7px 11px",
-                        borderRadius: 8,
-                        border: "1px solid #eeeeee",
-                        background: "#fff",
-                        color: "#777",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontWeight: 750,
+                        padding: "7px 11px", borderRadius: 8, border: "1px solid #eeeeee",
+                        background: "#fff", color: "#777", cursor: "pointer", fontSize: 12, fontWeight: 750,
                       }}
-                    >
-                      취소
-                    </button>
+                    >취소</button>
                     <button
                       type="button"
                       onClick={requestStudyPlan}
                       disabled={selectedPlanSources.length === 0 || studyPlanLoading}
                       style={{
-                        padding: "7px 11px",
-                        borderRadius: 8,
-                        border: "none",
+                        padding: "7px 11px", borderRadius: 8, border: "none",
                         background: selectedPlanSources.length === 0 || studyPlanLoading ? "#ddd" : CYAN,
                         color: "#fff",
                         cursor: selectedPlanSources.length === 0 || studyPlanLoading ? "default" : "pointer",
-                        fontSize: 12,
-                        fontWeight: 800,
+                        fontSize: 12, fontWeight: 800,
                       }}
                     >
                       {studyPlanLoading ? "생성 중..." : "이대로 짜기"}
@@ -1325,15 +1263,9 @@ export default function Dashboard() {
                           }}
                           autoFocus
                           style={{
-                            flex: 1,
-                            minWidth: 0,
-                            padding: "7px 9px",
-                            borderRadius: 8,
-                            border: `1px solid ${CYAN}`,
-                            outline: "none",
-                            fontSize: 14,
-                            color: "#333",
-                            boxSizing: "border-box",
+                            flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
+                            border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
+                            color: "#333", boxSizing: "border-box",
                           }}
                         />
                       ) : (
@@ -1342,18 +1274,11 @@ export default function Dashboard() {
                           onClick={() => startEditPlan(p, i)}
                           title="클릭해서 수정"
                           style={{
-                            flex: 1,
-                            minWidth: 0,
-                            border: "none",
-                            background: "none",
-                            padding: 0,
-                            cursor: "text",
-                            textAlign: "left",
-                            fontSize: 14,
+                            flex: 1, minWidth: 0, border: "none", background: "none",
+                            padding: 0, cursor: "text", textAlign: "left", fontSize: 14,
                             color: p.done ? "#bbb" : "#444",
                             textDecoration: p.done ? "line-through" : "none",
-                            lineHeight: 1.45,
-                            wordBreak: "break-word",
+                            lineHeight: 1.45, wordBreak: "break-word",
                           }}
                         >
                           {p.text}
@@ -1364,21 +1289,11 @@ export default function Dashboard() {
                         aria-label={`${p.text} 학습 계획 삭제`}
                         title="삭제"
                         style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 8,
-                          border: "1px solid #eeeeee",
-                          background: "#fff",
-                          color: "#bbb",
-                          cursor: "pointer",
-                          fontSize: 15,
-                          lineHeight: "22px",
-                          padding: 0,
-                          flexShrink: 0,
+                          width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
+                          background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                          lineHeight: "22px", padding: 0, flexShrink: 0,
                         }}
-                      >
-                        ×
-                      </button>
+                      >×</button>
                     </div>
                   );
                 })

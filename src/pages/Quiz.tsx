@@ -21,6 +21,7 @@ import {
   type QuizAttemptAnswer,
   type SavedQuizAttempt,
 } from "../services/quizAttempts";
+import { inferWeakTopicFromQuestion } from "../services/statsHelpers";
 import {
   getFileMaterialId,
   loadCourseMaterialsFromServer,
@@ -39,6 +40,8 @@ type QuizLocationState = {
   fromDashboard?: boolean;
   quizSetId?: string;
   openQuiz?: boolean;
+  reviewQuestions?: QuizQuestion[];
+  reviewTitle?: string;
 } | null;
 
 const sourceLabels: Record<string, string> = {
@@ -96,16 +99,8 @@ const getDifficultyReason = (attempts: SavedQuizAttempt[]) => {
   return `최근 평균 ${average}%라서 쉬운 문제로 핵심 개념을 다시 잡는 편이 좋습니다.`;
 };
 
-const inferWeakTopic = (question: string) => {
-  const cleaned = question
-    .replace(/[^\w가-힣\s]/g, " ")
-    .split(/\s+/)
-    .filter(word => word.length >= 2 && !["다음", "설명", "대한", "것은", "중에서", "무엇"].includes(word));
-  return cleaned.slice(0, 4).join(" ") || question.slice(0, 24);
-};
-
 const uniqueWeakTopics = (questions: QuizQuestion[]) =>
-  Array.from(new Set(questions.map(question => inferWeakTopic(question.question)))).slice(0, 4);
+  Array.from(new Set(questions.map(question => inferWeakTopicFromQuestion(question.question, question.explanation)).filter(Boolean))).slice(0, 4);
 
 const normalizeAnswer = (value: string) =>
   value.toLowerCase().replace(/\s+/g, "").replace(/[.,:;!?()[\]{}'"`]/g, "");
@@ -161,11 +156,17 @@ export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
   const { courses } = useCourses();
+  const reviewState = location.state as QuizLocationState;
+  const reviewQuestions = reviewState?.reviewQuestions || null;
+  const hasReviewQuestions = Boolean(reviewQuestions && reviewQuestions.length > 0);
+  const reviewActiveRef = useRef(hasReviewQuestions);
   const [sidebar, setSidebar] = useState(false);
-  const [view, setView] = useState<QuizView>("courseList");
+  const [view, setView] = useState<QuizView>(hasReviewQuestions ? "quiz" : "courseList");
 
   // 과목 및 설정
-  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState(
+    hasReviewQuestions ? (reviewState?.selectedCourse || reviewState?.course || "") : "",
+  );
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState<QuizDifficulty>("보통");
   const [questionType, setQuestionType] = useState<QuizQuestionType>("객관식");
@@ -188,12 +189,14 @@ export default function Quiz() {
   const pendingMaterialIdsRef = useRef<string[] | null>(null);
   const pendingQuizSetIdRef = useRef<string | null>(null);
   const fromDashboardRef = useRef(false);
-  const [openedQuizTitle, setOpenedQuizTitle] = useState("");
+  const [openedQuizTitle, setOpenedQuizTitle] = useState(
+    hasReviewQuestions ? (reviewState?.reviewTitle || "오답 다시 풀기") : "",
+  );
   const [activeQuizSetId, setActiveQuizSetId] = useState<string | null>(null);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
 
   // 퀴즈
-  const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
+  const [quizzes, setQuizzes] = useState<QuizQuestion[]>(hasReviewQuestions && reviewQuestions ? reviewQuestions : []);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number | string>>({});
   const [shortAnswerInput, setShortAnswerInput] = useState("");
@@ -204,7 +207,7 @@ export default function Quiz() {
   const [examMode, setExamMode] = useState(false);
   const [examMinutes, setExamMinutes] = useState(10);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-  const [quizStartedAt, setQuizStartedAt] = useState<number | null>(null);
+  const [quizStartedAt, setQuizStartedAt] = useState<number | null>(hasReviewQuestions ? Date.now() : null);
   const [timedOut, setTimedOut] = useState(false);
   const [attemptSavedKey, setAttemptSavedKey] = useState("");
   const [attemptSaveNotice, setAttemptSaveNotice] = useState("");
@@ -212,6 +215,7 @@ export default function Quiz() {
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
+    if (reviewActiveRef.current) return; // 오답 다시 풀기: 초기 상태에서 이미 풀이 화면 구성
     const state = location.state as QuizLocationState;
     const course = state?.course || state?.selectedCourse;
     if (course) {
@@ -227,6 +231,8 @@ export default function Quiz() {
   // 과목 선택 시 Supabase에서 마크다운 + 요약본 로드
   useEffect(() => {
     let ignore = false;
+
+    if (reviewActiveRef.current) return; // 오답 다시 풀기 진입 시에는 과목 로드로 풀이 상태를 덮어쓰지 않음
 
     if (!selectedCourse) {
       setMaterials([]);

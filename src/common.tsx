@@ -12,6 +12,8 @@ export const pageRoutes = {
   "대시보드": "/",
   "자료 요약": "/summary",
   "퀴즈 생성": "/quiz",
+  "오답 노트": "/review",
+  "학습 통계": "/stats",
   "마이페이지": "/mypage",
 } as const;
 

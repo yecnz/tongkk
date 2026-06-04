@@ -80,6 +80,26 @@ export async function loadQuizAttemptsFromServer(course: string): Promise<SavedQ
   return (data || []).map(toSavedQuizAttempt);
 }
 
+export type SavedQuizAttemptWithCourse = SavedQuizAttempt & { courseName: string };
+
+export async function loadAllQuizAttemptsFromServer(): Promise<SavedQuizAttemptWithCourse[]> {
+  const user = await requireSupabaseUser();
+  const courses = await fetchCourses();
+  const courseNameById = new Map(courses.map(course => [course.id, course.name]));
+
+  const { data, error } = await supabase
+    .from('quiz_attempts')
+    .select('id, course_id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, answers, duration_seconds, timed_out, material_ids, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(formatSupabaseError(error));
+  return (data || []).map((row): SavedQuizAttemptWithCourse => ({
+    ...toSavedQuizAttempt(row),
+    courseName: courseNameById.get(row.course_id) || '알 수 없는 과목',
+  }));
+}
+
 export async function saveQuizAttemptToServer(
   course: string,
   attempt: Omit<SavedQuizAttempt, 'id' | 'createdAt'>,
