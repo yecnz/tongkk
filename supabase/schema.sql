@@ -123,7 +123,7 @@ create table if not exists public.quiz_attempts (
 
 create table if not exists public.dashboard_state (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  key text not null check (key in ('ddays', 'plans')),
+  key text not null check (key in ('ddays', 'plans', 'pacePlans', 'community') or key like 'todayBudget:%'),
   value jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

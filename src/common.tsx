@@ -28,6 +28,7 @@ type SidebarProps = {
 type CardProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
   style?: CSSProperties;
+  className?: string;
 };
 
 export const SidebarIcon = () => (
@@ -58,8 +59,8 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
   </div>
 );
 
-export const Card = ({ children, style, ...props }: CardProps) => (
-  <div className="tongkk-card" style={{
+export const Card = ({ children, style, className, ...props }: CardProps) => (
+  <div className={["tongkk-card", className].filter(Boolean).join(" ")} style={{
     background: CARD_BACKGROUND, borderRadius: 18, border: `1px solid ${BORDER_COLOR}`,
     boxShadow: SOFT_SHADOW, ...style
   }} {...props}>{children}</div>

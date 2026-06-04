@@ -1,3 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pink: #F070AE;
+  --color-cyan: #00C0E8;
+  --color-page: #f7f8fb;
+  --color-card: #fbfcfe;
+  --color-border: #e2e6ee;
+  --color-muted: #888888;
+  --radius-card: 18px;
+  --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
+}
+
+/* 기존 다크모드 방식(html[data-theme="dark"])을 Tailwind dark: 변형에 연결 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 html {
   background: #f7f8fb;
 }
