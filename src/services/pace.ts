@@ -104,7 +104,7 @@ export const PACE_SPRINT_DAYS = 3;
 export const isPaceSprint = (daysLeft: number) => daysLeft >= 0 && daysLeft <= PACE_SPRINT_DAYS;
 
 // ── P7/P8. 일별 학습 기록 기반 스트릭 + 주간 회고 ──────────────────────
-// PaceLog: dateKey("YYYY-MM-DD") → 그날 완료한 단위 수.
+// PaceLog: dateKey("YYYY-MM-DD") → 그날 완료한 개수.
 export type PaceLog = Record<string, number>;
 
 export const paceDateKey = (date: Date) =>
@@ -141,7 +141,7 @@ export const paceStreak = (
   return { days, restUsed };
 };
 
-// 최근 7일(오늘 포함) 동안의 학습 단위 합과 활동 일수.
+// 최근 7일(오늘 포함) 동안의 학습 개수 합과 활동 일수.
 export const paceWeekStats = (
   log: PaceLog,
   now = new Date(),

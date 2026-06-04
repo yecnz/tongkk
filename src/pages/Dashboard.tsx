@@ -454,7 +454,7 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
                 )}
               </div>
               <div className="mb-3">
-                <label className={labelClass}>총 분량 (단위)</label>
+                <label className={labelClass}>총 분량 (개)</label>
                 <input
                   value={units}
                   onChange={e => setUnits(e.target.value.replace(/[^0-9]/g, ""))}
@@ -475,14 +475,14 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
                       onClick={() => setUnits(String(preset))}
                       className="rounded-[10px] border border-border bg-white px-3 py-2 text-sm font-bold text-[#667085] cursor-pointer hover:bg-slate-50 aria-pressed:border-cyan aria-pressed:bg-cyan/10 aria-pressed:text-cyan dark:bg-slate-800 dark:text-slate-200"
                     >
-                      총 {preset}단위
+                      총 {preset}개
                     </button>
                   );
                 })}
               </div>
               <div className="mb-5 flex items-center justify-between rounded-[12px] bg-pink/10 px-4 py-3">
                 <span className="text-xs font-bold text-[#667085] dark:text-slate-300">생성할 플랜의 총 학습량</span>
-                <span className="text-sm font-extrabold text-pink">{canAdd ? `총 ${total}단위` : "총 학습량을 입력하세요"}</span>
+                <span className="text-sm font-extrabold text-pink">{canAdd ? `총 ${total}개` : "총 학습량을 입력하세요"}</span>
               </div>
             </>
           )}
@@ -1492,7 +1492,7 @@ export default function Dashboard() {
               ? "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300"
               : "bg-cyan/10 text-cyan";
           const ment = stepView.status === "behind"
-            ? `⚠️ 알고리즘이 페이스보다 뒤처졌어요. 오늘 ${stepView.catchUpTarget}단위로 나눠 따라잡을게요.`
+            ? `⚠️ 알고리즘이 페이스보다 뒤처졌어요. 오늘 ${stepView.catchUpTarget}개로 나눠 따라잡을게요.`
             : stepView.status === "slightly"
               ? "🙂 거의 페이스에 맞아요. 오늘 한 걸음만 더 가면 돼요."
               : "✅ 페이스 양호. 지금 속도면 충분해요.";
@@ -1647,13 +1647,13 @@ export default function Dashboard() {
                   <p className="m-0 mb-3 text-sm font-semibold text-[#333] dark:text-slate-100">
                     {stepView.reviewOnly
                       ? "오늘은 약점 복습만 가볍게 — 새 분량은 쉬어가요."
-                      : `오늘 여기까지가 페이스예요: ${stepView.todayTarget}단위`}
+                      : `오늘 여기까지가 페이스예요: ${stepView.todayTarget}개`}
                   </p>
                   <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
                     <div className="h-2 rounded-full bg-cyan" style={{ width: `${stepView.progress}%` }} />
                   </div>
                   <p className="m-0 mt-2 text-xs text-muted">
-                    {stepView.plan.doneUnits} / {stepView.plan.totalUnits}단위 ({stepView.progress}%)
+                    {stepView.plan.doneUnits} / {stepView.plan.totalUnits}개 ({stepView.progress}%)
                   </p>
                   <div className="mt-4 flex items-center gap-2">
                     <button
@@ -1756,7 +1756,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
                     <span className="block text-[11px] font-bold text-muted">이번 주 학습</span>
-                    <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.units}단위</strong>
+                    <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.units}개</strong>
                   </div>
                   <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
                     <span className="block text-[11px] font-bold text-muted">학습한 날</span>
@@ -1769,7 +1769,7 @@ export default function Dashboard() {
                     : streak.days === 0
                       ? "오늘 한 걸음으로 스트릭을 시작해 봐요."
                       : "꾸준해요! 주 1회 휴식권으로 하루쯤은 쉬어도 괜찮아요."}
-                  {totalRemaining > 0 && ` 다음 주 목표는 ${weeklyGoal}단위 정도가 적당해요.`}
+                  {totalRemaining > 0 && ` 다음 주 목표는 ${weeklyGoal}개 정도가 적당해요.`}
                 </p>
               </Card>
             )}
