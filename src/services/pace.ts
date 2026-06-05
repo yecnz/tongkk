@@ -104,8 +104,10 @@ export const PACE_SPRINT_DAYS = 3;
 export const isPaceSprint = (daysLeft: number) => daysLeft >= 0 && daysLeft <= PACE_SPRINT_DAYS;
 
 // ── P7/P8. 일별 학습 기록 기반 스트릭 + 주간 회고 ──────────────────────
-// PaceLog: dateKey("YYYY-MM-DD") → 그날 완료한 개수.
-export type PaceLog = Record<string, number>;
+// PaceLog: dateKey("YYYY-MM-DD") -> 그날 완료한 새 학습 개수와 복습 세션 수.
+// 예전 저장값(number)도 읽을 수 있게 두 형태를 함께 지원한다.
+export type PaceLogEntry = number | { units: number; reviewSessions?: number };
+export type PaceLog = Record<string, PaceLogEntry>;
 
 export const paceDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -126,7 +128,10 @@ export const paceStreak = (
   let days = 0;
   let restUsed = false;
   for (let i = 0; i < 400; i++) {
-    const active = (log[paceDateKey(addDays(now, -i))] ?? 0) > 0;
+    const entry = log[paceDateKey(addDays(now, -i))];
+    const units = typeof entry === "number" ? entry : entry?.units ?? 0;
+    const reviewSessions = typeof entry === "number" ? 0 : entry?.reviewSessions ?? 0;
+    const active = units > 0 || reviewSessions > 0;
     if (active) {
       days += 1;
       continue;
@@ -145,17 +150,21 @@ export const paceStreak = (
 export const paceWeekStats = (
   log: PaceLog,
   now = new Date(),
-): { units: number; activeDays: number } => {
+): { units: number; activeDays: number; reviewSessions: number } => {
   let units = 0;
   let activeDays = 0;
+  let reviewSessions = 0;
   for (let i = 0; i < 7; i++) {
-    const value = log[paceDateKey(addDays(now, -i))] ?? 0;
-    if (value > 0) {
+    const entry = log[paceDateKey(addDays(now, -i))];
+    const value = typeof entry === "number" ? entry : entry?.units ?? 0;
+    const reviews = typeof entry === "number" ? 0 : entry?.reviewSessions ?? 0;
+    if (value > 0 || reviews > 0) {
       units += value;
+      reviewSessions += reviews;
       activeDays += 1;
     }
   }
-  return { units, activeDays };
+  return { units, activeDays, reviewSessions };
 };
 
 // 다음 주 목표: 이번 주 실적과 전체 잔여 분량을 보고 무리 없는 주간 목표를 제안.

@@ -392,9 +392,18 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 };
 
 const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => {
-  const selectableDdays = ddays.filter(dday => Boolean(dday.id));
+  const getModalDaysLeft = (dateStr: string) => {
+    const target = new Date(dateStr);
+    const today = new Date();
+    target.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+  };
+  const selectableDdays = [...ddays]
+    .filter(dday => Boolean(dday.id))
+    .sort((a, b) => getModalDaysLeft(a.date) - getModalDaysLeft(b.date));
   const [course, setCourse] = useState(courses[0] ?? "");
-  const [ddayId, setDdayId] = useState("");
+  const [ddayId, setDdayId] = useState(selectableDdays[0]?.id ?? "");
   const [units, setUnits] = useState("");
   const total = Math.floor(Number(units));
   const canAdd = Boolean(course) && Number.isFinite(total) && total > 0;
@@ -448,9 +457,11 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
                 {selectableDdays.length > 0 ? (
                   <select value={ddayId} onChange={e => setDdayId(e.target.value)} className={fieldClass}>
                     <option value="">연결 안 함</option>
-                    {selectableDdays.map(dday => (
-                      <option key={dday.id} value={dday.id}>{dday.subj} ({dday.date})</option>
-                    ))}
+                    {selectableDdays.map(dday => {
+                      const left = getModalDaysLeft(dday.date);
+                      const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
+                      return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
+                    })}
                   </select>
                 ) : (
                   <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
@@ -1441,16 +1452,24 @@ export default function Dashboard() {
   };
 
   const completePaceStep = (planId: string, amount: number) => {
-    let creditedUnits = 0;
+    const currentPlan = pacePlans.find(plan => plan.id === planId);
+    if (!currentPlan) return;
+    const nextDone = Math.min(currentPlan.totalUnits, currentPlan.doneUnits + amount);
+    const creditedUnits = nextDone - currentPlan.doneUnits;
     setPacePlans(prev => prev.map(plan => {
       if (plan.id !== planId) return plan;
-      const nextDone = Math.min(plan.totalUnits, plan.doneUnits + amount);
-      creditedUnits = nextDone - plan.doneUnits;
       return { ...plan, doneUnits: nextDone, lastActivityAt: Date.now() };
     }));
-    if (creditedUnits > 0) {
-      setPaceLog(prev => ({ ...prev, [todayKey]: (prev[todayKey] ?? 0) + creditedUnits }));
-    }
+    setPaceLog(prev => {
+      const entry = prev[todayKey];
+      const units = typeof entry === "number" ? entry : entry?.units ?? 0;
+      const reviewSessions = typeof entry === "number" ? 0 : entry?.reviewSessions ?? 0;
+      if (creditedUnits > 0) {
+        const nextUnits = units + creditedUnits;
+        return { ...prev, [todayKey]: reviewSessions > 0 ? { units: nextUnits, reviewSessions } : nextUnits };
+      }
+      return { ...prev, [todayKey]: { units, reviewSessions: reviewSessions + 1 } };
+    });
     clearCatchUp(planId);
   };
 
@@ -1462,21 +1481,6 @@ export default function Dashboard() {
     setPacePlans(prev => prev.filter(plan => plan.id !== planId));
     clearCatchUp(planId);
   };
-
-  const budgetPack = todayBudget === null ? null : (() => {
-    let remaining = todayBudget;
-    let fit = 0;
-    incompletePlans
-      .map(plan => plan.minutes ?? 30)
-      .sort((a, b) => a - b)
-      .forEach(minutes => {
-        if (remaining - minutes >= 0) {
-          remaining -= minutes;
-          fit += 1;
-        }
-      });
-    return { fit };
-  })();
 
   const lastActivityAt = pacePlans.reduce<number | undefined>((latest, plan) => {
     if (plan.lastActivityAt === undefined) return latest;
@@ -1512,7 +1516,7 @@ export default function Dashboard() {
       : "";
   const weekActionLabel = stepView
     ? stepView.reviewOnly
-      ? "복습 완료하기"
+      ? "복습 세션 기록하기"
       : `오늘 목표 ${stepView.todayTarget}개 완료하기`
     : "";
   // P5: 시험 준비도 — D-day 연결된 플랜만, 임박 순
@@ -1529,19 +1533,23 @@ export default function Dashboard() {
     setRecoveryDismissed(true);
   };
 
-  const startPacer = (taskLabel: string, durationMin: number) => {
-    if (!stepView) return;
+  const startPacerForView = (view: NonNullable<typeof stepView>, taskLabel: string, durationMin: number) => {
     setPacerSession({
-      course: stepView.plan.course,
+      course: view.plan.course,
       taskLabel,
       durationMin,
       startedAt: Date.now(),
-      planId: stepView.plan.id,
-      creditUnits: stepView.todayTarget,
-      daysLeft: stepView.dday ? stepView.daysLeft : null,
-      paceStatus: stepView.status,
+      planId: view.plan.id,
+      creditUnits: view.todayTarget,
+      daysLeft: view.dday ? view.daysLeft : null,
+      paceStatus: view.status,
     });
     setPacerStuckOpen(false);
+  };
+
+  const startPacer = (taskLabel: string, durationMin: number) => {
+    if (!stepView) return;
+    startPacerForView(stepView, taskLabel, durationMin);
   };
 
   // 시간을 끝까지 채웠을 때만 적립(완료 화면은 유지). 중단은 적립하지 않는다.
@@ -1557,7 +1565,16 @@ export default function Dashboard() {
   // "한 세션 더": 현재 페이스 기준으로 새 세션을 다시 띄운다(목표 달성 시 닫기).
   const restartPacer = () => {
     setPacerStuckOpen(false);
-    if (stepView) startPacer(pacerSession?.taskLabel ?? stepView.plan.course, pacerSession?.durationMin ?? 25);
+    if (!pacerSession) {
+      closePacer();
+      return;
+    }
+    const currentPlanView = pacePlanViews.find(view => view.plan.id === pacerSession.planId && view.remaining > 0);
+    if (currentPlanView) {
+      startPacerForView(currentPlanView, pacerSession.taskLabel, pacerSession.durationMin);
+      return;
+    }
+    if (stepView) startPacerForView(stepView, stepView.dday?.subj ?? stepView.plan.course, pacerSession.durationMin);
     else closePacer();
   };
 
@@ -1710,7 +1727,12 @@ export default function Dashboard() {
         )}
         {pacePlanViews.length > 0 && (
           <div className="mb-5 flex flex-wrap items-center gap-2 rounded-card border border-border bg-card px-4 py-3">
-            <span className="text-sm font-semibold text-[#444] dark:text-slate-200">오늘 몇 분 가능해요?</span>
+            <div className="basis-full">
+              <p className="m-0 text-sm font-extrabold text-[#333] dark:text-slate-100">오늘 학습 가능 시간</p>
+              <p className="m-0 mt-1 text-xs leading-5 text-muted">
+                선택한 시간에 맞춰 오늘의 한 걸음 목표 개수를 자동으로 조정합니다.
+              </p>
+            </div>
             {BUDGET_OPTIONS.map(minutes => {
               const selected = todayBudget === minutes;
               return (
@@ -1720,14 +1742,18 @@ export default function Dashboard() {
                   aria-pressed={selected}
                   onClick={() => setTodayBudget(selected ? null : minutes)}
                   className="px-3 py-1.5 rounded-full border border-border text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 aria-pressed:bg-pink aria-pressed:text-white aria-pressed:border-pink"
-                >{minutes}분</button>
+                >
+                  {minutes <= 10 ? "10분: 복습만" : `${minutes}분`}
+                </button>
               );
             })}
-            {todayBudget !== null && budgetPack && (
+            {todayBudget !== null && (
               <span className="basis-full mt-1 text-xs text-muted">
                 {todayBudget <= 10
-                  ? "10분이면 새 학습은 쉬고 약점 복습만 가볍게 가요."
-                  : `오늘 예산 ${todayBudget}분 · 학습계획 ${budgetPack.fit}개가 들어가요.`}
+                  ? "10분 선택됨: 새 학습 목표를 0개로 줄이고 약점 복습만 표시합니다."
+                  : stepView
+                    ? `${todayBudget}분 선택됨: 오늘의 한 걸음 목표가 ${stepView.todayTarget}개로 조정됩니다.`
+                    : `${todayBudget}분 선택됨: 오늘 할 분량이 남아 있을 때 목표 개수를 조정합니다.`}
               </span>
             )}
           </div>
@@ -1845,7 +1871,7 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
                       className="px-4 py-2 rounded-xl bg-pink text-white text-sm font-semibold cursor-pointer hover:brightness-95"
-                    >{stepView.reviewOnly ? "복습 완료" : "완료"}</button>
+                    >{stepView.reviewOnly ? "복습 기록" : "완료"}</button>
                     <button
                       type="button"
                       onClick={() => setShowPacerStart(true)}
@@ -1942,7 +1968,7 @@ export default function Dashboard() {
                   <div className="rounded-[14px] border border-dashed border-border bg-white px-4 py-4 text-center dark:bg-slate-900/30">
                     <p className="m-0 text-sm font-bold text-[#333] dark:text-slate-100">아직 이번 주 학습 기록이 없어요</p>
                     <p className="m-0 mt-1 text-sm leading-6 text-muted">{weekPaceMessage}</p>
-                    {stepView && stepView.todayTarget > 0 && (
+                    {stepView && (stepView.todayTarget > 0 || stepView.reviewOnly) && (
                       <button
                         type="button"
                         onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
@@ -1957,7 +1983,7 @@ export default function Dashboard() {
                   <>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                        <span className="block text-[11px] font-bold text-muted">이번 주 완료</span>
+                        <span className="block text-[11px] font-bold text-muted">새 학습</span>
                         <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.units}개</strong>
                       </div>
                       <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
@@ -1969,11 +1995,16 @@ export default function Dashboard() {
                         <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{streak.days}일</strong>
                       </div>
                     </div>
+                    {weekStats.reviewSessions > 0 && (
+                      <p className="m-0 mt-2 text-xs font-bold text-cyan">
+                        복습 세션 {weekStats.reviewSessions}회도 이번 주 흐름에 반영됐어요.
+                      </p>
+                    )}
                     <p className="m-0 mt-3 text-xs leading-5 text-muted">
                       {weekPaceMessage}
                       {weekGoalMessage && ` ${weekGoalMessage}`}
                     </p>
-                    {stepView && stepView.todayTarget > 0 && (
+                    {stepView && (stepView.todayTarget > 0 || stepView.reviewOnly) && (
                       <button
                         type="button"
                         onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
