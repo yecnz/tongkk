@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import { CourseProvider } from "./CourseContext";
 import { ToastProvider } from "./ToastContext";
 import Dashboard from "./pages/Dashboard";
+import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
 import Quiz from "./pages/Quiz";
 import ReviewNotes from "./pages/ReviewNotes";
@@ -50,6 +51,7 @@ function ProtectedApp() {
     <CourseProvider>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/summary" element={<Summary />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/review" element={<ReviewNotes />} />

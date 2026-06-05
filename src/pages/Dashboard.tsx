@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -10,6 +10,7 @@ import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets"
 import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 import {
+  paceDateKey,
   paceProgressPct,
   paceRemaining,
   paceStatus,
@@ -17,6 +18,19 @@ import {
   type PacePlan,
   type PaceStatus,
 } from "../services/pace";
+import {
+  createClientId,
+  ddayTypeColors,
+  ddayTypeLabels,
+  formatDdayLabel,
+  getDaysLeft,
+  PACE_NO_DDAY_HORIZON_DAYS,
+  type Dday,
+  type DdayType,
+  type PaceBasis,
+  type Plan,
+} from "../services/studyPlanner";
+import { AddDdayModal, AddPaceModal, AddPlanModal } from "../components/PlannerModals";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -32,18 +46,6 @@ type CourseDetailModalProps = {
   onOpenSummary: (summary: SavedSummary) => void;
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
 };
-type CustomCalendarProps = { value: string; onChange: (value: string) => void };
-type DdayType = "assignment" | "event";
-type AddDdayModalProps = { onClose: () => void; onAdd: (type: DdayType, subject: string, date: string) => void };
-type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
-type AddPaceModalProps = {
-  courses: string[];
-  ddays: Dday[];
-  onClose: () => void;
-  onAdd: (course: string, ddayId: string, totalUnits: number, unitLabel: string, basis: PaceBasis) => void;
-};
-type Dday = { id?: string; type?: DdayType; subj: string; date: string };
-type Plan = { id?: string; text: string; done: boolean; minutes?: number; sourceType?: DdayType | "carryover" };
 type PlanSource = {
   key: string;
   label: string;
@@ -63,9 +65,6 @@ type CourseStats = {
 };
 
 const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
-
-const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정" };
 
 const templateLabels: Record<SavedSummary["template"], string> = {
   GENERAL: "일반 요약",
@@ -192,423 +191,6 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
     </Card>
   </div>
 );
-
-const MONTH_NAMES = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
-const DAY_NAMES = ["일","월","화","수","목","금","토"];
-
-const CustomCalendar = ({ value, onChange }: CustomCalendarProps) => {
-  const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-
-  const selected = value ? new Date(value + "T00:00:00") : null;
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  const prevMonth = () => {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
-    else setViewMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
-    else setViewMonth(m => m + 1);
-  };
-
-  const cells: Array<number | null> = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-
-  return (
-    <div style={{ background: "rgba(255,255,255,0.55)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid rgba(255,255,255,0.8)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#aaa", padding: "4px 10px", borderRadius: 8 }}>‹</button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#222" }}>{viewYear}년 {MONTH_NAMES[viewMonth]}</span>
-        <button onClick={nextMonth} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#aaa", padding: "4px 10px", borderRadius: 8 }}>›</button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 6 }}>
-        {DAY_NAMES.map((d, i) => (
-          <div key={d} style={{ textAlign: "center", fontSize: 12, fontWeight: 600, padding: "4px 0",
-            color: i === 0 ? "#FF6B6B" : i === 6 ? "#5B9CF6" : "#aaa" }}>{d}</div>
-        ))}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-        {cells.map((day, i) => {
-          if (!day) return <div key={`e-${i}`} />;
-          const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const isSelected = selected &&
-            selected.getFullYear() === viewYear &&
-            selected.getMonth() === viewMonth &&
-            selected.getDate() === day;
-          const isToday =
-            today.getFullYear() === viewYear &&
-            today.getMonth() === viewMonth &&
-            today.getDate() === day;
-          return (
-            <button key={day} onClick={() => onChange(dateStr)} style={{
-              width: "100%", aspectRatio: "1", borderRadius: "50%", border: "none",
-              background: isSelected ? PINK : isToday ? "rgba(240,112,174,0.12)" : "transparent",
-              color: isSelected ? "#fff" : isToday ? PINK : "#333",
-              fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
-              cursor: "pointer", transition: "background 0.15s",
-            }}>{day}</button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const AddDdayModal = ({ onClose, onAdd }: AddDdayModalProps) => {
-  const [type, setType] = useState<DdayType>("assignment");
-  const [subj, setSubj] = useState("");
-  const [date, setDate] = useState("");
-  const title = type === "assignment" ? "과제 추가" : "일정 추가";
-  const placeholder = type === "assignment" ? "과제명" : "일정명";
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 380, background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid rgba(255,255,255,0.9)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>D-day 추가</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-          {(["assignment", "event"] as const).map(item => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setType(item)}
-              style={{
-                padding: "9px 0",
-                borderRadius: 10,
-                border: type === item ? `1px solid ${PINK}` : "1px solid #e0e0e0",
-                background: type === item ? "#FFF0F6" : "rgba(255,255,255,0.8)",
-                color: type === item ? PINK : "#666",
-                fontSize: 13,
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              {ddayTypeLabels[item]}
-            </button>
-          ))}
-        </div>
-        <input value={subj} onChange={e => setSubj(e.target.value)} placeholder={placeholder} aria-label={title} style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 14,
-          background: "rgba(255,255,255,0.8)"
-        }}/>
-        {date && (
-          <div style={{ marginBottom: 10, fontSize: 13, color: PINK, fontWeight: 600, textAlign: "center" }}>
-            선택된 날짜: {date}
-          </div>
-        )}
-        <CustomCalendar value={date} onChange={setDate} />
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>추가</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
-  const [txt, setTxt] = useState("");
-  const handleAdd = () => {
-    const planText = txt.trim();
-    if (!planText) return;
-    onAdd(planText);
-    onClose();
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
-        <input
-          value={txt}
-          onChange={e => setTxt(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
-          placeholder="학습 계획을 입력하세요"
-          autoFocus
-          style={{
-            width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-            fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
-          }}
-        />
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>추가</button>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-type PaceBasis = "pages" | "quiz" | "materials" | "manual";
-type CourseContentMetrics = {
-  materialCount: number;
-  pageUnits: number;
-  pageUnitLabel: "페이지" | "슬라이드";
-  quizQuestions: number;
-};
-const emptyMetrics: CourseContentMetrics = { materialCount: 0, pageUnits: 0, pageUnitLabel: "페이지", quizQuestions: 0 };
-// 과목이 이미 보유한 실제 콘텐츠에서 "분량" 후보들을 뽑는다(페이지 합계 우선, 없으면 슬라이드 / 퀴즈 문항 / 자료 개수).
-const computeCourseMetrics = (materials: CourseMaterial[], quizSets: SavedQuizSet[]): CourseContentMetrics => {
-  const pageSum = materials.reduce((sum, material) => sum + (material.pages ?? 0), 0);
-  const slideSum = materials.reduce((sum, material) => sum + (material.slides ?? 0), 0);
-  const usePages = pageSum > 0;
-  return {
-    materialCount: materials.length,
-    pageUnits: usePages ? pageSum : slideSum,
-    pageUnitLabel: usePages ? "페이지" : "슬라이드",
-    quizQuestions: quizSets.reduce((sum, quizSet) => sum + (quizSet.count ?? 0), 0),
-  };
-};
-
-const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => {
-  const getModalDaysLeft = (dateStr: string) => {
-    const target = new Date(dateStr);
-    const today = new Date();
-    target.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    return Math.ceil((target.getTime() - today.getTime()) / 86400000);
-  };
-  const selectableDdays = [...ddays]
-    .filter(dday => Boolean(dday.id))
-    .sort((a, b) => getModalDaysLeft(a.date) - getModalDaysLeft(b.date));
-  const [course, setCourse] = useState(courses[0] ?? "");
-  // 기본은 "연결 안 함"(14일 기준). 마감일은 과목과 무관할 수 있어 사용자가 직접 고르게 둔다.
-  const [ddayId, setDdayId] = useState("");
-  const [basis, setBasis] = useState<PaceBasis>("pages");
-  const [manualUnits, setManualUnits] = useState("");
-  const [metrics, setMetrics] = useState<CourseContentMetrics>(emptyMetrics);
-  const [metricsLoading, setMetricsLoading] = useState(false);
-  const [metricsError, setMetricsError] = useState("");
-  const metricsCache = useRef<Record<string, CourseContentMetrics>>({});
-
-  // 과목을 고르면 그 과목의 실제 자료·퀴즈 분량을 불러와 기준 후보로 쓴다.
-  useEffect(() => {
-    if (!course) { setMetrics(emptyMetrics); return; }
-    const applyMetrics = (next: CourseContentMetrics) => {
-      setMetrics(next);
-      // 현재 고른 기준에 값이 없으면 값이 있는 기준으로 똑똑하게 자동 전환.
-      setBasis(prev => {
-        if (prev === "manual") return prev;
-        const value: Record<Exclude<PaceBasis, "manual">, number> = {
-          pages: next.pageUnits,
-          quiz: next.quizQuestions,
-          materials: next.materialCount,
-        };
-        if (value[prev] > 0) return prev;
-        if (next.pageUnits > 0) return "pages";
-        if (next.quizQuestions > 0) return "quiz";
-        if (next.materialCount > 0) return "materials";
-        return "manual";
-      });
-    };
-    const cached = metricsCache.current[course];
-    if (cached) { applyMetrics(cached); setMetricsError(""); setMetricsLoading(false); return; }
-    let ignore = false;
-    setMetricsLoading(true);
-    setMetricsError("");
-    Promise.all([loadCourseMaterialsFromServer(course), loadQuizSetsFromServer(course)])
-      .then(([materials, quizSets]) => {
-        if (ignore) return;
-        const next = computeCourseMetrics(materials, quizSets);
-        metricsCache.current[course] = next;
-        applyMetrics(next);
-      })
-      .catch(err => {
-        if (ignore) return;
-        setMetricsError(err instanceof Error ? err.message : "강의 콘텐츠를 불러오지 못했어요.");
-        setMetrics(emptyMetrics);
-        // 콘텐츠를 못 불러오면 비활성 카드만 남으니, 바로 쓸 수 있는 직접 입력으로 폴백.
-        setBasis("manual");
-      })
-      .finally(() => { if (!ignore) setMetricsLoading(false); });
-    return () => { ignore = true; };
-  }, [course]);
-
-  const basisOptions = [
-    { key: "pages" as const, title: "강의자료 분량", value: metrics.pageUnits, unitLabel: metrics.pageUnitLabel, hint: metrics.pageUnits > 0 ? `총 ${metrics.pageUnits}${metrics.pageUnitLabel}` : "페이지 정보 없음" },
-    { key: "quiz" as const, title: "퀴즈 문항", value: metrics.quizQuestions, unitLabel: "문항", hint: metrics.quizQuestions > 0 ? `총 ${metrics.quizQuestions}문항` : "저장된 퀴즈 없음" },
-    { key: "materials" as const, title: "강의자료 개수", value: metrics.materialCount, unitLabel: "개", hint: metrics.materialCount > 0 ? `${metrics.materialCount}개` : "자료 없음" },
-  ];
-
-  const manualTotal = Math.floor(Number(manualUnits));
-  const manualValid = Number.isFinite(manualTotal) && manualTotal > 0;
-  const activeBasis = basisOptions.find(option => option.key === basis);
-  const total = basis === "manual" ? (manualValid ? manualTotal : 0) : (activeBasis?.value ?? 0);
-  const unitLabel = basis === "manual" ? "개" : (activeBasis?.unitLabel ?? "개");
-  const canAdd = Boolean(course) && total > 0;
-
-  // 하루 권장량 미리보기: 연결된 D-day(없으면 14일 기준)로 총량을 나눠 보여준다.
-  const connectedDday = ddayId ? selectableDdays.find(dday => dday.id === ddayId) : undefined;
-  const rawDaysLeft = connectedDday ? getModalDaysLeft(connectedDday.date) : null;
-  const previewDaysLeft = rawDaysLeft !== null ? Math.max(rawDaysLeft, 1) : PACE_NO_DDAY_HORIZON_DAYS;
-  const perDay = total > 0 ? Math.max(1, Math.ceil(total / Math.max(previewDaysLeft, 1))) : 0;
-  const previewText = total <= 0
-    ? "기준을 선택하면 하루 권장량을 알려드려요."
-    : rawDaysLeft === null
-      ? `${PACE_NO_DDAY_HORIZON_DAYS}일 기준 → 하루 약 ${perDay}${unitLabel}`
-      : rawDaysLeft > 0
-        ? `마감까지 ${rawDaysLeft}일 → 하루 약 ${perDay}${unitLabel}`
-        : `마감 임박 → 남은 ${total}${unitLabel} 마무리`;
-
-  const handleAdd = () => {
-    if (!canAdd) return;
-    onAdd(course, ddayId, total, unitLabel, basis);
-    onClose();
-  };
-  const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-white text-sm text-[#222] outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10 dark:bg-slate-800 dark:text-slate-100";
-  const labelClass = "block mb-2 text-xs font-extrabold text-[#667085] dark:text-slate-300";
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4 py-6">
-      <Card className="w-[min(430px,100%)] overflow-hidden">
-        <div className="border-b border-border bg-white px-6 py-5 dark:bg-slate-900">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan">
-                PACE PLAN
-              </span>
-              <h3 className="m-0 text-[19px] font-extrabold text-[#222] dark:text-slate-100">페이스 플랜 만들기</h3>
-              <p className="m-0 mt-1 text-sm leading-6 text-muted">
-                마감일과 분량을 연결해서 오늘 할 양을 계산해요.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="페이스 플랜 닫기"
-              className="h-9 w-9 shrink-0 rounded-[10px] border border-border bg-white text-lg leading-none text-muted cursor-pointer hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700"
-            >×</button>
-          </div>
-        </div>
-        <div className="px-6 py-5">
-          {courses.length === 0 ? (
-            <div className="mb-5 rounded-[12px] border border-border bg-slate-50 px-4 py-4 dark:bg-slate-800/60">
-              <p className="m-0 text-sm leading-6 text-muted">
-                먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있어요.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4">
-                <label className={labelClass}>과목</label>
-                <select value={course} onChange={e => setCourse(e.target.value)} className={fieldClass}>
-                  {courses.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className={labelClass}>연결할 D-day</label>
-                {selectableDdays.length > 0 ? (
-                  <select value={ddayId} onChange={e => setDdayId(e.target.value)} className={fieldClass}>
-                    <option value="">연결 안 함</option>
-                    {selectableDdays.map(dday => {
-                      const left = getModalDaysLeft(dday.date);
-                      const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
-                      return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
-                    })}
-                  </select>
-                ) : (
-                  <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
-                    D-day 없이 14일 기준 페이스로 시작합니다.
-                  </div>
-                )}
-              </div>
-              <div className="mb-4">
-                <label className={labelClass}>무엇을 기준으로 끝낼까요?</label>
-                {metricsLoading ? (
-                  <div className="rounded-[10px] border border-border bg-slate-50 px-3.5 py-4 text-sm text-muted dark:bg-slate-800/60">
-                    강의 콘텐츠 분량을 불러오는 중…
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {basisOptions.map(option => {
-                      const selected = basis === option.key;
-                      const disabled = option.value <= 0;
-                      return (
-                        <button
-                          key={option.key}
-                          type="button"
-                          aria-pressed={selected}
-                          disabled={disabled}
-                          onClick={() => setBasis(option.key)}
-                          className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 text-left transition ${
-                            disabled
-                              ? "border-border bg-slate-50 cursor-default dark:bg-slate-800/40"
-                              : selected
-                                ? "border-cyan bg-cyan/10 cursor-pointer"
-                                : "border-border bg-white cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
-                          }`}
-                        >
-                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-[#344054] dark:text-slate-200"}`}>
-                            {option.title}
-                          </span>
-                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-[#667085] dark:text-slate-300"}`}>
-                            {option.hint}
-                          </span>
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      aria-pressed={basis === "manual"}
-                      onClick={() => setBasis("manual")}
-                      className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 text-left transition cursor-pointer ${
-                        basis === "manual"
-                          ? "border-cyan bg-cyan/10"
-                          : "border-border bg-white hover:bg-slate-50 dark:bg-slate-800"
-                      }`}
-                    >
-                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan" : "text-[#344054] dark:text-slate-200"}`}>직접 입력</span>
-                      <span className="shrink-0 text-xs font-semibold text-muted">숫자로 직접 지정</span>
-                    </button>
-                  </div>
-                )}
-                {metricsError && <p className="m-0 mt-2 text-xs text-pink">{metricsError}</p>}
-              </div>
-              {basis === "manual" && (
-                <div className="mb-4">
-                  <label className={labelClass}>총 분량 (개)</label>
-                  <input
-                    value={manualUnits}
-                    onChange={e => setManualUnits(e.target.value.replace(/[^0-9]/g, ""))}
-                    onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
-                    inputMode="numeric"
-                    placeholder="전체 학습량을 숫자로 입력 (예: 120)"
-                    className={fieldClass}
-                  />
-                </div>
-              )}
-              <div className="mb-5 flex items-center justify-between gap-3 rounded-[12px] bg-pink/10 px-4 py-3">
-                <span className="shrink-0 text-xs font-bold text-[#667085] dark:text-slate-300">하루 권장 학습량</span>
-                <span className="text-right text-sm font-extrabold text-pink">{previewText}</span>
-              </div>
-            </>
-          )}
-          <div className="flex gap-2.5 justify-end">
-            <button onClick={onClose} className="px-4 py-2.5 rounded-[10px] border border-border bg-white text-sm font-bold text-[#555] cursor-pointer hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200">취소</button>
-            <button
-              onClick={handleAdd}
-              disabled={!canAdd}
-              className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
-            >
-              만들기
-            </button>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-
-// D-day를 연결하지 않은 플랜은 마감일이 없으므로, 남은 분량을 이 기간에 나눠 꾸준히 진행하는 페이스로 계산한다.
-const PACE_NO_DDAY_HORIZON_DAYS = 14;
-
 
 const CourseDetailModal = ({
   course,
@@ -1044,18 +626,11 @@ export default function Dashboard() {
     return () => window.removeEventListener("click", closeMenu);
   }, [openCourseMenu]);
 
-  const getDaysLeft = (dateStr: string) => {
-    const t = new Date(dateStr); const n = new Date();
-    t.setHours(0,0,0,0); n.setHours(0,0,0,0);
-    return Math.ceil((t.getTime() - n.getTime()) / 86400000);
-  };
-
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
   const incompletePlans = plans.filter(plan => !plan.done);
   const makeDdaySourceKey = (dday: Dday, index: number) => `dday-${dday.id || `${dday.subj}-${dday.date}-${index}`}`;
   const makePlanSourceKey = (plan: Plan, index: number) => `plan-${plan.id || `${plan.text}-${index}`}`;
-  const formatDdayLabel = (daysLeft: number) => daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? "D-Day" : `D+${Math.abs(daysLeft)}`;
   const planSources: PlanSource[] = [
     ...sortedDdays.map((dday, index) => {
       const daysLeft = getDaysLeft(dday.date);
@@ -1085,10 +660,12 @@ export default function Dashboard() {
   const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode) => {
     const carryoverCount = sources.filter(source => source.kind === "carryover").length;
     const assignmentCount = sources.filter(source => source.kind === "assignment").length;
+    const examCount = sources.filter(source => source.kind === "exam").length;
     const eventCount = sources.filter(source => source.kind === "event").length;
     const parts = [
       carryoverCount ? `미완료 계획 ${carryoverCount}개` : "",
       assignmentCount ? `가까운 과제 ${assignmentCount}개` : "",
+      examCount ? `가까운 시험 ${examCount}개` : "",
       eventCount ? `가까운 일정 ${eventCount}개` : "",
     ].filter(Boolean);
     if (parts.length === 0) return "자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.";
@@ -1105,14 +682,16 @@ export default function Dashboard() {
     const carryoverSources = planSources
       .filter(source => source.kind === "carryover")
       .slice(0, carryoverLimit);
+    // 과제·시험은 마감 전 미리 준비하는 "마감형"으로 함께 보고, 일정(event)은 당일 위주로 본다.
+    const isDeadlineKind = (kind: PlanSource["kind"]) => kind === "assignment" || kind === "exam";
     const ddaySources = planSources
       .filter(source => {
         const daysLeft = source.daysLeft ?? 999;
         if (mode === "assignment") return source.kind === "assignment" && daysLeft <= 10;
         if (mode === "event") return source.kind === "event" && daysLeft <= 7;
-        if (mode === "lighter") return source.kind === "assignment" ? daysLeft <= 3 : daysLeft <= 1;
-        if (mode === "harder") return source.kind === "assignment" ? daysLeft <= 14 : daysLeft <= 2;
-        return source.kind === "assignment" ? daysLeft <= 7 : daysLeft <= 1;
+        if (mode === "lighter") return isDeadlineKind(source.kind) ? daysLeft <= 3 : daysLeft <= 1;
+        if (mode === "harder") return isDeadlineKind(source.kind) ? daysLeft <= 14 : daysLeft <= 2;
+        return isDeadlineKind(source.kind) ? daysLeft <= 7 : daysLeft <= 1;
       })
       .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0))
       .slice(0, ddayLimit);
@@ -1137,7 +716,9 @@ export default function Dashboard() {
     try {
       const selectedDdays = selectedPlanSources
         .map(source => source.dday)
-        .filter((dday): dday is Dday => Boolean(dday));
+        .filter((dday): dday is Dday => Boolean(dday))
+        // study-plan API는 assignment/event만 알아서, 시험은 마감형 과제로 매핑해 보낸다.
+        .map(dday => ({ ...dday, type: dday.type === "exam" ? ("assignment" as const) : dday.type }));
       const selectedIncompletePlans = selectedPlanSources
         .map(source => source.plan)
         .filter((plan): plan is Plan => Boolean(plan));
@@ -1225,6 +806,13 @@ export default function Dashboard() {
     };
   });
   const activePaceViews = pacePlanViews.filter(view => view.remaining > 0);
+  const todayStr = paceDateKey(new Date());
+  // 페이스 수동 항목을 오늘 이미 반영했는지(lastActivityAt 날짜 == 오늘) 판단.
+  const isReflectedToday = (timestamp?: number) => timestamp !== undefined && paceDateKey(new Date(timestamp)) === todayStr;
+  // 오늘의 학습계획에는 날짜가 없거나(레거시=오늘) 오늘인 항목만 노출, 나머지는 캘린더에서.
+  const todayPlanEntries = plans
+    .map((plan, index) => ({ plan, index }))
+    .filter(({ plan }) => !plan.date || plan.date === todayStr);
   const statusRank: Record<PaceStatus, number> = { behind: 0, slightly: 1, on: 2 };
   // 오늘 바로 시작할 추천 과목 — 가장 급한(밀린·임박) 진행 중 플랜 하나.
   const stepView = [...activePaceViews]
@@ -1392,20 +980,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {!done && (
-                      <>
-                        <span className="text-xs font-bold text-[#344054] dark:text-slate-300">오늘 {view.todayTarget}{view.unitLabel}</span>
-                        {view.auto ? (
-                          <span className="rounded-[8px] bg-cyan/10 px-2.5 py-1.5 text-xs font-bold text-cyan">퀴즈 풀면 자동</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => completePaceStepManual(view.plan.id, view.todayTarget)}
-                            className="rounded-[8px] border border-cyan bg-white px-2.5 py-1.5 text-xs font-extrabold text-cyan cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
-                          >+오늘 완료</button>
-                        )}
-                      </>
-                    )}
                     <button
                       type="button"
                       onClick={() => deletePacePlan(view.plan.id)}
@@ -1519,8 +1093,8 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <span style={{
                             flexShrink: 0, padding: "3px 7px", borderRadius: 999,
-                            background: type === "assignment" ? "#FFF0F6" : "#E8FAFE",
-                            color: type === "assignment" ? PINK : CYAN,
+                            background: ddayTypeColors[type].soft,
+                            color: ddayTypeColors[type].solid,
                             fontSize: 11, fontWeight: 800,
                           }}>{ddayTypeLabels[type]}</span>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "#333", wordBreak: "break-word" }}>{d.subj}</span>
@@ -1557,6 +1131,24 @@ export default function Dashboard() {
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#222" }}>오늘의 학습계획</h3>
+                <button
+                  type="button"
+                  onClick={() => navigate(pageRoutes["학습 캘린더"])}
+                  aria-label="학습 캘린더 열기"
+                  title="학습 캘린더"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 30, height: 30, borderRadius: 9, border: "1px solid #eeeeee",
+                    background: "#fff", color: "#64748b", cursor: "pointer", padding: 0,
+                  }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                  </svg>
+                </button>
               </div>
               {studyPlanMessage ? (
                 <p style={{ margin: "0 0 12px", color: "#555", fontSize: 13, lineHeight: 1.6 }}>{studyPlanMessage}</p>
@@ -1652,7 +1244,7 @@ export default function Dashboard() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                           {group.sources.map(source => {
                             const selected = selectedPlanSourceKeys.includes(source.key);
-                            const accent = source.kind === "event" ? CYAN : source.kind === "assignment" ? PINK : "#777";
+                            const accent = source.kind === "carryover" ? "#777" : ddayTypeColors[source.kind].solid;
                             return (
                               <button
                                 key={source.key}
@@ -1661,7 +1253,7 @@ export default function Dashboard() {
                                 style={{
                                   maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
                                   border: `1px solid ${selected ? accent : "#eeeeee"}`,
-                                  background: selected ? (source.kind === "event" ? "#E8FAFE" : source.kind === "assignment" ? "#FFF0F6" : "#f7f7f7") : "#fff",
+                                  background: selected ? (source.kind === "carryover" ? "#f7f7f7" : ddayTypeColors[source.kind].soft) : "#fff",
                                   color: selected ? accent : "#777",
                                   cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                                   textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -1711,74 +1303,122 @@ export default function Dashboard() {
                   먼저 D-day에 과제나 일정을 추가해보세요
                 </p>
               )}
-              {plans.length === 0 ? (
+              {activePaceViews.length === 0 && todayPlanEntries.length === 0 ? (
                 <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "6px 0", margin: 0 }}>아직 생성된 계획이 없습니다</p>
               ) : (
-                plans.map((p, i) => {
-                  const planKey = p.id || `index-${i}`;
-                  const isEditing = editingPlanKey === planKey;
-                  return (
-                    <div key={p.id || `${p.text}-${i}`} style={{
-                      display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-                      borderBottom: i < plans.length - 1 ? "1px solid #f5f5f5" : "none"
-                    }}>
-                      <button onClick={() => {
-                        setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));
-                      }} style={{
-                        width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "#ddd"}`,
-                        background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
-                        alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
+                <>
+                  {/* 페이스 플랜의 "오늘 분량" — 수동 기준은 체크 항목, 퀴즈 기준은 자동 진행(읽기 전용) */}
+                  {activePaceViews.map((view, idx) => {
+                    const checkedToday = isReflectedToday(view.plan.lastActivityAt);
+                    return (
+                      <div key={`pace-${view.plan.id}`} style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                        borderTop: idx > 0 ? "1px solid #f5f5f5" : "none"
                       }}>
-                        {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
-                      </button>
-                      {isEditing ? (
-                        <input
-                          value={editingPlanText}
-                          onChange={e => setEditingPlanText(e.target.value)}
-                          onBlur={() => finishEditPlan(p, i)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") finishEditPlan(p, i);
-                            if (e.key === "Escape") {
-                              setEditingPlanKey(null);
-                              setEditingPlanText("");
-                            }
-                          }}
-                          autoFocus
-                          style={{
-                            flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
-                            border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
-                            color: "#333", boxSizing: "border-box",
-                          }}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEditPlan(p, i)}
-                          title="클릭해서 수정"
-                          style={{
-                            flex: 1, minWidth: 0, border: "none", background: "none",
-                            padding: 0, cursor: "text", textAlign: "left", fontSize: 14,
-                            color: p.done ? "#bbb" : "#444",
-                            textDecoration: p.done ? "line-through" : "none",
-                            lineHeight: 1.45, wordBreak: "break-word",
-                          }}
-                        >
-                          {p.text}
+                        {view.auto ? (
+                          <span aria-hidden style={{
+                            width: 22, height: 22, borderRadius: "50%", border: "2px solid #e6e6e6",
+                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                            color: CYAN, fontSize: 12, lineHeight: 1,
+                          }}>↻</span>
+                        ) : (
+                          <button
+                            onClick={() => { if (!checkedToday) completePaceStepManual(view.plan.id, view.todayTarget); }}
+                            aria-label={`${view.plan.course} 오늘 분량 완료`}
+                            disabled={checkedToday}
+                            style={{
+                              width: 22, height: 22, borderRadius: "50%",
+                              border: `2px solid ${checkedToday ? CYAN : "#ddd"}`,
+                              background: checkedToday ? CYAN : "#fff",
+                              cursor: checkedToday ? "default" : "pointer", display: "flex",
+                              alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
+                            }}
+                          >
+                            {checkedToday && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                          </button>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
+                            color: !view.auto && checkedToday ? "#bbb" : "#444",
+                            textDecoration: !view.auto && checkedToday ? "line-through" : "none",
+                          }}>
+                            {view.plan.course} · 오늘 {view.todayTarget}{view.unitLabel}
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: view.auto ? CYAN : "#999" }}>
+                            {view.auto ? "퀴즈에서 자동" : "페이스"} · {view.doneUnits}/{view.totalUnits}{view.unitLabel}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {todayPlanEntries.map(({ plan: p, index: i }, idx) => {
+                    const planKey = p.id || `index-${i}`;
+                    const isEditing = editingPlanKey === planKey;
+                    const showTopBorder = idx > 0 || activePaceViews.length > 0;
+                    return (
+                      <div key={p.id || `${p.text}-${i}`} style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                        borderTop: showTopBorder ? "1px solid #f5f5f5" : "none"
+                      }}>
+                        <button onClick={() => {
+                          setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));
+                        }} style={{
+                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "#ddd"}`,
+                          background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
+                          alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
+                        }}>
+                          {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                         </button>
-                      )}
-                      <button
-                        onClick={() => deletePlan(p, i)}
-                        aria-label={`${p.text} 학습 계획 삭제`}
-                        title="삭제"
-                        style={{
-                          width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
-                          background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
-                          lineHeight: "22px", padding: 0, flexShrink: 0,
-                        }}
-                      >×</button>
-                    </div>
-                  );
-                })
+                        {isEditing ? (
+                          <input
+                            value={editingPlanText}
+                            onChange={e => setEditingPlanText(e.target.value)}
+                            onBlur={() => finishEditPlan(p, i)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") finishEditPlan(p, i);
+                              if (e.key === "Escape") {
+                                setEditingPlanKey(null);
+                                setEditingPlanText("");
+                              }
+                            }}
+                            autoFocus
+                            style={{
+                              flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
+                              border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
+                              color: "#333", boxSizing: "border-box",
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEditPlan(p, i)}
+                            title="클릭해서 수정"
+                            style={{
+                              flex: 1, minWidth: 0, border: "none", background: "none",
+                              padding: 0, cursor: "text", textAlign: "left", fontSize: 14,
+                              color: p.done ? "#bbb" : "#444",
+                              textDecoration: p.done ? "line-through" : "none",
+                              lineHeight: 1.45, wordBreak: "break-word",
+                            }}
+                          >
+                            {p.text}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deletePlan(p, i)}
+                          aria-label={`${p.text} 학습 계획 삭제`}
+                          title="삭제"
+                          style={{
+                            width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
+                            background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                            lineHeight: "22px", padding: 0, flexShrink: 0,
+                          }}
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </Card>
           </div>

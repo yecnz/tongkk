@@ -10,6 +10,7 @@ export const SOFT_SHADOW = "0 10px 28px rgba(15, 23, 42, 0.045)";
 
 export const pageRoutes = {
   "대시보드": "/",
+  "학습 캘린더": "/calendar",
   "자료 요약": "/summary",
   "퀴즈 생성": "/quiz",
   "오답 노트": "/review",
