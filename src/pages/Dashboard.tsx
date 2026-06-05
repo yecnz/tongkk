@@ -10,11 +10,15 @@ import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets"
 import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 import {
+  isPaceSprint,
+  paceCatchUpTarget,
   paceDateKey,
   paceProgressPct,
+  paceReadiness,
   paceRemaining,
   paceStatus,
   paceTodayTarget,
+  readinessTier,
   type PacePlan,
   type PaceStatus,
 } from "../services/pace";
@@ -514,7 +518,7 @@ export default function Dashboard() {
   const [pacePlans, setPacePlans] = useState<PacePlan[]>([]);
   const [pacePlansLoaded, setPacePlansLoaded] = useState(false);
   // 퀴즈 기준 플랜의 진행도를 파생 계산하기 위한 과목별 응시 기록 {count, createdAt}.
-  const [courseQuizAttempts, setCourseQuizAttempts] = useState<Record<string, { count: number; createdAt: number }[]>>({});
+  const [courseQuizAttempts, setCourseQuizAttempts] = useState<Record<string, { count: number; createdAt: number; scorePercent: number }[]>>({});
   const [showAddPace, setShowAddPace] = useState(false);
 
   useEffect(() => {
@@ -600,23 +604,26 @@ export default function Dashboard() {
     saveDashboardState("pacePlans", pacePlans).catch(console.warn);
   }, [pacePlansLoaded, pacePlans]);
 
-  // 퀴즈 기준 플랜이 있는 과목의 응시 기록을 불러와 진행도(자동) 계산에 사용.
+  // 페이스 플랜 과목의 응시 기록을 불러와 자동 진행도(퀴즈 기준)와 시험 준비도(최근 점수) 계산에 사용.
   // 과목 집합이 바뀔 때만 재조회하도록 안정 키에 의존(수동 플랜 변경 시 불필요한 재조회 방지).
-  const quizCoursesKey = JSON.stringify(
-    Array.from(new Set(pacePlans.filter(plan => plan.basis === "quiz").map(plan => plan.course))).sort()
+  const paceCoursesKey = JSON.stringify(
+    Array.from(new Set(pacePlans.map(plan => plan.course))).sort()
   );
   useEffect(() => {
-    const quizCourses: string[] = JSON.parse(quizCoursesKey);
-    if (quizCourses.length === 0) { setCourseQuizAttempts({}); return; }
+    const paceCourses: string[] = JSON.parse(paceCoursesKey);
+    if (paceCourses.length === 0) { setCourseQuizAttempts({}); return; }
     let ignore = false;
-    Promise.all(quizCourses.map(async course => {
+    Promise.all(paceCourses.map(async course => {
       const attempts = await loadQuizAttemptsFromServer(course);
-      return [course, attempts.map(attempt => ({ count: attempt.count, createdAt: attempt.createdAt }))] as const;
+      const mapped = attempts
+        .map(attempt => ({ count: attempt.count, createdAt: attempt.createdAt, scorePercent: attempt.scorePercent }))
+        .sort((a, b) => b.createdAt - a.createdAt); // 최근 응시가 앞 — 준비도 가중치(최근일수록 ↑)용
+      return [course, mapped] as const;
     }))
       .then(entries => { if (!ignore) setCourseQuizAttempts(Object.fromEntries(entries)); })
       .catch(error => console.warn("페이스 퀴즈 진행 불러오기 실패", error));
     return () => { ignore = true; };
-  }, [quizCoursesKey]);
+  }, [paceCoursesKey]);
 
 
   useEffect(() => {
@@ -783,14 +790,20 @@ export default function Dashboard() {
     const daysLeft = dday ? getDaysLeft(dday.date) : PACE_NO_DDAY_HORIZON_DAYS;
     // 퀴즈 기준 플랜은 생성 이후 같은 과목 응시 문항수를 진행도로 파생, 그 외는 저장된 doneUnits 사용.
     const auto = plan.basis === "quiz";
+    const attempts = courseQuizAttempts[plan.course] ?? [];
     const autoDone = auto
-      ? (courseQuizAttempts[plan.course] ?? [])
+      ? attempts
           .filter(attempt => attempt.createdAt >= plan.createdAt)
           .reduce((sum, attempt) => sum + attempt.count, 0)
       : 0;
     const doneUnits = auto ? Math.min(plan.totalUnits, autoDone) : plan.doneUnits;
     const view: PacePlan = { ...plan, doneUnits };
     const status: PaceStatus = dday ? paceStatus(view, dday.date) : "on";
+    // 따라잡기: 연결된 D-day가 있으면 밀린 만큼 오늘 목표를 올려준다(없으면 기본 목표).
+    const todayTarget = dday ? paceCatchUpTarget(view, dday.date, daysLeft) : paceTodayTarget(view, daysLeft);
+    // 시험 준비도: 진도 + 최근 퀴즈 점수(없으면 진도로 대체). 막판 스퍼트: 연결 D-day가 D-3 이내.
+    const readiness = paceReadiness(view, attempts.map(attempt => attempt.scorePercent));
+    const sprint = dday ? isPaceSprint(daysLeft) : false;
     return {
       plan,
       dday,
@@ -802,7 +815,11 @@ export default function Dashboard() {
       unitLabel: plan.unitLabel ?? "개",
       remaining: paceRemaining(view),
       progress: paceProgressPct(view),
-      todayTarget: paceTodayTarget(view, daysLeft),
+      todayTarget,
+      readiness,
+      tier: readinessTier(readiness),
+      hasScores: attempts.length > 0,
+      sprint,
     };
   });
   const activePaceViews = pacePlanViews.filter(view => view.remaining > 0);
@@ -963,12 +980,27 @@ export default function Dashboard() {
                       )}
                       {done ? (
                         <span className="rounded-full bg-cyan px-2 py-0.5 text-[11px] font-bold text-white">완료</span>
+                      ) : view.sprint ? (
+                        <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: "#fb7185" }}>
+                          막판 스퍼트 · 복습
+                        </span>
                       ) : (
                         <span
                           className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
                           style={{ background: view.status === "behind" ? PINK : view.status === "slightly" ? "#f59e0b" : CYAN }}
                         >
                           {view.status === "behind" ? "따라잡는 중" : view.status === "slightly" ? "조금 뒤처짐" : "정상 페이스"}
+                        </span>
+                      )}
+                      {!done && (view.dday || view.hasScores) && (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                          style={{
+                            background: view.tier === "ready" ? "rgba(0,192,232,0.12)" : view.tier === "soon" ? "rgba(245,158,11,0.15)" : "rgba(240,112,174,0.12)",
+                            color: view.tier === "ready" ? CYAN : view.tier === "soon" ? "#d97706" : PINK,
+                          }}
+                        >
+                          준비도 {view.readiness}%
                         </span>
                       )}
                     </div>
