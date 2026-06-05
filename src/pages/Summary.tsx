@@ -1416,7 +1416,9 @@ const MaterialDetailView = ({
             원본 PPT/PPTX 열기
           </a>
         )}
-        <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
+        {material.filePath && (
+          <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
+        )}
       </div>
     );
   };
