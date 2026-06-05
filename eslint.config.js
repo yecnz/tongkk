@@ -27,6 +27,8 @@ export default defineConfig([
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // 마운트 시 로딩 플래그/초기화를 effect에서 동기 setState하는 의도된 패턴이 코드베이스에 있어 비활성화.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
   {
