@@ -6,6 +6,7 @@ export type PacePlan = {
   doneUnits: number;
   createdAt: number;
   unitLabel?: string;
+  basis?: "pages" | "quiz" | "materials" | "manual";
   lastActivityAt?: number;
 };
 

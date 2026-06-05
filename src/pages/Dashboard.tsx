@@ -13,6 +13,7 @@ import {
   paceProgressPct,
   paceRemaining,
   paceStatus,
+  paceTodayTarget,
   type PacePlan,
   type PaceStatus,
 } from "../services/pace";
@@ -39,7 +40,7 @@ type AddPaceModalProps = {
   courses: string[];
   ddays: Dday[];
   onClose: () => void;
-  onAdd: (course: string, ddayId: string, totalUnits: number, unitLabel: string) => void;
+  onAdd: (course: string, ddayId: string, totalUnits: number, unitLabel: string, basis: PaceBasis) => void;
 };
 type Dday = { id?: string; type?: DdayType; subj: string; date: string };
 type Plan = { id?: string; text: string; done: boolean; minutes?: number; sourceType?: DdayType | "carryover" };
@@ -458,7 +459,7 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
 
   const handleAdd = () => {
     if (!canAdd) return;
-    onAdd(course, ddayId, total, unitLabel);
+    onAdd(course, ddayId, total, unitLabel, basis);
     onClose();
   };
   const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-white text-sm text-[#222] outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10 dark:bg-slate-800 dark:text-slate-100";
@@ -930,6 +931,8 @@ export default function Dashboard() {
   const [courseStats, setCourseStats] = useState<Record<string, CourseStats>>({});
   const [pacePlans, setPacePlans] = useState<PacePlan[]>([]);
   const [pacePlansLoaded, setPacePlansLoaded] = useState(false);
+  // 퀴즈 기준 플랜의 진행도를 파생 계산하기 위한 과목별 응시 기록 {count, createdAt}.
+  const [courseQuizAttempts, setCourseQuizAttempts] = useState<Record<string, { count: number; createdAt: number }[]>>({});
   const [showAddPace, setShowAddPace] = useState(false);
 
   useEffect(() => {
@@ -1014,6 +1017,24 @@ export default function Dashboard() {
     if (!pacePlansLoaded) return;
     saveDashboardState("pacePlans", pacePlans).catch(console.warn);
   }, [pacePlansLoaded, pacePlans]);
+
+  // 퀴즈 기준 플랜이 있는 과목의 응시 기록을 불러와 진행도(자동) 계산에 사용.
+  // 과목 집합이 바뀔 때만 재조회하도록 안정 키에 의존(수동 플랜 변경 시 불필요한 재조회 방지).
+  const quizCoursesKey = JSON.stringify(
+    Array.from(new Set(pacePlans.filter(plan => plan.basis === "quiz").map(plan => plan.course))).sort()
+  );
+  useEffect(() => {
+    const quizCourses: string[] = JSON.parse(quizCoursesKey);
+    if (quizCourses.length === 0) { setCourseQuizAttempts({}); return; }
+    let ignore = false;
+    Promise.all(quizCourses.map(async course => {
+      const attempts = await loadQuizAttemptsFromServer(course);
+      return [course, attempts.map(attempt => ({ count: attempt.count, createdAt: attempt.createdAt }))] as const;
+    }))
+      .then(entries => { if (!ignore) setCourseQuizAttempts(Object.fromEntries(entries)); })
+      .catch(error => console.warn("페이스 퀴즈 진행 불러오기 실패", error));
+    return () => { ignore = true; };
+  }, [quizCoursesKey]);
 
 
   useEffect(() => {
@@ -1179,14 +1200,28 @@ export default function Dashboard() {
   const pacePlanViews = pacePlans.map(plan => {
     const dday = ddays.find(item => item.id === plan.ddayId);
     const daysLeft = dday ? getDaysLeft(dday.date) : PACE_NO_DDAY_HORIZON_DAYS;
-    const status: PaceStatus = dday ? paceStatus(plan, dday.date) : "on";
+    // 퀴즈 기준 플랜은 생성 이후 같은 과목 응시 문항수를 진행도로 파생, 그 외는 저장된 doneUnits 사용.
+    const auto = plan.basis === "quiz";
+    const autoDone = auto
+      ? (courseQuizAttempts[plan.course] ?? [])
+          .filter(attempt => attempt.createdAt >= plan.createdAt)
+          .reduce((sum, attempt) => sum + attempt.count, 0)
+      : 0;
+    const doneUnits = auto ? Math.min(plan.totalUnits, autoDone) : plan.doneUnits;
+    const view: PacePlan = { ...plan, doneUnits };
+    const status: PaceStatus = dday ? paceStatus(view, dday.date) : "on";
     return {
       plan,
       dday,
       daysLeft,
       status,
-      remaining: paceRemaining(plan),
-      progress: paceProgressPct(plan),
+      auto,
+      doneUnits,
+      totalUnits: plan.totalUnits,
+      unitLabel: plan.unitLabel ?? "개",
+      remaining: paceRemaining(view),
+      progress: paceProgressPct(view),
+      todayTarget: paceTodayTarget(view, daysLeft),
     };
   });
   const activePaceViews = pacePlanViews.filter(view => view.remaining > 0);
@@ -1207,11 +1242,24 @@ export default function Dashboard() {
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
 
-  const addPacePlan = (course: string, ddayId: string, totalUnits: number, unitLabel?: string) => {
+  const addPacePlan = (course: string, ddayId: string, totalUnits: number, unitLabel?: string, basis?: PaceBasis) => {
     setPacePlans(prev => [
       ...prev,
-      { id: createClientId(), course, ddayId, totalUnits, doneUnits: 0, createdAt: Date.now(), unitLabel },
+      { id: createClientId(), course, ddayId, totalUnits, doneUnits: 0, createdAt: Date.now(), unitLabel, basis },
     ]);
+  };
+
+  const deletePacePlan = (planId: string) => {
+    setPacePlans(prev => prev.filter(plan => plan.id !== planId));
+  };
+
+  // 수동 기준(페이지·자료·직접) 플랜: 오늘 권장량만큼 진행도를 올린다(상한 totalUnits).
+  const completePaceStepManual = (planId: string, amount: number) => {
+    setPacePlans(prev => prev.map(plan => {
+      if (plan.id !== planId) return plan;
+      const nextDone = Math.min(plan.totalUnits, plan.doneUnits + amount);
+      return { ...plan, doneUnits: nextDone, lastActivityAt: Date.now() };
+    }));
   };
 
   return (
@@ -1311,6 +1359,65 @@ export default function Dashboard() {
             </button>
           </div>
         </Card>
+        {pacePlanViews.length > 0 && (
+          <div className="mb-5 flex flex-col gap-2">
+            {pacePlanViews.map(view => {
+              const done = view.remaining <= 0;
+              return (
+                <Card key={view.plan.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-extrabold text-[#222] dark:text-slate-100">{view.plan.course}</span>
+                      {view.dday && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-[#555] dark:bg-slate-700 dark:text-slate-200">
+                          {formatDdayLabel(view.daysLeft)}
+                        </span>
+                      )}
+                      {done ? (
+                        <span className="rounded-full bg-cyan px-2 py-0.5 text-[11px] font-bold text-white">완료</span>
+                      ) : (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
+                          style={{ background: view.status === "behind" ? PINK : view.status === "slightly" ? "#f59e0b" : CYAN }}
+                        >
+                          {view.status === "behind" ? "따라잡는 중" : view.status === "slightly" ? "조금 뒤처짐" : "정상 페이스"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 rounded-full bg-slate-100 dark:bg-slate-700">
+                        <div className="h-1.5 rounded-full bg-cyan" style={{ width: `${view.progress}%` }} />
+                      </div>
+                      <span className="shrink-0 text-xs font-bold text-muted">{view.doneUnits}/{view.totalUnits}{view.unitLabel}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!done && (
+                      <>
+                        <span className="text-xs font-bold text-[#344054] dark:text-slate-300">오늘 {view.todayTarget}{view.unitLabel}</span>
+                        {view.auto ? (
+                          <span className="rounded-[8px] bg-cyan/10 px-2.5 py-1.5 text-xs font-bold text-cyan">퀴즈 풀면 자동</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => completePaceStepManual(view.plan.id, view.todayTarget)}
+                            className="rounded-[8px] border border-cyan bg-white px-2.5 py-1.5 text-xs font-extrabold text-cyan cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
+                          >+오늘 완료</button>
+                        )}
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => deletePacePlan(view.plan.id)}
+                      aria-label={`${view.plan.course} 페이스 플랜 삭제`}
+                      className="h-7 w-7 shrink-0 rounded-[8px] border border-border bg-white text-muted cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
+                    >×</button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
           {/* 강의 목록 카드 그리드 */}
           <div>
