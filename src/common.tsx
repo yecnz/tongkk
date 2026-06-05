@@ -10,8 +10,11 @@ export const SOFT_SHADOW = "0 10px 28px rgba(15, 23, 42, 0.045)";
 
 export const pageRoutes = {
   "대시보드": "/",
+  "학습 캘린더": "/calendar",
   "자료 요약": "/summary",
   "퀴즈 생성": "/quiz",
+  "오답 노트": "/review",
+  "학습 통계": "/stats",
   "마이페이지": "/mypage",
 } as const;
 
@@ -26,6 +29,7 @@ type SidebarProps = {
 type CardProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
   style?: CSSProperties;
+  className?: string;
 };
 
 export const SidebarIcon = () => (
@@ -56,8 +60,8 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
   </div>
 );
 
-export const Card = ({ children, style, ...props }: CardProps) => (
-  <div className="tongkk-card" style={{
+export const Card = ({ children, style, className, ...props }: CardProps) => (
+  <div className={["tongkk-card", className].filter(Boolean).join(" ")} style={{
     background: CARD_BACKGROUND, borderRadius: 18, border: `1px solid ${BORDER_COLOR}`,
     boxShadow: SOFT_SHADOW, ...style
   }} {...props}>{children}</div>

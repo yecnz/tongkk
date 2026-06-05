@@ -2,9 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { CourseProvider } from "./CourseContext";
+import { ToastProvider } from "./ToastContext";
 import Dashboard from "./pages/Dashboard";
+import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
 import Quiz from "./pages/Quiz";
+import ReviewNotes from "./pages/ReviewNotes";
+import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import { loadUserProfile } from "./services/profile";
@@ -47,8 +51,11 @@ function ProtectedApp() {
     <CourseProvider>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/summary" element={<Summary />} />
         <Route path="/quiz" element={<Quiz />} />
+        <Route path="/review" element={<ReviewNotes />} />
+        <Route path="/stats" element={<Stats />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
@@ -58,14 +65,16 @@ function ProtectedApp() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/*" element={<ProtectedApp />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/*" element={<ProtectedApp />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

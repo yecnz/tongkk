@@ -123,12 +123,19 @@ create table if not exists public.quiz_attempts (
 
 create table if not exists public.dashboard_state (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  key text not null check (key in ('ddays', 'plans')),
+  key text not null check (key in ('ddays', 'plans', 'pacePlans', 'paceLog', 'community') or key like 'todayBudget:%'),
   value jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (user_id, key)
 );
+
+alter table public.dashboard_state
+drop constraint if exists dashboard_state_key_check;
+
+alter table public.dashboard_state
+add constraint dashboard_state_key_check
+check (key in ('ddays', 'plans', 'pacePlans', 'paceLog', 'community') or key like 'todayBudget:%');
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
