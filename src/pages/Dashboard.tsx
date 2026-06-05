@@ -925,7 +925,7 @@ export default function Dashboard() {
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       </div>
 
-      <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", zoom: 0.85 }}>
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
