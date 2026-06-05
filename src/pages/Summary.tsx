@@ -1372,6 +1372,13 @@ const MaterialDetailView = ({
       );
     }
 
+    // 원본이 없는 이유 구분: 50MB 한도 초과면 그에 맞는 안내, 그 외(원본 저장 기능 추가 전 업로드 등)는 기존 안내.
+    const originalSize = material.size;
+    const noOriginalMessage =
+      !material.filePath && originalSize != null && originalSize > MAX_ORIGINAL_FILE_BYTES
+        ? `이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.`
+        : "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다.";
+
     return (
       <div style={{
         background: "#f7f7f7",
@@ -1397,7 +1404,7 @@ const MaterialDetailView = ({
             ? (isLegacyPpt
               ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
               : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
-            : "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다.")}
+            : noOriginalMessage)}
         </div>
         {fileUrl && isPresentation && (
           <a
