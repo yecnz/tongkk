@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -610,43 +610,28 @@ const PacerOverlay = ({ session, helpOpen, onStuck, onCredit, onClose, onAbandon
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
   const [paused, setPaused] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
-  const [done, setDone] = useState(false);
-  const deadlineRef = useRef(Date.now() + totalSeconds * 1000);
+  const deadlineRef = useRef(0);
   const creditedRef = useRef(false);
-
-  // 새 세션(한 세션 더)으로 startedAt이 바뀌면 시계를 리셋한다.
-  useEffect(() => {
-    deadlineRef.current = Date.now() + totalSeconds * 1000;
-    creditedRef.current = false;
-    setSecondsLeft(totalSeconds);
-    setPaused(false);
-    setConfirmEnd(false);
-    setDone(false);
-  }, [session.startedAt, totalSeconds]);
+  const done = secondsLeft === 0;
 
   // 시각 기반 카운트다운 — 백그라운드 탭 throttling/드리프트에도 정확.
   useEffect(() => {
     if (paused || done) return;
+    if (deadlineRef.current === 0) deadlineRef.current = Date.now() + totalSeconds * 1000;
     const id = setInterval(() => {
       setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
     }, 250);
     return () => clearInterval(id);
-  }, [paused, done]);
+  }, [paused, done, totalSeconds]);
 
   // 0 도달 → 완료 화면 + 단 한 번만 적립.
   useEffect(() => {
-    if (done || secondsLeft > 0) return;
-    setDone(true);
+    if (!done) return;
     if (!creditedRef.current) {
       creditedRef.current = true;
       onCredit();
     }
-  }, [secondsLeft, done, onCredit]);
-
-  // AI 튜터 도움 드로어가 열리면 시계를 자동 정지. 닫아도 자동 재개하지 않고 재개 버튼으로 잇는다.
-  useEffect(() => {
-    if (helpOpen) setPaused(true);
-  }, [helpOpen]);
+  }, [done, onCredit]);
 
   // 키보드: Space=일시정지/재개, Esc=끝내기 확인.
   useEffect(() => {
@@ -673,6 +658,10 @@ const PacerOverlay = ({ session, helpOpen, onStuck, onCredit, onClose, onAbandon
       if (prev) deadlineRef.current = Date.now() + secondsLeft * 1000;
       return !prev;
     });
+  };
+  const openTutor = () => {
+    setPaused(true);
+    onStuck();
   };
 
   const chip = paceChip[session.paceStatus];
@@ -753,7 +742,7 @@ const PacerOverlay = ({ session, helpOpen, onStuck, onCredit, onClose, onAbandon
 
             <div className="mt-6 flex gap-2 justify-center">
               <button type="button" onClick={togglePause} className={slateBtn}>{paused ? "재개" : "일시정지"}</button>
-              <button type="button" onClick={onStuck} className={cyanBtn}>AI 튜터에게 질문</button>
+              <button type="button" onClick={openTutor} className={cyanBtn}>AI 튜터에게 질문</button>
             </div>
             <button
               type="button"
@@ -1638,6 +1627,7 @@ export default function Dashboard() {
       )}
       {pacerSession && (
         <PacerOverlay
+          key={pacerSession.startedAt}
           session={pacerSession}
           helpOpen={pacerStuckOpen}
           onStuck={() => setPacerStuckOpen(true)}
