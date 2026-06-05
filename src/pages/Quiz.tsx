@@ -1295,7 +1295,7 @@ export default function Quiz() {
         questionIndex,
         question: quiz.question,
         type,
-        weakTopic: inferWeakTopic(quiz.question),
+        weakTopic: inferWeakTopicFromQuestion(quiz.question, quiz.explanation),
         studentAnswer: formatAnswerForReview(quiz, answerValue),
         correctAnswer: formatAnswerForReview(quiz, answerValue, true),
         explanation: subjectiveGrade?.feedback || quiz.explanation,
