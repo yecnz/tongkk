@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
-import { loadDashboardState, removeDashboardState, saveDashboardState } from "../services/dashboardState";
+import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
@@ -20,7 +20,6 @@ import {
   paceStatus,
   paceStreak,
   paceTodayTarget,
-  paceWeeklyGoal,
   paceWeekStats,
   readinessTier,
   type PaceLog,
@@ -103,13 +102,6 @@ const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, load
 const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const toDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-const BUDGET_OPTIONS = [10, 30, 60, 120] as const;
-const FULL_DAY_BUDGET = 120;
-// 시간 예산에 맞춰 오늘치 분량을 리사이즈 (10분 이하는 새 학습 빼고 약점 복습만)
-const resizeTargetByBudget = (target: number, budget: number) => {
-  if (budget <= 10) return 0;
-  return Math.max(1, Math.round(target * Math.min(budget / FULL_DAY_BUDGET, 1)));
-};
 const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정" };
 
 const templateLabels: Record<SavedSummary["template"], string> = {
@@ -1083,8 +1075,6 @@ export default function Dashboard() {
   const [paceLogLoaded, setPaceLogLoaded] = useState(false);
   const [appliedCatchUp, setAppliedCatchUp] = useState<Record<string, number>>({});
   const [todayKey] = useState(() => toDateKey(new Date()));
-  const [todayBudget, setTodayBudget] = useState<number | null>(null);
-  const [todayBudgetLoaded, setTodayBudgetLoaded] = useState(false);
   const [recoveryDismissed, setRecoveryDismissed] = useState(false);
   const [pacerSession, setPacerSession] = useState<PacerSession | null>(null);
   const [showPacerStart, setShowPacerStart] = useState(false);
@@ -1206,27 +1196,6 @@ export default function Dashboard() {
     if (!paceLogLoaded) return;
     saveDashboardState("paceLog", paceLog).catch(console.warn);
   }, [paceLogLoaded, paceLog]);
-
-  useEffect(() => {
-    let ignore = false;
-    loadDashboardState<number | null>(`todayBudget:${todayKey}`, null)
-      .then(next => {
-        if (ignore) return;
-        setTodayBudget(next);
-        setTodayBudgetLoaded(true);
-      })
-      .catch(error => console.warn("오늘 예산 불러오기 실패", error));
-    return () => { ignore = true; };
-  }, [todayKey]);
-
-  useEffect(() => {
-    if (!todayBudgetLoaded) return;
-    if (todayBudget === null) {
-      removeDashboardState(`todayBudget:${todayKey}`).catch(console.warn);
-    } else {
-      saveDashboardState(`todayBudget:${todayKey}`, todayBudget).catch(console.warn);
-    }
-  }, [todayBudgetLoaded, todayBudget, todayKey]);
 
   useEffect(() => {
     if (!openCourseMenu) return;
@@ -1394,7 +1363,6 @@ export default function Dashboard() {
       const daysLeft = dday ? getDaysLeft(dday.date) : PACE_NO_DDAY_HORIZON_DAYS;
       const baseTarget = paceTodayTarget(plan, daysLeft);
       const override = appliedCatchUp[plan.id];
-      const budgetTarget = todayBudget === null ? undefined : resizeTargetByBudget(baseTarget, todayBudget);
       const status: PaceStatus = dday ? paceStatus(plan, dday.date) : "on";
       const readiness = paceReadiness(plan, courseScores[plan.course] ?? []);
       return {
@@ -1404,8 +1372,8 @@ export default function Dashboard() {
         status,
         remaining: paceRemaining(plan),
         baseTarget,
-        todayTarget: override ?? budgetTarget ?? baseTarget,
-        reviewOnly: override === undefined && budgetTarget === 0,
+        todayTarget: override ?? baseTarget,
+        reviewOnly: false,
         catchUpTarget: dday ? paceCatchUpTarget(plan, dday.date, daysLeft) : baseTarget,
         catchUpApplied: override !== undefined,
         progress: paceProgressPct(plan),
@@ -1481,37 +1449,39 @@ export default function Dashboard() {
   // P7/P8: 회복형 스트릭 + 이번 주 회고
   const streak = paceStreak(paceLog);
   const weekStats = paceWeekStats(paceLog);
-  const totalRemaining = pacePlanViews.reduce((sum, view) => sum + view.remaining, 0);
-  const weeklyGoal = paceWeeklyGoal(weekStats.units, totalRemaining);
   const hasWeeklyActivity = weekStats.units > 0 || weekStats.activeDays > 0;
-  const weekPaceBadge = !hasWeeklyActivity
-    ? { label: "아직 시작 전", className: "bg-slate-100 text-[#667085] dark:bg-slate-800 dark:text-slate-300" }
-    : stepView
-      ? { label: streak.days >= 2 ? "좋은 흐름" : "기록 진행 중", className: "bg-cyan/10 text-cyan" }
-      : { label: "오늘 목표 완료", className: "bg-pink/10 text-pink" };
-  const weekPaceMessage = !hasWeeklyActivity
-    ? "오늘의 한 걸음을 완료하면 이번 주 학습량과 연속 학습일이 표시됩니다."
-    : streak.restUsed
-      ? "어제는 쉬었지만 연속 학습은 유지돼요. 오늘 다시 완료하면 흐름을 이어갈 수 있어요."
-      : streak.days === 0
-        ? "오늘 목표를 완료하면 이번 주 페이스 기록이 시작됩니다."
-        : stepView
-          ? "오늘 목표를 완료하면 연속 학습이 이어집니다."
-          : "오늘 목표를 모두 완료했어요. 이 흐름을 유지해보세요.";
-  const weekGoalMessage = !hasWeeklyActivity
-    ? "첫 목표는 오늘 목표 완료부터 시작해요."
-    : totalRemaining > 0
-      ? `이번 주 흐름을 기준으로 다음 주에는 ${weeklyGoal}개 정도를 목표로 잡아볼 수 있어요.`
-      : "";
-  const weekActionLabel = stepView
-    ? stepView.reviewOnly
-      ? "복습 세션 기록하기"
-      : `오늘 목표 ${stepView.todayTarget}개 완료하기`
-    : "";
   // P5: 시험 준비도 — D-day 연결된 플랜만, 임박 순
   const readinessViews = pacePlanViews
     .filter(view => view.dday)
     .sort((a, b) => a.daysLeft - b.daysLeft);
+  const focusReadiness = readinessViews[0];
+  const paceCoachTone = !stepView
+    ? "border-cyan/30 bg-cyan/5"
+    : stepView.status === "behind"
+      ? "border-pink/30 bg-pink/5"
+      : stepView.status === "slightly"
+        ? "border-amber-200 bg-amber-50 dark:bg-amber-400/10"
+        : "border-cyan/30 bg-cyan/5";
+  const paceCoachBadge = !stepView
+    ? "오늘 목표 완료"
+    : stepView.status === "behind"
+      ? "복구 필요"
+      : stepView.status === "slightly"
+        ? "조금만 더"
+        : "정상 페이스";
+  const paceCoachTitle = !stepView
+    ? "오늘 계획한 페이스는 끝났어요."
+    : `${stepView.plan.course} ${stepView.todayTarget}개만 끝내면 오늘 페이스예요.`;
+  const paceCoachBody = !stepView
+    ? "더 할 여유가 있으면 오답 재풀이처럼 부담이 낮은 복습으로 마무리해도 좋아요."
+    : stepView.status === "behind"
+      ? `조금 밀렸어요. 무리해서 몰아가기보다 오늘은 ${stepView.todayTarget}개를 먼저 끝내고, 필요하면 복구 목표 ${stepView.catchUpTarget}개로 조정하세요.`
+      : stepView.status === "slightly"
+        ? "크게 밀린 상태는 아니에요. 오늘 목표 하나만 처리하면 흐름을 다시 안정시킬 수 있어요."
+        : "지금 흐름은 괜찮아요. 오늘 목표를 짧게 끝내고 다음 자료로 넘어가면 됩니다.";
+  const paceCoachMeta = hasWeeklyActivity
+    ? `이번 주 새 학습 ${weekStats.units}개 · 학습 ${weekStats.activeDays}일 · 연속 ${streak.days}일${weekStats.reviewSessions > 0 ? ` · 복습 ${weekStats.reviewSessions}회` : ""}`
+    : "이번 주 기록은 아직 없어요. 오늘 목표를 끝내면 페이스 기록이 시작됩니다.";
 
   const applyRecovery = () => {
     if (!stepView) return;
@@ -1677,34 +1647,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        {stepView && !stepView.sprint && (() => {
-          const tone = stepView.status === "behind"
-            ? "bg-pink/10 text-pink"
-            : stepView.status === "slightly"
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300"
-              : "bg-cyan/10 text-cyan";
-          const ment = stepView.status === "behind"
-            ? `조금 더 힘을 내볼까요? 오늘 ${stepView.catchUpTarget}개로 나눠 따라잡을게요.`
-            : stepView.status === "slightly"
-              ? "오늘 한 걸음만 더 가면 돼요. 조금만 더 힘내봐요!"
-              : "지금 속도면 충분해요. 오늘도 꾸준히 가봅시다!";
-          return (
-            <div className={`mb-5 flex flex-wrap items-center gap-2 rounded-card px-4 py-3 text-sm font-semibold ${tone}`}>
-              <span>{ment}</span>
-              {stepView.status === "behind" && (
-                stepView.catchUpApplied ? (
-                  <span className="ml-auto rounded-lg bg-white/70 px-3 py-1.5 text-sm font-semibold">반영됨</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => applyCatchUp(stepView.plan.id, stepView.catchUpTarget)}
-                    className="ml-auto rounded-lg bg-white/70 px-3 py-1.5 text-sm font-semibold text-pink cursor-pointer hover:bg-white"
-                  >적용</button>
-                )
-              )}
-            </div>
-          );
-        })()}
         {showRecovery && (
           <div className="mb-5 flex flex-wrap items-center gap-3 rounded-card bg-cyan/10 px-4 py-3 text-sm text-[#234] dark:text-slate-200">
             <span>{gapDays}일 공백이 있었네요. 몰아서 말고 약한 개념부터 가볍게 다시 시작해요.</span>
@@ -1716,37 +1658,99 @@ export default function Dashboard() {
           </div>
         )}
         {pacePlanViews.length > 0 && (
-          <div className="mb-5 flex flex-wrap items-center gap-2 rounded-card border border-border bg-card px-4 py-3">
-            <div className="basis-full">
-              <p className="m-0 text-sm font-extrabold text-[#333] dark:text-slate-100">오늘 학습 가능 시간</p>
-              <p className="m-0 mt-1 text-xs leading-5 text-muted">
-                선택한 시간에 맞춰 오늘의 한 걸음 목표 개수를 자동으로 조정합니다.
-              </p>
+          <Card className={`mb-5 border p-5 ${paceCoachTone}`}>
+            <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-extrabold text-[#344054] dark:bg-slate-900/70 dark:text-slate-200">
+                    페이스 코치
+                  </span>
+                  <span className="rounded-full bg-cyan px-2.5 py-1 text-xs font-extrabold text-white">
+                    {paceCoachBadge}
+                  </span>
+                </div>
+                <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
+                  {paceCoachTitle}
+                </h2>
+                <p className="m-0 mt-2 text-sm leading-6 text-[#555] dark:text-slate-300">
+                  {paceCoachBody}
+                </p>
+                <p className="m-0 mt-3 text-xs font-bold leading-5 text-muted">
+                  {paceCoachMeta}
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-2 md:w-[260px]">
+                {stepView ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
+                      className="w-full rounded-[10px] bg-pink px-4 py-3 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
+                    >
+                      {stepView.todayTarget}개 완료하기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPacerStart(true)}
+                      className="w-full rounded-[10px] border border-cyan bg-white px-4 py-3 text-sm font-extrabold text-cyan cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
+                    >
+                      집중 타이머 시작
+                    </button>
+                    {stepView.status === "behind" && (
+                      stepView.catchUpApplied ? (
+                        <span className="rounded-[10px] bg-white/70 px-3 py-2 text-center text-xs font-extrabold text-pink">
+                          복구 목표 반영됨
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => applyCatchUp(stepView.plan.id, stepView.catchUpTarget)}
+                          className="w-full rounded-[10px] border border-pink bg-white px-4 py-2.5 text-sm font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
+                        >
+                          복구 목표 {stepView.catchUpTarget}개로 조정
+                        </button>
+                      )
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => deletePacePlan(stepView.plan.id)}
+                      className="border-none bg-transparent px-2 py-1 text-xs font-bold text-muted cursor-pointer hover:text-pink"
+                    >
+                      이 플랜 삭제
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/review")}
+                      className="w-full rounded-[10px] bg-cyan px-4 py-3 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
+                    >
+                      오답 재풀이
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPace(true)}
+                      className="w-full rounded-[10px] border border-pink bg-white px-4 py-3 text-sm font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
+                    >
+                      페이스 플랜 추가
+                    </button>
+                  </>
+                )}
+                {focusReadiness && (
+                  <div className="rounded-[10px] bg-white/70 px-3 py-2 dark:bg-slate-900/60">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-xs font-extrabold text-[#344054] dark:text-slate-200">
+                      <span className="truncate">{focusReadiness.plan.course} 준비도</span>
+                      <span>{focusReadiness.readiness}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
+                      <div className="h-1.5 rounded-full bg-cyan" style={{ width: `${focusReadiness.readiness}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            {BUDGET_OPTIONS.map(minutes => {
-              const selected = todayBudget === minutes;
-              return (
-                <button
-                  key={minutes}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setTodayBudget(selected ? null : minutes)}
-                  className="px-3 py-1.5 rounded-full border border-border text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 aria-pressed:bg-pink aria-pressed:text-white aria-pressed:border-pink"
-                >
-                  {minutes <= 10 ? "10분: 복습만" : `${minutes}분`}
-                </button>
-              );
-            })}
-            {todayBudget !== null && (
-              <span className="basis-full mt-1 text-xs text-muted">
-                {todayBudget <= 10
-                  ? "10분 선택됨: 새 학습 목표를 0개로 줄이고 약점 복습만 표시합니다."
-                  : stepView
-                    ? `${todayBudget}분 선택됨: 오늘의 한 걸음 목표가 ${stepView.todayTarget}개로 조정됩니다.`
-                    : `${todayBudget}분 선택됨: 오늘 할 분량이 남아 있을 때 목표 개수를 조정합니다.`}
-              </span>
-            )}
-          </div>
+          </Card>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
           {/* 강의 목록 카드 그리드 */}
@@ -1826,188 +1830,6 @@ export default function Dashboard() {
 
           {/* D-day + 학습 계획 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* 오늘의 한 걸음 */}
-            <Card className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="m-0 text-base font-bold text-[#222] dark:text-slate-100">오늘의 한 걸음</h3>
-                {pacePlanViews.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddPace(true)}
-                    aria-label="페이스 플랜 추가"
-                    className="border-none bg-transparent text-pink text-xl leading-none cursor-pointer"
-                  >+</button>
-                )}
-              </div>
-              {stepView ? (
-                <>
-                  <p className="m-0 mb-1 text-sm text-[#555] dark:text-slate-300">
-                    {stepView.plan.course}
-                    {stepView.dday && ` · ${stepView.dday.subj} · ${formatDdayLabel(stepView.daysLeft)}`}
-                  </p>
-                  <p className="m-0 mb-3 text-sm font-semibold text-[#333] dark:text-slate-100">
-                    {stepView.reviewOnly
-                      ? "오늘은 약점 복습만 가볍게 — 새 분량은 쉬어가요."
-                      : `오늘 여기까지가 페이스예요: ${stepView.todayTarget}개`}
-                  </p>
-                  <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
-                    <div className="h-2 rounded-full bg-cyan" style={{ width: `${stepView.progress}%` }} />
-                  </div>
-                  <p className="m-0 mt-2 text-xs text-muted">
-                    {stepView.plan.doneUnits} / {stepView.plan.totalUnits}개 ({stepView.progress}%)
-                  </p>
-                  <div className="mt-4 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
-                      className="px-4 py-2 rounded-xl bg-pink text-white text-sm font-semibold cursor-pointer hover:brightness-95"
-                    >{stepView.reviewOnly ? "복습 기록" : "완료"}</button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPacerStart(true)}
-                      className="px-4 py-2 rounded-xl bg-cyan text-white text-sm font-semibold cursor-pointer hover:brightness-95"
-                    >집중 타이머</button>
-                    <button
-                      type="button"
-                      onClick={() => deletePacePlan(stepView.plan.id)}
-                      className="ml-auto border-none bg-transparent text-xs text-muted cursor-pointer hover:text-pink"
-                    >이 플랜 삭제</button>
-                  </div>
-                </>
-              ) : pacePlanViews.length > 0 ? (
-                <p className="m-0 py-2 text-center text-sm text-muted">
-                  오늘 페이스를 모두 따라잡았어요. 잘하고 있어요!
-                </p>
-              ) : (
-                <div className="rounded-[14px] border border-dashed border-border bg-white px-4 py-4 text-center dark:bg-slate-900/30">
-                  <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-pink/10 text-base font-extrabold text-pink">
-                    +
-                  </div>
-                  <p className="m-0 text-sm font-bold text-[#333] dark:text-slate-100">아직 페이스 플랜이 없어요</p>
-                  <p className="m-0 mt-1 text-sm leading-6 text-muted">
-                    D-day와 분량을 묶어 오늘 할 만큼만 나눠볼게요.
-                  </p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-left">
-                    <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                      <span className="block text-[11px] font-bold text-muted">D-day</span>
-                      <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{ddays.length}개</strong>
-                    </div>
-                    <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                      <span className="block text-[11px] font-bold text-muted">강의</span>
-                      <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{courses.length}개</strong>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddPace(true)}
-                    className="mt-4 w-full rounded-[10px] bg-pink px-3 py-2.5 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
-                  >페이스 플랜 만들기</button>
-                </div>
-              )}
-            </Card>
-
-            {/* P5. 시험 준비도 */}
-            {readinessViews.length > 0 && (
-              <Card className="p-5">
-                <h3 className="m-0 mb-3 text-base font-bold text-[#222] dark:text-slate-100">시험 준비도</h3>
-                <div className="flex flex-col gap-3">
-                  {readinessViews.map(view => {
-                    const tone = view.readinessTier === "ready"
-                      ? "bg-cyan"
-                      : view.readinessTier === "soon"
-                        ? "bg-amber-400"
-                        : "bg-pink";
-                    const label = view.readinessTier === "ready"
-                      ? "충분해요"
-                      : view.readinessTier === "soon"
-                        ? "조금만 더"
-                        : "더 채워요";
-                    return (
-                      <div key={view.plan.id}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="min-w-0 truncate text-sm font-semibold text-[#333] dark:text-slate-100">
-                            {view.plan.course}
-                            {view.dday && <span className="text-muted"> · D-{view.daysLeft}</span>}
-                          </span>
-                          <span className="shrink-0 text-sm font-extrabold text-[#222] dark:text-slate-100">{view.readiness}%</span>
-                        </div>
-                        <div className="mt-1.5 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
-                          <div className={`h-2 rounded-full ${tone}`} style={{ width: `${view.readiness}%` }} />
-                        </div>
-                        <p className="m-0 mt-1 text-xs text-muted">
-                          {label}
-                          {!view.hasScores && " · 퀴즈를 풀면 더 정확해져요"}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
-
-            {/* P7/P8. 이번 주 페이스 + 스트릭 */}
-            {pacePlanViews.length > 0 && (
-              <Card className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="m-0 text-base font-bold text-[#222] dark:text-slate-100">이번 주 페이스</h3>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${weekPaceBadge.className}`}>
-                    {weekPaceBadge.label}
-                  </span>
-                </div>
-                {!hasWeeklyActivity ? (
-                  <div className="rounded-[14px] border border-dashed border-border bg-white px-4 py-4 text-center dark:bg-slate-900/30">
-                    <p className="m-0 text-sm font-bold text-[#333] dark:text-slate-100">아직 이번 주 학습 기록이 없어요</p>
-                    <p className="m-0 mt-1 text-sm leading-6 text-muted">{weekPaceMessage}</p>
-                    {stepView && (stepView.todayTarget > 0 || stepView.reviewOnly) && (
-                      <button
-                        type="button"
-                        onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
-                        className="mt-4 w-full rounded-[10px] bg-pink px-3 py-2.5 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
-                      >
-                        {weekActionLabel}
-                      </button>
-                    )}
-                    <p className="m-0 mt-3 text-xs leading-5 text-muted">{weekGoalMessage}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                        <span className="block text-[11px] font-bold text-muted">새 학습</span>
-                        <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.units}개</strong>
-                      </div>
-                      <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                        <span className="block text-[11px] font-bold text-muted">학습한 날</span>
-                        <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{weekStats.activeDays}일</strong>
-                      </div>
-                      <div className="rounded-[10px] bg-slate-50 px-3 py-2 dark:bg-slate-800">
-                        <span className="block text-[11px] font-bold text-muted">연속 학습</span>
-                        <strong className="mt-0.5 block text-sm text-[#222] dark:text-slate-100">{streak.days}일</strong>
-                      </div>
-                    </div>
-                    {weekStats.reviewSessions > 0 && (
-                      <p className="m-0 mt-2 text-xs font-bold text-cyan">
-                        복습 세션 {weekStats.reviewSessions}회도 이번 주 흐름에 반영됐어요.
-                      </p>
-                    )}
-                    <p className="m-0 mt-3 text-xs leading-5 text-muted">
-                      {weekPaceMessage}
-                      {weekGoalMessage && ` ${weekGoalMessage}`}
-                    </p>
-                    {stepView && (stepView.todayTarget > 0 || stepView.reviewOnly) && (
-                      <button
-                        type="button"
-                        onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
-                        className="mt-3 w-full rounded-[10px] border border-pink bg-white px-3 py-2 text-sm font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
-                      >
-                        {weekActionLabel}
-                      </button>
-                    )}
-                  </>
-                )}
-              </Card>
-            )}
-
             {/* D-day */}
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
