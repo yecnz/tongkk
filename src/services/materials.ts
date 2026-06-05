@@ -19,6 +19,9 @@ export type CourseMaterial = {
 
 const MATERIAL_STORAGE_BUCKET = 'course-materials';
 
+// 원본 파일 저장 한도(Supabase Free 플랜 업로드 한도 ≈ 50MB). Pro로 글로벌 한도를 올리면 이 값도 함께 조정.
+export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
+
 export const getFileMaterialId = (file: Pick<File, "name" | "size">) => `${file.name}:${file.size}`;
 
 export const combineMaterialsMarkdown = (materials: CourseMaterial[]) =>
@@ -95,6 +98,10 @@ export const uploadCourseMaterialFile = async (
   material: CourseMaterial,
   file: File,
 ): Promise<CourseMaterial> => {
+  // 한도 초과 파일은 네트워크 업로드를 시도하지 않고 즉시 막는다(원본 저장만 생략 — 텍스트는 호출부에서 별도 저장됨).
+  if (file.size > MAX_ORIGINAL_FILE_BYTES) {
+    throw new Error(`원본 파일이 ${(file.size / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 초과해 원본은 저장하지 못했어요.`);
+  }
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) throw new Error('과목을 찾을 수 없습니다.');
 

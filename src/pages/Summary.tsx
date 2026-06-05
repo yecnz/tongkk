@@ -26,6 +26,7 @@ import {
   loadCourseMaterialsFromServer,
   saveCourseMaterials,
   uploadCourseMaterialFile,
+  MAX_ORIGINAL_FILE_BYTES,
   type CourseMaterial,
 } from "../services/materials";
 import { AITutorDrawer } from "../components/AITutorDrawer";
@@ -161,11 +162,16 @@ const classifyUploadFailure = (message: string): { kind: UploadFailureKind; labe
       guide: "PDF, PPT/PPTX, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
     };
   }
-  if (message.includes("너무 큽") || message.includes("10MB") || message.includes("413") || lower.includes("too large")) {
+  if (
+    message.includes("너무 큽") || message.includes("10MB") || message.includes("413") ||
+    message.includes("50MB") || message.includes("저장 한도") ||
+    lower.includes("too large") || lower.includes("maximum allowed size") ||
+    lower.includes("exceeded the maximum") || lower.includes("payload too large")
+  ) {
     return {
       kind: "tooLarge",
       label: "파일이 너무 큼",
-      guide: "파일 크기를 줄이거나 여러 파일로 나눠 업로드해주세요.",
+      guide: "파일을 50MB 미만으로 줄이거나 나눠 올리면 원본도 저장됩니다. 지금도 텍스트는 저장돼 요약·퀴즈엔 사용할 수 있어요.",
     };
   }
   if (message.includes("로그인") || message.includes("인증") || message.includes("401") || lower.includes("jwt")) {
@@ -1966,6 +1972,8 @@ export default function Summary() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
+  // 50MB 초과로 원본을 저장하지 못한 파일들을 모아 가운데 모달로 안내.
+  const [sizeLimitNotice, setSizeLimitNotice] = useState<{ names: string[] } | null>(null);
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
@@ -2306,7 +2314,9 @@ export default function Summary() {
 
     setIsExtracting(true);
     setExtractError("");
+    setSizeLimitNotice(null);
     const uploadedMaterials: CourseMaterial[] = [];
+    const oversizeNames: string[] = [];
     try {
       for (const documentFile of newFiles) {
         try {
@@ -2328,31 +2338,43 @@ export default function Summary() {
               markdown,
               updatedAt: Date.now(),
             };
-            updateUploadStatus(documentFile, {
-              state: "storing",
-              label: "원본 저장 중",
-              message: "추출된 텍스트와 원본 파일을 저장하고 있습니다.",
-              materialId: baseMaterial.id,
-            });
-            try {
-              const savedMaterial = await uploadCourseMaterialFile(selectedCourse, baseMaterial, documentFile);
-              uploadedMaterials.push(savedMaterial);
-              updateUploadStatus(documentFile, {
-                state: "done",
-                label: "완료",
-                message: "업로드와 텍스트 추출이 완료됐습니다.",
-                materialId: savedMaterial.id,
-              });
-            } catch (err) {
-              const message = err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패";
-              setExtractError(message);
+            if (documentFile.size > MAX_ORIGINAL_FILE_BYTES) {
+              // 한도 초과: 원본 저장은 건너뛰고 텍스트만 저장 — 실패가 아니라 정상 폴백이라 에러 배너 없이 안내만.
               uploadedMaterials.push(baseMaterial);
+              oversizeNames.push(documentFile.name);
               updateUploadStatus(documentFile, {
                 state: "done",
                 label: "텍스트만 완료",
-                message: `${message} 그래도 텍스트 추출 결과는 저장되어 요약과 퀴즈에 사용할 수 있습니다.`,
+                message: `원본 파일이 ${(documentFile.size / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본은 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.`,
                 materialId: baseMaterial.id,
               });
+            } else {
+              updateUploadStatus(documentFile, {
+                state: "storing",
+                label: "원본 저장 중",
+                message: "추출된 텍스트와 원본 파일을 저장하고 있습니다.",
+                materialId: baseMaterial.id,
+              });
+              try {
+                const savedMaterial = await uploadCourseMaterialFile(selectedCourse, baseMaterial, documentFile);
+                uploadedMaterials.push(savedMaterial);
+                updateUploadStatus(documentFile, {
+                  state: "done",
+                  label: "완료",
+                  message: "업로드와 텍스트 추출이 완료됐습니다.",
+                  materialId: savedMaterial.id,
+                });
+              } catch (err) {
+                const message = err instanceof Error ? `원본 파일 저장 실패: ${err.message}` : "원본 파일 저장 실패";
+                setExtractError(message);
+                uploadedMaterials.push(baseMaterial);
+                updateUploadStatus(documentFile, {
+                  state: "done",
+                  label: "텍스트만 완료",
+                  message: `${message} 그래도 텍스트 추출 결과는 저장되어 요약과 퀴즈에 사용할 수 있습니다.`,
+                  materialId: baseMaterial.id,
+                });
+              }
             }
           }
         } catch (err) {
@@ -2362,6 +2384,9 @@ export default function Summary() {
         }
       }
 
+      if (oversizeNames.length > 0) {
+        setSizeLimitNotice({ names: oversizeNames });
+      }
       if (uploadedMaterials.length > 0) {
         const nextMaterials = [...materials, ...uploadedMaterials];
         await saveCourseMaterials(selectedCourse, nextMaterials);
@@ -2564,6 +2589,55 @@ export default function Summary() {
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
+      {sizeLimitNotice && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="원본 저장 한도 안내"
+          onClick={() => setSizeLimitNotice(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.32)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "min(380px, 100%)", background: "#fff", borderRadius: 18, padding: 24,
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <span style={{
+                width: 36, height: 36, borderRadius: "50%", background: "#FFF7ED", color: "#F59E0B",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0,
+              }}>!</span>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>원본은 저장하지 않았어요</h3>
+            </div>
+            <p style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.6, color: "#555" }}>
+              아래 파일은 <b style={{ color: "#222" }}>50MB 저장 한도</b>를 넘어 원본을 저장하지 않았어요.{" "}
+              <b style={{ color: "#222" }}>텍스트는 저장돼 요약·퀴즈에 그대로 사용</b>할 수 있어요.
+            </p>
+            <div style={{
+              margin: "0 0 14px", padding: "10px 12px", borderRadius: 10, background: "#f7f8fb",
+              fontSize: 12.5, fontWeight: 700, color: "#444", wordBreak: "break-word", lineHeight: 1.5,
+            }}>
+              {sizeLimitNotice.names.join(", ")}
+            </div>
+            <p style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "#888" }}>
+              원본까지 저장하려면 파일을 50MB 미만으로 줄이거나 나눠서 올려주세요.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setSizeLimitNotice(null)}
+                style={{
+                  padding: "9px 22px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                }}
+              >확인</button>
+            </div>
+          </div>
+        </div>
+      )}
       {duplicateNotice && (
         <div
           role="dialog"
