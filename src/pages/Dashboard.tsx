@@ -7,26 +7,15 @@ import { loadDashboardState, saveDashboardState } from "../services/dashboardSta
 import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
-import { loadAllQuizAttemptsFromServer, loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
+import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 import {
-  isPaceSprint,
-  paceCatchUpTarget,
-  paceGapDays,
   paceProgressPct,
-  paceReadiness,
-  paceRecoveryTarget,
   paceRemaining,
   paceStatus,
-  paceStreak,
-  paceTodayTarget,
-  paceWeekStats,
-  readinessTier,
-  type PaceLog,
   type PacePlan,
   type PaceStatus,
 } from "../services/pace";
-import { AITutorDrawer } from "../components/AITutorDrawer";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -50,32 +39,7 @@ type AddPaceModalProps = {
   courses: string[];
   ddays: Dday[];
   onClose: () => void;
-  onAdd: (course: string, ddayId: string, totalUnits: number) => void;
-};
-type PacerSession = {
-  course: string;
-  taskLabel: string;
-  durationMin: number;
-  startedAt: number;
-  planId: string;
-  creditUnits: number;
-  daysLeft: number | null;
-  paceStatus: PaceStatus;
-};
-type PacerStartModalProps = {
-  defaultCourse: string;
-  defaultTask: string;
-  onClose: () => void;
-  onStart: (taskLabel: string, durationMin: number) => void;
-};
-type PacerOverlayProps = {
-  session: PacerSession;
-  helpOpen: boolean;
-  onStuck: () => void;
-  onCredit: () => void;
-  onClose: () => void;
-  onAbandon: () => void;
-  onRestart: () => void;
+  onAdd: (course: string, ddayId: string, totalUnits: number, unitLabel: string) => void;
 };
 type Dday = { id?: string; type?: DdayType; subj: string; date: string };
 type Plan = { id?: string; text: string; done: boolean; minutes?: number; sourceType?: DdayType | "carryover" };
@@ -100,8 +64,6 @@ type CourseStats = {
 const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
 
 const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const toDateKey = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정" };
 
 const templateLabels: Record<SavedSummary["template"], string> = {
@@ -383,6 +345,27 @@ const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   );
 };
 
+type PaceBasis = "pages" | "quiz" | "materials" | "manual";
+type CourseContentMetrics = {
+  materialCount: number;
+  pageUnits: number;
+  pageUnitLabel: "페이지" | "슬라이드";
+  quizQuestions: number;
+};
+const emptyMetrics: CourseContentMetrics = { materialCount: 0, pageUnits: 0, pageUnitLabel: "페이지", quizQuestions: 0 };
+// 과목이 이미 보유한 실제 콘텐츠에서 "분량" 후보들을 뽑는다(페이지 합계 우선, 없으면 슬라이드 / 퀴즈 문항 / 자료 개수).
+const computeCourseMetrics = (materials: CourseMaterial[], quizSets: SavedQuizSet[]): CourseContentMetrics => {
+  const pageSum = materials.reduce((sum, material) => sum + (material.pages ?? 0), 0);
+  const slideSum = materials.reduce((sum, material) => sum + (material.slides ?? 0), 0);
+  const usePages = pageSum > 0;
+  return {
+    materialCount: materials.length,
+    pageUnits: usePages ? pageSum : slideSum,
+    pageUnitLabel: usePages ? "페이지" : "슬라이드",
+    quizQuestions: quizSets.reduce((sum, quizSet) => sum + (quizSet.count ?? 0), 0),
+  };
+};
+
 const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => {
   const getModalDaysLeft = (dateStr: string) => {
     const target = new Date(dateStr);
@@ -395,14 +378,87 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
     .filter(dday => Boolean(dday.id))
     .sort((a, b) => getModalDaysLeft(a.date) - getModalDaysLeft(b.date));
   const [course, setCourse] = useState(courses[0] ?? "");
-  const [ddayId, setDdayId] = useState(selectableDdays[0]?.id ?? "");
-  const [units, setUnits] = useState("");
-  const total = Math.floor(Number(units));
-  const canAdd = Boolean(course) && Number.isFinite(total) && total > 0;
-  const unitPresets = [30, 60, 120] as const;
+  // 기본은 "연결 안 함"(14일 기준). 마감일은 과목과 무관할 수 있어 사용자가 직접 고르게 둔다.
+  const [ddayId, setDdayId] = useState("");
+  const [basis, setBasis] = useState<PaceBasis>("pages");
+  const [manualUnits, setManualUnits] = useState("");
+  const [metrics, setMetrics] = useState<CourseContentMetrics>(emptyMetrics);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState("");
+  const metricsCache = useRef<Record<string, CourseContentMetrics>>({});
+
+  // 과목을 고르면 그 과목의 실제 자료·퀴즈 분량을 불러와 기준 후보로 쓴다.
+  useEffect(() => {
+    if (!course) { setMetrics(emptyMetrics); return; }
+    const applyMetrics = (next: CourseContentMetrics) => {
+      setMetrics(next);
+      // 현재 고른 기준에 값이 없으면 값이 있는 기준으로 똑똑하게 자동 전환.
+      setBasis(prev => {
+        if (prev === "manual") return prev;
+        const value: Record<Exclude<PaceBasis, "manual">, number> = {
+          pages: next.pageUnits,
+          quiz: next.quizQuestions,
+          materials: next.materialCount,
+        };
+        if (value[prev] > 0) return prev;
+        if (next.pageUnits > 0) return "pages";
+        if (next.quizQuestions > 0) return "quiz";
+        if (next.materialCount > 0) return "materials";
+        return "manual";
+      });
+    };
+    const cached = metricsCache.current[course];
+    if (cached) { applyMetrics(cached); setMetricsError(""); setMetricsLoading(false); return; }
+    let ignore = false;
+    setMetricsLoading(true);
+    setMetricsError("");
+    Promise.all([loadCourseMaterialsFromServer(course), loadQuizSetsFromServer(course)])
+      .then(([materials, quizSets]) => {
+        if (ignore) return;
+        const next = computeCourseMetrics(materials, quizSets);
+        metricsCache.current[course] = next;
+        applyMetrics(next);
+      })
+      .catch(err => {
+        if (ignore) return;
+        setMetricsError(err instanceof Error ? err.message : "강의 콘텐츠를 불러오지 못했어요.");
+        setMetrics(emptyMetrics);
+        // 콘텐츠를 못 불러오면 비활성 카드만 남으니, 바로 쓸 수 있는 직접 입력으로 폴백.
+        setBasis("manual");
+      })
+      .finally(() => { if (!ignore) setMetricsLoading(false); });
+    return () => { ignore = true; };
+  }, [course]);
+
+  const basisOptions = [
+    { key: "pages" as const, title: "강의자료 분량", value: metrics.pageUnits, unitLabel: metrics.pageUnitLabel, hint: metrics.pageUnits > 0 ? `총 ${metrics.pageUnits}${metrics.pageUnitLabel}` : "페이지 정보 없음" },
+    { key: "quiz" as const, title: "퀴즈 문항", value: metrics.quizQuestions, unitLabel: "문항", hint: metrics.quizQuestions > 0 ? `총 ${metrics.quizQuestions}문항` : "저장된 퀴즈 없음" },
+    { key: "materials" as const, title: "강의자료 개수", value: metrics.materialCount, unitLabel: "개", hint: metrics.materialCount > 0 ? `${metrics.materialCount}개` : "자료 없음" },
+  ];
+
+  const manualTotal = Math.floor(Number(manualUnits));
+  const manualValid = Number.isFinite(manualTotal) && manualTotal > 0;
+  const activeBasis = basisOptions.find(option => option.key === basis);
+  const total = basis === "manual" ? (manualValid ? manualTotal : 0) : (activeBasis?.value ?? 0);
+  const unitLabel = basis === "manual" ? "개" : (activeBasis?.unitLabel ?? "개");
+  const canAdd = Boolean(course) && total > 0;
+
+  // 하루 권장량 미리보기: 연결된 D-day(없으면 14일 기준)로 총량을 나눠 보여준다.
+  const connectedDday = ddayId ? selectableDdays.find(dday => dday.id === ddayId) : undefined;
+  const rawDaysLeft = connectedDday ? getModalDaysLeft(connectedDday.date) : null;
+  const previewDaysLeft = rawDaysLeft !== null ? Math.max(rawDaysLeft, 1) : PACE_NO_DDAY_HORIZON_DAYS;
+  const perDay = total > 0 ? Math.max(1, Math.ceil(total / Math.max(previewDaysLeft, 1))) : 0;
+  const previewText = total <= 0
+    ? "기준을 선택하면 하루 권장량을 알려드려요."
+    : rawDaysLeft === null
+      ? `${PACE_NO_DDAY_HORIZON_DAYS}일 기준 → 하루 약 ${perDay}${unitLabel}`
+      : rawDaysLeft > 0
+        ? `마감까지 ${rawDaysLeft}일 → 하루 약 ${perDay}${unitLabel}`
+        : `마감 임박 → 남은 ${total}${unitLabel} 마무리`;
+
   const handleAdd = () => {
     if (!canAdd) return;
-    onAdd(course, ddayId, total);
+    onAdd(course, ddayId, total, unitLabel);
     onClose();
   };
   const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-white text-sm text-[#222] outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10 dark:bg-slate-800 dark:text-slate-100";
@@ -461,36 +517,74 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
                   </div>
                 )}
               </div>
-              <div className="mb-3">
-                <label className={labelClass}>총 분량 (개)</label>
-                <input
-                  value={units}
-                  onChange={e => setUnits(e.target.value.replace(/[^0-9]/g, ""))}
-                  onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
-                  inputMode="numeric"
-                  placeholder="전체 학습량을 숫자로 입력 (예: 120)"
-                  className={fieldClass}
-                />
-              </div>
-              <div className="mb-5 grid grid-cols-3 gap-2">
-                {unitPresets.map(preset => {
-                  const selected = total === preset;
-                  return (
+              <div className="mb-4">
+                <label className={labelClass}>무엇을 기준으로 끝낼까요?</label>
+                {metricsLoading ? (
+                  <div className="rounded-[10px] border border-border bg-slate-50 px-3.5 py-4 text-sm text-muted dark:bg-slate-800/60">
+                    강의 콘텐츠 분량을 불러오는 중…
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {basisOptions.map(option => {
+                      const selected = basis === option.key;
+                      const disabled = option.value <= 0;
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          aria-pressed={selected}
+                          disabled={disabled}
+                          onClick={() => setBasis(option.key)}
+                          className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 text-left transition ${
+                            disabled
+                              ? "border-border bg-slate-50 cursor-default dark:bg-slate-800/40"
+                              : selected
+                                ? "border-cyan bg-cyan/10 cursor-pointer"
+                                : "border-border bg-white cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
+                          }`}
+                        >
+                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-[#344054] dark:text-slate-200"}`}>
+                            {option.title}
+                          </span>
+                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-[#667085] dark:text-slate-300"}`}>
+                            {option.hint}
+                          </span>
+                        </button>
+                      );
+                    })}
                     <button
-                      key={preset}
                       type="button"
-                      aria-pressed={selected}
-                      onClick={() => setUnits(String(preset))}
-                      className="rounded-[10px] border border-border bg-white px-3 py-2 text-sm font-bold text-[#667085] cursor-pointer hover:bg-slate-50 aria-pressed:border-cyan aria-pressed:bg-cyan/10 aria-pressed:text-cyan dark:bg-slate-800 dark:text-slate-200"
+                      aria-pressed={basis === "manual"}
+                      onClick={() => setBasis("manual")}
+                      className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 text-left transition cursor-pointer ${
+                        basis === "manual"
+                          ? "border-cyan bg-cyan/10"
+                          : "border-border bg-white hover:bg-slate-50 dark:bg-slate-800"
+                      }`}
                     >
-                      총 {preset}개
+                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan" : "text-[#344054] dark:text-slate-200"}`}>직접 입력</span>
+                      <span className="shrink-0 text-xs font-semibold text-muted">숫자로 직접 지정</span>
                     </button>
-                  );
-                })}
+                  </div>
+                )}
+                {metricsError && <p className="m-0 mt-2 text-xs text-pink">{metricsError}</p>}
               </div>
-              <div className="mb-5 flex items-center justify-between rounded-[12px] bg-pink/10 px-4 py-3">
-                <span className="text-xs font-bold text-[#667085] dark:text-slate-300">생성할 플랜의 총 학습량</span>
-                <span className="text-sm font-extrabold text-pink">{canAdd ? `총 ${total}개` : "총 학습량을 입력하세요"}</span>
+              {basis === "manual" && (
+                <div className="mb-4">
+                  <label className={labelClass}>총 분량 (개)</label>
+                  <input
+                    value={manualUnits}
+                    onChange={e => setManualUnits(e.target.value.replace(/[^0-9]/g, ""))}
+                    onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
+                    inputMode="numeric"
+                    placeholder="전체 학습량을 숫자로 입력 (예: 120)"
+                    className={fieldClass}
+                  />
+                </div>
+              )}
+              <div className="mb-5 flex items-center justify-between gap-3 rounded-[12px] bg-pink/10 px-4 py-3">
+                <span className="shrink-0 text-xs font-bold text-[#667085] dark:text-slate-300">하루 권장 학습량</span>
+                <span className="text-right text-sm font-extrabold text-pink">{previewText}</span>
               </div>
             </>
           )}
@@ -510,243 +604,10 @@ const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => 
   );
 };
 
-const PACER_DURATIONS = [15, 25, 50] as const;
 
 // D-day를 연결하지 않은 플랜은 마감일이 없으므로, 남은 분량을 이 기간에 나눠 꾸준히 진행하는 페이스로 계산한다.
 const PACE_NO_DDAY_HORIZON_DAYS = 14;
 
-const PacerStartModal = ({ defaultCourse, defaultTask, onClose, onStart }: PacerStartModalProps) => {
-  const [task, setTask] = useState(defaultTask);
-  const [duration, setDuration] = useState<number>(25);
-  const handleStart = () => {
-    const label = task.trim() || defaultTask;
-    onStart(label, duration);
-    onClose();
-  };
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30">
-      <Card className="w-[340px] p-7">
-        <h3 className="m-0 mb-1 text-[17px] font-bold text-[#222] dark:text-slate-100">집중 타이머 시작</h3>
-        <p className="m-0 mb-4 text-sm text-muted">{defaultCourse} · 정한 시간 동안 학습하고 오늘 목표에 반영해요.</p>
-        <label className="block mb-1.5 text-xs font-bold text-muted">할 일</label>
-        <input
-          value={task}
-          onChange={e => setTask(e.target.value)}
-          placeholder="무엇에 집중할까요?"
-          className="w-full mb-4 px-3.5 py-2.5 rounded-[10px] border border-border bg-white text-sm text-[#333] outline-none box-border dark:bg-slate-800 dark:text-slate-100"
-        />
-        <label className="block mb-1.5 text-xs font-bold text-muted">집중 시간</label>
-        <div className="flex gap-2 mb-5">
-          {PACER_DURATIONS.map(minutes => {
-            const selected = duration === minutes;
-            return (
-              <button
-                key={minutes}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => setDuration(minutes)}
-                className="flex-1 py-2 rounded-[10px] border border-border text-sm font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 aria-pressed:bg-cyan aria-pressed:text-white aria-pressed:border-cyan"
-              >{minutes}분</button>
-            );
-          })}
-        </div>
-        <div className="flex gap-2.5 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-border bg-white text-sm text-[#555] cursor-pointer dark:bg-slate-800 dark:text-slate-200">취소</button>
-          <button onClick={handleStart} className="px-4 py-2 rounded-[10px] border-none bg-cyan text-white text-sm font-semibold cursor-pointer hover:brightness-95">시작</button>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const PACER_RING_RADIUS = 96;
-const PACER_RING_CIRC = 2 * Math.PI * PACER_RING_RADIUS;
-
-const paceChip: Record<PaceStatus, { label: string; color: string }> = {
-  on: { label: "페이스 좋음", color: CYAN },
-  slightly: { label: "조금 뒤처짐", color: "#f59e0b" },
-  behind: { label: "따라잡는 중", color: PINK },
-};
-
-// phase(시작/흐름/막판) × pace(뒤처짐/순항)로 멘트를 고르고, ~1.5분마다 회전시켜 살아있게.
-const pacerCoach = (
-  secondsLeft: number,
-  totalSeconds: number,
-  status: PaceStatus,
-  creditUnits: number,
-): string => {
-  if (secondsLeft === 0) return "끝까지 왔어요. 오늘 몫을 해냈어요.";
-  const elapsed = totalSeconds - secondsLeft;
-  const progress = totalSeconds > 0 ? elapsed / totalSeconds : 0;
-  const rotate = Math.floor(elapsed / 90);
-  const goal = creditUnits > 0 ? `이 세션이면 오늘 목표 ${creditUnits}개를 끝내요. ` : "";
-  let pool: string[];
-  if (progress >= 0.7) {
-    pool = status === "behind"
-      ? ["막판이에요. 여기서 멈추면 밀린 게 그대로예요. 조금만 더!", "거의 다 왔어요. 이 구간만 넘기면 따라잡아요."]
-      : ["막판이에요. 여기서 멈추면 아까워요.", "거의 다 왔어요. 끝까지 같은 페이스로."];
-  } else if (progress >= 0.15) {
-    pool = status === "behind"
-      ? [`조금 밀렸지만 흐름 탔어요. ${goal}딴 데 보지 말고 같이 가요.`, "지금 페이스면 충분히 따라잡아요. 계속 가요."]
-      : ["페이스 좋아요. 딴 데 보지 말고 이대로.", `좋은 흐름이에요. ${goal}쭉 가요.`];
-  } else {
-    pool = status === "behind"
-      ? [`조금 밀렸어요. 그래도 ${goal}시작이 반이에요.`, "딴 길로 새지 말고 같이 가요."]
-      : [`시작이 반이에요. ${goal}같이 가요.`, "자, 집중 모드. 딴 데 보지 말고 가봅시다."];
-  }
-  return pool[rotate % pool.length];
-};
-
-const PacerOverlay = ({ session, helpOpen, onStuck, onCredit, onClose, onAbandon, onRestart }: PacerOverlayProps) => {
-  const totalSeconds = session.durationMin * 60;
-  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
-  const [paused, setPaused] = useState(false);
-  const [confirmEnd, setConfirmEnd] = useState(false);
-  const deadlineRef = useRef(0);
-  const creditedRef = useRef(false);
-  const done = secondsLeft === 0;
-
-  // 시각 기반 카운트다운 — 백그라운드 탭 throttling/드리프트에도 정확.
-  useEffect(() => {
-    if (paused || done) return;
-    if (deadlineRef.current === 0) deadlineRef.current = Date.now() + totalSeconds * 1000;
-    const id = setInterval(() => {
-      setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
-    }, 250);
-    return () => clearInterval(id);
-  }, [paused, done, totalSeconds]);
-
-  // 0 도달 → 완료 화면 + 단 한 번만 적립.
-  useEffect(() => {
-    if (!done) return;
-    if (!creditedRef.current) {
-      creditedRef.current = true;
-      onCredit();
-    }
-  }, [done, onCredit]);
-
-  // 키보드: Space=일시정지/재개, Esc=끝내기 확인.
-  useEffect(() => {
-    if (done) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (helpOpen) return;
-      if (e.code === "Space") {
-        e.preventDefault();
-        setPaused(prev => {
-          if (prev) deadlineRef.current = Date.now() + secondsLeft * 1000;
-          return !prev;
-        });
-      } else if (e.code === "Escape") {
-        e.preventDefault();
-        setConfirmEnd(true);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [helpOpen, done, secondsLeft]);
-
-  const togglePause = () => {
-    setPaused(prev => {
-      if (prev) deadlineRef.current = Date.now() + secondsLeft * 1000;
-      return !prev;
-    });
-  };
-  const openTutor = () => {
-    setPaused(true);
-    onStuck();
-  };
-
-  const chip = paceChip[session.paceStatus];
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
-  const ss = String(secondsLeft % 60).padStart(2, "0");
-  const ringOffset = PACER_RING_CIRC * (1 - (totalSeconds > 0 ? secondsLeft / totalSeconds : 0));
-  const coach = paused
-    ? "준비되면 다시 이어가요. ‘재개’를 누르세요."
-    : pacerCoach(secondsLeft, totalSeconds, session.paceStatus, session.creditUnits);
-
-  const cyanBtn = "px-5 py-2 rounded-xl bg-cyan text-white text-sm font-semibold cursor-pointer hover:brightness-95";
-  const slateBtn = "px-5 py-2 rounded-xl bg-slate-200 text-[#444] text-sm font-semibold cursor-pointer hover:brightness-95 dark:bg-slate-700 dark:text-slate-100";
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className={`fixed inset-0 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm transition-opacity ${helpOpen ? "z-[180] opacity-60 pointer-events-none" : "z-[200] opacity-100"}`}
-    >
-      <Card className="w-[min(520px,94vw)] p-8 text-center">
-        {done ? (
-          <div className="py-6">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cyan/15 text-sm font-extrabold text-cyan">완료</div>
-            <p className="m-0 mb-1 text-lg font-bold text-[#222] dark:text-slate-100">잘했어요! 한 구간 완주</p>
-            <p className="m-0 mb-6 text-sm text-muted">
-              {session.creditUnits > 0 ? `+${session.creditUnits}개 적립 · 오늘 목표 달성` : "복습 한 세션 완료"}
-            </p>
-            <div className="flex gap-2 justify-center">
-              <button type="button" onClick={onRestart} className={cyanBtn}>한 세션 더</button>
-              <button type="button" onClick={onClose} className={slateBtn}>닫기</button>
-            </div>
-          </div>
-        ) : confirmEnd ? (
-          <div className="py-6">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink/10 text-xs font-extrabold text-pink">중단</div>
-            <p className="m-0 mb-1 text-base font-bold text-[#222] dark:text-slate-100">지금 끝낼까요?</p>
-            <p className="m-0 mb-6 text-sm text-muted">아직 시간이 남았어요. 지금 그만두면 이번 세션은 기록되지 않아요.</p>
-            <div className="flex gap-2 justify-center">
-              <button type="button" onClick={() => setConfirmEnd(false)} className={cyanBtn}>계속하기</button>
-              <button type="button" onClick={onAbandon} className={slateBtn}>그만두기</button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-1">
-              <span className="text-sm font-semibold text-muted">{session.course}</span>
-              {session.daysLeft !== null && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-[#555] dark:bg-slate-700 dark:text-slate-200">
-                  {session.daysLeft <= 0 ? "D-DAY" : `D-${session.daysLeft}`}
-                </span>
-              )}
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: chip.color }}>{chip.label}</span>
-            </div>
-            <p className="m-0 mb-5 text-sm text-muted">
-              {session.creditUnits > 0 ? `이 세션이면 오늘 목표 ${session.creditUnits}개 완료` : "오늘은 약점 복습 세션이에요"}
-            </p>
-
-            <div className="relative mx-auto" style={{ width: 240, height: 240 }}>
-              <svg width="240" height="240" viewBox="0 0 240 240" className="-rotate-90">
-                <circle cx="120" cy="120" r={PACER_RING_RADIUS} fill="none" strokeWidth="12" className="stroke-slate-100 dark:stroke-slate-700" />
-                <circle
-                  cx="120" cy="120" r={PACER_RING_RADIUS} fill="none" strokeWidth="12" strokeLinecap="round"
-                  stroke={chip.color}
-                  strokeDasharray={PACER_RING_CIRC}
-                  strokeDashoffset={ringOffset}
-                  className="transition-[stroke-dashoffset] duration-300 ease-linear motion-reduce:transition-none"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center" aria-live="off">
-                <div className="font-bold tabular-nums leading-none text-[#222] dark:text-slate-100">
-                  <span className="text-5xl">{mm}</span><span className="text-2xl text-muted">:{ss}</span>
-                </div>
-                {paused && <span className="mt-2 text-xs font-bold text-muted">일시정지됨</span>}
-              </div>
-            </div>
-
-            <p className="mt-5 min-h-[20px] text-sm text-muted" aria-live="polite">{coach}</p>
-
-            <div className="mt-6 flex gap-2 justify-center">
-              <button type="button" onClick={togglePause} className={slateBtn}>{paused ? "재개" : "일시정지"}</button>
-              <button type="button" onClick={openTutor} className={cyanBtn}>AI 튜터에게 질문</button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setConfirmEnd(true)}
-              className="mt-4 border-none bg-transparent text-xs font-semibold text-muted cursor-pointer underline-offset-2 hover:underline"
-            >세션 끝내기</button>
-          </>
-        )}
-      </Card>
-    </div>
-  );
-};
 
 const CourseDetailModal = ({
   course,
@@ -1070,15 +931,6 @@ export default function Dashboard() {
   const [pacePlans, setPacePlans] = useState<PacePlan[]>([]);
   const [pacePlansLoaded, setPacePlansLoaded] = useState(false);
   const [showAddPace, setShowAddPace] = useState(false);
-  const [courseScores, setCourseScores] = useState<Record<string, number[]>>({});
-  const [paceLog, setPaceLog] = useState<PaceLog>({});
-  const [paceLogLoaded, setPaceLogLoaded] = useState(false);
-  const [appliedCatchUp, setAppliedCatchUp] = useState<Record<string, number>>({});
-  const [todayKey] = useState(() => toDateKey(new Date()));
-  const [recoveryDismissed, setRecoveryDismissed] = useState(false);
-  const [pacerSession, setPacerSession] = useState<PacerSession | null>(null);
-  const [showPacerStart, setShowPacerStart] = useState(false);
-  const [pacerStuckOpen, setPacerStuckOpen] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -1163,39 +1015,6 @@ export default function Dashboard() {
     saveDashboardState("pacePlans", pacePlans).catch(console.warn);
   }, [pacePlansLoaded, pacePlans]);
 
-  // P5: 전체 퀴즈 응시 점수를 코스별 최신순 배열로 모아 준비도 계산에 사용
-  useEffect(() => {
-    let ignore = false;
-    loadAllQuizAttemptsFromServer()
-      .then(attempts => {
-        if (ignore) return;
-        const byCourse: Record<string, number[]> = {};
-        attempts.forEach(attempt => {
-          (byCourse[attempt.courseName] ??= []).push(attempt.scorePercent);
-        });
-        setCourseScores(byCourse);
-      })
-      .catch(error => console.warn("퀴즈 점수 불러오기 실패", error));
-    return () => { ignore = true; };
-  }, []);
-
-  // P7/P8: 일별 학습 기록 로드·저장
-  useEffect(() => {
-    let ignore = false;
-    loadDashboardState<PaceLog>("paceLog", {})
-      .then(next => {
-        if (ignore) return;
-        setPaceLog(next);
-        setPaceLogLoaded(true);
-      })
-      .catch(error => console.warn("학습 기록 불러오기 실패", error));
-    return () => { ignore = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!paceLogLoaded) return;
-    saveDashboardState("paceLog", paceLog).catch(console.warn);
-  }, [paceLogLoaded, paceLog]);
 
   useEffect(() => {
     if (!openCourseMenu) return;
@@ -1357,184 +1176,42 @@ export default function Dashboard() {
     }));
   };
 
-  const pacePlanViews = pacePlans
-    .map(plan => {
-      const dday = ddays.find(item => item.id === plan.ddayId);
-      const daysLeft = dday ? getDaysLeft(dday.date) : PACE_NO_DDAY_HORIZON_DAYS;
-      const baseTarget = paceTodayTarget(plan, daysLeft);
-      const override = appliedCatchUp[plan.id];
-      const status: PaceStatus = dday ? paceStatus(plan, dday.date) : "on";
-      const readiness = paceReadiness(plan, courseScores[plan.course] ?? []);
-      return {
-        plan,
-        dday,
-        daysLeft,
-        status,
-        remaining: paceRemaining(plan),
-        baseTarget,
-        todayTarget: override ?? baseTarget,
-        reviewOnly: false,
-        catchUpTarget: dday ? paceCatchUpTarget(plan, dday.date, daysLeft) : baseTarget,
-        catchUpApplied: override !== undefined,
-        progress: paceProgressPct(plan),
-        readiness,
-        readinessTier: readinessTier(readiness),
-        hasScores: (courseScores[plan.course] ?? []).length > 0,
-        sprint: dday ? isPaceSprint(daysLeft) : false,
-      };
-    });
+  const pacePlanViews = pacePlans.map(plan => {
+    const dday = ddays.find(item => item.id === plan.ddayId);
+    const daysLeft = dday ? getDaysLeft(dday.date) : PACE_NO_DDAY_HORIZON_DAYS;
+    const status: PaceStatus = dday ? paceStatus(plan, dday.date) : "on";
+    return {
+      plan,
+      dday,
+      daysLeft,
+      status,
+      remaining: paceRemaining(plan),
+      progress: paceProgressPct(plan),
+    };
+  });
   const activePaceViews = pacePlanViews.filter(view => view.remaining > 0);
   const statusRank: Record<PaceStatus, number> = { behind: 0, slightly: 1, on: 2 };
+  // 오늘 바로 시작할 추천 과목 — 가장 급한(밀린·임박) 진행 중 플랜 하나.
   const stepView = [...activePaceViews]
     .sort((a, b) =>
       statusRank[a.status] - statusRank[b.status] ||
       a.daysLeft - b.daysLeft ||
       a.progress - b.progress
     )[0] ?? null;
+  const recommendedCourse = stepView?.plan.course ?? null;
+  const startHint = !stepView
+    ? "추천할 과목이 아직 없어요."
+    : stepView.status !== "on"
+      ? `조금 밀렸어요. ${stepView.plan.course}부터 시작해요.`
+      : stepView.dday
+        ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
+        : `오늘 추천: ${stepView.plan.course}`;
 
-  const addPacePlan = (course: string, ddayId: string, totalUnits: number) => {
+  const addPacePlan = (course: string, ddayId: string, totalUnits: number, unitLabel?: string) => {
     setPacePlans(prev => [
       ...prev,
-      { id: createClientId(), course, ddayId, totalUnits, doneUnits: 0, createdAt: Date.now() },
+      { id: createClientId(), course, ddayId, totalUnits, doneUnits: 0, createdAt: Date.now(), unitLabel },
     ]);
-  };
-
-  const clearCatchUp = (planId: string) => {
-    setAppliedCatchUp(prev => {
-      if (!(planId in prev)) return prev;
-      const next = { ...prev };
-      delete next[planId];
-      return next;
-    });
-  };
-
-  const completePaceStep = (planId: string, amount: number) => {
-    const currentPlan = pacePlans.find(plan => plan.id === planId);
-    if (!currentPlan) return;
-    const nextDone = Math.min(currentPlan.totalUnits, currentPlan.doneUnits + amount);
-    const creditedUnits = nextDone - currentPlan.doneUnits;
-    setPacePlans(prev => prev.map(plan => {
-      if (plan.id !== planId) return plan;
-      return { ...plan, doneUnits: nextDone, lastActivityAt: Date.now() };
-    }));
-    setPaceLog(prev => {
-      const entry = prev[todayKey];
-      const units = typeof entry === "number" ? entry : entry?.units ?? 0;
-      const reviewSessions = typeof entry === "number" ? 0 : entry?.reviewSessions ?? 0;
-      if (creditedUnits > 0) {
-        const nextUnits = units + creditedUnits;
-        return { ...prev, [todayKey]: reviewSessions > 0 ? { units: nextUnits, reviewSessions } : nextUnits };
-      }
-      return { ...prev, [todayKey]: { units, reviewSessions: reviewSessions + 1 } };
-    });
-    clearCatchUp(planId);
-  };
-
-  const applyCatchUp = (planId: string, amount: number) => {
-    setAppliedCatchUp(prev => ({ ...prev, [planId]: amount }));
-  };
-
-  const deletePacePlan = (planId: string) => {
-    setPacePlans(prev => prev.filter(plan => plan.id !== planId));
-    clearCatchUp(planId);
-  };
-
-  const lastActivityAt = pacePlans.reduce<number | undefined>((latest, plan) => {
-    if (plan.lastActivityAt === undefined) return latest;
-    return latest === undefined ? plan.lastActivityAt : Math.max(latest, plan.lastActivityAt);
-  }, undefined);
-  const gapDays = paceGapDays(lastActivityAt);
-  const showRecovery = !recoveryDismissed && lastActivityAt !== undefined && gapDays >= 2 && stepView !== null;
-
-  // P7/P8: 회복형 스트릭 + 이번 주 회고
-  const streak = paceStreak(paceLog);
-  const weekStats = paceWeekStats(paceLog);
-  const hasWeeklyActivity = weekStats.units > 0 || weekStats.activeDays > 0;
-  // P5: 시험 준비도 — D-day 연결된 플랜만, 임박 순
-  const readinessViews = pacePlanViews
-    .filter(view => view.dday)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-  const focusReadiness = readinessViews[0];
-  const paceCoachTone = !stepView
-    ? "border-cyan/30 bg-cyan/5"
-    : stepView.status === "behind"
-      ? "border-pink/30 bg-pink/5"
-      : stepView.status === "slightly"
-        ? "border-amber-200 bg-amber-50 dark:bg-amber-400/10"
-        : "border-cyan/30 bg-cyan/5";
-  const paceCoachBadge = !stepView
-    ? "오늘 목표 완료"
-    : stepView.status === "behind"
-      ? "복구 필요"
-      : stepView.status === "slightly"
-        ? "조금만 더"
-        : "정상 페이스";
-  const paceCoachTitle = !stepView
-    ? "오늘 계획한 페이스는 끝났어요."
-    : `${stepView.plan.course} ${stepView.todayTarget}개만 끝내면 오늘 페이스예요.`;
-  const paceCoachBody = !stepView
-    ? "더 할 여유가 있으면 오답 재풀이처럼 부담이 낮은 복습으로 마무리해도 좋아요."
-    : stepView.status === "behind"
-      ? `조금 밀렸어요. 무리해서 몰아가기보다 오늘은 ${stepView.todayTarget}개를 먼저 끝내고, 필요하면 복구 목표 ${stepView.catchUpTarget}개로 조정하세요.`
-      : stepView.status === "slightly"
-        ? "크게 밀린 상태는 아니에요. 오늘 목표 하나만 처리하면 흐름을 다시 안정시킬 수 있어요."
-        : "지금 흐름은 괜찮아요. 오늘 목표를 짧게 끝내고 다음 자료로 넘어가면 됩니다.";
-  const paceCoachMeta = hasWeeklyActivity
-    ? `이번 주 새 학습 ${weekStats.units}개 · 학습 ${weekStats.activeDays}일 · 연속 ${streak.days}일${weekStats.reviewSessions > 0 ? ` · 복습 ${weekStats.reviewSessions}회` : ""}`
-    : "이번 주 기록은 아직 없어요. 오늘 목표를 끝내면 페이스 기록이 시작됩니다.";
-
-  const applyRecovery = () => {
-    if (!stepView) return;
-    setAppliedCatchUp(prev => ({
-      ...prev,
-      [stepView.plan.id]: paceRecoveryTarget(stepView.plan, stepView.daysLeft),
-    }));
-    setRecoveryDismissed(true);
-  };
-
-  const startPacerForView = (view: NonNullable<typeof stepView>, taskLabel: string, durationMin: number) => {
-    setPacerSession({
-      course: view.plan.course,
-      taskLabel,
-      durationMin,
-      startedAt: Date.now(),
-      planId: view.plan.id,
-      creditUnits: view.todayTarget,
-      daysLeft: view.dday ? view.daysLeft : null,
-      paceStatus: view.status,
-    });
-    setPacerStuckOpen(false);
-  };
-
-  const startPacer = (taskLabel: string, durationMin: number) => {
-    if (!stepView) return;
-    startPacerForView(stepView, taskLabel, durationMin);
-  };
-
-  // 시간을 끝까지 채웠을 때만 적립(완료 화면은 유지). 중단은 적립하지 않는다.
-  const creditPacer = () => {
-    if (pacerSession) completePaceStep(pacerSession.planId, pacerSession.creditUnits);
-  };
-
-  const closePacer = () => {
-    setPacerSession(null);
-    setPacerStuckOpen(false);
-  };
-
-  // "한 세션 더": 현재 페이스 기준으로 새 세션을 다시 띄운다(목표 달성 시 닫기).
-  const restartPacer = () => {
-    setPacerStuckOpen(false);
-    if (!pacerSession) {
-      closePacer();
-      return;
-    }
-    const currentPlanView = pacePlanViews.find(view => view.plan.id === pacerSession.planId && view.remaining > 0);
-    if (currentPlanView) {
-      startPacerForView(currentPlanView, pacerSession.taskLabel, pacerSession.durationMin);
-      return;
-    }
-    if (stepView) startPacerForView(stepView, stepView.dday?.subj ?? stepView.plan.course, pacerSession.durationMin);
-    else closePacer();
   };
 
   return (
@@ -1587,37 +1264,6 @@ export default function Dashboard() {
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
       {showAddPace && <AddPaceModal courses={courses} ddays={ddays} onClose={() => setShowAddPace(false)} onAdd={addPacePlan} />}
-      {showPacerStart && stepView && (
-        <PacerStartModal
-          defaultCourse={stepView.plan.course}
-          defaultTask={stepView.dday?.subj ?? stepView.plan.course}
-          onClose={() => setShowPacerStart(false)}
-          onStart={startPacer}
-        />
-      )}
-      {pacerSession && (
-        <PacerOverlay
-          key={pacerSession.startedAt}
-          session={pacerSession}
-          helpOpen={pacerStuckOpen}
-          onStuck={() => setPacerStuckOpen(true)}
-          onCredit={creditPacer}
-          onClose={closePacer}
-          onAbandon={closePacer}
-          onRestart={restartPacer}
-        />
-      )}
-      {pacerSession && (
-        <AITutorDrawer
-          layout="drawer"
-          open={pacerStuckOpen}
-          onOpenChange={setPacerStuckOpen}
-          resetHistory
-          contextTitle={`${pacerSession.course} · ${pacerSession.taskLabel}`}
-          contextMarkdown={`# ${pacerSession.course} 집중 세션\n\n현재 학습: ${pacerSession.taskLabel}\n\n막힌 부분을 짧고 쉽게 도와줘.`}
-          disabledReason="세션 맥락을 불러오지 못했어요."
-        />
-      )}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -1627,131 +1273,44 @@ export default function Dashboard() {
       </div>
 
       <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto" }}>
-        {stepView?.sprint && (
-          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-card bg-pink/10 px-4 py-3 text-sm text-[#234] dark:text-slate-200">
-            <span className="font-semibold text-pink">
-              {stepView.plan.course} D-{stepView.daysLeft} 막판 스퍼트
-            </span>
-            <span>새 분량은 멈추고, 틀린 문제 다시 풀고 시험모드로 마지막 점검해요.</span>
-            <div className="ml-auto flex gap-2">
-              <button
-                type="button"
-                onClick={() => navigate("/review")}
-                className="rounded-lg bg-white/70 px-3 py-1.5 text-sm font-semibold text-pink cursor-pointer hover:bg-white"
-              >오답 재풀이</button>
-              <button
-                type="button"
-                onClick={() => navigate("/quiz")}
-                className="rounded-lg bg-pink px-3 py-1.5 text-sm font-semibold text-white cursor-pointer hover:brightness-95"
-              >시험모드</button>
-            </div>
-          </div>
-        )}
-        {showRecovery && (
-          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-card bg-cyan/10 px-4 py-3 text-sm text-[#234] dark:text-slate-200">
-            <span>{gapDays}일 공백이 있었네요. 몰아서 말고 약한 개념부터 가볍게 다시 시작해요.</span>
+        <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
+              공부 시작하기
+            </h2>
             <button
               type="button"
-              onClick={applyRecovery}
-              className="ml-auto rounded-lg bg-white/70 px-3 py-1.5 text-sm font-semibold text-cyan cursor-pointer hover:bg-white"
-            >복구 플랜 적용</button>
+              onClick={() => setShowAddPace(true)}
+              className="rounded-full border border-pink/40 bg-white px-3 py-1.5 text-xs font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
+            >
+              {pacePlanViews.length > 0 ? "페이스 플랜 추가" : "페이스 플랜 만들기"}
+            </button>
           </div>
-        )}
-        {pacePlanViews.length > 0 && (
-          <Card className={`mb-5 border p-5 ${paceCoachTone}`}>
-            <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-extrabold text-[#344054] dark:bg-slate-900/70 dark:text-slate-200">
-                    페이스 코치
-                  </span>
-                  <span className="rounded-full bg-cyan px-2.5 py-1 text-xs font-extrabold text-white">
-                    {paceCoachBadge}
-                  </span>
-                </div>
-                <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
-                  {paceCoachTitle}
-                </h2>
-                <p className="m-0 mt-2 text-sm leading-6 text-[#555] dark:text-slate-300">
-                  {paceCoachBody}
-                </p>
-                <p className="m-0 mt-3 text-xs font-bold leading-5 text-muted">
-                  {paceCoachMeta}
-                </p>
-              </div>
-              <div className="flex w-full flex-col gap-2 md:w-[260px]">
-                {stepView ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => completePaceStep(stepView.plan.id, stepView.todayTarget)}
-                      className="w-full rounded-[10px] bg-pink px-4 py-3 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
-                    >
-                      {stepView.todayTarget}개 완료하기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPacerStart(true)}
-                      className="w-full rounded-[10px] border border-cyan bg-white px-4 py-3 text-sm font-extrabold text-cyan cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
-                    >
-                      집중 타이머 시작
-                    </button>
-                    {stepView.status === "behind" && (
-                      stepView.catchUpApplied ? (
-                        <span className="rounded-[10px] bg-white/70 px-3 py-2 text-center text-xs font-extrabold text-pink">
-                          복구 목표 반영됨
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => applyCatchUp(stepView.plan.id, stepView.catchUpTarget)}
-                          className="w-full rounded-[10px] border border-pink bg-white px-4 py-2.5 text-sm font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
-                        >
-                          복구 목표 {stepView.catchUpTarget}개로 조정
-                        </button>
-                      )
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => deletePacePlan(stepView.plan.id)}
-                      className="border-none bg-transparent px-2 py-1 text-xs font-bold text-muted cursor-pointer hover:text-pink"
-                    >
-                      이 플랜 삭제
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => navigate("/review")}
-                      className="w-full rounded-[10px] bg-cyan px-4 py-3 text-sm font-extrabold text-white cursor-pointer hover:brightness-95"
-                    >
-                      오답 재풀이
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddPace(true)}
-                      className="w-full rounded-[10px] border border-pink bg-white px-4 py-3 text-sm font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
-                    >
-                      페이스 플랜 추가
-                    </button>
-                  </>
-                )}
-                {focusReadiness && (
-                  <div className="rounded-[10px] bg-white/70 px-3 py-2 dark:bg-slate-900/60">
-                    <div className="mb-1 flex items-center justify-between gap-2 text-xs font-extrabold text-[#344054] dark:text-slate-200">
-                      <span className="truncate">{focusReadiness.plan.course} 준비도</span>
-                      <span>{focusReadiness.readiness}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
-                      <div className="h-1.5 rounded-full bg-cyan" style={{ width: `${focusReadiness.readiness}%` }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
+          <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
+            {startHint}
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => navigate(pageRoutes["오답 노트"])}
+              className="flex flex-col items-start gap-1 rounded-[14px] border border-pink bg-white px-5 py-4 text-left cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
+            >
+              <span className="text-base font-extrabold text-pink">오답 다시 풀기</span>
+              <span className="text-xs font-semibold text-pink/80">틀린 문제부터 확인</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(
+                pageRoutes["자료 요약"],
+                recommendedCourse ? { state: { selectedCourse: recommendedCourse, fromDashboard: true } } : undefined,
+              )}
+              className="flex flex-col items-start gap-1 rounded-[14px] border border-cyan bg-white px-5 py-4 text-left cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
+            >
+              <span className="text-base font-extrabold text-cyan">자료 복습하기</span>
+              <span className="text-xs font-semibold text-cyan/80">요약과 자료 보기</span>
+            </button>
+          </div>
+        </Card>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
           {/* 강의 목록 카드 그리드 */}
           <div>

@@ -5,6 +5,7 @@ export type PacePlan = {
   totalUnits: number;
   doneUnits: number;
   createdAt: number;
+  unitLabel?: string;
   lastActivityAt?: number;
 };
 
