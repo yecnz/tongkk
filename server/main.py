@@ -2,6 +2,8 @@ import json
 import os
 import base64
 import zipfile
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from datetime import date
@@ -19,6 +21,7 @@ load_dotenv(SERVER_DIR / ".env")
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
@@ -72,6 +75,10 @@ VISUAL_ANALYSIS_MIN_TEXT_CHARS = _env_int("VISUAL_ANALYSIS_MIN_TEXT_CHARS", 1200
 PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 90)
 PDF_VISUAL_TEXT_PAGE_CHARS = _env_int("PDF_VISUAL_TEXT_PAGE_CHARS", 180)
 PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
+# 요약 출력 토큰 한도. 기본 8192로는 긴 강의자료(예: 100p+) 요약이 중간에 잘리므로 넉넉히 둔다.
+# gpt-5.4-mini 출력 하드 상한은 128000이라 32768은 안전한 헤드룸(약 300p+ 커버).
+SUMMARY_MAX_TOKENS = _env_int("SUMMARY_MAX_TOKENS", 32768)
 
 
 async def require_api_user(authorization: str | None = Header(default=None)):
@@ -130,18 +137,18 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - 단순 정리본처럼 모든 내용을 같은 밀도로 나열하지 말고, 중요도와 개념 간 관계가 드러나게 정리해.
 - 권장 흐름은 '# 강의 제목' → '## 한눈에 보는 흐름' → '## 핵심 개념' → '## 방법/절차' → '## 주요 용어' → '## 시험 포인트' → '## 핵심 암기 사항' → '## 참고/주의 사항'이다. 자료에 없는 섹션은 억지로 만들지 마.
 - '한눈에 보는 흐름'에서는 강의가 어떤 문제의식에서 시작해 어떤 개념과 방법으로 이어지는지 4~7개 bullet로 정리해.
-- '핵심 개념'에서는 각 개념을 정의, 의미, 중요한 이유, 예시/적용 맥락 순서로 설명해.
+- '핵심 개념'에서는 개념을 하나씩 '### 개념명' 소제목으로 나눠 설명해. 각 소제목 아래에 정의, 의미, 중요한 이유, 예시/적용 맥락을 bullet로 적어. 여러 개념을 '6.1 …', '6.2 …'처럼 절 번호 제목 하나에 몰아넣거나 '**개념명**' 굵은 글머리로 묶지 말고, 소제목에는 번호 없이 개념 이름만 써. 각 개념의 출처는 그 개념 소제목 아래 내용에만 붙여.
 - '방법/절차'에서는 실험법, 계산법, 분석법처럼 순서가 있는 내용을 번호 목록으로 정리하고, 단계별 목적과 결과를 함께 적어.
 - '주요 용어'는 별도 섹션에서 '용어 | 설명 | 헷갈리는 점' 표로 정리해.
-- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 질문-답변 관점으로 정리해.
-- '핵심 암기 사항'은 마지막 복습용으로 반드시 외울 정의, 공식, 절차, 비교 개념만 압축해.
-- '참고/주의 사항'에는 실험 주의점, 예외, 단위, 조건, 흔한 실수를 모아 정리해.
+- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 '문제 → 답' 형식으로 정리해. 각 항목은 반드시 '>' 인용문 박스 하나로 감싸서 항목끼리 카드처럼 분리하고, 박스 안에는 질문을 한 줄로 쓰고 그 질문 줄 끝에 '(출처: 파일명, p.X)'로 해당 문제의 출처를 붙인 다음, 줄을 바꿔 '- 답:'을 한 줄로만 적고, 바로 아래 줄부터 답 내용을 요점별로 하위 bullet('  - ')로 나눠 적어라. 한 bullet에는 한 가지 요점만 담고, 한 문장에 사실이 여러 개면 쪼개서 각각 별도 bullet로 만들어라(답이 정말 한 가지뿐일 때만 bullet 하나). '답:' 옆에 답 내용을 같은 줄로 붙이지 말고, 답의 각 요점은 반드시 '- '로 시작하는 별도 줄에 둬라. 질문과 답은 반드시 서로 다른 줄에 둬라. 시험 포인트 출처는 헤딩이 아니라 각 질문 옆에만 둔다. 질문 앞에 '시험 포인트:' 같은 라벨은 붙이지 마.
+- '핵심 암기 사항'은 마지막 복습용으로 반드시 외울 정의, 공식, 절차, 비교 개념만 압축해서, 전체를 '>' 인용문 박스 하나로 묶어 bullet 목록으로 정리해(핵심 키워드는 굵게).
+- '참고/주의 사항'에는 실험 주의점, 예외, 단위, 조건, 흔한 실수를 '>' 인용문 박스 하나로 묶어 bullet로 정리해(핵심 암기 사항과 같은 박스 형태). 각 항목 앞에 '헷갈림 주의:' 같은 라벨은 붙이지 마.
 - 비교가 필요한 개념은 Markdown 표로 정리해.
 - 분류 체계나 분석 방법의 갈래는 코드블록 구조도(tree)로 먼저 보여준 뒤 설명해.
 - 절차, 시험 포인트, 헷갈림 주의, 핵심 암기 묶음은 필요할 때 '>' 인용문을 사용해 텍스트 상자로 정리해.
-- 시험에 나올 가능성이 높은 내용은 '**시험 포인트:**'라는 굵은 문구로 표시해.
-- 헷갈리기 쉬운 내용은 '**헷갈림 주의:**'라는 굵은 문구로 표시해.
-- 제목별 카드 구조는 만들지 말고, 텍스트 상자는 학습상 강조가 필요한 곳에만 사용해.""",
+- '시험 포인트' 섹션 안에서는 '**시험 포인트:**' 라벨을 붙이지 마라. 다른 섹션 본문에서 특히 시험에 중요한 문장만 제한적으로 '**시험 포인트:**'로 강조한다.
+- '참고/주의 사항' 섹션 안에서는 '**헷갈림 주의:**' 라벨을 붙이지 마라. 다른 섹션 본문에서 특히 헷갈리기 쉬운 문장만 제한적으로 '**헷갈림 주의:**'로 강조한다.
+- 박스('>' 인용문)는 위에서 지정한 '시험 포인트'·'핵심 암기 사항'·'참고/주의 사항' 세 섹션에서만 써라. '핵심 개념'·'방법/절차'·'주요 용어'·'한눈에 보는 흐름'은 박스로 감싸지 말고 일반 텍스트와 bullet로만 정리하고, 절대 카드/박스로 쪼개지 마.""",
     "MINDMAP": """강의자료의 핵심 구조를 JSON으로만 출력해. 공통 기준은 무시하고 아래 형식만 따라.
 
 출력 형식 (순수 JSON만, 코드 블록·설명 없이):
@@ -184,6 +191,7 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 11. '>' 인용문은 텍스트 상자가 필요한 경우에만 사용해. 화면에서는 왼쪽 색 선 없이 둥근 박스로 렌더링된다.
 12. 제목별로 카드나 박스를 나누는 형식은 사용하지 마.
 13. 템플릿별 목적을 최우선으로 따르고, 세 템플릿의 출력 스타일이 서로 비슷해지지 않게 해.
+14. 일반 요약, 강의 노트, 치트시트에서는 핵심 bullet이나 중요한 문장 끝에 가능한 경우 `(출처: 파일명, p.3/slide 7/OCR 이미지 2/섹션명)`처럼 짧은 근거 표기를 붙여라. 자료에 위치 단서가 없으면 파일명이나 섹션명만 써도 된다.
 
 [강의자료]
 {markdown}
@@ -476,8 +484,66 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENSIONS}
+SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _find_office_binary() -> str | None:
+    configured_path = os.getenv("LIBREOFFICE_PATH", "").strip()
+    if configured_path:
+        return configured_path
+
+    for command in ("soffice", "libreoffice"):
+        resolved = shutil.which(command)
+        if resolved:
+            return resolved
+
+    windows_candidates = [
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+    ]
+    for candidate in windows_candidates:
+        if Path(candidate).exists():
+            return candidate
+
+    return None
+
+
+def _convert_presentation_to_pdf(file_path: str) -> bytes:
+    office_binary = _find_office_binary()
+    if not office_binary:
+        raise RuntimeError("PPT/PPTX 미리보기를 사용하려면 서버에 LibreOffice가 설치되어 있어야 합니다.")
+
+    with tempfile.TemporaryDirectory() as output_dir:
+        command = [
+            office_binary,
+            "--headless",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            output_dir,
+            file_path,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=_env_int("PPT_PREVIEW_TIMEOUT_SECONDS", 120),
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("PPT/PPTX PDF 변환 시간이 초과되었습니다.") from e
+
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(f"PPT/PPTX PDF 변환 실패: {detail or 'LibreOffice 변환 오류'}")
+
+        pdf_files = sorted(Path(output_dir).glob("*.pdf"))
+        if not pdf_files:
+            raise RuntimeError("PPT/PPTX 변환 결과 PDF를 찾지 못했습니다.")
+
+        return pdf_files[0].read_bytes()
 
 
 def _extract_image_text_with_tesseract(path: str) -> str:
@@ -501,6 +567,20 @@ def _image_data_url(image_bytes: bytes, mime_type: str = "image/png") -> str:
 
 def _text_length(text: str) -> int:
     return len("".join(text.split()))
+
+
+def _extract_pdf_markdown_with_page_markers(file_path: str) -> str:
+    try:
+        import fitz
+    except ImportError:
+        return ""
+    pages = []
+    with fitz.open(file_path) as doc:
+        for i, page in enumerate(doc):
+            text = page.get_text("text") or ""
+            if text.strip():
+                pages.append(f"<!-- p.{i + 1} -->\n{text.strip()}")
+    return "\n\n".join(pages)
 
 
 def _pdf_page_has_image(page) -> bool:
@@ -672,9 +752,17 @@ async def convert_document_to_markdown(
             text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
             return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
 
-        # 1단계: markitdown으로 텍스트 레이어 추출
-        result = await run_in_threadpool(md_converter.convert, tmp_path)
-        base_markdown = (result.text_content or "").strip()
+        # 1단계: 텍스트 레이어 추출 (PDF는 페이지 마커 포함)
+        if suffix == ".pdf":
+            pdf_markdown = await run_in_threadpool(_extract_pdf_markdown_with_page_markers, tmp_path)
+            if pdf_markdown:
+                base_markdown = pdf_markdown
+            else:
+                result = await run_in_threadpool(md_converter.convert, tmp_path)
+                base_markdown = (result.text_content or "").strip()
+        else:
+            result = await run_in_threadpool(md_converter.convert, tmp_path)
+            base_markdown = (result.text_content or "").strip()
         visual_markdown = ""
         try:
             visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
@@ -686,6 +774,48 @@ async def convert_document_to_markdown(
         raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
     finally:
         os.unlink(tmp_path)
+
+
+@app.post("/preview/pdf")
+async def convert_document_to_pdf_preview(
+    file: UploadFile = File(...),
+    _user=Depends(require_api_user),
+):
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in SUPPORTED_PREVIEW_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 미리보기를 지원합니다.")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="미리보기 파일이 비어 있습니다.")
+
+    if suffix == ".pdf":
+        return Response(
+            content=file_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        pdf_bytes = await run_in_threadpool(_convert_presentation_to_pdf, tmp_path)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"PPT/PPTX 미리보기 변환 실패: {str(e)}") from e
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
 
 
 @app.post("/vision/ocr")
@@ -765,7 +895,7 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
-        llm = build_llm(req.model)
+        llm = build_llm(req.model, max_tokens=SUMMARY_MAX_TOKENS)
         response = llm.invoke([
             SystemMessage(content="""너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
 사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.

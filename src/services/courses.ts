@@ -21,7 +21,17 @@ const toCourseRecord = (row: CourseRow): CourseRecord => ({
   updatedAt: new Date(row.updated_at).getTime(),
 });
 
+let _coursesCache: { data: CourseRecord[]; expiry: number } | null = null;
+const COURSES_CACHE_TTL = 30_000;
+
+export function invalidateCoursesCache() {
+  _coursesCache = null;
+}
+
 export async function fetchCourses(): Promise<CourseRecord[]> {
+  if (_coursesCache && Date.now() < _coursesCache.expiry) {
+    return _coursesCache.data;
+  }
   await requireSupabaseUser();
   const { data, error } = await supabase
     .from('courses')
@@ -29,7 +39,9 @@ export async function fetchCourses(): Promise<CourseRecord[]> {
     .order('updated_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
-  return (data || []).map(toCourseRecord);
+  const result = (data || []).map(toCourseRecord);
+  _coursesCache = { data: result, expiry: Date.now() + COURSES_CACHE_TTL };
+  return result;
 }
 
 export async function createCourse(name: string): Promise<CourseRecord> {
@@ -41,6 +53,7 @@ export async function createCourse(name: string): Promise<CourseRecord> {
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateCoursesCache();
   return toCourseRecord(data);
 }
 
@@ -53,6 +66,7 @@ export async function updateCourse(courseId: string, name: string): Promise<Cour
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateCoursesCache();
   return toCourseRecord(data);
 }
 
@@ -63,4 +77,5 @@ export async function removeCourse(courseId: string): Promise<void> {
     .eq('id', courseId);
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateCoursesCache();
 }

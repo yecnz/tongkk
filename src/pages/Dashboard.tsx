@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
@@ -100,6 +100,16 @@ type CourseStats = {
 
 const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
 
+type CourseStats = {
+  materials: number;
+  summaries: number;
+  quizzes: number;
+  loading: boolean;
+  error: string;
+};
+
+const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
+
 const createClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const toDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -121,6 +131,33 @@ const templateLabels: Record<SavedSummary["template"], string> = {
 
 const formatDate = (timestamp: number) =>
   new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
+
+const materialMeta = (material: CourseMaterial) => {
+  if (material.pages) return `${material.pages}페이지`;
+  if (material.slides) return `${material.slides}슬라이드`;
+  return material.type.toUpperCase();
+};
+
+const preview = (summary: SavedSummary): string => {
+  const { content, template } = summary;
+  if (template === "MINDMAP") {
+    try {
+      const parsed = JSON.parse(content) as { root?: string };
+      return parsed.root ? `${parsed.root} 마인드맵` : "마인드맵 요약";
+    } catch {
+      return "마인드맵 요약";
+    }
+  }
+  return content
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, "$1")
+    .replace(/\|[^\n]*/g, "")
+    .replace(/[-=]{2,}/g, "")
+    .replace(/`[^`]*`/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+};
 
 const materialMeta = (material: CourseMaterial) => {
   if (material.pages) return `${material.pages}페이지`;
@@ -225,6 +262,7 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
     <Card style={{ padding: 28, width: 360 }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#222" }}>강의를 삭제할까요?</h3>
       <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "#666" }}>
+        {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
         {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
       </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -770,6 +808,7 @@ const PacerOverlay = ({ session, helpOpen, onStuck, onCredit, onClose, onAbandon
 const CourseDetailModal = ({
   course,
   initialSection = "materials",
+  initialSection = "materials",
   onClose,
   onGoSummary,
   onGoQuiz,
@@ -778,12 +817,17 @@ const CourseDetailModal = ({
   onOpenQuiz,
 }: CourseDetailModalProps) => {
   const [activeTab, setActiveTab] = useState<CourseDetailSection>(initialSection);
+  const [activeTab, setActiveTab] = useState<CourseDetailSection>(initialSection);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setActiveTab(initialSection);
+  }, [initialSection]);
 
   useEffect(() => {
     setActiveTab(initialSection);
@@ -808,6 +852,7 @@ const CourseDetailModal = ({
         setQuizAttempts(nextQuizAttempts);
       } catch (err) {
         if (!ignore) setError(err instanceof Error ? err.message : "강의 상세 정보를 불러오지 못했습니다.");
+        if (!ignore) setError(err instanceof Error ? err.message : "강의 상세 정보를 불러오지 못했습니다.");
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -818,6 +863,31 @@ const CourseDetailModal = ({
     };
   }, [course]);
 
+  const emptyText = loading ? "불러오는 중..." : "아직 기록이 없습니다";
+  const tabCount = {
+    materials: materials.length,
+    summaries: summaries.length,
+    quizzes: quizSets.length,
+  };
+  const tabs: Array<{ key: CourseDetailSection; label: string; accent: string }> = [
+    { key: "materials", label: "자료", accent: "#555" },
+    { key: "summaries", label: "요약", accent: PINK },
+    { key: "quizzes", label: "퀴즈", accent: CYAN },
+  ];
+
+  const tabButtonStyle = (tab: CourseDetailSection, accent: string) => {
+    const selected = activeTab === tab;
+    return {
+      padding: "10px 16px",
+      borderRadius: 999,
+      border: selected ? `1px solid ${accent}` : "1px solid #eeeeee",
+      background: selected ? (tab === "quizzes" ? "#E8FAFE" : tab === "summaries" ? "#FFF0F6" : "#f8f8f8") : "#fff",
+      color: selected ? accent : "#777",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: selected ? 850 : 700,
+    };
+  };
   const emptyText = loading ? "불러오는 중..." : "아직 기록이 없습니다";
   const tabCount = {
     materials: materials.length,
@@ -857,15 +927,20 @@ const CourseDetailModal = ({
     }}>
       <Card style={{
         width: "min(900px, 100%)",
+        width: "min(900px, 100%)",
         maxHeight: "calc(100vh - 56px)",
         overflowY: "auto",
         padding: 28,
       }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "#222" }}>{course}</h2>
             <p style={{ margin: 0, fontSize: 13, color: "#888" }}>탭을 선택해 강의별 자료, 요약, 퀴즈 내역을 확인하세요.</p>
+            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "#222" }}>{course}</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>탭을 선택해 강의별 자료, 요약, 퀴즈 내역을 확인하세요.</p>
           </div>
+          <button onClick={onClose} aria-label="강의 상세 닫기" style={{
           <button onClick={onClose} aria-label="강의 상세 닫기" style={{
             width: 32,
             height: 32,
@@ -899,7 +974,21 @@ const CourseDetailModal = ({
           {activeTab === "materials" && (
             materials.length === 0 ? (
               <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+          {tabs.map(tab => (
+            <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} style={tabButtonStyle(tab.key, tab.accent)}>
+              {tab.label} {tabCount[tab.key] > 0 ? tabCount[tab.key] : ""}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ border: "1px solid #eeeeee", borderRadius: 14, background: "#fff", minHeight: 320, padding: 18 }}>
+          {activeTab === "materials" && (
+            materials.length === 0 ? (
+              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {materials.map((material, index) => (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {materials.map((material, index) => (
                   <button
@@ -909,7 +998,9 @@ const CourseDetailModal = ({
                     style={{
                       width: "100%",
                       padding: "14px 0",
+                      padding: "14px 0",
                       border: "none",
+                      borderBottom: index < materials.length - 1 ? "1px solid #f3f3f3" : "none",
                       borderBottom: index < materials.length - 1 ? "1px solid #f3f3f3" : "none",
                       background: "none",
                       cursor: "pointer",
@@ -917,8 +1008,11 @@ const CourseDetailModal = ({
                     }}
                   >
                     <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
                       {material.name}
                     </div>
+                    <div style={{ marginTop: 5, fontSize: 12, color: "#999" }}>
+                      {materialMeta(material)} · 수정일 {formatDate(material.updatedAt)}
                     <div style={{ marginTop: 5, fontSize: 12, color: "#999" }}>
                       {materialMeta(material)} · 수정일 {formatDate(material.updatedAt)}
                     </div>
@@ -927,11 +1021,22 @@ const CourseDetailModal = ({
               </div>
             )
           )}
+            )
+          )}
 
           {activeTab === "summaries" && (
             summaries.length === 0 ? (
               <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
+          {activeTab === "summaries" && (
+            summaries.length === 0 ? (
+              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {summaries.map((summary, index) => {
+                  const sourceMaterials = (summary.materialIds || [])
+                    .map(id => materials.find(m => m.id === id))
+                    .filter(Boolean) as typeof materials;
+                  return (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {summaries.map((summary, index) => {
                   const sourceMaterials = (summary.materialIds || [])
@@ -945,13 +1050,18 @@ const CourseDetailModal = ({
                     style={{
                       width: "100%",
                       padding: "14px 0",
+                      padding: "14px 0",
                       border: "none",
+                      borderBottom: index < summaries.length - 1 ? "1px solid #f3f3f3" : "none",
                       borderBottom: index < summaries.length - 1 ? "1px solid #f3f3f3" : "none",
                       background: "none",
                       cursor: "pointer",
                       textAlign: "left",
                     }}
                   >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 850, color: PINK }}>{templateLabels[summary.template]}</span>
+                      <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0 }}>생성일 {formatDate(summary.createdAt)}</span>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                       <span style={{ fontSize: 13, fontWeight: 850, color: PINK }}>{templateLabels[summary.template]}</span>
                       <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0 }}>생성일 {formatDate(summary.createdAt)}</span>
@@ -987,7 +1097,40 @@ const CourseDetailModal = ({
           {activeTab === "quizzes" && (
             quizSets.length === 0 ? (
               <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
+                    {sourceMaterials.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                        {sourceMaterials.map(m => (
+                          <span key={m.id} style={{
+                            fontSize: 11,
+                            color: "#333",
+                            background: "#f2f2f2",
+                            border: "1px solid #ddd",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            maxWidth: 200,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>{m.name}</span>
+                        ))}
+                      </div>
+                    )}
+                    <p style={{ margin: "7px 0 0", fontSize: 13, lineHeight: 1.55, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {preview(summary) || "요약 내용 없음"}
+                    </p>
+                  </button>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {activeTab === "quizzes" && (
+            quizSets.length === 0 ? (
+              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {quizSets.map((quizSet, index) => {
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {quizSets.map((quizSet, index) => {
                   const latestAttempt = quizAttempts.find(attempt => attempt.quizSetId === quizSet.id);
@@ -999,7 +1142,9 @@ const CourseDetailModal = ({
                       style={{
                         width: "100%",
                         padding: "14px 0",
+                        padding: "14px 0",
                         border: "none",
+                        borderBottom: index < quizSets.length - 1 ? "1px solid #f3f3f3" : "none",
                         borderBottom: index < quizSets.length - 1 ? "1px solid #f3f3f3" : "none",
                         background: "none",
                         cursor: "pointer",
@@ -1007,8 +1152,13 @@ const CourseDetailModal = ({
                       }}
                     >
                       <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
                         {quizSet.title}
                       </div>
+                      <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
+                        </span>
                       <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                         <span style={{ fontSize: 12, color: "#999" }}>
                           {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
@@ -1016,8 +1166,11 @@ const CourseDetailModal = ({
                         {latestAttempt ? (
                           <span style={{ flexShrink: 0, fontSize: 12, color: latestAttempt.scorePercent < 70 ? PINK : CYAN, fontWeight: 850 }}>
                             최근 점수 {latestAttempt.scorePercent}%
+                          <span style={{ flexShrink: 0, fontSize: 12, color: latestAttempt.scorePercent < 70 ? PINK : CYAN, fontWeight: 850 }}>
+                            최근 점수 {latestAttempt.scorePercent}%
                           </span>
                         ) : (
+                          <span style={{ flexShrink: 0, fontSize: 12, color: "#aaa", fontWeight: 800 }}>
                           <span style={{ flexShrink: 0, fontSize: 12, color: "#aaa", fontWeight: 800 }}>
                             풀이 전
                           </span>
@@ -1027,6 +1180,8 @@ const CourseDetailModal = ({
                   );
                 })}
               </div>
+            )
+          )}
             )
           )}
         </div>
@@ -2041,8 +2196,10 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <span style={{
                             flexShrink: 0, padding: "3px 7px", borderRadius: 999,
+                            flexShrink: 0, padding: "3px 7px", borderRadius: 999,
                             background: type === "assignment" ? "#FFF0F6" : "#E8FAFE",
                             color: type === "assignment" ? PINK : CYAN,
+                            fontSize: 11, fontWeight: 800,
                             fontSize: 11, fontWeight: 800,
                           }}>{ddayTypeLabels[type]}</span>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "#333", wordBreak: "break-word" }}>{d.subj}</span>
@@ -2059,7 +2216,11 @@ export default function Dashboard() {
                               width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
                               background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
                               lineHeight: "22px", padding: 0,
+                              width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
+                              background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                              lineHeight: "22px", padding: 0,
                             }}
+                          >×</button>
                           >×</button>
                         </div>
                       </div>
@@ -2095,10 +2256,12 @@ export default function Dashboard() {
                     disabled={!canGenerateStudyPlan || studyPlanLoading}
                     style={{
                       flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 8,
+                      flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 8,
                       border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "#e5e5e5" : CYAN}`,
                       background: "#fff",
                       color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : CYAN,
                       cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
+                      fontSize: 13, fontWeight: 800,
                       fontSize: 13, fontWeight: 800,
                     }}
                   >
@@ -2113,6 +2276,9 @@ export default function Dashboard() {
                       width: 30, flexShrink: 0, borderRadius: 8,
                       border: "1px solid #eaf7fa", background: "#fff",
                       color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
+                      width: 30, flexShrink: 0, borderRadius: 8,
+                      border: "1px solid #eaf7fa", background: "#fff",
+                      color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
                     }}
                   >
                     {showStudyPlanOptions ? "⌃" : "⌄"}
@@ -2122,6 +2288,9 @@ export default function Dashboard() {
                   type="button"
                   onClick={() => setShowAddPlan(true)}
                   style={{
+                    flex: 1, padding: "8px 10px", borderRadius: 8,
+                    border: `1px solid ${CYAN}`, background: "#fff",
+                    color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800,
                     flex: 1, padding: "8px 10px", borderRadius: 8,
                     border: `1px solid ${CYAN}`, background: "#fff",
                     color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800,
@@ -2145,9 +2314,11 @@ export default function Dashboard() {
                       disabled={!canGenerateStudyPlan || studyPlanLoading}
                       style={{
                         padding: "6px 9px", borderRadius: 8, border: "1px solid #f0f0f0",
+                        padding: "6px 9px", borderRadius: 8, border: "1px solid #f0f0f0",
                         background: !canGenerateStudyPlan || studyPlanLoading ? "#f2f2f2" : "#fff",
                         color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : "#666",
                         cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
+                        fontSize: 12, fontWeight: 700,
                         fontSize: 12, fontWeight: 700,
                       }}
                     >
@@ -2158,6 +2329,8 @@ export default function Dashboard() {
               )}
               {showPlanSourcePicker && (
                 <div style={{
+                  marginBottom: 14, padding: 12, borderRadius: 12,
+                  border: "1px solid #eef7f9", background: "#fbfeff",
                   marginBottom: 14, padding: 12, borderRadius: 12,
                   border: "1px solid #eef7f9", background: "#fbfeff",
                 }}>
@@ -2182,9 +2355,12 @@ export default function Dashboard() {
                                 onClick={() => togglePlanSource(source.key)}
                                 style={{
                                   maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
+                                  maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
                                   border: `1px solid ${selected ? accent : "#eeeeee"}`,
                                   background: selected ? (source.kind === "event" ? "#E8FAFE" : source.kind === "assignment" ? "#FFF0F6" : "#f7f7f7") : "#fff",
                                   color: selected ? accent : "#777",
+                                  cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
+                                  textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                   cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                                   textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                 }}
@@ -2204,7 +2380,10 @@ export default function Dashboard() {
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "1px solid #eeeeee",
                         background: "#fff", color: "#777", cursor: "pointer", fontSize: 12, fontWeight: 750,
+                        padding: "7px 11px", borderRadius: 8, border: "1px solid #eeeeee",
+                        background: "#fff", color: "#777", cursor: "pointer", fontSize: 12, fontWeight: 750,
                       }}
+                    >취소</button>
                     >취소</button>
                     <button
                       type="button"
@@ -2212,9 +2391,11 @@ export default function Dashboard() {
                       disabled={selectedPlanSources.length === 0 || studyPlanLoading}
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "none",
+                        padding: "7px 11px", borderRadius: 8, border: "none",
                         background: selectedPlanSources.length === 0 || studyPlanLoading ? "#ddd" : CYAN,
                         color: "#fff",
                         cursor: selectedPlanSources.length === 0 || studyPlanLoading ? "default" : "pointer",
+                        fontSize: 12, fontWeight: 800,
                         fontSize: 12, fontWeight: 800,
                       }}
                     >
@@ -2270,6 +2451,9 @@ export default function Dashboard() {
                             flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
                             border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
                             color: "#333", boxSizing: "border-box",
+                            flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
+                            border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
+                            color: "#333", boxSizing: "border-box",
                           }}
                         />
                       ) : (
@@ -2280,8 +2464,11 @@ export default function Dashboard() {
                           style={{
                             flex: 1, minWidth: 0, border: "none", background: "none",
                             padding: 0, cursor: "text", textAlign: "left", fontSize: 14,
+                            flex: 1, minWidth: 0, border: "none", background: "none",
+                            padding: 0, cursor: "text", textAlign: "left", fontSize: 14,
                             color: p.done ? "#bbb" : "#444",
                             textDecoration: p.done ? "line-through" : "none",
+                            lineHeight: 1.45, wordBreak: "break-word",
                             lineHeight: 1.45, wordBreak: "break-word",
                           }}
                         >
@@ -2296,7 +2483,11 @@ export default function Dashboard() {
                           width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
                           background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
                           lineHeight: "22px", padding: 0, flexShrink: 0,
+                          width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
+                          background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                          lineHeight: "22px", padding: 0, flexShrink: 0,
                         }}
+                      >×</button>
                       >×</button>
                     </div>
                   );

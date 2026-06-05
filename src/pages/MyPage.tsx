@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
-import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
 import {
   deleteOwnAppData,
@@ -197,7 +196,6 @@ const SettingsModal = ({
 
 export default function MyPage() {
   const navigate = useNavigate();
-  const { courses } = useCourses();
   const { user, signOut } = useAuth();
   const [sidebar, setSidebar] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -279,90 +277,102 @@ export default function MyPage() {
         <span style={{ color: "#bbb", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <Card style={{ padding: 28 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#222" }}>프로필</h3>
-                  <button onClick={() => setShowEdit(true)} style={{
-                    background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
-                    color: PINK, fontSize: 13, fontWeight: 600
-                  }}>
-                    <span style={{ fontSize: 14 }}>✎</span> 편집
-                  </button>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 20 }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
-                    background: profile.avatarUrl ? "none" : `${CYAN}40`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: CYAN, fontWeight: 800
-                  }}>
-                    {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : profile.nickname.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#222", marginBottom: 4 }}>{profile.nickname}</div>
-                    <div style={{ fontSize: 13, color: "#aaa" }}>{user?.email}</div>
-                  </div>
-                </div>
-                {error && <div style={{ marginBottom: 12, color: "#E53E3E", fontSize: 12 }}>{error}</div>}
-                <button onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
-                  width: "100%", padding: "10px 0", borderRadius: 10,
-                  border: "1px solid #e0e0e0", background: "#fff", color: "#999",
-                  fontSize: 13, cursor: "pointer"
-                }}>로그아웃</button>
-              </Card>
-
-              <Card style={{ padding: 24 }}>
-                <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#222" }}>앱 설정</h3>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #f5f5f5" }}>
-                    <span style={{ fontSize: 14, color: "#444" }}>다크모드</span>
-                    <Toggle on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #f5f5f5" }}>
-                    <span style={{ fontSize: 14, color: "#444" }}>알림 설정</span>
-                    <Toggle on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
-                  </div>
-                  {[
-                    { label: "공지사항", type: "notice" as const },
-                    { label: "문의하기", type: "contact" as const },
-                    { label: "회원 탈퇴", type: "deleteAccount" as const },
-                  ].map((item, index) => (
-                    <button key={item.label} onClick={() => setSettingsDialog(item.type)} style={{
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "14px 0", border: "none", background: "none", cursor: "pointer",
-                      borderBottom: index < 2 ? "1px solid #f5f5f5" : "none", width: "100%", textAlign: "left"
-                    }}>
-                      <span style={{ fontSize: 14, color: item.type === "deleteAccount" ? "#E53E3E" : "#444" }}>{item.label}</span>
-                      <span style={{ color: "#ddd", fontSize: 14 }}>›</span>
-                    </button>
-                  ))}
-                </div>
-              </Card>
+      <div style={{ padding: 24, maxWidth: 860, margin: "0 auto" }}>
+        {/* 상단: 프로필 (왼) + 앱 설정 (오) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20, alignItems: "start" }}>
+          {/* 프로필 */}
+          <Card style={{ padding: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#222" }}>프로필</h3>
+              <button onClick={() => setShowEdit(true)} style={{
+                background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                color: PINK, fontSize: 13, fontWeight: 600
+              }}>
+                <span style={{ fontSize: 14 }}>✎</span> 편집
+              </button>
             </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Card style={{ padding: "18px 22px", marginBottom: 4 }}>
-                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "#222" }}>수강 중인 강의</h4>
-                {courses.length === 0 ? (
-                  <p style={{ margin: 0, fontSize: 13, color: "#bbb" }}>등록된 강의가 없습니다</p>
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {courses.map((course, index) => (
-                      <span key={`${course}-${index}`} style={{
-                        padding: "5px 14px", borderRadius: 20,
-                        background: "#FFF0F6", color: PINK, fontSize: 13, fontWeight: 600
-                      }}>{course}</span>
-                    ))}
-                  </div>
-                )}
-              </Card>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+                background: profile.avatarUrl ? "none" : `${CYAN}40`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: CYAN, fontWeight: 800, fontSize: 18
+              }}>
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : profile.nickname.slice(0, 2).toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#222", marginBottom: 3 }}>{profile.nickname}</div>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
+                <div style={{ fontSize: 12, color: "#aaa", wordBreak: "break-all" }}>{user?.email}</div>
+              </div>
             </div>
-          </div>
+            {error && <div style={{ marginBottom: 12, color: "#E53E3E", fontSize: 12 }}>{error}</div>}
+            <button onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
+              width: "100%", padding: "9px 0", borderRadius: 10,
+              border: "1px solid #e0e0e0", background: "#fff", color: "#999",
+              fontSize: 13, cursor: "pointer"
+            }}>로그아웃</button>
+          </Card>
+
+          {/* 앱 설정 */}
+          <Card style={{ padding: 24 }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#222" }}>앱 설정</h3>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #f5f5f5" }}>
+                <span style={{ fontSize: 14, color: "#444" }}>다크모드</span>
+                <Toggle on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
+                <span style={{ fontSize: 14, color: "#444" }}>알림 설정</span>
+                <Toggle on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* 하단: 데이터 관리 (왼) + 지원 및 정보 (오) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+          {/* 데이터 관리 */}
+          <Card style={{ padding: 24 }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#222" }}>데이터 관리</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#888", lineHeight: 1.6 }}>
+              과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
+            </p>
+            <button onClick={() => setSettingsDialog("deleteAccount")} style={{
+              width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #fca5a5",
+              background: "#FFF5F5", color: "#E53E3E", fontSize: 13, fontWeight: 700, cursor: "pointer"
+            }}>내 앱 데이터 삭제</button>
+            <p style={{ margin: "10px 0 0", fontSize: 12, color: "#aaa", lineHeight: 1.5 }}>
+              삭제 후에는 복구할 수 없습니다.
+            </p>
+          </Card>
+
+          {/* 지원 및 정보 */}
+          <Card style={{ padding: 24 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#222" }}>지원 및 정보</h3>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {[
+                { label: "공지사항", type: "notice" as const },
+                { label: "문의하기", type: "contact" as const },
+              ].map((item, index) => (
+                <button key={item.label} onClick={() => setSettingsDialog(item.type)} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "14px 0", border: "none", background: "none", cursor: "pointer",
+                  borderBottom: index === 0 ? "1px solid #f5f5f5" : "none", width: "100%", textAlign: "left"
+                }}>
+                  <span style={{ fontSize: 14, color: "#444" }}>{item.label}</span>
+                  <span style={{ color: "#ddd", fontSize: 14 }}>›</span>
+                </button>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderTop: "1px solid #f5f5f5" }}>
+                <span style={{ fontSize: 14, color: "#aaa" }}>앱 버전</span>
+                <span style={{ fontSize: 13, color: "#bbb" }}>MVP v1.0</span>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
