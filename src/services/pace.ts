@@ -175,3 +175,95 @@ export const paceWeeklyGoal = (thisWeekUnits: number, totalRemaining: number): n
   const suggested = Math.ceil(base * 1.1); // 이번 주보다 살짝 높게
   return clamp(suggested, 1, Math.max(totalRemaining, 1));
 };
+
+// ── 캘린더용: 페이스 플랜을 날짜별 학습 칩으로 펼친다 ────────────────────
+// createdAt(생성일)부터 연결 D-day(없으면 horizonDays)까지 총 분량을 날짜별로 고르게
+// 나누고, 누적 분배량과 doneUnits를 비교해 done/today/upcoming/overdue 상태를 매긴다.
+// quiz 기준 플랜은 퀴즈 응시에서 자동 집계되므로 분배하지 않고 오늘 칸에 읽기 전용 한 칸만 둔다.
+export type PaceEntryStatus = "done" | "today" | "upcoming" | "overdue";
+
+export type PaceCalendarEntry = {
+  planId: string;
+  course: string;
+  label: string;
+  units: number;
+  unitLabel: string;
+  status: PaceEntryStatus;
+  readOnly: boolean; // quiz 기준이면 true (체크 불가)
+};
+
+export type BuildPaceEntriesOptions = { now?: Date; horizonDays?: number };
+
+export const buildPaceCalendarEntries = (
+  plans: PacePlan[],
+  // ddayId → "YYYY-MM-DD". Dday 타입을 직접 의존하지 않도록 맵으로 받는다.
+  ddayDateById: Record<string, string>,
+  options: BuildPaceEntriesOptions = {},
+): Record<string, PaceCalendarEntry[]> => {
+  const horizonDays = options.horizonDays ?? 14;
+  const today = options.now ? new Date(options.now) : new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const result: Record<string, PaceCalendarEntry[]> = {};
+  const push = (date: Date, entry: PaceCalendarEntry) => {
+    const key = paceDateKey(date);
+    (result[key] ??= []).push(entry);
+  };
+
+  plans.forEach(plan => {
+    const unitLabel = plan.unitLabel ?? "개";
+    const done = Math.max(plan.doneUnits, 0);
+    const total = Math.max(plan.totalUnits, 0);
+    if (total <= 0) return;
+
+    const start = new Date(plan.createdAt);
+    start.setHours(0, 0, 0, 0);
+    const ddayStr = plan.ddayId ? ddayDateById[plan.ddayId] : undefined;
+    let end = ddayStr ? new Date(`${ddayStr}T00:00:00`) : addDays(start, horizonDays - 1);
+    end.setHours(0, 0, 0, 0);
+    if (end.getTime() < start.getTime()) end = start;
+
+    // 퀴즈 기준: 분배 대신 오늘(범위 안으로 클램프) 한 칸만 읽기 전용으로.
+    if (plan.basis === "quiz") {
+      const clamped = Math.min(Math.max(today.getTime(), start.getTime()), end.getTime());
+      const remaining = Math.max(total - done, 0);
+      push(new Date(clamped), {
+        planId: plan.id,
+        course: plan.course,
+        label: `${plan.course} 퀴즈 자동집계`,
+        units: remaining,
+        unitLabel,
+        status: remaining <= 0 ? "done" : "today",
+        readOnly: true,
+      });
+      return;
+    }
+
+    const totalDays = Math.max(Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1, 1);
+    let prevCum = 0;
+    for (let i = 0; i < totalDays; i++) {
+      // 누적 목표를 반올림해 차분하면 합이 정확히 total이 되고 분량이 고르게 퍼진다.
+      const cum = Math.round((total * (i + 1)) / totalDays);
+      const units = cum - prevCum;
+      prevCum = cum;
+      if (units <= 0) continue;
+      const day = addDays(start, i);
+      let status: PaceEntryStatus;
+      if (cum <= done) status = "done";
+      else if (day.getTime() < today.getTime()) status = "overdue";
+      else if (day.getTime() === today.getTime()) status = "today";
+      else status = "upcoming";
+      push(day, {
+        planId: plan.id,
+        course: plan.course,
+        label: `${plan.course} ${units}${unitLabel}`,
+        units,
+        unitLabel,
+        status,
+        readOnly: false,
+      });
+    }
+  });
+
+  return result;
+};
