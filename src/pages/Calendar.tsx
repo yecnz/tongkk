@@ -102,14 +102,14 @@ export default function Calendar() {
     return () => { ignore = true; };
   }, [paceQuizCoursesKey]);
 
-  // ── 마커(점): 할 일만. 마감·일정(D-day)·페이스는 칸 안 칩으로 표시한다. ──
+  // ── 마커(점): 페이스 + 할 일을 모두 같은 "할 일" 점(회색)으로. 마감·일정(D-day)만 칩. ──
+  // (페이스 점은 paceEntriesByDate 계산 이후에 채운다.)
   const markers: Record<string, CalendarMarker[]> = {};
   const pushMarker = (dateStr: string, color: string) => {
     if (!dateStr) return;
     if (!markers[dateStr]) markers[dateStr] = [];
     markers[dateStr].push({ color });
   };
-  plans.forEach(plan => { if (plan.date) pushMarker(plan.date, plan.done ? PLAN_DONE_MARKER_COLOR : PLAN_MARKER_COLOR); });
 
   // ── 선택한 날 데이터 ── (날짜 없는 plan은 "오늘"로 간주: 하위호환)
   const selectedIsToday = selectedDate === todayStr;
@@ -134,7 +134,15 @@ export default function Calendar() {
   );
   const sortByUrgency = <T extends { status: string }>(list: T[]) =>
     [...list].sort((a, b) => (TONE_RANK[a.status] ?? 9) - (TONE_RANK[b.status] ?? 9));
-  // 칸 안 칩 = 마감·일정(D-day, 타입색)을 먼저 + 페이스(긴급도순). 할 일은 점으로만.
+  // 점(마커): 페이스(완료 제외) + 할 일 모두 회색 "할 일" 점으로. 마감·일정은 칩으로.
+  Object.entries(paceEntriesByDate).forEach(([date, entries]) => {
+    entries.forEach(entry => {
+      if (entry.status === "done") return;
+      pushMarker(date, PLAN_MARKER_COLOR);
+    });
+  });
+  plans.forEach(plan => { if (plan.date) pushMarker(plan.date, plan.done ? PLAN_DONE_MARKER_COLOR : PLAN_MARKER_COLOR); });
+  // 칸 안 칩 = 마감·일정(D-day, 타입색)만.
   const eventsByDate: Record<string, CalendarChip[]> = {};
   ddays.forEach(dday => {
     if (!dday.date) return;
@@ -143,13 +151,6 @@ export default function Calendar() {
       label: dday.subj,
       color: { bg: ddayTypeColors[type].soft, fg: ddayTypeColors[type].solid },
     });
-  });
-  Object.entries(paceEntriesByDate).forEach(([date, entries]) => {
-    const paceChips: CalendarChip[] = sortByUrgency(entries).map(entry => ({
-      label: entry.readOnly ? `${entry.course} 퀴즈` : entry.label,
-      tone: entry.status,
-    }));
-    (eventsByDate[date] ??= []).push(...paceChips);
   });
   const dayPaceEntries = sortByUrgency(paceEntriesByDate[selectedDate] ?? []);
   const pacePlanById = Object.fromEntries(pacePlans.map(plan => [plan.id, plan] as const));
@@ -276,13 +277,16 @@ export default function Calendar() {
                 )}
               </div>
 
-              {/* 그 날의 학습 계획: 페이스 분량 + 할 일 */}
+              {/* 그 날의 할 일: 페이스 분량 + 일반 할 일 (모두 할 일로 통합) */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#444" }}>학습 계획</span>
-                <button type="button" onClick={() => setShowAddPlan(true)} style={addBtnStyle}>+ 할 일</button>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#444" }}>할 일</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button type="button" onClick={() => setShowAddPlan(true)} style={addBtnStyle}>+ 할 일</button>
+                  <button type="button" onClick={() => setShowAddPace(true)} style={addBtnStyle}>+ 페이스</button>
+                </div>
               </div>
               {dayPaceEntries.length === 0 && dayPlanEntries.length === 0 ? (
-                <p style={{ margin: "0 0 6px", fontSize: 13, color: "#bbb", padding: "4px 0" }}>이 날의 학습 계획이 없습니다</p>
+                <p style={{ margin: "0 0 6px", fontSize: 13, color: "#bbb", padding: "4px 0" }}>이 날의 할 일이 없습니다</p>
               ) : (
                 <>
                   {dayPaceEntries.map((entry, idx) => {
@@ -324,9 +328,15 @@ export default function Calendar() {
                             color: done ? "#bbb" : "#444", textDecoration: done ? "line-through" : "none",
                           }}>{entry.readOnly ? `${entry.course} 퀴즈` : entry.label}</div>
                           <span style={{ fontSize: 11, fontWeight: 700, color: entry.readOnly ? CYAN : meta.color }}>
-                            {entry.readOnly ? "퀴즈에서 자동 집계" : `페이스 · ${meta.label}`}
+                            {entry.readOnly ? "퀴즈 자동 집계" : meta.label}
                           </span>
                         </div>
+                        {plan && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                            <button type="button" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
+                            <button type="button" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
