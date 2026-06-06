@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { PINK, CYAN, Card } from "../common";
 import { loadCourseMaterialsFromServer } from "../services/materials";
 import { loadQuizSetsFromServer } from "../services/quizSets";
+import type { PacePlan } from "../services/pace";
 import {
   ddayTypeLabels,
   ddayTypeColors,
@@ -22,18 +23,36 @@ const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8�
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
 export type CalendarMarker = { color: string };
+// 날짜 칸 안에 짧게 표시할 칩. 페이스는 tone(상태색), 마감·일정은 color(타입색)로 그린다.
+export type CalendarChip = {
+  label: string;
+  tone?: "done" | "today" | "upcoming" | "overdue";
+  color?: { bg: string; fg: string };
+  strike?: boolean;
+};
+// 톤 색: 9px→10px와 함께 대비를 끌어올리고, done(회색·취소선)과 upcoming(슬레이트)을 구분.
+const CHIP_TONES: Record<CalendarChip["tone"], { bg: string; fg: string }> = {
+  done: { bg: "#edf0f4", fg: "#6b7785" },
+  today: { bg: "#E2F6FC", fg: "#0a7491" },
+  upcoming: { bg: "#eef1f6", fg: "#475569" },
+  overdue: { bg: "#FFEAF2", fg: "#c0397e" },
+};
 type CustomCalendarProps = {
   value: string;
   onChange: (value: string) => void;
   // dateStr("YYYY-MM-DD") → 그 날 표시할 점들. 있으면 날짜 셀 아래 작은 점으로 렌더.
   markers?: Record<string, CalendarMarker[]>;
+  // dateStr → 그 날의 학습 칩. 주어지면 날짜 칸을 "월간 계획표" 모드(큰 칸 + 칩)로 렌더한다.
+  eventsByDate?: Record<string, CalendarChip[]>;
   onSelectDate?: (value: string) => void;
 };
 
-export const CustomCalendar = ({ value, onChange, markers, onSelectDate }: CustomCalendarProps) => {
+export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelectDate }: CustomCalendarProps) => {
+  const planner = Boolean(eventsByDate);
   const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const initDate = value ? new Date(value + "T00:00:00") : today;
+  const [viewYear, setViewYear] = useState(initDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initDate.getMonth());
 
   const selected = value ? new Date(value + "T00:00:00") : null;
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
@@ -52,27 +71,54 @@ export const CustomCalendar = ({ value, onChange, markers, onSelectDate }: Custo
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
+  // 선택 날짜가 보이는 달 밖이면 그 달로 이동(날짜 선택/오늘 버튼 시에만 — 화살표 탐색은 자유).
+  useEffect(() => {
+    if (!value) return;
+    const d = new Date(value + "T00:00:00");
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+  }, [value]);
+
+  const offCurrentMonth = viewYear !== today.getFullYear() || viewMonth !== today.getMonth();
+  const goToToday = () => {
+    const ty = today.getFullYear();
+    const tm = today.getMonth();
+    setViewYear(ty);
+    setViewMonth(tm);
+    const td = `${ty}-${String(tm + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    onChange(td);
+    onSelectDate?.(td);
+  };
+
   return (
     <div style={{ background: "rgba(255,255,255,0.55)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid rgba(255,255,255,0.8)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#aaa", padding: "4px 10px", borderRadius: 8 }}>‹</button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#222" }}>{viewYear}년 {MONTH_NAMES[viewMonth]}</span>
-        <button onClick={nextMonth} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#aaa", padding: "4px 10px", borderRadius: 8 }}>›</button>
+        <button onClick={prevMonth} aria-label="이전 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>‹</button>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "#222" }}>{viewYear}년 {MONTH_NAMES[viewMonth]}</span>
+          {planner && offCurrentMonth && (
+            <button type="button" onClick={goToToday} style={{
+              border: "none", cursor: "pointer", fontSize: 11, fontWeight: 800,
+              color: "#0a7491", background: "#E2F6FC", borderRadius: 999, padding: "2px 9px",
+            }}>오늘</button>
+          )}
+        </span>
+        <button onClick={nextMonth} aria-label="다음 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>›</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 6 }}>
         {DAY_NAMES.map((d, i) => (
           <div key={d} style={{ textAlign: "center", fontSize: 12, fontWeight: 600, padding: "4px 0",
-            color: i === 0 ? "#FF6B6B" : i === 6 ? "#5B9CF6" : "#aaa" }}>{d}</div>
+            color: i === 0 ? "#FF6B6B" : i === 6 ? "#5B9CF6" : "#6b7280" }}>{d}</div>
         ))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
         {cells.map((day, i) => {
           if (!day) return <div key={`e-${i}`} />;
           const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const isSelected = selected &&
+          const isSelected = Boolean(selected &&
             selected.getFullYear() === viewYear &&
             selected.getMonth() === viewMonth &&
-            selected.getDate() === day;
+            selected.getDate() === day);
           const isToday =
             today.getFullYear() === viewYear &&
             today.getMonth() === viewMonth &&
@@ -80,11 +126,60 @@ export const CustomCalendar = ({ value, onChange, markers, onSelectDate }: Custo
           const dayMarkers = markers?.[dateStr] ?? [];
           const shownMarkers = dayMarkers.slice(0, 3);
           const extraMarkers = dayMarkers.length - shownMarkers.length;
+          const weekdayColor = i % 7 === 0 ? "#FF6B6B" : i % 7 === 6 ? "#5B9CF6" : "#555";
+
+          // 월간 계획표 모드: 큰 칸 + 날짜 위 작은 점(마감/할 일) + 학습 칩.
+          if (planner) {
+            const chips = eventsByDate?.[dateStr] ?? [];
+            const shownChips = chips.slice(0, 2);
+            const extraChips = chips.length - shownChips.length;
+            return (
+              <button key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} className="tongkk-cal-cell" style={{
+                width: "100%", minHeight: 62, borderRadius: 10, padding: "4px 4px 5px",
+                border: isSelected ? `1.5px solid ${PINK}` : isToday ? "1px solid rgba(0,192,232,0.55)" : "1px solid transparent",
+                background: isSelected ? "rgba(240,112,174,0.14)" : "transparent",
+                cursor: "pointer", display: "flex", flexDirection: "column",
+                alignItems: "stretch", gap: 2, overflow: "hidden", textAlign: "left",
+              }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 3, paddingLeft: 1 }}>
+                  <span style={{ fontSize: 11, lineHeight: 1, fontWeight: isSelected || isToday ? 800 : 600,
+                    color: isSelected ? "#1f2937" : isToday ? "#0a7491" : weekdayColor }}>{day}</span>
+                  {dayMarkers.length > 0 && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      {shownMarkers.map((marker, mi) => (
+                        <span key={mi} style={{ width: 4, height: 4, borderRadius: "50%", background: marker.color }} />
+                      ))}
+                      {extraMarkers > 0 && (
+                        <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: "#64748b" }}>+{extraMarkers}</span>
+                      )}
+                    </span>
+                  )}
+                </span>
+                {shownChips.map((chip, ci) => {
+                  const c = chip.color ?? CHIP_TONES[chip.tone ?? "upcoming"];
+                  const strike = chip.strike ?? chip.tone === "done";
+                  return (
+                    <span key={ci} title={chip.label} style={{
+                      display: "block", maxWidth: "100%", padding: "1px 4px", borderRadius: 4,
+                      background: c.bg, color: c.fg, fontSize: 10, fontWeight: 700, lineHeight: 1.35,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      textDecoration: strike ? "line-through" : "none",
+                    }}>{chip.label}</span>
+                  );
+                })}
+                {extraChips > 0 && (
+                  <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1.2, color: "#64748b", paddingLeft: 2 }}>+{extraChips}</span>
+                )}
+              </button>
+            );
+          }
+
           return (
             <button key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} style={{
-              width: "100%", aspectRatio: "1", borderRadius: "50%", border: "none",
-              background: isSelected ? PINK : isToday ? "rgba(240,112,174,0.12)" : "transparent",
-              color: isSelected ? "#fff" : isToday ? PINK : "#333",
+              width: "100%", aspectRatio: "1", borderRadius: "50%",
+              border: isSelected ? "none" : isToday ? "1px solid rgba(0,192,232,0.55)" : "none",
+              background: isSelected ? PINK : "transparent",
+              color: isSelected ? "#fff" : isToday ? "#0a7491" : "#333",
               fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
               cursor: "pointer", transition: "background 0.15s",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
@@ -113,18 +208,20 @@ type AddDdayModalProps = {
   onAdd: (type: DdayType, subject: string, date: string) => void;
   initialDate?: string;
   initialType?: DdayType;
+  initialSubj?: string;
+  heading?: string;
+  submitLabel?: string;
 };
 
-export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "assignment" }: AddDdayModalProps) => {
+export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "assignment", initialSubj = "", heading = "D-day 추가", submitLabel = "추가" }: AddDdayModalProps) => {
   const [type, setType] = useState<DdayType>(initialType);
-  const [subj, setSubj] = useState("");
+  const [subj, setSubj] = useState(initialSubj);
   const [date, setDate] = useState(initialDate);
-  const title = `${ddayTypeLabels[type]} 추가`;
   const placeholder = `${ddayTypeLabels[type]}명`;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: 380, background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid rgba(255,255,255,0.9)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>D-day 추가</h3>
+        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
           {(["assignment", "event", "exam"] as const).map(item => {
             const selected = type === item;
@@ -150,9 +247,9 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
             );
           })}
         </div>
-        <input value={subj} onChange={e => setSubj(e.target.value)} placeholder={placeholder} aria-label={title} style={{
+        <input value={subj} onChange={e => setSubj(e.target.value)} placeholder={placeholder} aria-label={placeholder} style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 14,
+          fontSize: 14, boxSizing: "border-box", marginBottom: 14,
           background: "rgba(255,255,255,0.8)"
         }}/>
         {date && (
@@ -165,7 +262,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
           <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>추가</button>
+          }}>{submitLabel}</button>
         </div>
       </div>
     </div>
@@ -195,7 +292,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           autoFocus
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-            fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
+            fontSize: 14, boxSizing: "border-box", marginBottom: 16
           }}
         />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -443,6 +540,109 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
           </div>
         </div>
       </Card>
+    </div>
+  );
+};
+
+type EditPaceModalProps = {
+  plan: PacePlan;
+  ddays: Dday[];
+  onClose: () => void;
+  onSave: (updates: { ddayId: string; totalUnits: number; doneUnits: number }) => void;
+};
+
+export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalProps) => {
+  const selectableDdays = [...ddays]
+    .filter(dday => Boolean(dday.id))
+    .sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
+  const isQuiz = plan.basis === "quiz";
+  const unit = plan.unitLabel ?? "개";
+  const [ddayId, setDdayId] = useState(plan.ddayId);
+  const [total, setTotal] = useState(String(plan.totalUnits));
+  const [done, setDone] = useState(String(plan.doneUnits));
+
+  const totalNum = Math.floor(Number(total));
+  const totalValid = Number.isFinite(totalNum) && totalNum > 0;
+  const doneNum = Math.floor(Number(done || "0"));
+  const doneValid = Number.isFinite(doneNum) && doneNum >= 0;
+  const canSave = totalValid && doneValid;
+
+  const handleSave = () => {
+    if (!canSave) return;
+    // 퀴즈 기준은 진행도가 자동 집계라 doneUnits를 보존하고, 그 외엔 총량을 넘지 않게 보정한다.
+    const nextDone = isQuiz ? plan.doneUnits : Math.min(doneNum, totalNum);
+    onSave({ ddayId, totalUnits: totalNum, doneUnits: nextDone });
+    onClose();
+  };
+
+  const inputStyle: CSSProperties = {
+    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+    fontSize: 14, boxSizing: "border-box", background: "rgba(255,255,255,0.8)",
+  };
+  const labelStyle: CSSProperties = { display: "block", marginBottom: 6, fontSize: 12, fontWeight: 800, color: "#667085" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 380, background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid rgba(255,255,255,0.9)" }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>페이스 플랜 수정</h3>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "#888" }}>{plan.course}</p>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>연결할 D-day</label>
+          <select value={ddayId} onChange={e => setDdayId(e.target.value)} style={inputStyle}>
+            <option value="">연결 안 함</option>
+            {selectableDdays.map(dday => {
+              const left = getDaysLeft(dday.date);
+              const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
+              return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
+            })}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>총 분량 ({unit})</label>
+          <input
+            value={total}
+            onChange={e => setTotal(e.target.value.replace(/[^0-9]/g, ""))}
+            inputMode="numeric"
+            placeholder="총 분량"
+            aria-label={`총 분량 (${unit})`}
+            style={inputStyle}
+          />
+        </div>
+
+        {isQuiz ? (
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: CYAN, fontWeight: 700 }}>
+            퀴즈 기준 플랜은 진행도가 퀴즈 응시에서 자동 집계돼요.
+          </p>
+        ) : (
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>완료한 분량 ({unit})</label>
+            <input
+              value={done}
+              onChange={e => setDone(e.target.value.replace(/[^0-9]/g, ""))}
+              onKeyDown={e => { if (e.key === "Enter") handleSave(); }}
+              inputMode="numeric"
+              placeholder="지금까지 완료한 분량"
+              aria-label={`완료한 분량 (${unit})`}
+              style={inputStyle}
+            />
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              padding: "8px 18px", borderRadius: 10, border: "none",
+              background: canSave ? PINK : "#d8d8d8", color: "#fff",
+              cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600,
+            }}
+          >저장</button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -31,10 +31,9 @@ import {
   PACE_NO_DDAY_HORIZON_DAYS,
   type Dday,
   type DdayType,
-  type PaceBasis,
   type Plan,
 } from "../services/studyPlanner";
-import { AddDdayModal, AddPaceModal, AddPlanModal } from "../components/PlannerModals";
+import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -515,11 +514,10 @@ export default function Dashboard() {
   const [detailCourse, setDetailCourse] = useState<string | null>(null);
   const [detailSection, setDetailSection] = useState<CourseDetailSection | undefined>(undefined);
   const [courseStats, setCourseStats] = useState<Record<string, CourseStats>>({});
+  // 페이스 플랜은 학습 캘린더에서 관리한다. 대시보드는 "오늘 추천 과목" 계산을 위해 읽기 전용으로만 로드.
   const [pacePlans, setPacePlans] = useState<PacePlan[]>([]);
-  const [pacePlansLoaded, setPacePlansLoaded] = useState(false);
   // 퀴즈 기준 플랜의 진행도를 파생 계산하기 위한 과목별 응시 기록 {count, createdAt}.
   const [courseQuizAttempts, setCourseQuizAttempts] = useState<Record<string, { count: number; createdAt: number; scorePercent: number }[]>>({});
-  const [showAddPace, setShowAddPace] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -593,16 +591,10 @@ export default function Dashboard() {
       .then(next => {
         if (ignore) return;
         setPacePlans(next);
-        setPacePlansLoaded(true);
       })
       .catch(error => console.warn("페이스 플랜 불러오기 실패", error));
     return () => { ignore = true; };
   }, []);
-
-  useEffect(() => {
-    if (!pacePlansLoaded) return;
-    saveDashboardState("pacePlans", pacePlans).catch(console.warn);
-  }, [pacePlansLoaded, pacePlans]);
 
   // 페이스 플랜 과목의 응시 기록을 불러와 자동 진행도(퀴즈 기준)와 시험 준비도(최근 점수) 계산에 사용.
   // 과목 집합이 바뀔 때만 재조회하도록 안정 키에 의존(수동 플랜 변경 시 불필요한 재조회 방지).
@@ -824,8 +816,6 @@ export default function Dashboard() {
   });
   const activePaceViews = pacePlanViews.filter(view => view.remaining > 0);
   const todayStr = paceDateKey(new Date());
-  // 페이스 수동 항목을 오늘 이미 반영했는지(lastActivityAt 날짜 == 오늘) 판단.
-  const isReflectedToday = (timestamp?: number) => timestamp !== undefined && paceDateKey(new Date(timestamp)) === todayStr;
   // 오늘의 학습계획에는 날짜가 없거나(레거시=오늘) 오늘인 항목만 노출, 나머지는 캘린더에서.
   const todayPlanEntries = plans
     .map((plan, index) => ({ plan, index }))
@@ -846,26 +836,6 @@ export default function Dashboard() {
       : stepView.dday
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
-
-  const addPacePlan = (course: string, ddayId: string, totalUnits: number, unitLabel?: string, basis?: PaceBasis) => {
-    setPacePlans(prev => [
-      ...prev,
-      { id: createClientId(), course, ddayId, totalUnits, doneUnits: 0, createdAt: Date.now(), unitLabel, basis },
-    ]);
-  };
-
-  const deletePacePlan = (planId: string) => {
-    setPacePlans(prev => prev.filter(plan => plan.id !== planId));
-  };
-
-  // 수동 기준(페이지·자료·직접) 플랜: 오늘 권장량만큼 진행도를 올린다(상한 totalUnits).
-  const completePaceStepManual = (planId: string, amount: number) => {
-    setPacePlans(prev => prev.map(plan => {
-      if (plan.id !== planId) return plan;
-      const nextDone = Math.min(plan.totalUnits, plan.doneUnits + amount);
-      return { ...plan, doneUnits: nextDone, lastActivityAt: Date.now() };
-    }));
-  };
 
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -916,7 +886,6 @@ export default function Dashboard() {
       )}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
-      {showAddPace && <AddPaceModal courses={courses} ddays={ddays} onClose={() => setShowAddPace(false)} onAdd={addPacePlan} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -927,18 +896,9 @@ export default function Dashboard() {
 
       <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", zoom: 0.85 }}>
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
-              공부 시작하기
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowAddPace(true)}
-              className="rounded-full border border-pink/40 bg-white px-3 py-1.5 text-xs font-extrabold text-pink cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
-            >
-              {pacePlanViews.length > 0 ? "페이스 플랜 추가" : "페이스 플랜 만들기"}
-            </button>
-          </div>
+          <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
+            공부 시작하기
+          </h2>
           <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
             {startHint}
           </p>
@@ -964,66 +924,6 @@ export default function Dashboard() {
             </button>
           </div>
         </Card>
-        {pacePlanViews.length > 0 && (
-          <div className="mb-5 flex flex-col gap-2">
-            {pacePlanViews.map(view => {
-              const done = view.remaining <= 0;
-              return (
-                <Card key={view.plan.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-extrabold text-[#222] dark:text-slate-100">{view.plan.course}</span>
-                      {view.dday && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-[#555] dark:bg-slate-700 dark:text-slate-200">
-                          {formatDdayLabel(view.daysLeft)}
-                        </span>
-                      )}
-                      {done ? (
-                        <span className="rounded-full bg-cyan px-2 py-0.5 text-[11px] font-bold text-white">완료</span>
-                      ) : view.sprint ? (
-                        <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: "#fb7185" }}>
-                          막판 스퍼트 · 복습
-                        </span>
-                      ) : (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
-                          style={{ background: view.status === "behind" ? PINK : view.status === "slightly" ? "#f59e0b" : CYAN }}
-                        >
-                          {view.status === "behind" ? "따라잡는 중" : view.status === "slightly" ? "조금 뒤처짐" : "정상 페이스"}
-                        </span>
-                      )}
-                      {!done && (view.dday || view.hasScores) && (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                          style={{
-                            background: view.tier === "ready" ? "rgba(0,192,232,0.12)" : view.tier === "soon" ? "rgba(245,158,11,0.15)" : "rgba(240,112,174,0.12)",
-                            color: view.tier === "ready" ? CYAN : view.tier === "soon" ? "#d97706" : PINK,
-                          }}
-                        >
-                          준비도 {view.readiness}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 rounded-full bg-slate-100 dark:bg-slate-700">
-                        <div className="h-1.5 rounded-full bg-cyan" style={{ width: `${view.progress}%` }} />
-                      </div>
-                      <span className="shrink-0 text-xs font-bold text-muted">{view.doneUnits}/{view.totalUnits}{view.unitLabel}</span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => deletePacePlan(view.plan.id)}
-                      aria-label={`${view.plan.course} 페이스 플랜 삭제`}
-                      className="h-7 w-7 shrink-0 rounded-[8px] border border-border bg-white text-muted cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
-                    >×</button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
           {/* 강의 목록 카드 그리드 */}
           <div>
@@ -1335,59 +1235,14 @@ export default function Dashboard() {
                   먼저 D-day에 과제나 일정을 추가해보세요
                 </p>
               )}
-              {activePaceViews.length === 0 && todayPlanEntries.length === 0 ? (
+              {todayPlanEntries.length === 0 ? (
                 <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "6px 0", margin: 0 }}>아직 생성된 계획이 없습니다</p>
               ) : (
                 <>
-                  {/* 페이스 플랜의 "오늘 분량" — 수동 기준은 체크 항목, 퀴즈 기준은 자동 진행(읽기 전용) */}
-                  {activePaceViews.map((view, idx) => {
-                    const checkedToday = isReflectedToday(view.plan.lastActivityAt);
-                    return (
-                      <div key={`pace-${view.plan.id}`} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-                        borderTop: idx > 0 ? "1px solid #f5f5f5" : "none"
-                      }}>
-                        {view.auto ? (
-                          <span aria-hidden style={{
-                            width: 22, height: 22, borderRadius: "50%", border: "2px solid #e6e6e6",
-                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                            color: CYAN, fontSize: 12, lineHeight: 1,
-                          }}>↻</span>
-                        ) : (
-                          <button
-                            onClick={() => { if (!checkedToday) completePaceStepManual(view.plan.id, view.todayTarget); }}
-                            aria-label={`${view.plan.course} 오늘 분량 완료`}
-                            disabled={checkedToday}
-                            style={{
-                              width: 22, height: 22, borderRadius: "50%",
-                              border: `2px solid ${checkedToday ? CYAN : "#ddd"}`,
-                              background: checkedToday ? CYAN : "#fff",
-                              cursor: checkedToday ? "default" : "pointer", display: "flex",
-                              alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
-                            }}
-                          >
-                            {checkedToday && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
-                          </button>
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
-                            color: !view.auto && checkedToday ? "#bbb" : "#444",
-                            textDecoration: !view.auto && checkedToday ? "line-through" : "none",
-                          }}>
-                            {view.plan.course} · 오늘 {view.todayTarget}{view.unitLabel}
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: view.auto ? CYAN : "#999" }}>
-                            {view.auto ? "퀴즈에서 자동" : "페이스"} · {view.doneUnits}/{view.totalUnits}{view.unitLabel}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
                   {todayPlanEntries.map(({ plan: p, index: i }, idx) => {
                     const planKey = p.id || `index-${i}`;
                     const isEditing = editingPlanKey === planKey;
-                    const showTopBorder = idx > 0 || activePaceViews.length > 0;
+                    const showTopBorder = idx > 0;
                     return (
                       <div key={p.id || `${p.text}-${i}`} style={{
                         display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
