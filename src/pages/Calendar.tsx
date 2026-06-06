@@ -4,13 +4,12 @@ import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } f
 import type { PageRouteLabel } from "../common";
 import { useCourses } from "../CourseContext";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
-import { buildPaceCalendarEntries, paceDateKey, paceProgressPct, paceRemaining, type PacePlan } from "../services/pace";
+import { buildPaceCalendarEntries, paceDateKey, type PacePlan } from "../services/pace";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
 import {
   createClientId,
   ddayTypeColors,
   ddayTypeLabels,
-  formatDdayLabel,
   getDaysLeft,
   PACE_NO_DDAY_HORIZON_DAYS,
   type Dday,
@@ -404,72 +403,6 @@ export default function Calendar() {
               )}
             </Card>
 
-            {/* 페이스 플랜 관리 (생성·수정·삭제) */}
-            <Card style={{ padding: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>페이스 플랜 관리</h3>
-                <button type="button" onClick={() => setShowAddPace(true)} style={addBtnStyle}>+ 페이스 플랜</button>
-              </div>
-              {pacePlans.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 13, color: "#bbb", padding: "4px 0" }}>설정된 페이스 플랜이 없습니다</p>
-              ) : (
-                pacePlans.map((pace, idx) => {
-                  const dday = ddays.find(item => item.id === pace.ddayId);
-                  const left = dday ? getDaysLeft(dday.date) : null;
-                  const done = resolvePaceDone(pace);
-                  const view: PacePlan = { ...pace, doneUnits: done };
-                  const remaining = paceRemaining(view);
-                  const isQuiz = pace.basis === "quiz";
-                  const unit = pace.unitLabel ?? "개";
-                  return (
-                    <div key={pace.id} style={{
-                      display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
-                      borderTop: idx > 0 ? "1px solid #f5f5f5" : "none",
-                    }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 14, fontWeight: 800, color: "#222", wordBreak: "break-word" }}>{pace.course}</span>
-                          {left !== null && (
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "#555", background: "#f1f4f8", borderRadius: 999, padding: "1px 7px" }}>
-                              {formatDdayLabel(left)}
-                            </span>
-                          )}
-                          {remaining <= 0 && (
-                            <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: CYAN, borderRadius: 999, padding: "1px 7px" }}>완료</span>
-                          )}
-                        </div>
-                        {isQuiz ? (
-                          <span style={{ fontSize: 11, fontWeight: 700, color: CYAN }}>퀴즈에서 자동 집계 · {done}/{pace.totalUnits}{unit}</span>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                            <div style={{ flex: 1, height: 5, borderRadius: 999, background: "#eef1f6" }}>
-                              <div style={{ height: 5, borderRadius: 999, background: CYAN, width: `${paceProgressPct(view)}%` }} />
-                            </div>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "#777", flexShrink: 0 }}>{view.doneUnits}/{pace.totalUnits}{unit}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                        <button
-                          type="button"
-                          onClick={() => setEditingPace(pace)}
-                          aria-label={`${pace.course} 페이스 플랜 수정`}
-                          title="수정"
-                          style={editBtnStyle}
-                        >✎</button>
-                        <button
-                          type="button"
-                          onClick={() => deletePacePlan(pace.id)}
-                          aria-label={`${pace.course} 페이스 플랜 삭제`}
-                          title="삭제"
-                          style={deleteBtnStyle}
-                        >×</button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </Card>
           </div>
         </div>
       </div>
