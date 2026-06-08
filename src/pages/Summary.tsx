@@ -225,21 +225,6 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
   },
 };
 
-const renderInlineText = (text: string): ReactNode[] => {
-  return text.split(/(\*\*[^*]+\*\*|==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\))/g).map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith("==") && part.endsWith("==")) {
-      return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
-    }
-    if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
-      return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1)}</span>;
-    }
-    return part;
-  });
-};
-
 const renderHighlightSyntax = (children: ReactNode): ReactNode => {
   if (typeof children === "string") {
     return children.split(/(==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\))/g).map((part, index) => {
@@ -515,108 +500,6 @@ const SummaryContentView = ({ content, template }: { content: string; template?:
     : <FormattedAiText content={content} template={template} />;
 };
 
-const PdfFormattedAiText = ({ content }: { content: string }) => {
-  const lines = content.replace(/\r\n/g, "\n").trim().split("\n");
-
-  return (
-    <div>
-      {lines.map((rawLine, index) => {
-        const line = rawLine.trim();
-        if (!line) return <div key={index} style={{ height: 10 }} />;
-
-        const heading = line.match(/^(#{1,6})\s+(.+)$/);
-        if (heading) {
-          const level = heading[1].length;
-          return (
-            <div key={index} style={{
-              display: "block",
-              margin: `${index === 0 ? 0 : 16}px 0 8px`,
-              fontSize: level <= 2 ? 20 : 17,
-              fontWeight: 800,
-              lineHeight: "28px",
-              color: "#222",
-            }}>
-              {renderInlineText(heading[2])}
-            </div>
-          );
-        }
-
-        const boldHeading = line.match(/^\*\*(.+)\*\*$/);
-        if (boldHeading) {
-          return (
-            <div key={index} style={{
-              display: "block",
-              margin: `${index === 0 ? 0 : 14}px 0 8px`,
-              fontSize: 17,
-              fontWeight: 800,
-              lineHeight: "26px",
-              color: "#222",
-            }}>
-              {renderInlineText(boldHeading[1])}
-            </div>
-          );
-        }
-
-        const bullet = line.match(/^[-*•]\s+(.+)$/);
-        if (bullet) {
-          return (
-            <div key={index} style={{
-              display: "block",
-              margin: "0 0 8px 0",
-              paddingLeft: 18,
-              position: "relative",
-              lineHeight: "25px",
-            }}>
-              <span style={{
-                position: "absolute",
-                left: 2,
-                top: 10,
-                width: 5,
-                height: 5,
-                borderRadius: "50%",
-                background: PINK,
-              }} />
-              {renderInlineText(bullet[1])}
-            </div>
-          );
-        }
-
-        const numbered = line.match(/^(\d+)[.)]\s+(.+)$/);
-        if (numbered) {
-          return (
-            <div key={index} style={{
-              display: "block",
-              margin: "0 0 8px 0",
-              paddingLeft: 28,
-              position: "relative",
-              lineHeight: "25px",
-            }}>
-              <strong style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                color: PINK,
-                fontWeight: 800,
-              }}>{numbered[1]}.</strong>
-              {renderInlineText(numbered[2])}
-            </div>
-          );
-        }
-
-        return (
-          <div key={index} style={{
-            display: "block",
-            margin: "0 0 8px 0",
-            lineHeight: "25px",
-          }}>
-            {renderInlineText(line)}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
 const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
     { key: "GENERAL", name: "일반 요약", desc: "핵심 내용과 결론을 빠르게 정리", accent: "#555" },
@@ -671,6 +554,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
+  const [showPrintGuide, setShowPrintGuide] = useState(false);
   const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   const questions = suggestedTutorQuestions[template];
@@ -685,8 +569,33 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
     if (initialTutorQuestion?.trim()) setIsTutorOpen(true);
   }, [initialTutorQuestion]);
 
+  // 실제 인쇄(→ PDF 저장) 실행. 안내 팝업에서 '계속'을 누르면 호출된다.
+  const runPrint = () => {
+    setShowPrintGuide(false);
+    const prevTitle = document.title;
+    document.title = `tongkk-${template.toLowerCase()}-summary`;
+    const restoreTitle = () => {
+      document.title = prevTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+    window.addEventListener("afterprint", restoreTitle);
+    setActionMessage("인쇄 창에서 '대상'을 'PDF로 저장'으로 선택하세요.");
+    window.print();
+  };
+
   const handleDownload = async () => {
-    if (!pdfExportRef.current || pdfSaving) return;
+    if (pdfSaving) return;
+
+    // 텍스트 요약: 브라우저 인쇄로 PDF 저장 (인쇄창 → '대상'을 'PDF로 저장' 선택)
+    // 화면 렌더링을 그대로 인쇄하므로 글자 선택이 가능한 텍스트 PDF가 나온다.
+    // 바로 인쇄창을 띄우면 사용자가 당황하므로, 먼저 이유를 안내하는 팝업을 보여준다.
+    if (!mindmapData) {
+      setShowPrintGuide(true);
+      return;
+    }
+
+    // 마인드맵은 시각화라 인쇄 대신 기존 이미지 캡처(PDF) 방식 유지
+    if (!pdfExportRef.current) return;
 
     setActionMessage("PDF를 생성 중입니다...");
     setPdfSaving(true);
@@ -789,6 +698,80 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
 
   return (
     <div>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .pdf-print-area, .pdf-print-area * { visibility: visible !important; }
+          .pdf-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+            z-index: auto !important;
+          }
+          @page { size: A4; margin: 14mm; }
+        }
+      `}</style>
+      {showPrintGuide && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="PDF 저장 안내"
+          onClick={() => setShowPrintGuide(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.32)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "min(440px, 100%)", background: "#fff", borderRadius: 20, padding: "32px 30px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <span style={{
+                width: 36, height: 36, borderRadius: "50%", background: "#E8FAFD",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+              }}>📄</span>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>PDF로 저장하기</h3>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "#555", wordBreak: "keep-all" }}>
+              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "#222" }}>인쇄 창</b>이 열립니다.<br />
+              프린터 대신 <b style={{ color: "#222" }}>PDF로 저장</b>을 선택하면 돼요.
+            </p>
+            <div style={{
+              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "#f7f8fb",
+              fontSize: 13, lineHeight: 1.8, color: "#666", wordBreak: "keep-all",
+              display: "flex", gap: 8, alignItems: "flex-start",
+            }}>
+              <span style={{ flexShrink: 0 }}>💡</span>
+              <span>
+                저장된 PDF는 이미지가 아니라 문서 형태라서,<br />
+                <b style={{ color: "#222" }}>텍스트 선택과 복사</b>가 가능해요.
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowPrintGuide(false)}
+                style={{
+                  padding: "9px 18px", borderRadius: 10, border: "1px solid #e0e0e0",
+                  background: "#fff", color: "#555", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                }}
+              >취소</button>
+              <button
+                type="button"
+                onClick={runPrint}
+                style={{
+                  padding: "9px 22px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                }}
+              >계속</button>
+            </div>
+          </div>
+        </div>
+      )}
       <button onClick={onBack} style={{
         background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 템플릿 선택으로</button>
@@ -888,6 +871,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
         {!isLoading && !error && (
           <div
             ref={pdfExportRef}
+            className="pdf-print-area"
             aria-hidden="true"
             style={{
               position: "fixed",
@@ -917,7 +901,9 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
             {mindmapData ? (
               <MindmapView key={`pdf-${displayContent}`} data={mindmapData} />
             ) : (
-              <PdfFormattedAiText content={displayContent} />
+              // 인쇄(PDF)도 화면과 동일하게 보이도록 웹과 같은 렌더러를 사용한다.
+              // (이전 PdfFormattedAiText는 출처를 가공하지 않아 문장 끝마다 출처가 노출됐다.)
+              <FormattedAiText content={displayContent} template={template} />
             )}
           </div>
         )}
