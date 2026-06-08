@@ -380,8 +380,8 @@ const mergeSourceCitations = (sources: string[]): string => {
 };
 
 // 시험 포인트 섹션을 항목별로 재구성한다.
-// - 질문만 '>' 인용문 박스 안에 넣고(출처는 질문 줄 끝으로 모음)
-// - '답:'과 답 내용은 박스 밖에서 리스트로 들여쓴다. ('답:'은 렌더 시 글머리 숨김)
+// - 질문과 답을 같은 '>' 인용문 박스 안에 넣어 한 카드로 묶는다(출처는 질문 줄 끝으로 모음).
+// - '답:'과 답 내용도 박스 안에서 리스트로 들여쓴다. ('답:'은 렌더 시 글머리 숨김)
 const formatExamCards = (sectionLines: string[]): string[] => {
   const SRC = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/;
   type Item = { question: string; answer: string[] };
@@ -418,7 +418,7 @@ const formatExamCards = (sectionLines: string[]): string[] => {
     if (idx > 0) out.push("");
     out.push(`> ${question}`);
     if (answerLines.length) {
-      out.push("");
+      out.push(">");
       const labelIdx = answerLines.findIndex(a => /^답\s*:/.test(a));
       const label = labelIdx >= 0 ? answerLines[labelIdx] : "답:";
       const points = answerLines.filter((_, k) => k !== labelIdx);
@@ -426,8 +426,8 @@ const formatExamCards = (sectionLines: string[]): string[] => {
       // '답:'은 라벨로만 두고 내용은 하위 bullet로 내린다. (단답·목록답 모두 같은 카드 형태로 통일)
       const inlineAnswer = label.replace(/^답\s*:\s*/, "").trim();
       if (inlineAnswer) points.unshift(inlineAnswer);
-      out.push("- 답:");               // '답:' (렌더 시 글머리 숨김)
-      for (const p of points) out.push(`  - ${p}`);  // 답 내용은 한 단계 들여쓰기(중첩)
+      out.push("> - 답:");               // '답:' (박스 안, 렌더 시 글머리 숨김)
+      for (const p of points) out.push(`>   - ${p}`);  // 답 내용도 박스 안 중첩 리스트
     }
   });
   return out;
