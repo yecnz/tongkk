@@ -159,7 +159,7 @@ const SettingsModal = ({
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
             <p style={{ margin: "0 0 12px" }}>오류 제보나 개선 요청은 팀 관리자에게 전달하세요.</p>
             <a
-              href="mailto:team-1-learning-platform@example.com?subject=Tongkk%20문의"
+              href="mailto:tongkk.team@gmail.com?subject=Tongkk%20문의"
               style={{ color: CYAN, fontWeight: 800, textDecoration: "none" }}
             >
               문의 메일 작성하기
