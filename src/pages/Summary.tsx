@@ -227,12 +227,24 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
 
 const renderHighlightSyntax = (children: ReactNode): ReactNode => {
   if (typeof children === "string") {
-    return children.split(/(==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\))/g).map((part, index) => {
+    return children.split(/(§EXAM§[\s\S]*?§\/EXAM§|==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)|\*\*[^*]+\*\*)/g).map((part, index) => {
+      if (part.startsWith("§EXAM§") && part.endsWith("§/EXAM§")) {
+        return (
+          <mark key={index} style={{ padding: "1px 6px", borderRadius: 5, background: "#FFF3BF", color: "#222" }}>
+            <strong style={{ fontWeight: 800 }}>시험 포인트:</strong> {part.slice(6, -7)}
+          </mark>
+        );
+      }
       if (part.startsWith("==") && part.endsWith("==")) {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
       if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
         return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
+      }
+      // CommonMark 경계 규칙(닫는 ** 앞이 ')' 등 문장부호 + 뒤가 한글)으로 굵게 처리에
+      // 실패해 그대로 남은 **...**를 폴백으로 굵게 렌더링한다.
+      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+        return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
       }
       return part;
     });
@@ -388,6 +400,13 @@ const simplifySoleFileSources = (markdown: string): string => {
   });
 };
 
+// 본문 속 인라인 시험 포인트 "(**시험 포인트:** ...)"를 렌더 토큰으로 변환한다.
+// 마크다운 파싱(특히 **굵게**) 전에 적용해야 표시 단계에서 형광펜으로 묶어 렌더할 수 있다.
+const markInlineExamPoints = (markdown: string): string =>
+  markdown
+    .replace(/\(\s*\*\*\s*시험\s*포인트\s*:?\s*\*\*\s*([^)]*?)\s*\)/g, (_m, c) => `§EXAM§${c}§/EXAM§`)
+    .replace(/\(\s*시험\s*포인트\s*:\s*([^)]*?)\s*\)/g, (_m, c) => `§EXAM§${c}§/EXAM§`);
+
 // 시험 포인트 섹션을 항목별로 재구성한다.
 // - 질문만 '>' 인용문 박스 안에 넣고(출처는 질문 줄 끝으로 모음)
 // - '답:'과 답 내용은 박스 밖에서 리스트로 들여쓴다. ('답:'은 렌더 시 글머리 숨김)
@@ -490,7 +509,7 @@ const hoistSourceToHeadings = (markdown: string): string => {
 const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
-  const normalized = simplifySoleFileSources(normalizeMarkdownContent(content));
+  const normalized = markInlineExamPoints(simplifySoleFileSources(normalizeMarkdownContent(content)));
   const cleaned = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
   if (!cleaned) return null;
 
