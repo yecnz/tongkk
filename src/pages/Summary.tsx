@@ -232,7 +232,7 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
       if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
-        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1)}</span>;
+        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
       }
       return part;
     });
@@ -364,6 +364,30 @@ const mergeSourceCitations = (sources: string[]): string => {
   return parts.length ? `(출처: ${parts.join("; ")})` : "";
 };
 
+// 출처 표기에서 파일명 부분만 떼어낸다. (예: "(출처: a.pdf, p.3)" -> "a.pdf")
+const citationFileName = (src: string): string => {
+  const inner = src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
+  const commaIdx = inner.indexOf(",");
+  return (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+};
+
+// 요약 전체가 단일 자료(파일명이 한 종류)일 때는 출처에서 파일명을 떼고
+// 위치(p.3 등)만 남긴다. 위치 단서 없이 파일명만 있는 출처는 통째로 제거한다.
+// 여러 파일명이 섞여 있으면 어느 자료인지 구분이 필요하므로 그대로 둔다.
+const simplifySoleFileSources = (markdown: string): string => {
+  const matches = markdown.match(SOURCE_PATTERN) || [];
+  if (!matches.length) return markdown;
+  const files = new Set(matches.map(citationFileName).filter(Boolean));
+  if (files.size > 1) return markdown;
+
+  return markdown.replace(SOURCE_PATTERN, (m) => {
+    const inner = m.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
+    const commaIdx = inner.indexOf(",");
+    const loc = commaIdx === -1 ? "" : inner.slice(commaIdx + 1).trim();
+    return loc ? `(출처: ${loc})` : "";
+  });
+};
+
 // 시험 포인트 섹션을 항목별로 재구성한다.
 // - 질문만 '>' 인용문 박스 안에 넣고(출처는 질문 줄 끝으로 모음)
 // - '답:'과 답 내용은 박스 밖에서 리스트로 들여쓴다. ('답:'은 렌더 시 글머리 숨김)
@@ -466,7 +490,7 @@ const hoistSourceToHeadings = (markdown: string): string => {
 const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
-  const normalized = normalizeMarkdownContent(content);
+  const normalized = simplifySoleFileSources(normalizeMarkdownContent(content));
   const cleaned = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
   if (!cleaned) return null;
 
@@ -562,7 +586,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
   const exportContent = template === "MINDMAP"
     ? displayContent
-    : hoistSourceToHeadings(normalizeMarkdownContent(displayContent));
+    : hoistSourceToHeadings(simplifySoleFileSources(normalizeMarkdownContent(displayContent)));
   const exportText = `${templateLabels[template]} 요약\n\n${exportContent}`;
 
   useEffect(() => {
