@@ -509,8 +509,9 @@ const hoistSourceToHeadings = (markdown: string): string => {
 const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
-  const normalized = markInlineExamPoints(simplifySoleFileSources(normalizeMarkdownContent(content)));
-  const cleaned = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
+  const normalized = markInlineExamPoints(normalizeMarkdownContent(content));
+  const hoisted = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
+  const cleaned = simplifySoleFileSources(hoisted);
   if (!cleaned) return null;
 
   if (template === "CHEAT_SHEET") {
@@ -605,7 +606,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
   const exportContent = template === "MINDMAP"
     ? displayContent
-    : hoistSourceToHeadings(simplifySoleFileSources(normalizeMarkdownContent(displayContent)));
+    : simplifySoleFileSources(hoistSourceToHeadings(normalizeMarkdownContent(displayContent)));
   const exportText = `${templateLabels[template]} 요약\n\n${exportContent}`;
 
   useEffect(() => {
