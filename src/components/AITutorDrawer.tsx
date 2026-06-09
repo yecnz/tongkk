@@ -155,7 +155,6 @@ const formatSessionDate = (timestamp: number) =>
   }).format(new Date(timestamp));
 
 export const AITutorDrawer = ({
-  contextTitle,
   contextMarkdown,
   summaryId,
   materialId,
@@ -177,7 +176,7 @@ export const AITutorDrawer = ({
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<SummaryChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   // 기존 대화가 있을 때는 추천 질문을 접어두고 토글로 열어보게 한다(기본 접힘).
   const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(true);
   const [agentLoading, setAgentLoading] = useState(false);
@@ -336,7 +335,7 @@ export const AITutorDrawer = ({
     setAgentInput("");
     setAgentError("");
     setShowScrollBtn(false);
-    setSessionsCollapsed(false);
+    setSessionMenuOpen(false);
 
     if (!canPersistChat) return;
     setChatLoading(true);
@@ -393,7 +392,7 @@ export const AITutorDrawer = ({
           sessionId = createdSession.id;
           setActiveSessionId(createdSession.id);
           setChatSessions(prev => [createdSession, ...prev]);
-          setSessionsCollapsed(false);
+          setSessionMenuOpen(false);
         } catch (err) {
           persistenceError = err instanceof Error ? err.message : "AI 튜터 대화 세션 생성 실패";
         }
@@ -506,26 +505,147 @@ export const AITutorDrawer = ({
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>AI 튜터</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {canUseAgent && (
-              <button
-                type="button"
-                onClick={() => void startNewConversation()}
-                disabled={chatLoading || agentLoading}
-                aria-label="기존 대화를 보존하고 새 대화 시작"
-                title="기존 대화를 보존하고 새 대화를 시작합니다"
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e0e0e0",
-                  background: "#fafafa",
-                  color: chatLoading || agentLoading ? "#bbb" : "#777",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: chatLoading || agentLoading ? "default" : "pointer",
-                  opacity: chatLoading || agentLoading ? 0.6 : 1,
-                }}
-              >
-                새 대화 시작
-              </button>
+              canPersistChat ? (
+                <div style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setSessionMenuOpen(prev => !prev)}
+                    aria-label="저장된 대화 목록 보기"
+                    aria-expanded={sessionMenuOpen}
+                    title="저장된 대화 목록"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: sessionMenuOpen ? `1px solid ${PINK}55` : "1px solid #e0e0e0",
+                      background: sessionMenuOpen ? "#FFF0F6" : "#fafafa",
+                      color: sessionMenuOpen ? PINK : "#777",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    대화 목록
+                    <i className="fa-solid fa-chevron-down" style={{ fontSize: 9 }} />
+                  </button>
+                  {sessionMenuOpen && (
+                    <>
+                      <div onClick={() => setSessionMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 300 }} />
+                      <div
+                        role="menu"
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 6px)",
+                          right: 0,
+                          zIndex: 301,
+                          width: 260,
+                          maxHeight: 320,
+                          overflowY: "auto",
+                          background: "#fff",
+                          borderRadius: 12,
+                          border: "1px solid #ececec",
+                          boxShadow: "0 12px 32px rgba(0,0,0,0.16)",
+                          padding: 6,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 2,
+                        }}
+                      >
+                        {chatSessions.length === 0 && (
+                          <div style={{ padding: "10px 12px", fontSize: 12, color: "#aaa", fontWeight: 800, textAlign: "center" }}>
+                            저장된 대화가 없습니다
+                          </div>
+                        )}
+                        {chatSessions.map(session => {
+                          const isActive = session.id === activeSessionId;
+                          return (
+                            <button
+                              key={session.id}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => { setSessionMenuOpen(false); void openChatSession(session.id); }}
+                              disabled={chatLoading || agentLoading}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                width: "100%",
+                                padding: "9px 10px",
+                                borderRadius: 8,
+                                border: "none",
+                                background: isActive ? "#FFF0F6" : "transparent",
+                                color: isActive ? PINK : "#444",
+                                textAlign: "left",
+                                cursor: chatLoading || agentLoading ? "default" : "pointer",
+                                opacity: chatLoading || agentLoading ? 0.6 : 1,
+                              }}
+                            >
+                              <i className="fa-regular fa-message" style={{ fontSize: 12, color: isActive ? PINK : "#bbb", flexShrink: 0 }} />
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ display: "block", fontSize: 12.5, fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {session.title}
+                                </span>
+                                <span style={{ display: "block", fontSize: 10, color: "#aaa", fontWeight: 700 }}>
+                                  {formatSessionDate(session.updatedAt)}
+                                </span>
+                              </span>
+                              {isActive && <i className="fa-solid fa-check" style={{ fontSize: 12, color: PINK, flexShrink: 0 }} />}
+                            </button>
+                          );
+                        })}
+                        <div style={{ height: 1, background: "#f0f0f0", margin: "4px 2px" }} />
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => { setSessionMenuOpen(false); void startNewConversation(); }}
+                          disabled={chatLoading || agentLoading}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            width: "100%",
+                            padding: "9px 10px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: "transparent",
+                            color: chatLoading || agentLoading ? "#bbb" : PINK,
+                            fontSize: 12.5,
+                            fontWeight: 850,
+                            textAlign: "left",
+                            cursor: chatLoading || agentLoading ? "default" : "pointer",
+                          }}
+                        >
+                          <i className="fa-solid fa-plus" style={{ fontSize: 12, flexShrink: 0 }} />
+                          <span>새 대화 시작</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void startNewConversation()}
+                  disabled={chatLoading || agentLoading}
+                  aria-label="기존 대화를 보존하고 새 대화 시작"
+                  title="기존 대화를 보존하고 새 대화를 시작합니다"
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #e0e0e0",
+                    background: "#fafafa",
+                    color: chatLoading || agentLoading ? "#bbb" : "#777",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: chatLoading || agentLoading ? "default" : "pointer",
+                    opacity: chatLoading || agentLoading ? 0.6 : 1,
+                  }}
+                >
+                  새 대화 시작
+                </button>
+              )
             )}
             {canUseAgent && (
               <button
@@ -557,88 +677,6 @@ export const AITutorDrawer = ({
             </button>
           </div>
         </div>
-        <div style={{ margin: "0 0 14px", padding: "10px 12px", borderRadius: 10, background: "#fafafa", border: "1px solid #eeeeee" }}>
-          <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 900, color: "#aaa" }}>근거로 본 자료</div>
-          <div style={{ fontSize: 12, lineHeight: 1.45, color: "#555", fontWeight: 800, wordBreak: "break-word" }}>
-            {contextTitle}
-          </div>
-          <div style={{ marginTop: 5, fontSize: 11, lineHeight: 1.45, color: "#999", fontWeight: 700 }}>
-            답변은 이 자료 범위 안에서만 설명하도록 요청됩니다.
-          </div>
-        </div>
-
-        {canPersistChat && (chatSessions.length > 0 || !activeSessionId) && (
-          <div style={{ marginBottom: 14, border: "1px solid #eeeeee", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
-            <button
-              type="button"
-              onClick={() => setSessionsCollapsed(prev => !prev)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                border: "none",
-                background: "#fafafa",
-                color: "#666",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 850,
-              }}
-            >
-              <span>대화 목록 {chatSessions.length}</span>
-              <span style={{ color: "#aaa", fontSize: 13 }}>{sessionsCollapsed ? "펼치기" : "접기"}</span>
-            </button>
-            {!sessionsCollapsed && (
-              <div style={{ maxHeight: 132, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-                {!activeSessionId && (
-                  <div style={{
-                    padding: "9px 10px",
-                    borderRadius: 9,
-                    border: `1px solid ${PINK}55`,
-                    background: "#FFF0F6",
-                    color: PINK,
-                    fontSize: 12,
-                    fontWeight: 850,
-                    lineHeight: 1.35,
-                  }}>
-                    새 대화 작성 중
-                  </div>
-                )}
-                {chatSessions.map(session => {
-                  const isActive = session.id === activeSessionId;
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => void openChatSession(session.id)}
-                      disabled={chatLoading || agentLoading}
-                      style={{
-                        padding: "9px 10px",
-                        borderRadius: 9,
-                        border: isActive ? `1px solid ${PINK}55` : "1px solid transparent",
-                        background: isActive ? "#FFF0F6" : "#fff",
-                        color: isActive ? PINK : "#555",
-                        textAlign: "left",
-                        cursor: chatLoading || agentLoading ? "default" : "pointer",
-                        opacity: chatLoading || agentLoading ? 0.65 : 1,
-                      }}
-                    >
-                      <span style={{ display: "block", marginBottom: 3, fontSize: 12, fontWeight: 850, lineHeight: 1.35, wordBreak: "break-word" }}>
-                        {session.title}
-                      </span>
-                      <span style={{ display: "block", fontSize: 10, color: "#aaa", fontWeight: 700 }}>
-                        {formatSessionDate(session.updatedAt)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
         {canUseAgent && suggestedQuestions.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             {agentMessages.length > 0 ? (

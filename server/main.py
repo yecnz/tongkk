@@ -621,7 +621,8 @@ def _parse_page_selection(spec: str) -> set[int]:
     return pages
 
 
-_PAGE_MARKER_RE = re.compile(r"<!--\s*p\.(\d+)\s*-->")
+# PDF는 `<!-- p.N -->`, PPT/PPTX(markitdown)는 `<!-- Slide number: N -->` 형식의 마커를 쓴다.
+_PAGE_MARKER_RE = re.compile(r"<!--\s*(?:p\.|Slide number:\s*)(\d+)\s*-->")
 
 
 def _filter_markdown_by_pages(markdown: str, spec: str | None) -> str:

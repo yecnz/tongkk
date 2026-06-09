@@ -6,6 +6,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
+import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import {
@@ -76,7 +77,6 @@ type MaterialDetailViewProps = {
   onBack: () => void;
   onGoSummary: () => void;
   onGoQuiz: () => void;
-  onOpenSummary: (summary: SavedSummary) => void;
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
   initialTab?: MaterialDetailTab;
   initialTutorQuestion?: string;
@@ -1207,6 +1207,261 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   );
 };
 
+// 요약 결과의 전체 복사 / PDF 다운로드 / 퀴즈 생성하기 버튼 묶음.
+// 자세히 보기 페이지(SummaryResultView)와 동일한 동작을, 자료 상세의 요약 탭에서 바로 쓰도록 분리했다.
+// 숨김 export 노드(.pdf-print-area)·인쇄 CSS·안내 모달을 자체적으로 포함하므로, 버튼 줄 안에 그대로 넣으면 된다.
+const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTemplate; content: string; onGoToQuiz?: () => void }) => {
+  const { showToast } = useToast();
+  const [pdfSaving, setPdfSaving] = useState(false);
+  const [showPrintGuide, setShowPrintGuide] = useState(false);
+  const pdfExportRef = useRef<HTMLDivElement | null>(null);
+  const mindmapData = template === "MINDMAP" && content ? parseMindmapJson(content) : null;
+  // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
+  const exportContent = template === "MINDMAP"
+    ? content
+    : simplifySoleFileSources(hoistSourceToHeadings(normalizeMarkdownContent(content)));
+  const exportText = `${templateLabels[template]} 요약\n\n${exportContent}`;
+
+  // 실제 인쇄(→ PDF 저장) 실행. 안내 팝업에서 '계속'을 누르면 호출된다.
+  const runPrint = () => {
+    setShowPrintGuide(false);
+    const prevTitle = document.title;
+    document.title = `tongkk-${template.toLowerCase()}-summary`;
+    const restoreTitle = () => {
+      document.title = prevTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+    window.addEventListener("afterprint", restoreTitle);
+    showToast("인쇄 창에서 '대상'을 'PDF로 저장'으로 선택하세요.", "info");
+    window.print();
+  };
+
+  const handleDownload = async () => {
+    if (pdfSaving) return;
+    // 텍스트 요약: 브라우저 인쇄로 PDF 저장(텍스트 선택 가능). 마인드맵: 이미지 캡처(PDF).
+    if (!mindmapData) {
+      setShowPrintGuide(true);
+      return;
+    }
+    if (!pdfExportRef.current) return;
+    setPdfSaving(true);
+    try {
+      await document.fonts.ready;
+      const exportNode = pdfExportRef.current;
+      if (!exportNode) return;
+      const backdrop = document.createElement("div");
+      backdrop.setAttribute("data-pdf-backdrop", "");
+      backdrop.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;";
+      document.body.appendChild(backdrop);
+      exportNode.style.left = "0px";
+      exportNode.style.top = "0px";
+      exportNode.style.zIndex = "99999";
+      exportNode.style.letterSpacing = "0.01px";
+      void exportNode.getBoundingClientRect();
+      const canvas = await html2canvas(exportNode, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+      });
+      document.body.removeChild(backdrop);
+      exportNode.style.left = "-10000px";
+      exportNode.style.top = "0px";
+      exportNode.style.zIndex = "-1";
+      exportNode.style.letterSpacing = "";
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2;
+      const imgHeight = (canvas.height * contentWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let y = margin;
+      pdf.addImage(imgData, "PNG", margin, y, contentWidth, imgHeight);
+      heightLeft -= contentHeight;
+      while (heightLeft > 0) {
+        pdf.addPage();
+        y -= contentHeight;
+        pdf.addImage(imgData, "PNG", margin, y, contentWidth, imgHeight);
+        heightLeft -= contentHeight;
+      }
+      pdf.save(`tongkk-${template.toLowerCase()}-summary.pdf`);
+      showToast("PDF를 다운로드했습니다.", "success");
+    } catch {
+      document.querySelectorAll<HTMLElement>('[data-pdf-backdrop]').forEach(el => el.remove());
+      if (pdfExportRef.current) {
+        pdfExportRef.current.style.left = "-10000px";
+        pdfExportRef.current.style.zIndex = "-1";
+        pdfExportRef.current.style.letterSpacing = "";
+      }
+      showToast("PDF 다운로드에 실패했습니다.", "error");
+    } finally {
+      setPdfSaving(false);
+    }
+  };
+
+  const copySummaryToClipboard = async () => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(exportText);
+      return;
+    }
+    const textArea = document.createElement("textarea");
+    textArea.value = exportText;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.top = "-9999px";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.select();
+    const copied = document.execCommand("copy");
+    textArea.remove();
+    if (!copied) throw new Error("Clipboard copy failed");
+  };
+
+  const handleCopyAll = async () => {
+    try {
+      await copySummaryToClipboard();
+      showToast("요약본 전체를 클립보드에 복사했습니다.", "success");
+    } catch {
+      showToast("전체 복사에 실패했습니다.", "error");
+    }
+  };
+
+  return (
+    <>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          .pdf-print-area, .pdf-print-area * { visibility: visible !important; }
+          .pdf-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+            z-index: auto !important;
+          }
+          @page { size: A4; margin: 14mm; }
+        }
+      `}</style>
+      {showPrintGuide && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="PDF 저장 안내"
+          onClick={() => setShowPrintGuide(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.32)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "min(440px, 100%)", background: "#fff", borderRadius: 20, padding: "32px 30px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <span style={{
+                width: 36, height: 36, borderRadius: "50%", background: "#E8FAFD",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+              }}>📄</span>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>PDF로 저장하기</h3>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "#555", wordBreak: "keep-all" }}>
+              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "#222" }}>인쇄 창</b>이 열립니다.<br />
+              프린터 대신 <b style={{ color: "#222" }}>PDF로 저장</b>을 선택하면 돼요.
+            </p>
+            <div style={{
+              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "#f7f8fb",
+              fontSize: 13, lineHeight: 1.8, color: "#666", wordBreak: "keep-all",
+              display: "flex", gap: 8, alignItems: "flex-start",
+            }}>
+              <span style={{ flexShrink: 0 }}>💡</span>
+              <span>
+                저장된 PDF는 이미지가 아니라 문서 형태라서,<br />
+                <b style={{ color: "#222" }}>텍스트 선택과 복사</b>가 가능해요.
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowPrintGuide(false)}
+                style={{
+                  padding: "9px 18px", borderRadius: 10, border: "1px solid #e0e0e0",
+                  background: "#fff", color: "#555", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                }}
+              >취소</button>
+              <button
+                type="button"
+                onClick={runPrint}
+                style={{
+                  padding: "9px 22px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                }}
+              >계속</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <button onClick={handleCopyAll} style={{
+        padding: "9px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
+        background: "#fff", color: "#555", fontSize: 12, fontWeight: 800, cursor: "pointer",
+      }}>전체 복사</button>
+      <button onClick={handleDownload} disabled={pdfSaving} style={{
+        padding: "9px 12px", borderRadius: 8, border: "none",
+        background: pdfSaving ? "#d9f5f9" : "#70dff0",
+        color: "#555", fontSize: 12, fontWeight: 800,
+        cursor: pdfSaving ? "default" : "pointer",
+        opacity: pdfSaving ? 0.75 : 1,
+      }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
+      {onGoToQuiz && (
+        <button onClick={onGoToQuiz} style={{
+          padding: "9px 12px", borderRadius: 8, border: "none",
+          background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer",
+        }}>퀴즈 생성하기</button>
+      )}
+      <div
+        ref={pdfExportRef}
+        className="pdf-print-area"
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          left: "-10000px",
+          top: 0,
+          zIndex: -1,
+          width: 794,
+          padding: 48,
+          background: "#fff",
+          color: "#222",
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
+          fontSize: 14,
+          lineHeight: "25px",
+          pointerEvents: "none",
+        }}
+      >
+        <h1 style={{
+          margin: "0 0 22px",
+          paddingBottom: 14,
+          borderBottom: "2px solid #f0f0f0",
+          fontSize: 24,
+          lineHeight: 1.35,
+          color: "#222",
+        }}>
+          Tongkk {templateLabels[template]} 요약
+        </h1>
+        {mindmapData ? (
+          <MindmapView key={`pdf-${content}`} data={mindmapData} />
+        ) : (
+          <FormattedAiText content={content} template={template} />
+        )}
+      </div>
+    </>
+  );
+};
+
 const formatHubDate = (timestamp?: number) => {
   if (!timestamp) return "업데이트 정보 없음";
   return new Intl.DateTimeFormat("ko-KR", {
@@ -1317,7 +1572,6 @@ const MaterialDetailView = ({
   onBack,
   onGoSummary,
   onGoQuiz,
-  onOpenSummary,
   onOpenQuiz,
   initialTab = "original",
   initialTutorQuestion = "",
@@ -1819,9 +2073,7 @@ const MaterialDetailView = ({
               {activeTab === "summary" && activeSummary && (
                 <>
                   {multiSourceBadge(activeSummary.materialIds)}
-                  <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-                    자세히 보기
-                  </button>
+                  <SummaryActions template={activeSummary.template} content={activeSummary.content} onGoToQuiz={onGoQuiz} />
                   <button onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
                     padding: "9px 12px",
                     borderRadius: 8,
@@ -2855,21 +3107,6 @@ export default function Summary() {
     });
   };
 
-  const handleOpenMaterialSummary = (summary: SavedSummary) => {
-    const validMaterialIds = (summary.materialIds || []).filter(id => materials.some(material => material.id === id));
-    setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : activeMaterial ? [activeMaterial.id] : []);
-    setSelectedTemplate(summary.template);
-    setActiveSummaryId(summary.id || null);
-    setSummaryText(summary.content);
-    setIsSummarizing(false);
-    setSummaryError("");
-    setElapsedTime(null);
-    setLoadingStep("");
-    setAgentThreadId("");
-    setResultBackView("materialDetail");
-    setView("summaryResult");
-  };
-
   const handleOpenMaterialQuiz = (quizSet: SavedQuizSet) => {
     navigate(pageRoutes["퀴즈 생성"], {
       state: { course: selectedCourse, quizSetId: quizSet.id, openQuiz: true, fromDashboard: fromDashboardRef.current },
@@ -3127,7 +3364,6 @@ export default function Summary() {
             onBack={() => { if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]); else setView("upload"); }}
             onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
-            onOpenSummary={handleOpenMaterialSummary}
             onOpenQuiz={handleOpenMaterialQuiz}
             initialTab={materialDetailInitialTab}
             initialTutorQuestion={materialDetailTutorQuestion}
