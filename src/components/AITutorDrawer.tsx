@@ -21,6 +21,9 @@ type AITutorDrawerProps = {
   suggestedQuestions?: string[];
   initialQuestion?: string;
   onInitialQuestionConsumed?: () => void;
+  // 마운트 후에도 사용자가 본문을 선택할 때마다 새 질문을 입력창에 채워 넣기 위한 prop.
+  // nonce가 바뀔 때마다 같은 텍스트라도 다시 반영된다.
+  pendingQuestion?: { text: string; nonce: number };
   disabledReason?: string;
   resetHistory?: boolean;
   layout?: "drawer" | "embedded";
@@ -157,6 +160,7 @@ export const AITutorDrawer = ({
   suggestedQuestions = [],
   initialQuestion,
   onInitialQuestionConsumed,
+  pendingQuestion,
   disabledReason = "요약 생성 후 AI 튜터를 사용할 수 있습니다",
   resetHistory = false,
   layout = "drawer",
@@ -178,6 +182,7 @@ export const AITutorDrawer = ({
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
   const initialQuestionRef = useRef("");
+  const pendingNonceRef = useRef<number | null>(null);
   const agentInputRef = useRef<HTMLTextAreaElement>(null);
   const canUseAgent = Boolean(contextMarkdown.trim());
   const canPersistChat = Boolean(summaryId || materialId);
@@ -287,6 +292,25 @@ export const AITutorDrawer = ({
     setAgentInput(question);
     onInitialQuestionConsumed?.();
   }, [initialQuestion, canUseAgent, setOpen, onInitialQuestionConsumed]);
+
+  // 본문 선택 → "AI 튜터에게 묻기"로 전달된 질문을 입력창에 채운다.
+  // initialQuestion과 달리 nonce 기반이라 같은 텍스트를 다시 선택해도 매번 반영된다.
+  useEffect(() => {
+    if (!pendingQuestion || !canUseAgent) return;
+    if (pendingNonceRef.current === pendingQuestion.nonce) return;
+    const text = pendingQuestion.text.trim();
+    if (!text) return;
+    pendingNonceRef.current = pendingQuestion.nonce;
+    setOpen(true);
+    setAgentInput(text);
+    requestAnimationFrame(() => {
+      const el = agentInputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  }, [pendingQuestion, canUseAgent, setOpen]);
 
   useEffect(() => {
     if (!isOpen) setExpanded(false);
