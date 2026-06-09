@@ -148,6 +148,11 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- 기존 DB(profiles 테이블이 이미 있는 경우)에도 컬럼이 적용되도록 마이그레이션 추가.
+-- create table if not exists는 기존 테이블에 새 컬럼을 넣지 않으므로 alter로 보강한다.
+alter table public.profiles
+add column if not exists hide_summary_notice boolean not null default false;
+
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do update set public = excluded.public;
