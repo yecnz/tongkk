@@ -2095,6 +2095,21 @@ export default function Summary() {
   const filesRef = useRef<UploadedFile[]>([]);
 
   const [view, setView] = useState<SummaryView>("upload");
+  // 업로드 화면에 '실제로' 머무를 때만 요약 안내 팝업을 띄운다.
+  // 딥링크 진입 시 비동기 로딩이 끝나기 전까지 view가 잠깐 'upload'였다가
+  // materialDetail/summaryResult 등으로 바뀌는데, 그 transient 동안 팝업이
+  // 깜빡이는 걸 막기 위해 '대기 중인 딥링크 네비게이션'이 없을 때만 띄운다.
+  useEffect(() => {
+    const hasPendingNav =
+      Boolean(pendingMaterialIdRef.current) ||
+      pendingCreateSummaryRef.current ||
+      Boolean(pendingSummaryRef.current);
+    if (view === "upload" && !hasPendingNav && localStorage.getItem("hideMultiSummaryNotice") !== "1") {
+      setShowMultiSummaryNotice(true);
+    } else {
+      setShowMultiSummaryNotice(false);
+    }
+  }, [view]);
   const [selectedTemplate, setSelectedTemplate] = useState<SummaryTemplate | null>(null);
   const [activeSummaryId, setActiveSummaryId] = useState<string | null>(null);
   const [summaryText, setSummaryText] = useState("");
@@ -2115,6 +2130,8 @@ export default function Summary() {
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   // 50MB 초과로 원본을 저장하지 못한 파일들을 모아 가운데 모달로 안내.
   const [sizeLimitNotice, setSizeLimitNotice] = useState<{ names: string[] } | null>(null);
+  const [showMultiSummaryNotice, setShowMultiSummaryNotice] = useState(false);
+  const [dontShowMultiSummaryNotice, setDontShowMultiSummaryNotice] = useState(false);
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
@@ -2730,6 +2747,71 @@ export default function Summary() {
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
+      {showMultiSummaryNotice && view === "upload" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="요약 안내"
+          onClick={() => {
+            if (dontShowMultiSummaryNotice) localStorage.setItem("hideMultiSummaryNotice", "1");
+            setShowMultiSummaryNotice(false);
+          }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.32)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "min(440px, 100%)", background: "#fff", borderRadius: 20, padding: "32px 30px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <span style={{
+                width: 36, height: 36, borderRadius: "50%", background: "#FFF7ED",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+              }}>📝</span>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>요약 안내</h3>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "#555", wordBreak: "keep-all" }}>
+              출력 토큰이 제한되어 있어, <b style={{ color: "#222" }}>여러 개 요약해도</b> <b style={{ color: "#222" }}>하나만 </b>생성돼요.
+            </p>
+            <div style={{
+              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "#f7f8fb",
+              fontSize: 13, lineHeight: 1.8, color: "#666", wordBreak: "keep-all",
+              display: "flex", gap: 8, alignItems: "flex-start",
+            }}>
+              <span style={{ flexShrink: 0 }}>💡</span>
+              <span>
+                자료가 많을수록 AI가 내용을 줄여서 요약할 수 있어요.<br />
+                각 자료를 자세히 보고 싶다면 <b style={{ color: PINK }}>한 개씩 선택해서 요약</b>하는 걸 추천해요.
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#888", cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={dontShowMultiSummaryNotice}
+                  onChange={e => setDontShowMultiSummaryNotice(e.target.checked)}
+                  style={{ cursor: "pointer" }}
+                />
+                다시 보지 않기
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (dontShowMultiSummaryNotice) localStorage.setItem("hideMultiSummaryNotice", "1");
+                  setShowMultiSummaryNotice(false);
+                }}
+                style={{
+                  padding: "9px 22px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                }}
+              >확인</button>
+            </div>
+          </div>
+        </div>
+      )}
       {sizeLimitNotice && (
         <div
           role="dialog"
