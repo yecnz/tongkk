@@ -4,7 +4,7 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
@@ -478,7 +478,7 @@ const hoistSourceToHeadings = (markdown: string): string => {
   return result.join("\n");
 };
 
-const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
+const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
   const normalized = normalizeMarkdownContent(content);

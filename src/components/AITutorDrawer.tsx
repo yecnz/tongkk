@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { PINK } from "../common";
+import { PINK, normalizeBoldSpacing } from "../common";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   createSummaryChatSession,
@@ -33,6 +33,11 @@ const markdownStyles = {
   list: { margin: "6px 0 10px", paddingLeft: 20, lineHeight: 1.65 } satisfies CSSProperties,
 };
 
+// AI 튜터 입력창(textarea) 자동 높이: 줄높이 20px 기준 최대 5줄 + 상하 패딩(11*2) + 테두리(1*2).
+const AGENT_INPUT_LINE_HEIGHT = 20;
+const AGENT_INPUT_BORDER = 2;
+const AGENT_INPUT_MAX_HEIGHT = AGENT_INPUT_LINE_HEIGHT * 5 + 22 + AGENT_INPUT_BORDER;
+
 const markdownComponents: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>{children}</h1>,
   h2: ({ children }) => <h2 style={{ margin: "16px 0 10px", fontSize: 16, lineHeight: 1.4, fontWeight: 850, color: "#222" }}>{children}</h2>,
@@ -56,7 +61,7 @@ const markdownComponents: Components = {
 };
 
 const FormattedTutorText = ({ content }: { content: string }) => {
-  const cleaned = content.replace(/\r\n/g, "\n").trim();
+  const cleaned = normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
   if (!cleaned) return null;
 
   return (
@@ -173,6 +178,7 @@ export const AITutorDrawer = ({
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
   const initialQuestionRef = useRef("");
+  const agentInputRef = useRef<HTMLTextAreaElement>(null);
   const canUseAgent = Boolean(contextMarkdown.trim());
   const canPersistChat = Boolean(summaryId || materialId);
   const chatTarget = { summaryId, materialId };
@@ -187,6 +193,14 @@ export const AITutorDrawer = ({
     const el = chatContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   };
+
+  // 입력 길이에 따라 textarea 높이를 1~5줄 범위에서 자동 조절한다.
+  useEffect(() => {
+    const el = agentInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight + AGENT_INPUT_BORDER, AGENT_INPUT_MAX_HEIGHT)}px`;
+  }, [agentInput]);
 
   const handleChatScroll = () => {
     const el = chatContainerRef.current;
@@ -687,20 +701,28 @@ export const AITutorDrawer = ({
         </div>
 
         {agentError && <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>}
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea
+            ref={agentInputRef}
             value={agentInput}
             onChange={e => setAgentInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") void handleSubmit(); }}
+            onKeyDown={e => {
+              // Enter는 전송, Shift+Enter는 줄바꿈. 한글 IME 조합 중 Enter는 전송하지 않는다.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void handleSubmit();
+              }
+            }}
             disabled={!canUseAgent || chatLoading || agentLoading}
             placeholder="요약본에 대해 질문하기"
-            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 13, outline: "none" }}
+            rows={1}
+            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
           />
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
-            style={{ padding: "0 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff", fontSize: 13, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
+            style={{ padding: "11px 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
           >
             {agentLoading ? "응답 중" : "전송"}
           </button>

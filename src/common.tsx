@@ -8,6 +8,12 @@ export const BORDER_COLOR = "#e2e6ee";
 export const MUTED_SURFACE = "#f1f4f8";
 export const SOFT_SHADOW = "0 10px 28px rgba(15, 23, 42, 0.045)";
 
+// LLM이 별표 안쪽에 공백을 넣어(`** 텍스트 **`) 출력하면 react-markdown이 굵게로 파싱하지
+// 못하고 별표를 그대로 보여준다. 마크다운 렌더 직전에 별표와 텍스트 사이의 공백(줄바꿈 제외)을
+// 제거해 정상적으로 굵게 처리되도록 한다.
+export const normalizeBoldSpacing = (text: string): string =>
+  text.replace(/\*\*[^\S\n]+(.+?)[^\S\n]+\*\*/g, "**$1**");
+
 export const pageRoutes = {
   "대시보드": "/",
   "학습 캘린더": "/calendar",
