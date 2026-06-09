@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
-import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
@@ -221,7 +220,7 @@ const VIEW_TO_URL_TOKEN: Record<SummaryView, string> = {
 };
 const URL_TOKEN_TO_VIEW: Record<string, SummaryView> = {
   upload: "upload",
-  list: "materialList",
+  list: "upload",
   templates: "templates",
   summary: "summaryResult",
   quiz: "quizCreate",
@@ -1226,6 +1225,7 @@ const MaterialDetailView = ({
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
   const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
+  const [showSummaryList, setShowSummaryList] = useState(false);
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<{ range: Range; top: number } | null>(null);
@@ -1414,125 +1414,13 @@ const MaterialDetailView = ({
     },
   ];
 
-  const openSummaryTab = () => {
-    if (activeSummary) setActiveSummaryId(activeSummary.id || "");
-    setActiveTab("summary");
-  };
-
-  const openTutor = (question: string) => {
-    if (activeSummary) setActiveSummaryId(activeSummary.id || "");
-    setIsOriginalTutorOpen(false);
-    setActiveTab("summary");
-    setTutorPrompt(question);
-    setIsSummaryTutorOpen(true);
-  };
-
-  const learningCta = (() => {
-    if (!hasSummaries) {
-      return {
-        message: "먼저 이 자료를 요약해 학습 흐름을 잡아보세요.",
-        actions: [
-          { label: "요약 생성하기", onClick: onGoSummary, tone: "primary" as const },
-        ],
-      };
-    }
-
-    if (hasLowRecentScore) {
-      return {
-        message: "점수가 낮았던 부분을 요약과 함께 다시 볼까요?",
-        actions: [
-          { label: "약점 요약 보기", onClick: openSummaryTab, tone: "primary" as const },
-          {
-            label: "AI 튜터로 복습",
-            onClick: () => openTutor(hasReviewContext
-              ? "위의 이번 퀴즈 오답 복습 문맥을 기준으로 내가 틀린 문제들을 순서대로 설명해줘. 각 문제마다 왜 틀렸는지, 어떤 개념을 다시 봐야 하는지, 비슷한 문제를 풀 때 주의할 점을 알려줘."
-              : "최근 퀴즈에서 틀린 부분과 약점을 요약 기준으로 다시 설명해줘"),
-            tone: "secondary" as const,
-          },
-        ],
-      };
-    }
-
-    if (hasQuizSets) {
-      return {
-        message: "최근 요약을 이어서 보고, 퀴즈 결과를 복습하세요.",
-        actions: [
-          { label: "요약 보기", onClick: openSummaryTab, tone: "primary" as const },
-          { label: "퀴즈 다시 풀기", onClick: () => onOpenQuiz(quizSets[0]), tone: "secondary" as const },
-          {
-            label: "AI 튜터",
-            onClick: () => openTutor("이 요약에서 시험에 다시 나올 만한 부분을 짚어줘"),
-            tone: "quiet" as const,
-          },
-        ],
-      };
-    }
-
-    return {
-      message: "요약은 완료됐어요. 이제 이해도를 확인해볼 차례입니다.",
-      actions: [
-        { label: "퀴즈 만들기", onClick: onGoQuiz, tone: "primary" as const },
-        {
-          label: "AI 튜터에게 질문",
-          onClick: () => openTutor("이 요약을 바탕으로 내가 이해했는지 확인 질문을 해줘"),
-          tone: "secondary" as const,
-        },
-      ],
-    };
-  })();
-
-  const ctaButtonStyle = (tone: "primary" | "secondary" | "quiet"): CSSProperties => {
-    if (tone === "primary") {
-      return {
-        height: 36,
-        padding: "0 14px",
-        borderRadius: 9,
-        border: "none",
-        background: PINK,
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: 850,
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-      };
-    }
-
-    if (tone === "secondary") {
-      return {
-        height: 36,
-        padding: "0 14px",
-        borderRadius: 9,
-        border: `1px solid ${CYAN}33`,
-        background: "#E8FAFE",
-        color: CYAN,
-        fontSize: 13,
-        fontWeight: 850,
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-      };
-    }
-
-    return {
-      height: 36,
-      padding: "0 12px",
-      borderRadius: 9,
-      border: `1px solid ${BORDER_COLOR}`,
-      background: "#fff",
-      color: "#777",
-      fontSize: 13,
-      fontWeight: 800,
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-    };
-  };
-
   const tabButtonStyle = (tab: MaterialDetailTab): CSSProperties => ({
-    height: 42,
+    height: 34,
     borderRadius: 10,
     border: activeTab === tab ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
     background: activeTab === tab ? "#FFF0F6" : "#fff",
     color: activeTab === tab ? PINK : "#777",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 800,
     cursor: "pointer",
   });
@@ -1651,9 +1539,14 @@ const MaterialDetailView = ({
       <button onClick={onBack} style={{
         background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 과목 자료로</button>
-      <Card style={{ padding: 0, overflow: "hidden" }}>
+      <Card style={{ padding: 0 }}>
         <div style={{
-          padding: "14px 18px",
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
+          overflow: "hidden",
+        }}>
+        <div style={{
+          padding: "9px 18px",
           borderBottom: "1px solid #f0f0f0",
           background: "#f2f2f2",
           color: "#222",
@@ -1663,7 +1556,7 @@ const MaterialDetailView = ({
           gap: 16,
         }}>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#222", wordBreak: "break-word" }}>
+            <h2 style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 800, color: "#222", wordBreak: "break-word" }}>
               {material.name}
             </h2>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#777" }}>
@@ -1672,168 +1565,157 @@ const MaterialDetailView = ({
               <span>업데이트 {formatHubDate(material.updatedAt)}</span>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            {fileUrl && (
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
+          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+              {materialProgressSteps.map((step, index) => {
+                const color = step.done ? "#999" : step.current ? PINK : "#bbb";
+                const connectorFilled = index > 0 && materialProgressSteps[index - 1].done;
+                return (
+                  <div key={step.label} style={{ display: "flex", alignItems: "center" }}>
+                    {index > 0 && (
+                      <div style={{ width: 18, height: 2, background: connectorFilled ? "#999" : "#e0e0e0" }} />
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        border: `2px solid ${color}`,
+                        background: step.done ? "#999" : step.current ? PINK : "#fff",
+                        color: step.done || step.current ? "#fff" : "#bbb",
+                        fontSize: 10,
+                        fontWeight: 900,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}>
+                        {step.done ? "✓" : index + 1}
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 800, color, whiteSpace: "nowrap" }}>
+                        {step.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+          {relatedMaterials.length > 1 && (
+            <div style={{ padding: "0 18px 12px", background: "#fff" }}>
+              <div style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: `1px solid ${BORDER_COLOR}`,
+                background: "#fff",
+              }}>
+                <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
+                  이 퀴즈에 연결된 자료
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {relatedMaterials.map(related => {
+                    const isActive = related.id === material.id;
+                    return (
+                      <button
+                        key={related.id}
+                        type="button"
+                        onClick={() => onSelectRelatedMaterial?.(related)}
+                        style={{
+                          maxWidth: 280,
+                          padding: "7px 10px",
+                          borderRadius: 999,
+                          border: isActive ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                          background: isActive ? "#FFF0F6" : "#fafafa",
+                          color: isActive ? PINK : "#666",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          cursor: isActive ? "default" : "pointer",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {related.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          background: "#fff",
+          padding: "10px 18px",
+          borderBottom: "1px solid #f0f0f0",
+        }}>
+          {hasSummaries && activeTab !== "quiz" && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 10 }}>
+              {activeTab === "summary" && (
+                <button
+                  type="button"
+                  onClick={() => setShowSummaryList(prev => !prev)}
+                  aria-label={showSummaryList ? "요약 목록 닫기" : "요약 목록 열기"}
+                  title={showSummaryList ? "요약 목록 닫기" : "요약 목록 열기"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    border: showSummaryList ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                    background: showSummaryList ? "#FFF0F6" : "#fff",
+                    color: showSummaryList ? PINK : "#555",
+                    fontSize: 16,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  ☰
+                </button>
+              )}
+              {activeTab === "original" && (
+                <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
                   height: 34,
                   padding: "0 12px",
                   borderRadius: 8,
-                  border: `1px solid ${BORDER_COLOR}`,
-                  background: "#fff",
-                  color: "#555",
+                  border: isOriginalTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                  background: isOriginalTutorOpen ? "#FFF0F6" : "#fff",
+                  color: isOriginalTutorOpen ? PINK : "#555",
                   fontSize: 13,
                   fontWeight: 800,
                   display: "inline-flex",
                   alignItems: "center",
-                  textDecoration: "none",
                   cursor: "pointer",
-                }}
-              >
-                원본 열기
-              </a>
-            )}
-            {activeTab === "original" && hasSummaries && (
-              <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
-                height: 34,
-                padding: "0 12px",
-                borderRadius: 8,
-                border: isOriginalTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                background: isOriginalTutorOpen ? "#FFF0F6" : "#fff",
-                color: isOriginalTutorOpen ? PINK : "#555",
-                fontSize: 13,
-                fontWeight: 800,
-                display: "inline-flex",
-                alignItems: "center",
-                cursor: "pointer",
-              }}>{isOriginalTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
-            )}
-          </div>
-        </div>
-        <div style={{ padding: 18, borderBottom: "1px solid #f0f0f0", background: "#fff" }}>
-          {relatedMaterials.length > 1 && (
-            <div style={{
-              marginBottom: 14,
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: `1px solid ${BORDER_COLOR}`,
-              background: "#fff",
-            }}>
-              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
-                이 퀴즈에 연결된 자료
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {relatedMaterials.map(related => {
-                  const isActive = related.id === material.id;
-                  return (
-                    <button
-                      key={related.id}
-                      type="button"
-                      onClick={() => onSelectRelatedMaterial?.(related)}
-                      style={{
-                        maxWidth: 280,
-                        padding: "7px 10px",
-                        borderRadius: 999,
-                        border: isActive ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                        background: isActive ? "#FFF0F6" : "#fafafa",
-                        color: isActive ? PINK : "#666",
-                        fontSize: 12,
-                        fontWeight: 800,
-                        cursor: isActive ? "default" : "pointer",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {related.name}
-                    </button>
-                  );
-                })}
-              </div>
+                }}>{isOriginalTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
+              )}
+              {activeTab === "summary" && activeSummary && (
+                <>
+                  {multiSourceBadge(activeSummary.materialIds)}
+                  <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                    자세히 보기
+                  </button>
+                  <button onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
+                    padding: "9px 12px",
+                    borderRadius: 8,
+                    border: isSummaryTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                    background: isSummaryTutorOpen ? "#FFF0F6" : "#fff",
+                    color: isSummaryTutorOpen ? PINK : "#555",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}>
+                    {isSummaryTutorOpen ? "튜터 닫기" : "AI 튜터"}
+                  </button>
+                </>
+              )}
             </div>
           )}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: 8,
-            marginBottom: 14,
-          }}>
-            {materialProgressSteps.map((step, index) => {
-              const color = step.done ? "#2F9E44" : step.current ? PINK : "#aaa";
-              const bg = step.done ? "#F1FFF5" : step.current ? "#FFF0F6" : "#f7f7f7";
-              return (
-                <div key={step.label} style={{
-                  padding: "9px 10px",
-                  borderRadius: 10,
-                  border: `1px solid ${step.current ? PINK + "44" : "#eeeeee"}`,
-                  background: bg,
-                  minWidth: 0,
-                }}>
-                  <div style={{ marginBottom: 3, fontSize: 10, fontWeight: 900, color: "#aaa" }}>
-                    {index + 1}
-                  </div>
-                  <div style={{ fontSize: 12, lineHeight: 1.35, color, fontWeight: 850, wordBreak: "keep-all" }}>
-                    {step.label}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 16,
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 14,
-            padding: 16,
-            borderRadius: 12,
-            border: `1px solid ${BORDER_COLOR}`,
-            background: "#fafafa",
-          }}>
-            <div style={{ minWidth: 260, flex: "1 1 360px" }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 9 }}>
-                <span style={{ padding: "5px 9px", borderRadius: 999, background: "#FFF0F6", color: PINK, fontSize: 12, fontWeight: 850 }}>
-                  요약 {summaries.length}개
-                </span>
-                <span style={{ padding: "5px 9px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 12, fontWeight: 850 }}>
-                  퀴즈 {quizSets.length}개
-                </span>
-                {recentQuizAttempt && (
-                  <span style={{
-                    padding: "5px 9px",
-                    borderRadius: 999,
-                    background: hasLowRecentScore ? "#FFF5F5" : "#F1FFF5",
-                    color: hasLowRecentScore ? "#E53E3E" : "#2F9E44",
-                    fontSize: 12,
-                    fontWeight: 850,
-                  }}>
-                    최근 점수 {recentQuizAttempt.scorePercent}%
-                  </span>
-                )}
-              </div>
-              <p style={{ margin: 0, color: "#444", fontSize: 14, fontWeight: 750, lineHeight: 1.5 }}>
-                {hubLoading ? "학습 상태를 불러오는 중입니다." : learningCta.message}
-              </p>
-            </div>
-            {!hubLoading && (
-              <div style={{ display: "flex", flex: "0 1 auto", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 }}>
-                {learningCta.actions.map(action => (
-                  <button
-                    key={action.label}
-                    type="button"
-                    onClick={action.onClick}
-                    style={ctaButtonStyle(action.tone)}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
             <button type="button" onClick={() => setActiveTab("original")} style={tabButtonStyle("original")}>원본</button>
             <button type="button" onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
@@ -1842,6 +1724,7 @@ const MaterialDetailView = ({
           {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
         </div>
 
+        <div style={{ borderBottomLeftRadius: 18, borderBottomRightRadius: 18, overflow: "hidden" }}>
         {activeTab === "original" && (
           <div style={{
             display: "grid",
@@ -1887,56 +1770,42 @@ const MaterialDetailView = ({
             ) : (
               <div style={{
                 display: "grid",
-                gridTemplateColumns: isSummaryTutorOpen ? "220px minmax(0, 1fr) 400px" : "220px minmax(0, 1fr)",
+                gridTemplateColumns: [
+                  showSummaryList ? "220px" : null,
+                  "minmax(0, 1fr)",
+                  isSummaryTutorOpen ? "400px" : null,
+                ].filter(Boolean).join(" "),
                 gap: 18,
                 alignItems: "start",
               }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {summaries.map(summary => (
-                    <button
-                      key={summary.id || `${summary.template}-${summary.createdAt}`}
-                      type="button"
-                      onClick={() => setActiveSummaryId(summary.id || "")}
-                      style={{
-                        padding: "12px 13px",
-                        borderRadius: 10,
-                        border: activeSummary?.id === summary.id ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                        background: activeSummary?.id === summary.id ? "#FFF0F6" : "#fff",
-                        color: activeSummary?.id === summary.id ? PINK : "#555",
-                        textAlign: "left",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
-                      <span style={{ display: "block", fontSize: 11, color: "#999" }}>{formatHubDate(summary.createdAt)}</span>
-                    </button>
-                  ))}
-                </div>
+                {showSummaryList && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {summaries.map(summary => (
+                      <button
+                        key={summary.id || `${summary.template}-${summary.createdAt}`}
+                        type="button"
+                        onClick={() => setActiveSummaryId(summary.id || "")}
+                        style={{
+                          padding: "12px 13px",
+                          borderRadius: 10,
+                          border: activeSummary?.id === summary.id ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
+                          background: activeSummary?.id === summary.id ? "#FFF0F6" : "#fff",
+                          color: activeSummary?.id === summary.id ? PINK : "#555",
+                          textAlign: "left",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
+                        <span style={{ display: "block", fontSize: 11, color: "#999" }}>{formatHubDate(summary.createdAt)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {activeSummary && (
                   <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 18 }}>
-                      <div>
-                        <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
-                        <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {multiSourceBadge(activeSummary.materialIds)}
-                        <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-                          자세히 보기
-                        </button>
-                        <button onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
-                          padding: "9px 12px",
-                          borderRadius: 8,
-                          border: isSummaryTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                          background: isSummaryTutorOpen ? "#FFF0F6" : "#fff",
-                          color: isSummaryTutorOpen ? PINK : "#555",
-                          fontSize: 12,
-                          fontWeight: 800,
-                          cursor: "pointer",
-                        }}>
-                          {isSummaryTutorOpen ? "튜터 닫기" : "AI 튜터"}
-                        </button>
-                      </div>
+                    <div style={{ marginBottom: 18 }}>
+                      <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
+                      <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
                     </div>
                     {hasReviewContext && (
                       <div style={{
@@ -2047,6 +1916,7 @@ const MaterialDetailView = ({
             )}
           </div>
         )}
+        </div>
       </Card>
     </div>
   );
@@ -2216,15 +2086,14 @@ export default function Summary() {
   );
   // URL 복원인데 자료 상세/요약을 못 살릴 때(자료 삭제, 요약 생성 중 새로고침 등) 돌아갈 화면.
   const pendingViewRef = useRef<SummaryView | null>(
-    restoreFromUrl ? urlView || "materialList" : null,
+    restoreFromUrl ? urlView || "upload" : null,
   );
-  const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [searched, setSearched] = useState(Boolean(initialCourse));
-  const [selectedCourse, setSelectedCourse] = useState(initialCourse);
+  const [selectedCourse] = useState(initialCourse);
   const [inputMode, setInputMode] = useState<"file" | "text">("file");
   const [textMaterialTitle, setTextMaterialTitle] = useState("");
   const [textMaterialContent, setTextMaterialContent] = useState("");
@@ -2419,7 +2288,7 @@ export default function Summary() {
           pendingViewRef.current = null;
           if (fallbackView !== "upload" && nextMaterials.length > 0) {
             setSearched(true);
-            setView("materialList");
+            setView("upload");
           }
         }
       })
@@ -2467,55 +2336,6 @@ export default function Summary() {
     const timer = window.setTimeout(() => setDuplicateNotice(null), 3600);
     return () => window.clearTimeout(timer);
   }, [duplicateNotice]);
-
-  const resetCourseSelection = () => {
-    setSelectedCourse("");
-    setFiles([]);
-    filesRef.current = [];
-    setDragOver(false);
-    setUploading(false);
-    setSearched(false);
-    setMaterials([]);
-    setActiveMaterial(null);
-    setSelectedMaterialIds([]);
-    setMaterialDetailReviewContext("");
-    setMaterialDetailReviewTitle("");
-    setIsExtracting(false);
-    setExtractError("");
-    setDuplicateNotice(null);
-    setUploadStatuses([]);
-    setActiveSummaryId(null);
-    navigate(pageRoutes["자료 요약"], { replace: true, state: null });
-  };
-
-  const handleCourseBack = () => {
-    if (fromDashboardRef.current) {
-      navigate(pageRoutes["대시보드"]);
-      return;
-    }
-    resetCourseSelection();
-  };
-
-  const handleCourseSelect = (course: string) => {
-    setSelectedCourse(course);
-    setFiles([]);
-    filesRef.current = [];
-    setDragOver(false);
-    setUploading(false);
-    setSearched(true);
-    setMaterials([]);
-    setCourseSummaries([]);
-    setActiveMaterial(null);
-    setSelectedMaterialIds([]);
-    setMaterialDetailReviewContext("");
-    setMaterialDetailReviewTitle("");
-    setIsExtracting(false);
-    setExtractError("");
-    setDuplicateNotice(null);
-    setUploadStatuses([]);
-    setActiveSummaryId(null);
-    setView("materialList");
-  };
 
   const updateUploadStatus = (file: File, nextStatus: Omit<UploadFileStatus, "id" | "name" | "file">) => {
     setUploadStatuses(prev => upsertUploadStatus(prev, {
@@ -2937,6 +2757,8 @@ export default function Summary() {
     setMaterialDetailReviewTitle("");
   };
 
+  if (!selectedCourse) return <Navigate to={pageRoutes["대시보드"]} replace />;
+
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
@@ -3144,50 +2966,6 @@ export default function Summary() {
         maxWidth: view === "summaryResult" || view === "materialDetail" ? 1480 : 1100,
         margin: "0 auto",
       }}>
-        {courses.length > 0 && view === "upload" && !selectedCourse && (
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ marginBottom: 12 }}>
-              <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
-              <p style={{ margin: 0, fontSize: 13, color: "#999" }}>자료를 정리할 과목을 선택하세요</p>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-              {courses.map((c, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleCourseSelect(c)}
-                    style={{
-                      minHeight: 170,
-                      padding: 22,
-                      borderRadius: 14,
-                      border: "1px solid #eeeeee",
-                      background: CARD_BACKGROUND,
-                      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                      color: "#222",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      transition: "border 0.15s, box-shadow 0.15s, background 0.15s",
-                    }}
-                  >
-                    <div>
-                      <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
-                    </div>
-                    <span style={{
-                      marginTop: 14,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "#aaa",
-                    }}>
-                      선택하기
-                    </span>
-                  </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} />
         )}
@@ -3219,7 +2997,7 @@ export default function Summary() {
           <MaterialDetailView
             material={activeMaterial}
             selectedCourse={selectedCourse}
-            onBack={() => setView(selectedCourse ? "materialList" : "upload")}
+            onBack={() => { if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]); else setView("upload"); }}
             onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
             onOpenSummary={handleOpenMaterialSummary}
@@ -3238,83 +3016,11 @@ export default function Summary() {
           <QuizCreateView fileName={selectedMaterials.map(material => material.name).join(", ")} onBack={() => setView("upload")} onCreate={handleGoToQuiz} />
         )}
 
-        {view === "materialList" && selectedCourse && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <button onClick={handleCourseBack} style={{
-                background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, padding: 0
-              }}>← 돌아가기</button>
-              <button
-                onClick={() => setView("upload")}
-                style={{
-                  padding: "9px 18px", borderRadius: 10, border: "none",
-                  background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
-                }}
-              >+ 새 자료 업로드</button>
-            </div>
-            <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 700, color: "#222" }}>{selectedCourse}</h2>
-            {materials.length === 0 ? (
-              <Card style={{ padding: 40, textAlign: "center" }}>
-                <p style={{ fontSize: 14, color: "#aaa", margin: 0 }}>
-                  아직 업로드된 자료가 없습니다.<br />새 자료를 업로드해보세요.
-                </p>
-              </Card>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[...materials]
-                  .sort((a, b) => {
-                    const aCount = courseSummaries.filter(s => s.materialIds?.includes(a.id)).length;
-                    const bCount = courseSummaries.filter(s => s.materialIds?.includes(b.id)).length;
-                    return bCount - aCount;
-                  })
-                  .map(material => {
-                    const summaryCount = courseSummaries.filter(s => s.materialIds?.includes(material.id)).length;
-                    const hasSummary = summaryCount > 0;
-                    return (
-                      <Card
-                        key={material.id}
-                        style={{
-                          padding: "16px 20px", cursor: "pointer",
-                          opacity: hasSummary ? 1 : 0.55,
-                          transition: "box-shadow 0.15s",
-                        }}
-                        onClick={() => {
-                          setActiveMaterial(material);
-                          setSelectedMaterialIds([material.id]);
-                          setMaterialDetailInitialTab(hasSummary ? "summary" : "original");
-                          setMaterialDetailTutorQuestion("");
-                          setMaterialDetailReviewContext("");
-                          setMaterialDetailReviewTitle("");
-                          setView("materialDetail");
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#222" }}>{material.name}</span>
-                          {hasSummary ? (
-                            <span style={{
-                              background: `${PINK}22`, color: PINK,
-                              borderRadius: 20, padding: "3px 12px",
-                              fontSize: 12, fontWeight: 700, flexShrink: 0
-                            }}>
-                              요약 {summaryCount}개
-                            </span>
-                          ) : (
-                            <span style={{ color: "#bbb", fontSize: 12, flexShrink: 0 }}>요약 없음</span>
-                          )}
-                        </div>
-                      </Card>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        )}
-
         {view === "upload" && selectedCourse && (
           <div>
-            <button onClick={() => setView("materialList")} style={{
+            <button onClick={() => navigate(pageRoutes["대시보드"])} style={{
               background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-            }}>← 자료 목록으로</button>
+            }}>← 대시보드로</button>
             <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
               <Card style={{ padding: 24 }}>

@@ -60,7 +60,9 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
       <button onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8" }}>✕</button>
     </div>
-    {(Object.keys(pageRoutes) as PageRouteLabel[]).map(item => (
+    {(Object.keys(pageRoutes) as PageRouteLabel[])
+      .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
+      .map(item => (
       <button key={item} onClick={() => { onNav(item); onClose(); }} style={{
         padding: "14px 24px", border: "none", background: active === item ? "rgba(240,112,174,0.11)" : "transparent",
         textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,

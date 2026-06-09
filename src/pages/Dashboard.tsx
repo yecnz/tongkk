@@ -45,8 +45,7 @@ type CourseDetailModalProps = {
   onClose: () => void;
   onGoSummary: () => void;
   onGoQuiz: () => void;
-  onOpenMaterial: (material: CourseMaterial) => void;
-  onOpenSummary: (summary: SavedSummary) => void;
+  onOpenMaterial: (material: CourseMaterial, initialTab?: "original" | "summary" | "quiz") => void;
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
 };
 type PlanSource = {
@@ -69,13 +68,6 @@ type CourseStats = {
 
 const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
 
-const templateLabels: Record<SavedSummary["template"], string> = {
-  GENERAL: "일반 요약",
-  LECTURE_NOTE: "강의 노트",
-  MINDMAP: "마인드맵",
-  CHEAT_SHEET: "치트시트",
-};
-
 const formatDate = (timestamp: number) =>
   new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
 
@@ -83,27 +75,6 @@ const materialMeta = (material: CourseMaterial) => {
   if (material.pages) return `${material.pages}페이지`;
   if (material.slides) return `${material.slides}슬라이드`;
   return material.type.toUpperCase();
-};
-
-const preview = (summary: SavedSummary): string => {
-  const { content, template } = summary;
-  if (template === "MINDMAP") {
-    try {
-      const parsed = JSON.parse(content) as { root?: string };
-      return parsed.root ? `${parsed.root} 마인드맵` : "마인드맵 요약";
-    } catch {
-      return "마인드맵 요약";
-    }
-  }
-  return content
-    .replace(/^#+\s*/gm, "")
-    .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, "$1")
-    .replace(/\|[^\n]*/g, "")
-    .replace(/[-=]{2,}/g, "")
-    .replace(/`[^`]*`/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 120);
 };
 
 const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
@@ -202,7 +173,6 @@ const CourseDetailModal = ({
   onGoSummary,
   onGoQuiz,
   onOpenMaterial,
-  onOpenSummary,
   onOpenQuiz,
 }: CourseDetailModalProps) => {
   const [activeTab, setActiveTab] = useState<CourseDetailSection>(initialSection);
@@ -357,57 +327,53 @@ const CourseDetailModal = ({
           )}
 
           {activeTab === "summaries" && (
-            summaries.length === 0 ? (
+            materials.length === 0 ? (
               <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {summaries.map((summary, index) => {
-                  const sourceMaterials = (summary.materialIds || [])
-                    .map(id => materials.find(m => m.id === id))
-                    .filter(Boolean) as typeof materials;
-                  return (
-                  <button
-                    key={summary.id || `${summary.template}-${index}`}
-                    type="button"
-                    onClick={() => onOpenSummary(summary)}
-                    style={{
-                      width: "100%",
-                      padding: "14px 0",
-                      border: "none",
-                      borderBottom: index < summaries.length - 1 ? "1px solid #f3f3f3" : "none",
-                      background: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 13, fontWeight: 850, color: PINK }}>{templateLabels[summary.template]}</span>
-                      <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0 }}>생성일 {formatDate(summary.createdAt)}</span>
-                    </div>
-                    {sourceMaterials.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
-                        {sourceMaterials.map(m => (
-                          <span key={m.id} style={{
-                            fontSize: 11,
-                            color: "#333",
-                            background: "#f2f2f2",
-                            border: "1px solid #ddd",
-                            borderRadius: 4,
-                            padding: "1px 6px",
-                            maxWidth: 200,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>{m.name}</span>
-                        ))}
-                      </div>
-                    )}
-                    <p style={{ margin: "7px 0 0", fontSize: 13, lineHeight: 1.55, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {preview(summary) || "요약 내용 없음"}
-                    </p>
-                  </button>
-                  );
-                })}
+                {[...materials]
+                  .sort((a, b) => {
+                    const aCount = summaries.filter(s => s.materialIds?.includes(a.id)).length;
+                    const bCount = summaries.filter(s => s.materialIds?.includes(b.id)).length;
+                    return bCount - aCount;
+                  })
+                  .map((material, index, sorted) => {
+                    const summaryCount = summaries.filter(s => s.materialIds?.includes(material.id)).length;
+                    const hasSummary = summaryCount > 0;
+                    return (
+                      <button
+                        key={material.id}
+                        type="button"
+                        onClick={() => onOpenMaterial(material, hasSummary ? "summary" : "original")}
+                        style={{
+                          width: "100%",
+                          padding: "14px 0",
+                          border: "none",
+                          borderBottom: index < sorted.length - 1 ? "1px solid #f3f3f3" : "none",
+                          background: "none",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 10,
+                        }}
+                      >
+                        <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>{material.name}</span>
+                        {hasSummary ? (
+                          <span style={{
+                            background: `${PINK}22`, color: PINK,
+                            borderRadius: 20, padding: "3px 12px",
+                            fontSize: 12, fontWeight: 700, flexShrink: 0,
+                          }}>
+                            요약 {summaryCount}개
+                          </span>
+                        ) : (
+                          <span style={{ color: "#bbb", fontSize: 12, flexShrink: 0 }}>요약 없음</span>
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
             )
           )}
@@ -858,23 +824,9 @@ export default function Dashboard() {
           onGoQuiz={() => {
             navigate(pageRoutes["퀴즈 생성"], { state: { course: detailCourse, fromDashboard: true } });
           }}
-          onOpenMaterial={(material) => {
+          onOpenMaterial={(material, initialTab) => {
             navigate(pageRoutes["자료 요약"], {
-              state: { selectedCourse: detailCourse, materialId: material.id, viewMaterial: true, fromDashboard: true },
-            });
-          }}
-          onOpenSummary={(summary) => {
-            navigate(pageRoutes["자료 요약"], {
-              state: {
-                selectedCourse: detailCourse,
-                summaryId: summary.id,
-                summaryTemplate: summary.template,
-                summaryContent: summary.content,
-                summaryCreatedAt: summary.createdAt,
-                materialIds: summary.materialIds || [],
-                openSummary: true,
-                fromDashboard: true,
-              },
+              state: { selectedCourse: detailCourse, materialId: material.id, viewMaterial: true, materialDetailTab: initialTab, fromDashboard: true },
             });
           }}
           onOpenQuiz={(quizSet) => {
