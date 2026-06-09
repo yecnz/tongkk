@@ -174,6 +174,8 @@ export const AITutorDrawer = ({
   const [chatSessions, setChatSessions] = useState<SummaryChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
+  // 기존 대화가 있을 때는 추천 질문을 접어두고 토글로 열어보게 한다(기본 접힘).
+  const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(true);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -476,8 +478,8 @@ export const AITutorDrawer = ({
         left: isExpanded ? "50%" : undefined,
         right: isExpanded ? "auto" : layout === "embedded" ? "auto" : 0,
         width: isExpanded ? "min(1080px, calc(100vw - 48px))" : layout === "embedded" ? "100%" : "min(420px, 100vw)",
-        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? "calc(100vh - 292px)" : "100vh",
-        minHeight: isExpanded ? undefined : layout === "embedded" ? 620 : undefined,
+        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? 1100 : "100vh",
+        minHeight: isExpanded ? undefined : layout === "embedded" ? 1100 : undefined,
         zIndex: isExpanded ? 260 : layout === "embedded" ? "auto" : 190,
         border: "1px solid #f0f0f0",
         borderRight: isExpanded || layout === "embedded" ? "1px solid #f0f0f0" : "none",
@@ -629,8 +631,34 @@ export const AITutorDrawer = ({
 
         {canUseAgent && suggestedQuestions.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {agentMessages.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setSuggestionsCollapsed(prev => !prev)}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #eeeeee",
+                  background: "#fafafa",
+                  color: "#666",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 850,
+                }}
+              >
+                <span>추천 질문 {suggestedQuestions.length}</span>
+                <span style={{ color: "#aaa", fontSize: 13 }}>{suggestionsCollapsed ? "펼치기" : "접기"}</span>
+              </button>
+            ) : (
+              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
+            )}
+            {(agentMessages.length === 0 || !suggestionsCollapsed) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: agentMessages.length > 0 ? 8 : 0 }}>
               {suggestedQuestions.map(question => (
                 <button
                   key={question}
@@ -655,6 +683,7 @@ export const AITutorDrawer = ({
                 </button>
               ))}
             </div>
+            )}
           </div>
         )}
 
