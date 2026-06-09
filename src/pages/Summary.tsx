@@ -1665,6 +1665,7 @@ const MaterialDetailView = ({
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
+                    marginRight: "auto",
                     width: 34,
                     height: 34,
                     borderRadius: 8,
