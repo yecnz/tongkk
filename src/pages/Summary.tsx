@@ -69,6 +69,10 @@ type LocationState = {
   materialDetailTab?: MaterialDetailTab;
 } | null;
 type FileIconProps = { type: FileKind };
+// 드래그해서 질문한 본문 구절의 위치 정보. 튜터를 닫을 때 그 자리로 스크롤을 되돌리는 데 쓴다.
+// range: 같은 본문이 살아 있을 때 구절 위치 보정용 / scrollY: 확대 등으로 본문이 언마운트돼
+// range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
+type DragAnchor = { range: Range; top: number; scrollY: number };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
 type MaterialDetailViewProps = {
@@ -559,9 +563,26 @@ const hoistSourceToHeadings = (markdown: string): string => {
 
 const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
 
+// 드래그 앵커를 기준으로 스크롤을 되돌린다.
+// - 본문이 살아 있으면(분할 화면 등) 드래그했던 구절을 처음 보던 화면 위치로 맞춘다.
+// - 확대 등으로 본문이 언마운트돼 Range가 떨어져 나갔으면, 드래그 당시 스크롤 위치로 근사 복귀한다.
+const restoreScrollToAnchor = (anchor: DragAnchor) => {
+  requestAnimationFrame(() => {
+    if (anchor.range.startContainer.isConnected) {
+      const rect = anchor.range.getBoundingClientRect();
+      if (rect.top !== 0 || rect.bottom !== 0) {
+        const delta = rect.top - anchor.top;
+        if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+        return;
+      }
+    }
+    window.scrollTo({ top: anchor.scrollY });
+  });
+};
+
 // 요약 본문을 감싸 드래그 선택 시 "AI 튜터에게 묻기" 플로팅 버튼을 띄운다.
 // 버튼 클릭 시 선택 텍스트를 onAsk로 넘긴다.
-const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (text: string, anchor: { range: Range; top: number } | null) => void }) => {
+const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (text: string, anchor: DragAnchor | null) => void }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [selection, setSelection] = useState<{ text: string; top: number; left: number } | null>(null);
 
@@ -608,7 +629,7 @@ const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (
             const sel = window.getSelection();
             const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
             const anchorTop = range ? range.getBoundingClientRect().top : null;
-            onAsk(selection.text, range && anchorTop != null ? { range, top: anchorTop } : null);
+            onAsk(selection.text, range && anchorTop != null ? { range, top: anchorTop, scrollY: window.scrollY } : null);
             setSelection(null);
             sel?.removeAllRanges();
             if (range && anchorTop != null) {
@@ -768,9 +789,9 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
-  const dragAnchorRef = useRef<{ range: Range; top: number } | null>(null);
+  const dragAnchorRef = useRef<DragAnchor | null>(null);
 
-  const askTutorWithSelection = (text: string, anchor: { range: Range; top: number } | null) => {
+  const askTutorWithSelection = (text: string, anchor: DragAnchor | null) => {
     dragAnchorRef.current = anchor;
     setIsTutorOpen(true);
     setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -784,12 +805,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
     const anchor = dragAnchorRef.current;
     if (next || !anchor) return;
     dragAnchorRef.current = null;
-    requestAnimationFrame(() => {
-      const rect = anchor.range.getBoundingClientRect();
-      if (rect.top === 0 && rect.bottom === 0) return; // Range가 떨어져 나간 경우 무시
-      const delta = rect.top - anchor.top;
-      if (Math.abs(delta) > 1) window.scrollBy(0, delta);
-    });
+    restoreScrollToAnchor(anchor);
   };
   const questions = suggestedTutorQuestions[template];
 
@@ -1611,11 +1627,11 @@ const MaterialDetailView = ({
   const [showSummaryList, setShowSummaryList] = useState(false);
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
-  const dragAnchorRef = useRef<{ range: Range; top: number } | null>(null);
+  const dragAnchorRef = useRef<DragAnchor | null>(null);
   // 요약/원본 ↔ AI 튜터 가로 분할 비율(드래그 조절, localStorage 기억).
   const tutorSplit = useTutorSplit();
 
-  const askSummaryTutorWithSelection = (text: string, anchor: { range: Range; top: number } | null) => {
+  const askSummaryTutorWithSelection = (text: string, anchor: DragAnchor | null) => {
     dragAnchorRef.current = anchor;
     setIsSummaryTutorOpen(true);
     setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -1629,12 +1645,7 @@ const MaterialDetailView = ({
     const anchor = dragAnchorRef.current;
     if (next || !anchor) return;
     dragAnchorRef.current = null;
-    requestAnimationFrame(() => {
-      const rect = anchor.range.getBoundingClientRect();
-      if (rect.top === 0 && rect.bottom === 0) return; // Range가 떨어져 나간 경우 무시
-      const delta = rect.top - anchor.top;
-      if (Math.abs(delta) > 1) window.scrollBy(0, delta);
-    });
+    restoreScrollToAnchor(anchor);
   };
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || lowerMaterialName.endsWith(".pdf");
   const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");

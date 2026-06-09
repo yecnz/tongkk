@@ -320,8 +320,8 @@ export const AITutorDrawer = ({
     const text = pendingQuestion.text.trim();
     if (!text) return;
     pendingNonceRef.current = pendingQuestion.nonce;
+    // 드래그 질문은 현재 화면(분할/확대) 그대로 두고 입력창만 채운다. 강제로 확대하지 않는다.
     setOpen(true);
-    setExpanded(true); // 드래그 질문이면 확대 화면으로 띄운다.
     setAgentInput(text);
     requestAnimationFrame(() => {
       const el = agentInputRef.current;
@@ -331,7 +331,7 @@ export const AITutorDrawer = ({
         el.setSelectionRange(el.value.length, el.value.length);
       }
     });
-  }, [pendingQuestion, canUseAgent, setOpen, setExpanded]);
+  }, [pendingQuestion, canUseAgent, setOpen]);
 
   useEffect(() => {
     if (!isOpen) setExpanded(false);
