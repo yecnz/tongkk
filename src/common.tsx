@@ -1,12 +1,15 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
-export const PINK = "#F070AE";
-export const CYAN = "#00C0E8";
-export const PAGE_BACKGROUND = "#f7f8fb";
-export const CARD_BACKGROUND = "#fbfcfe";
-export const BORDER_COLOR = "#e2e6ee";
-export const MUTED_SURFACE = "#f1f4f8";
-export const SOFT_SHADOW = "0 10px 28px rgba(15, 23, 42, 0.045)";
+// 색상은 모두 CSS 변수를 가리켜 라이트/다크 토큰을 자동으로 따른다(정의: src/index.css).
+// 브랜드색 PINK·CYAN도 다크에서 채도를 낮춘 값으로 전환되며, 투명도를 섞을 때는
+// color-mix(in srgb, var(--color-pink) N%, transparent)를 쓴다(var()엔 hex 알파 접미사를 못 붙인다).
+export const PINK = "var(--color-pink)";
+export const CYAN = "var(--color-cyan)";
+export const PAGE_BACKGROUND = "var(--color-page)";
+export const CARD_BACKGROUND = "var(--color-card)";
+export const BORDER_COLOR = "var(--color-border)";
+export const MUTED_SURFACE = "var(--color-muted-surface)";
+export const SOFT_SHADOW = "var(--shadow-card)";
 
 // LLM이 별표 안쪽에 공백을 넣어(`** 텍스트 **`) 출력하면 react-markdown이 굵게로 파싱하지
 // 못하고 별표를 그대로 보여준다. 마크다운 렌더 직전에 한 줄 안에서 별표와 텍스트 사이의 공백을
@@ -44,8 +47,8 @@ type CardProps = HTMLAttributes<HTMLDivElement> & {
 
 export const SidebarIcon = () => (
   <svg width="22" height="18" viewBox="0 0 22 18" fill="none">
-    <rect x="0.5" y="0.5" width="21" height="17" rx="4" stroke="#64748b" strokeWidth="1"/>
-    <line x1="8" y1="1" x2="8" y2="17" stroke="#64748b" strokeWidth="1"/>
+    <rect x="0.5" y="0.5" width="21" height="17" rx="4" stroke="var(--color-text-secondary)" strokeWidth="1"/>
+    <line x1="8" y1="1" x2="8" y2="17" stroke="var(--color-text-secondary)" strokeWidth="1"/>
   </svg>
 );
 
@@ -58,7 +61,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
   }}>
     <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
       <button onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#94a3b8" }}>✕</button>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
     </div>
     {(Object.keys(pageRoutes) as PageRouteLabel[])
       .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
@@ -66,7 +69,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
       <button key={item} onClick={() => { onNav(item); onClose(); }} style={{
         padding: "14px 24px", border: "none", background: active === item ? "rgba(240,112,174,0.11)" : "transparent",
         textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
-        color: active === item ? PINK : "#475569", cursor: "pointer", transition: "all 0.2s"
+        color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
       }}>{item}</button>
     ))}
   </div>

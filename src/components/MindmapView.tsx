@@ -59,7 +59,7 @@ function collapsibleIds(node: NodeData, id = "root"): string[] {
 const DEPTH_COLORS = [
   { bg: "#EDE9FF", border: "#C4B5FD", text: "#5B21B6" },
   { bg: "#f5f5f5", border: "#e0e0e0", text: "#333" },
-  { bg: "#E0F5F7", border: `${CYAN}60`, text: "#0E7490" },
+  { bg: "#E0F5F7", border: "rgba(0, 192, 232, 0.38)", text: "#0E7490" },
 ];
 
 export function MindmapView({ data }: { data: NodeData }) {
@@ -100,7 +100,7 @@ export function MindmapView({ data }: { data: NodeData }) {
               key={i}
               d={`M${sx} ${sy} C${mx} ${sy},${mx} ${ty},${tx} ${ty}`}
               fill="none"
-              stroke="#CBD5E1"
+              stroke="var(--color-border)"
               strokeWidth={1.5}
             />
           );
@@ -153,7 +153,7 @@ export function MindmapView({ data }: { data: NodeData }) {
                   height: 22,
                   cursor: "pointer",
                   fontSize: 12,
-                  color: "#888",
+                  color: "var(--color-muted)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

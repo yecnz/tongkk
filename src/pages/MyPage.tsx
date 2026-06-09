@@ -23,11 +23,11 @@ type SettingsDialog = "notice" | "contact" | "deleteAccount" | null;
 const Toggle = ({ on, onToggle }: ToggleProps) => (
   <button onClick={onToggle} style={{
     width: 46, height: 26, borderRadius: 13, border: "none", padding: 2,
-    background: on ? CYAN : "#ddd", cursor: "pointer", transition: "background 0.2s",
+    background: on ? CYAN : "var(--color-border-soft)", cursor: "pointer", transition: "background 0.2s",
     display: "flex", alignItems: "center"
   }}>
     <div style={{
-      width: 22, height: 22, borderRadius: "50%", background: "#fff",
+      width: 22, height: 22, borderRadius: "50%", background: "var(--color-card)",
       transform: on ? "translateX(20px)" : "translateX(0)", transition: "transform 0.2s",
       boxShadow: "0 1px 3px rgba(0,0,0,0.15)"
     }}/>
@@ -84,22 +84,22 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
             <div style={{
               position: "absolute", bottom: 0, right: 0, width: 26, height: 26,
               borderRadius: "50%", background: PINK, display: "flex", alignItems: "center", justifyContent: "center",
-              border: "2px solid #fff", color: "#fff", fontSize: 13
+              border: "2px solid #fff", color: "var(--color-on-brand)", fontSize: 13
             }}>✎</div>
             <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
           </div>
         </div>
-        <label style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, display: "block" }}>닉네임</label>
+        <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 6, display: "block" }}>닉네임</label>
         <input value={name} onChange={event => setName(event.target.value)} placeholder="닉네임 입력" style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12
         }} />
-        {error && <div style={{ marginBottom: 12, color: "#E53E3E", fontSize: 12 }}>{error}</div>}
+        {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={handleSave} disabled={saving} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: saving ? "#ddd" : PINK,
-            color: "#fff", cursor: saving ? "default" : "pointer", fontSize: 14, fontWeight: 600
+            color: "var(--color-on-brand)", cursor: saving ? "default" : "pointer", fontSize: 14, fontWeight: 600
           }}>{saving ? "저장 중" : "저장"}</button>
         </div>
       </Card>
@@ -140,15 +140,15 @@ const SettingsModal = ({
     }}>
       <Card style={{ width: "min(430px, 100%)", padding: 26 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#222" }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>{title}</h3>
           <button onClick={onClose} style={{
-            width: 30, height: 30, borderRadius: 8, border: "none", background: "#fafafa",
-            color: "#999", cursor: "pointer", fontSize: 18, lineHeight: "30px"
+            width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
+            color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px"
           }}>×</button>
         </div>
 
         {type === "notice" && (
-          <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
+          <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
             <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.</p>
             <p style={{ margin: "0 0 10px" }}>사용하시다 불편한 점이나 "이런 기능이 있으면 좋겠다" 싶은 아이디어가 있다면 언제든 알려주세요. 여러분의 피드백이 Tongkk을 더 좋게 만듭니다..</p>
             <p style={{ margin: 0 }}>문의 메일: tongkk.team@gmail.com</p>
@@ -156,7 +156,7 @@ const SettingsModal = ({
         )}
 
         {type === "contact" && (
-          <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
+          <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
             <p style={{ margin: "0 0 12px" }}>오류 제보나 개선 요청은 팀 관리자에게 전달하세요.</p>
             <a
               href="mailto:tongkk.team@gmail.com?subject=Tongkk%20문의"
@@ -168,20 +168,20 @@ const SettingsModal = ({
         )}
 
         {type === "deleteAccount" && (
-          <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
+          <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
             <p style={{ margin: "0 0 10px" }}>
               이 작업은 현재 계정의 과목, 자료, 요약, 퀴즈, 프로필 데이터를 삭제합니다.
             </p>
-            <p style={{ margin: "0 0 14px", color: "#E53E3E", fontWeight: 700 }}>
+            <p style={{ margin: "0 0 14px", color: "var(--color-danger)", fontWeight: 700 }}>
               Supabase Auth 계정 자체 삭제는 관리자 권한이 필요한 별도 서버 기능입니다.
             </p>
-            {error && <div style={{ marginBottom: 12, color: "#E53E3E", fontSize: 12 }}>{error}</div>}
+            {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
             <button
               onClick={handleDelete}
               disabled={loading}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                background: loading ? "#ddd" : "#E53E3E", color: "#fff",
+                background: loading ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
                 fontWeight: 800, cursor: loading ? "default" : "pointer"
               }}
             >
@@ -270,12 +270,12 @@ export default function MyPage() {
       {showEdit && <ProfileEditModal nickname={profile.nickname} avatarUrl={profile.avatarUrl} onSave={handleProfileSave} onClose={() => setShowEdit(false)} />}
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} />
 
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-        <span style={{ color: "#bbb", fontSize: 14 }}>/ 마이페이지</span>
+        <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
       <div style={{ padding: 24, maxWidth: 860, margin: "0 auto" }}>
@@ -284,7 +284,7 @@ export default function MyPage() {
           {/* 프로필 */}
           <Card style={{ padding: 28 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#222" }}>프로필</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>프로필</h3>
               <button onClick={() => setShowEdit(true)} style={{
                 background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
                 color: PINK, fontSize: 13, fontWeight: 600
@@ -304,29 +304,29 @@ export default function MyPage() {
                 ) : profile.nickname.slice(0, 2).toUpperCase()}
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#222", marginBottom: 3 }}>{profile.nickname}</div>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
-                <div style={{ fontSize: 12, color: "#aaa", wordBreak: "break-all" }}>{user?.email}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-strong)", marginBottom: 3 }}>{profile.nickname}</div>
+                <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
+                <div style={{ fontSize: 12, color: "var(--color-muted)", wordBreak: "break-all" }}>{user?.email}</div>
               </div>
             </div>
-            {error && <div style={{ marginBottom: 12, color: "#E53E3E", fontSize: 12 }}>{error}</div>}
+            {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
             <button onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
               width: "100%", padding: "9px 0", borderRadius: 10,
-              border: "1px solid #e0e0e0", background: "#fff", color: "#999",
+              border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-muted)",
               fontSize: 13, cursor: "pointer"
             }}>로그아웃</button>
           </Card>
 
           {/* 앱 설정 */}
           <Card style={{ padding: 24 }}>
-            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#222" }}>앱 설정</h3>
+            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>앱 설정</h3>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #f5f5f5" }}>
-                <span style={{ fontSize: 14, color: "#444" }}>다크모드</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid var(--color-border-soft)" }}>
+                <span style={{ fontSize: 14, color: "var(--color-text)" }}>다크모드</span>
                 <Toggle on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
-                <span style={{ fontSize: 14, color: "#444" }}>알림 설정</span>
+                <span style={{ fontSize: 14, color: "var(--color-text)" }}>알림 설정</span>
                 <Toggle on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
               </div>
             </div>
@@ -337,22 +337,22 @@ export default function MyPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
           {/* 데이터 관리 */}
           <Card style={{ padding: 24 }}>
-            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#222" }}>데이터 관리</h3>
-            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#888", lineHeight: 1.6 }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>데이터 관리</h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)", lineHeight: 1.6 }}>
               과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
             </p>
             <button onClick={() => setSettingsDialog("deleteAccount")} style={{
               width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #fca5a5",
-              background: "#FFF5F5", color: "#E53E3E", fontSize: 13, fontWeight: 700, cursor: "pointer"
+              background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 13, fontWeight: 700, cursor: "pointer"
             }}>내 앱 데이터 삭제</button>
-            <p style={{ margin: "10px 0 0", fontSize: 12, color: "#aaa", lineHeight: 1.5 }}>
+            <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--color-muted)", lineHeight: 1.5 }}>
               삭제 후에는 복구할 수 없습니다.
             </p>
           </Card>
 
           {/* 지원 및 정보 */}
           <Card style={{ padding: 24 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#222" }}>지원 및 정보</h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>지원 및 정보</h3>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {[
                 { label: "공지사항", type: "notice" as const },
@@ -361,15 +361,15 @@ export default function MyPage() {
                 <button key={item.label} onClick={() => setSettingsDialog(item.type)} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "14px 0", border: "none", background: "none", cursor: "pointer",
-                  borderBottom: index === 0 ? "1px solid #f5f5f5" : "none", width: "100%", textAlign: "left"
+                  borderBottom: index === 0 ? "1px solid var(--color-border-soft)" : "none", width: "100%", textAlign: "left"
                 }}>
-                  <span style={{ fontSize: 14, color: "#444" }}>{item.label}</span>
+                  <span style={{ fontSize: 14, color: "var(--color-text)" }}>{item.label}</span>
                   <span style={{ color: "#ddd", fontSize: 14 }}>›</span>
                 </button>
               ))}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderTop: "1px solid #f5f5f5" }}>
-                <span style={{ fontSize: 14, color: "#aaa" }}>앱 버전</span>
-                <span style={{ fontSize: 13, color: "#bbb" }}>MVP v1.0</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderTop: "1px solid var(--color-border-soft)" }}>
+                <span style={{ fontSize: 14, color: "var(--color-muted)" }}>앱 버전</span>
+                <span style={{ fontSize: 13, color: "var(--color-muted)" }}>MVP v1.0</span>
               </div>
             </div>
           </Card>
