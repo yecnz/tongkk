@@ -592,9 +592,10 @@ def _extract_pdf_markdown_with_page_markers(file_path: str) -> str:
     pages = []
     with fitz.open(file_path) as doc:
         for i, page in enumerate(doc):
-            text = page.get_text("text") or ""
-            if text.strip():
-                pages.append(f"<!-- p.{i + 1} -->\n{text.strip()}")
+            text = (page.get_text("text") or "").strip()
+            # 텍스트가 없는(이미지) 페이지에도 마커를 남긴다. 그래야 페이지 선택 필터가
+            # 모든 페이지를 인식하고, 시각 분석(페이지별 OCR) 결과와 같은 페이지로 짝지을 수 있다.
+            pages.append(f"<!-- p.{i + 1} -->\n{text}" if text else f"<!-- p.{i + 1} -->")
     return "\n\n".join(pages)
 
 
@@ -741,6 +742,19 @@ def _visual_batches(items: list[dict[str, str]]) -> list[list[dict[str, str]]]:
     ]
 
 
+# 시각 분석 결과의 'PDF N페이지' 제목 줄 앞에 `<!-- p.N -->` 마커를 심는다.
+# 텍스트 레이어가 없는(이미지) 슬라이드는 본문이 이 시각 분석에서 나오므로, 마커가 없으면
+# 페이지 선택 요약이 적용되지 않는다. 모델이 라벨('PDF N페이지')을 제목으로 그대로 쓰도록 유도하고,
+# 그 제목에서 페이지 번호를 읽어 마커를 붙인다. (매칭 실패한 제목은 기존처럼 그대로 둔다.)
+_VISUAL_PDF_PAGE_HEADING_RE = re.compile(r"(?m)^(#{1,6}\s+[^\n]*?PDF\s*(\d+)\s*페이지[^\n]*)$")
+
+
+def _tag_visual_pdf_pages(visual_markdown: str) -> str:
+    return _VISUAL_PDF_PAGE_HEADING_RE.sub(
+        lambda m: f"<!-- p.{m.group(2)} -->\n{m.group(1)}", visual_markdown
+    )
+
+
 def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = "") -> str:
     force_visual_scan = VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}
     if not force_visual_scan and not _should_analyze_visuals(base_markdown, suffix):
@@ -765,7 +779,8 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
             "type": "text",
             "text": (
                 "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
-                "반드시 각 항목을 '## 라벨' 제목으로 시작하고, 이미지 순서대로 작성해. "
+                "반드시 각 항목을 제공된 라벨을 그대로 쓴 '## 라벨' 제목(예: '## PDF 3페이지')으로 시작하고, "
+                "이미지 순서대로 작성해. "
                 "분석 대상: " + ", ".join(item["label"] for item in batch)
             ),
         }]
@@ -799,7 +814,13 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
     if not sections:
         return ""
 
-    return "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
+    body = "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
+    # PDF는 페이지별로 렌더링·분석하므로 'PDF N페이지' 섹션마다 페이지 마커를 심어,
+    # 페이지 선택 요약이 이미지 슬라이드에도 적용되게 한다. (PPTX 삽입 이미지는 슬라이드 번호와
+    # 1:1로 매칭되지 않아, 본문 markitdown의 'Slide number' 마커에만 의존한다.)
+    if suffix == ".pdf":
+        body = _tag_visual_pdf_pages(body)
+    return body
 
 
 @app.post("/convert")
