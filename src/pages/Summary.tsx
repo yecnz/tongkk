@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
+import { useState, useRef, useEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -68,7 +68,7 @@ type LocationState = {
   materialDetailTab?: MaterialDetailTab;
 } | null;
 type FileIconProps = { type: FileKind };
-type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
+type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
@@ -679,7 +679,9 @@ const SummaryContentView = ({ content, template }: { content: string; template?:
     : <FormattedAiText content={content} template={template} />;
 };
 
-const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
+const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewProps) => {
+  const [pageRange, setPageRange] = useState("");
+  const [focusPrompt, setFocusPrompt] = useState("");
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
     { key: "GENERAL", name: "일반 요약", desc: "강의 자료 내용을 깔끔하게 정리", accent: "#555" },
     { key: "LECTURE_NOTE", name: "강의 노트", desc: "개념, 흐름, 시험 포인트를 구조화", accent: PINK },
@@ -695,13 +697,39 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
 
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#222" }}>출력 템플릿 선택</h2>
-        <p style={{ margin: 0, fontSize: 13, color: "#999" }}>요약 결과를 어떤 형식으로 만들지 선택하세요</p>
+        <p style={{ margin: 0, fontSize: 13, color: "#999" }}>반영할 범위와 집중할 내용을 정한 뒤, 요약 형식을 선택하세요</p>
+      </div>
+
+      <div style={{ display: "grid", gap: 14, marginBottom: 24, maxWidth: 720 }}>
+        <div>
+          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "#444" }}>
+            반영할 페이지 <span style={{ fontWeight: 600, color: "#aaa" }}>(선택 · 비우면 전체)</span>
+          </label>
+          <input
+            value={pageRange}
+            onChange={e => setPageRange(e.target.value)}
+            placeholder={pageHint ? `예: 1-5, 8  (${pageHint})` : "예: 1-5, 8"}
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 14, color: "#333" }}
+          />
+        </div>
+        <div>
+          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "#444" }}>
+            집중할 내용 <span style={{ fontWeight: 600, color: "#aaa" }}>(선택)</span>
+          </label>
+          <textarea
+            value={focusPrompt}
+            onChange={e => setFocusPrompt(e.target.value)}
+            placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
+            rows={3}
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 14, color: "#333", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+          />
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {templates.map(t => (
           <Card key={t.key} style={{ padding: 0, overflow: "hidden" }}>
-            <button onClick={() => onSelect(t.key)} style={{
+            <button onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
               width: "100%",
               minHeight: 190,
               padding: 24,
@@ -1192,6 +1220,97 @@ const formatHubDate = (timestamp?: number) => {
 
 const LOW_QUIZ_SCORE_THRESHOLD = 70;
 
+// 요약 본문과 AI 튜터가 나란히 차지하는 분할 영역의 높이.
+// 카드를 뷰포트에 고정하지 않으므로 이 영역만 내부 스크롤되고, 위쪽 머리말/탭은
+// 페이지와 함께 바깥 스크롤된다(전체 화면이 같이 내려가는 느낌).
+const SPLIT_ROW_HEIGHT = "calc(100vh - 180px)";
+const SPLIT_ROW_MIN_HEIGHT = 440;
+const TUTOR_SPLIT_STORAGE_KEY = "tongkk:summaryTutorSplit";
+
+// 요약 ↔ AI 튜터의 가로 점유 비율을 드래그로 조절하고 localStorage에 기억한다.
+// ratio는 왼쪽(요약/원본)이 차지하는 비율(0~1). 분할 컨테이너에 containerRef를 달아야 한다.
+const useTutorSplit = (initial = 0.62) => {
+  const [ratio, setRatio] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem(TUTOR_SPLIT_STORAGE_KEY));
+      return saved >= 0.3 && saved <= 0.8 ? saved : initial;
+    } catch {
+      return initial;
+    }
+  });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ratioRef = useRef(ratio);
+  ratioRef.current = ratio;
+
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const prevUserSelect = document.body.style.userSelect;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const minLeft = Math.min(0.7, 320 / rect.width);
+      const minRight = Math.min(0.7, 360 / rect.width);
+      let next = (moveEvent.clientX - rect.left) / rect.width;
+      next = Math.max(minLeft, Math.min(1 - minRight, next));
+      ratioRef.current = next;
+      setRatio(next);
+    };
+    const handleUp = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      document.body.style.userSelect = prevUserSelect;
+      document.body.style.cursor = prevCursor;
+      try {
+        localStorage.setItem(TUTOR_SPLIT_STORAGE_KEY, String(ratioRef.current));
+      } catch {
+        // 비율 저장 실패는 편의 기능이라 조용히 무시한다.
+      }
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+  };
+
+  return { ratio, containerRef, startDrag };
+};
+
+// 요약/원본과 AI 튜터 사이의 드래그 구분선. 가운데 알약 핸들에 호버 강조를 준다.
+const TutorSplitDivider = ({ onPointerDown }: { onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void }) => {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      title="드래그해서 요약과 AI 튜터 비율을 조절하세요"
+      onPointerDown={onPointerDown}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        flex: "0 0 16px",
+        alignSelf: "stretch",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "col-resize",
+        touchAction: "none",
+      }}
+    >
+      <div style={{
+        width: hover ? 6 : 4,
+        height: 52,
+        borderRadius: 999,
+        background: hover ? PINK : "#d4d4d4",
+        transition: "background 0.15s ease, width 0.15s ease",
+      }} />
+    </div>
+  );
+};
+
 const MaterialDetailView = ({
   material,
   selectedCourse,
@@ -1229,6 +1348,8 @@ const MaterialDetailView = ({
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<{ range: Range; top: number } | null>(null);
+  // 요약/원본 ↔ AI 튜터 가로 분할 비율(드래그 조절, localStorage 기억).
+  const tutorSplit = useTutorSplit();
 
   const askSummaryTutorWithSelection = (text: string, anchor: { range: Range; top: number } | null) => {
     dragAnchorRef.current = anchor;
@@ -1443,7 +1564,7 @@ const MaterialDetailView = ({
   const renderOriginalTab = () => {
     if (fileLoading || previewLoading) {
       return (
-        <div style={{ height: "calc(100vh - 292px)", minHeight: 620, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
+        <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
           {previewLoading ? "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다." : "원본 파일을 불러오는 중입니다."}
         </div>
       );
@@ -1456,8 +1577,8 @@ const MaterialDetailView = ({
           src={`${fileUrl}#toolbar=1&navpanes=0`}
           style={{
             width: "100%",
-            height: "calc(100vh - 292px)",
-            minHeight: 620,
+            height: "100%",
+            minHeight: 0,
             border: "none",
             background: "#f2f2f2",
             display: "block",
@@ -1473,8 +1594,8 @@ const MaterialDetailView = ({
           src={`${previewPdfUrl}#toolbar=1&navpanes=0`}
           style={{
             width: "100%",
-            height: "calc(100vh - 292px)",
-            minHeight: 620,
+            height: "100%",
+            minHeight: 0,
             border: "none",
             background: "#f2f2f2",
             display: "block",
@@ -1497,9 +1618,9 @@ const MaterialDetailView = ({
         fontSize: 14,
         color: "#444",
         lineHeight: 1.8,
-        minHeight: 520,
-        maxHeight: "calc(100vh - 320px)",
+        height: "100%",
         overflowY: "auto",
+        boxSizing: "border-box",
       }}>
         <div style={{
           marginBottom: 18,
@@ -1539,7 +1660,7 @@ const MaterialDetailView = ({
       <button onClick={onBack} style={{
         background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 과목 자료로</button>
-      <Card style={{ padding: 0, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 140px)", overflow: "hidden" }}>
+      <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{
           flexShrink: 0,
           borderTopLeftRadius: 18,
@@ -1725,31 +1846,40 @@ const MaterialDetailView = ({
           {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
+        <div style={{ overflow: "hidden", borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
         {activeTab === "original" && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isOriginalTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
-            gap: isOriginalTutorOpen ? 12 : 0,
-            alignItems: "stretch",
-          }}>
-            <div style={{ minWidth: 0 }}>
+          <div
+            ref={tutorSplit.containerRef}
+            style={{
+              display: "flex",
+              alignItems: "stretch",
+              height: SPLIT_ROW_HEIGHT,
+              minHeight: SPLIT_ROW_MIN_HEIGHT,
+            }}
+          >
+            <div style={{ flex: isOriginalTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflow: "hidden" }}>
               {renderOriginalTab()}
             </div>
             {isOriginalTutorOpen && (
-              <AITutorDrawer
-                layout="embedded"
-                open={isOriginalTutorOpen}
-                onOpenChange={setIsOriginalTutorOpen}
-                contextTitle={tutorContextTitle}
-                contextMarkdown={combinedTutorContextMarkdown}
-                summaryId={activeSummary?.id || null}
-                materialId={material.id}
-                suggestedQuestions={tutorSuggestions}
-                initialQuestion={tutorPrompt}
-                onInitialQuestionConsumed={() => setTutorPrompt("")}
-                disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
-              />
+              <>
+                <TutorSplitDivider onPointerDown={tutorSplit.startDrag} />
+                <div style={{ flex: `${1 - tutorSplit.ratio} 1 0`, minWidth: 0, minHeight: 0 }}>
+                  <AITutorDrawer
+                    layout="embedded"
+                    fill
+                    open={isOriginalTutorOpen}
+                    onOpenChange={setIsOriginalTutorOpen}
+                    contextTitle={tutorContextTitle}
+                    contextMarkdown={combinedTutorContextMarkdown}
+                    summaryId={activeSummary?.id || null}
+                    materialId={material.id}
+                    suggestedQuestions={tutorSuggestions}
+                    initialQuestion={tutorPrompt}
+                    onInitialQuestionConsumed={() => setTutorPrompt("")}
+                    disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                  />
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1769,18 +1899,9 @@ const MaterialDetailView = ({
                 </div>
               </div>
             ) : (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: [
-                  showSummaryList ? "220px" : null,
-                  "minmax(0, 1fr)",
-                  isSummaryTutorOpen ? "400px" : null,
-                ].filter(Boolean).join(" "),
-                gap: 18,
-                alignItems: "start",
-              }}>
+              <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
                 {showSummaryList && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (
                       <button
                         key={summary.id || `${summary.template}-${summary.createdAt}`}
@@ -1794,6 +1915,7 @@ const MaterialDetailView = ({
                           color: activeSummary?.id === summary.id ? PINK : "#555",
                           textAlign: "left",
                           cursor: "pointer",
+                          flexShrink: 0,
                         }}
                       >
                         <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
@@ -1802,59 +1924,72 @@ const MaterialDetailView = ({
                     ))}
                   </div>
                 )}
-                {activeSummary && (
-                  <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0 }}>
-                    <div style={{ marginBottom: 18 }}>
-                      <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
-                      <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
-                    </div>
-                    {hasReviewContext && (
-                      <div style={{
-                        marginBottom: 18,
-                        padding: 16,
-                        borderRadius: 12,
-                        border: "1px solid #F8DFA8",
-                        background: "#FFF8E8",
-                      }}>
-                        <h4 style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 850, color: "#7A5200" }}>
-                          {reviewTitle || "이번 퀴즈 오답 복습"}
-                        </h4>
-                        <pre style={{
-                          margin: 0,
-                          maxHeight: 220,
-                          overflowY: "auto",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                          fontFamily: "inherit",
-                          fontSize: 13,
-                          lineHeight: 1.65,
-                          color: "#6A4B00",
-                        }}>
-                          {reviewContext.trim()}
-                        </pre>
+                <div
+                  ref={tutorSplit.containerRef}
+                  style={{ flex: "1 1 0", minWidth: 0, display: "flex", alignItems: "stretch" }}
+                >
+                  {activeSummary && (
+                    <div style={{ flex: isSummaryTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflowY: "auto", overflowX: "hidden" }}>
+                      <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0 }}>
+                        <div style={{ marginBottom: 18 }}>
+                          <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
+                          <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
+                        </div>
+                        {hasReviewContext && (
+                          <div style={{
+                            marginBottom: 18,
+                            padding: 16,
+                            borderRadius: 12,
+                            border: "1px solid #F8DFA8",
+                            background: "#FFF8E8",
+                          }}>
+                            <h4 style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 850, color: "#7A5200" }}>
+                              {reviewTitle || "이번 퀴즈 오답 복습"}
+                            </h4>
+                            <pre style={{
+                              margin: 0,
+                              maxHeight: 220,
+                              overflowY: "auto",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              fontFamily: "inherit",
+                              fontSize: 13,
+                              lineHeight: 1.65,
+                              color: "#6A4B00",
+                            }}>
+                              {reviewContext.trim()}
+                            </pre>
+                          </div>
+                        )}
+                        <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
+                          <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
+                        </SelectionAskButton>
                       </div>
-                    )}
-                    <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
-                      <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
-                    </SelectionAskButton>
-                  </div>
-                )}
-                {isSummaryTutorOpen && activeSummary && (
-                  <AITutorDrawer
-                    layout="embedded"
-                    open={isSummaryTutorOpen}
-                    onOpenChange={handleSummaryTutorOpenChange}
-                    contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
-                    contextMarkdown={combinedTutorContextMarkdown}
-                    summaryId={activeSummary.id || null}
-                    materialId={material.id}
-                    suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
-                    initialQuestion={tutorPrompt}
-                    onInitialQuestionConsumed={() => setTutorPrompt("")}
-                    pendingQuestion={tutorSelectionQuestion ?? undefined}
-                    disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
-                  />
-                )}
+                    </div>
+                  )}
+                  {isSummaryTutorOpen && activeSummary && (
+                    <>
+                      <TutorSplitDivider onPointerDown={tutorSplit.startDrag} />
+                      <div style={{ flex: `${1 - tutorSplit.ratio} 1 0`, minWidth: 0, minHeight: 0 }}>
+                        <AITutorDrawer
+                          layout="embedded"
+                          fill
+                          open={isSummaryTutorOpen}
+                          onOpenChange={handleSummaryTutorOpenChange}
+                          contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
+                          contextMarkdown={combinedTutorContextMarkdown}
+                          summaryId={activeSummary.id || null}
+                          materialId={material.id}
+                          suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
+                          initialQuestion={tutorPrompt}
+                          onInitialQuestionConsumed={() => setTutorPrompt("")}
+                          pendingQuestion={tutorSelectionQuestion ?? undefined}
+                          disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -2163,6 +2298,14 @@ export default function Summary() {
   );
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
+  // 페이지 범위 입력 힌트는 자료가 하나일 때만 명확하므로 그 경우에만 보여준다.
+  const summaryPageHint = selectedMaterials.length === 1
+    ? (selectedMaterials[0].pages
+        ? `총 ${selectedMaterials[0].pages}페이지`
+        : selectedMaterials[0].slides
+          ? `총 ${selectedMaterials[0].slides}슬라이드`
+          : undefined)
+    : undefined;
 
   useEffect(() => {
     filesRef.current = files;
@@ -2638,26 +2781,12 @@ export default function Summary() {
     }
   };
 
-  const handleTemplateSelect = async (template: SummaryTemplate) => {
+  const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => {
     setSelectedTemplate(template);
     setSummaryError("");
 
     if (selectedMarkdown) {
-      // 같은 자료 + 템플릿으로 이미 저장된 요약이 있으면 재사용
-      const existing = courseSummaries.find(
-        s => s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)
-      );
-      if (existing) {
-        setSummaryText(existing.content);
-        setActiveSummaryId(existing.id || null);
-        setElapsedTime(null);
-        setAgentThreadId("");
-        setSummaryError("");
-        setResultBackView("templates");
-        setView("summaryResult");
-        return;
-      }
-
+      // "요약 새로 생성"은 같은 자료여도 항상 새로 만든다(중복 허용). 기존 요약을 재사용하지 않는다.
       setIsSummarizing(true);
       setView("summaryResult");
       setSummaryText("");
@@ -2669,7 +2798,10 @@ export default function Summary() {
       const startTime = Date.now();
       try {
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 중...`);
-        const response = await summarizeWithTemplate(selectedMarkdown, template);
+        const response = await summarizeWithTemplate(selectedMarkdown, template, {
+          pages: opts?.pageRange,
+          focusPrompt: opts?.focusPrompt,
+        });
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
         if (selectedCourse) {
@@ -2683,10 +2815,8 @@ export default function Summary() {
           };
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
           setActiveSummaryId(persistedSummary.id || null);
-          setCourseSummaries(prev => {
-            const filtered = prev.filter(s => !(s.template === template && sameMaterialIds(s.materialIds, selectedMaterialIds)));
-            return [persistedSummary, ...filtered];
-          });
+          // 중복 허용: 같은 자료·템플릿이어도 기존 요약을 지우지 않고 새 항목으로 추가한다.
+          setCourseSummaries(prev => [persistedSummary, ...prev]);
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {
@@ -2968,7 +3098,7 @@ export default function Summary() {
         margin: "0 auto",
       }}>
         {view === "templates" && (
-          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} />
+          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}
 
         {view === "summaryResult" && selectedTemplate && (
