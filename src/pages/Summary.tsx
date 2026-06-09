@@ -1539,8 +1539,9 @@ const MaterialDetailView = ({
       <button onClick={onBack} style={{
         background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 과목 자료로</button>
-      <Card style={{ padding: 0 }}>
+      <Card style={{ padding: 0, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 140px)", overflow: "hidden" }}>
         <div style={{
+          flexShrink: 0,
           borderTopLeftRadius: 18,
           borderTopRightRadius: 18,
           overflow: "hidden",
@@ -1645,8 +1646,7 @@ const MaterialDetailView = ({
         </div>
 
         <div style={{
-          position: "sticky",
-          top: 0,
+          flexShrink: 0,
           zIndex: 20,
           background: "#fff",
           padding: "10px 18px",
@@ -1725,7 +1725,7 @@ const MaterialDetailView = ({
           {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
         </div>
 
-        <div style={{ borderBottomLeftRadius: 18, borderBottomRightRadius: 18, overflow: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
         {activeTab === "original" && (
           <div style={{
             display: "grid",
