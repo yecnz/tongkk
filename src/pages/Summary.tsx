@@ -2191,6 +2191,24 @@ const MaterialDetailView = ({
                         <span style={{ display: "block", fontSize: 11, color: "#999" }}>{formatHubDate(summary.createdAt)}</span>
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={onGoSummary}
+                      style={{
+                        padding: "12px 13px",
+                        borderRadius: 10,
+                        border: `1px dashed ${PINK}66`,
+                        background: "#fff",
+                        color: PINK,
+                        fontSize: 13,
+                        fontWeight: 850,
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        textAlign: "center",
+                      }}
+                    >
+                      + 요약 새로 생성
+                    </button>
                   </div>
                 )}
                 <div
