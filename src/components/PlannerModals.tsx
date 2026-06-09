@@ -31,7 +31,7 @@ export type CalendarChip = {
   strike?: boolean;
 };
 // 톤 색: 9px→10px와 함께 대비를 끌어올리고, done(회색·취소선)과 upcoming(슬레이트)을 구분.
-const CHIP_TONES: Record<CalendarChip["tone"], { bg: string; fg: string }> = {
+const CHIP_TONES: Record<NonNullable<CalendarChip["tone"]>, { bg: string; fg: string }> = {
   done: { bg: "#edf0f4", fg: "#6b7785" },
   today: { bg: "#E2F6FC", fg: "#0a7491" },
   upcoming: { bg: "#eef1f6", fg: "#475569" },
