@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import base64
 import zipfile
 import shutil
@@ -205,6 +206,15 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 """
 
 
+SUMMARY_SYSTEM_PROMPT = """너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
+사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.
+일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
+템플릿 간 출력 스타일이 서로 비슷해지지 않도록 각 템플릿 지시를 최우선으로 따라.
+텍스트 상자가 필요하면 '>' 인용문만 사용하고, HTML aside, 이모지, 색상 지시는 사용하지 마.
+중요 용어와 공식은 **굵게** 표시하고, 필요한 경우 제목·bullet list·번호 목록·표·코드블록만 사용해.
+후속 질문, 추가 제안, 작성 완료 멘트는 절대 붙이지 마."""
+
+
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
@@ -215,6 +225,10 @@ class SummarizeRequest(BaseModel):
     template: SummaryTemplate = "GENERAL"
     model: Literal["GPT", "Gemini"] = "GPT"
     thread_id: str | None = None
+    # 사용자가 "1-5, 8"처럼 지정한 반영 페이지. 비우면 전체.
+    pages: str | None = None
+    # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
+    focus_prompt: str | None = None
 
 
 class AgentRequest(BaseModel):
@@ -578,10 +592,67 @@ def _extract_pdf_markdown_with_page_markers(file_path: str) -> str:
     pages = []
     with fitz.open(file_path) as doc:
         for i, page in enumerate(doc):
-            text = page.get_text("text") or ""
-            if text.strip():
-                pages.append(f"<!-- p.{i + 1} -->\n{text.strip()}")
+            text = (page.get_text("text") or "").strip()
+            # 텍스트가 없는(이미지) 페이지에도 마커를 남긴다. 그래야 페이지 선택 필터가
+            # 모든 페이지를 인식하고, 시각 분석(페이지별 OCR) 결과와 같은 페이지로 짝지을 수 있다.
+            pages.append(f"<!-- p.{i + 1} -->\n{text}" if text else f"<!-- p.{i + 1} -->")
     return "\n\n".join(pages)
+
+
+def _parse_page_selection(spec: str) -> set[int]:
+    """"1-5, 8, 10-12" 같은 입력을 페이지 번호 집합으로 변환한다."""
+    pages: set[int] = set()
+    for part in spec.replace(" ", "").split(","):
+        if not part:
+            continue
+        if "-" in part:
+            start_str, _, end_str = part.partition("-")
+            try:
+                start, end = int(start_str), int(end_str)
+            except ValueError:
+                continue
+            if start > end:
+                start, end = end, start
+            pages.update(range(start, end + 1))
+        else:
+            try:
+                pages.add(int(part))
+            except ValueError:
+                continue
+    return pages
+
+
+# PDF는 `<!-- p.N -->`, PPT/PPTX(markitdown)는 `<!-- Slide number: N -->` 형식의 마커를 쓴다.
+_PAGE_MARKER_RE = re.compile(r"<!--\s*(?:p\.|Slide number:\s*)(\d+)\s*-->")
+
+
+def _filter_markdown_by_pages(markdown: str, spec: str | None) -> str:
+    """`<!-- p.N -->` 마커 기준으로 선택한 페이지 블록만 남긴다.
+
+    마커가 없거나(이미지 OCR 등) 선택이 비면 원본을 그대로 돌려준다.
+    """
+    if not spec or not spec.strip():
+        return markdown
+    selected = _parse_page_selection(spec)
+    if not selected:
+        return markdown
+    matches = list(_PAGE_MARKER_RE.finditer(markdown))
+    if not matches:
+        return markdown
+    preamble = markdown[: matches[0].start()].strip()
+    kept: list[str] = [preamble] if preamble else []
+    for idx, match in enumerate(matches):
+        page_no = int(match.group(1))
+        if page_no not in selected:
+            continue
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(markdown)
+        block = markdown[match.start():end].strip()
+        if block:
+            kept.append(block)
+    # 선택한 페이지가 자료에 하나도 없으면 빈 요약을 막기 위해 원본을 쓴다.
+    if len(kept) <= (1 if preamble else 0):
+        return markdown
+    return "\n\n".join(kept)
 
 
 def _pdf_page_has_image(page) -> bool:
@@ -671,6 +742,19 @@ def _visual_batches(items: list[dict[str, str]]) -> list[list[dict[str, str]]]:
     ]
 
 
+# 시각 분석 결과의 'PDF N페이지' 제목 줄 앞에 `<!-- p.N -->` 마커를 심는다.
+# 텍스트 레이어가 없는(이미지) 슬라이드는 본문이 이 시각 분석에서 나오므로, 마커가 없으면
+# 페이지 선택 요약이 적용되지 않는다. 모델이 라벨('PDF N페이지')을 제목으로 그대로 쓰도록 유도하고,
+# 그 제목에서 페이지 번호를 읽어 마커를 붙인다. (매칭 실패한 제목은 기존처럼 그대로 둔다.)
+_VISUAL_PDF_PAGE_HEADING_RE = re.compile(r"(?m)^(#{1,6}\s+[^\n]*?PDF\s*(\d+)\s*페이지[^\n]*)$")
+
+
+def _tag_visual_pdf_pages(visual_markdown: str) -> str:
+    return _VISUAL_PDF_PAGE_HEADING_RE.sub(
+        lambda m: f"<!-- p.{m.group(2)} -->\n{m.group(1)}", visual_markdown
+    )
+
+
 def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = "") -> str:
     force_visual_scan = VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}
     if not force_visual_scan and not _should_analyze_visuals(base_markdown, suffix):
@@ -695,7 +779,8 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
             "type": "text",
             "text": (
                 "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
-                "반드시 각 항목을 '## 라벨' 제목으로 시작하고, 이미지 순서대로 작성해. "
+                "반드시 각 항목을 제공된 라벨을 그대로 쓴 '## 라벨' 제목(예: '## PDF 3페이지')으로 시작하고, "
+                "이미지 순서대로 작성해. "
                 "분석 대상: " + ", ".join(item["label"] for item in batch)
             ),
         }]
@@ -729,7 +814,13 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
     if not sections:
         return ""
 
-    return "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
+    body = "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
+    # PDF는 페이지별로 렌더링·분석하므로 'PDF N페이지' 섹션마다 페이지 마커를 심어,
+    # 페이지 선택 요약이 이미지 슬라이드에도 적용되게 한다. (PPTX 삽입 이미지는 슬라이드 번호와
+    # 1:1로 매칭되지 않아, 본문 markitdown의 'Slide number' 마커에만 의존한다.)
+    if suffix == ".pdf":
+        body = _tag_visual_pdf_pages(body)
+    return body
 
 
 @app.post("/convert")
@@ -888,23 +979,28 @@ async def extract_text_with_google_vision(
 
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
+    markdown = _filter_markdown_by_pages(req.markdown, req.pages)
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
-        markdown=req.markdown,
+        markdown=markdown,
     )
+
+    system_content = SUMMARY_SYSTEM_PROMPT
+    if req.focus_prompt and req.focus_prompt.strip():
+        system_content = (
+            f"{SUMMARY_SYSTEM_PROMPT}\n\n"
+            "[사용자 집중 요청]\n"
+            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {req.focus_prompt.strip()}\n"
+            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
+            "원문에 없는 내용을 지어내지 마."
+        )
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
         llm = build_llm(req.model, max_tokens=SUMMARY_MAX_TOKENS)
         response = llm.invoke([
-            SystemMessage(content="""너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
-사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.
-일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
-템플릿 간 출력 스타일이 서로 비슷해지지 않도록 각 템플릿 지시를 최우선으로 따라.
-텍스트 상자가 필요하면 '>' 인용문만 사용하고, HTML aside, 이모지, 색상 지시는 사용하지 마.
-중요 용어와 공식은 **굵게** 표시하고, 필요한 경우 제목·bullet list·번호 목록·표·코드블록만 사용해.
-후속 질문, 추가 제안, 작성 완료 멘트는 절대 붙이지 마."""),
+            SystemMessage(content=system_content),
             HumanMessage(content=prompt),
         ])
         return {"result": _message_content_to_text(response.content).strip()}
