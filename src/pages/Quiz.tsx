@@ -1,7 +1,6 @@
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
-import { useCourses } from "../CourseContext";
 import {
   generateQuiz,
   gradeSubjectiveAnswer,
@@ -178,17 +177,18 @@ const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
 export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { courses } = useCourses();
   const reviewState = location.state as QuizLocationState;
   const reviewQuestions = reviewState?.reviewQuestions || null;
   const hasReviewQuestions = Boolean(reviewQuestions && reviewQuestions.length > 0);
   const reviewActiveRef = useRef(hasReviewQuestions);
   const [sidebar, setSidebar] = useState(false);
-  const [view, setView] = useState<QuizView>(hasReviewQuestions ? "quiz" : "courseList");
+  // 단독 진입(사이드바)이 사라져, 대시보드 모달 핸드오프(state.course)로만 들어온다.
+  const initialHandoffCourse = hasReviewQuestions ? "" : (reviewState?.course || reviewState?.selectedCourse || "");
+  const [view, setView] = useState<QuizView>(hasReviewQuestions ? "quiz" : (initialHandoffCourse ? "courseDetail" : "courseList"));
 
   // 과목 및 설정
   const [selectedCourse, setSelectedCourse] = useState(
-    hasReviewQuestions ? (reviewState?.selectedCourse || reviewState?.course || "") : "",
+    hasReviewQuestions ? (reviewState?.selectedCourse || reviewState?.course || "") : initialHandoffCourse,
   );
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState<QuizDifficulty>("보통");
@@ -217,7 +217,6 @@ export default function Quiz() {
   );
   const [activeQuizSetId, setActiveQuizSetId] = useState<string | null>(null);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
-  const [courseQuizSets, setCourseQuizSets] = useState<SavedQuizSet[]>([]);
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>(() => hasReviewQuestions && reviewQuestions ? shuffleQuizOptions(reviewQuestions) : []);
@@ -281,7 +280,6 @@ export default function Quiz() {
       if (ignore) return;
       setMaterials(courseMaterials);
       setQuizAttempts(attempts);
-      setCourseQuizSets(quizSets);
 
       // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
       const usable = summaries.filter(s => s.template !== "MINDMAP");
@@ -409,38 +407,6 @@ export default function Quiz() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [view]);
-
-  const handleCourseSelect = (course: string) => {
-    setSelectedCourse(course);
-    setCourseQuizSets([]);
-    setView("materialList");
-  };
-
-  const openExistingQuizSet = (quizSet: SavedQuizSet) => {
-    const attempts = quizAttempts.filter(a => a.quizSetId === quizSet.id);
-    const latestAttempt = attempts[0] || null;
-    const shuffledQuestions = shuffleQuizOptions(quizSet.questions, quizSet.questionType);
-    const restored = latestAttempt ? buildAnswersFromAttempt({ ...quizSet, questions: shuffledQuestions }, latestAttempt) : null;
-    setDifficulty(quizSet.difficulty);
-    setQuestionType(quizSet.questionType);
-    setCount(quizSet.count);
-    setSelectedMaterialIds(quizSet.materialIds.filter(id => materials.some(m => m.id === id)));
-    setQuizzes(shuffledQuestions);
-    setCurrent(0);
-    setAnswers(restored?.answers || {});
-    setShortAnswerInput("");
-    setShowExplanation(false);
-    setOpenedQuizTitle(quizSet.title);
-    setActiveQuizSetId(quizSet.id);
-    setSubjectiveGrades(restored?.subjectiveGrades || {});
-    setRemainingSeconds(null);
-    setQuizStartedAt(latestAttempt ? null : Date.now());
-    setTimedOut(latestAttempt?.timedOut || false);
-    setAttemptSavedKey(latestAttempt ? `review:${latestAttempt.id}` : "");
-    setAttemptSaveNotice(latestAttempt ? "저장된 풀이 기록을 불러왔습니다." : "");
-    setReviewAttempt(latestAttempt);
-    setView(latestAttempt ? "result" : "quiz");
-  };
 
   const handleCourseBack = () => {
     navigate(pageRoutes["자료 요약"], {
@@ -843,142 +809,11 @@ export default function Quiz() {
     </>
   );
 
-  // ── 과목 카드 리스트 ──
-  if (view === "courseList") {
-    return (
-      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-        {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
-        <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ marginBottom: 12 }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>과목 선택</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "#999" }}>퀴즈를 만들 과목을 선택하세요</p>
-          </div>
-
-          {courses.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-              {courses.map((c, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleCourseSelect(c)}
-                    style={{
-                      minHeight: 170, padding: 22, borderRadius: 14, border: "1px solid #eeeeee",
-                      background: CARD_BACKGROUND, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", color: "#222",
-                      cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column",
-                      justifyContent: "space-between", transition: "border 0.15s, box-shadow 0.15s",
-                    }}
-                  >
-                    <div>
-                      <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35 }}>{c}</span>
-                    </div>
-                    <span style={{ marginTop: 14, fontSize: 12, fontWeight: 600, color: "#aaa" }}>
-                      선택하기
-                    </span>
-                  </button>
-              ))}
-            </div>
-          ) : (
-            <Card style={{ padding: 40, textAlign: "center" }}>
-              <p style={{ fontSize: 14, color: "#aaa", margin: 0 }}>등록된 과목이 없습니다. 대시보드에서 과목을 추가해주세요.</p>
-            </Card>
-          )}
-        </div>
-      </div>
-    );
+  // 단독 과목 선택/자료 목록 브라우징 제거: 핸드오프 없이 진입하면 대시보드로 보낸다.
+  if (view === "courseList" || view === "materialList") {
+    return <Navigate to={pageRoutes["대시보드"]} replace />;
   }
 
-  // ── 자료 목록 (퀴즈 현황) ──
-  if (view === "materialList") {
-    return (
-      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-        {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
-        <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <button onClick={() => setView("courseList")} style={{
-              background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, padding: 0
-            }}>← 돌아가기</button>
-            <button
-              onClick={() => setView("courseDetail")}
-              style={{
-                padding: "9px 18px", borderRadius: 10, border: "none",
-                background: CYAN, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
-              }}
-            >+ 새 퀴즈 만들기</button>
-          </div>
-          <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 700, color: "#222" }}>{selectedCourse}</h2>
-          {materials.length === 0 ? (
-            <Card style={{ padding: 40, textAlign: "center" }}>
-              <p style={{ fontSize: 14, color: "#aaa", margin: 0 }}>아직 자료가 없습니다. 퀴즈를 만들려면 자료를 먼저 업로드하세요.</p>
-            </Card>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {[...materials]
-                .sort((a, b) => {
-                  const aCount = courseQuizSets.filter(q => q.materialIds?.includes(a.id)).length;
-                  const bCount = courseQuizSets.filter(q => q.materialIds?.includes(b.id)).length;
-                  return bCount - aCount;
-                })
-                .map(material => {
-                  const materialQuizSets = courseQuizSets
-                    .filter(q => q.materialIds?.includes(material.id))
-                    .sort((a, b) => b.createdAt - a.createdAt);
-                  const hasQuiz = materialQuizSets.length > 0;
-                  const latestAttempt = hasQuiz
-                    ? quizAttempts.find(a => a.quizSetId === materialQuizSets[0].id)
-                    : null;
-                  return (
-                    <Card key={material.id} style={{ padding: "16px 20px", opacity: hasQuiz ? 1 : 0.55 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasQuiz ? 12 : 0 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "#222" }}>{material.name}</span>
-                        {hasQuiz ? (
-                          <span style={{
-                            background: `${CYAN}22`, color: CYAN,
-                            borderRadius: 20, padding: "3px 12px",
-                            fontSize: 12, fontWeight: 700, flexShrink: 0
-                          }}>
-                            퀴즈 {materialQuizSets.length}개
-                            {latestAttempt && ` · 최근 ${latestAttempt.scorePercent}%`}
-                          </span>
-                        ) : (
-                          <span style={{ color: "#bbb", fontSize: 12, flexShrink: 0 }}>퀴즈 없음</span>
-                        )}
-                      </div>
-                      {hasQuiz && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {materialQuizSets.map(quizSet => {
-                            const attempt = quizAttempts.find(a => a.quizSetId === quizSet.id);
-                            return (
-                              <button
-                                key={quizSet.id}
-                                onClick={() => openExistingQuizSet(quizSet)}
-                                style={{
-                                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                                  padding: "10px 14px", borderRadius: 10,
-                                  border: `1px solid ${BORDER_COLOR}`, background: "#fafafa",
-                                  cursor: "pointer", textAlign: "left", width: "100%"
-                                }}
-                              >
-                                <span style={{ fontSize: 13, color: "#444", fontWeight: 600 }}>
-                                  {quizSet.title || `${quizSet.questionType} · ${quizSet.difficulty} · ${quizSet.count}문제`}
-                                </span>
-                                <span style={{ fontSize: 12, color: "#aaa", flexShrink: 0, marginLeft: 12 }}>
-                                  {attempt ? `${attempt.scorePercent}% · ${attempt.questionType}` : "미응시"}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </Card>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   // ── 과목 세부 (자료 + 설정) ──
   if (view === "courseDetail") {
@@ -1579,10 +1414,6 @@ export default function Quiz() {
             )}
 
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={() => goToMaterialReview()} style={{
-                padding: "12px 24px", borderRadius: 12, border: "1px solid #f3c3da",
-                background: "#FFF0F6", fontSize: 14, fontWeight: 700, cursor: "pointer", color: PINK
-              }}>약점 요약 보기</button>
               <button onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(primaryWeakTopic) })} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid #e0e0e0",
                 background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "#555"
