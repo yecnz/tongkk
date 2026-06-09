@@ -27,6 +27,9 @@ type AITutorDrawerProps = {
   disabledReason?: string;
   resetHistory?: boolean;
   layout?: "drawer" | "embedded";
+  // embedded일 때 고정 높이(1100) 대신 부모 패널 높이를 100%로 채운다.
+  // 이러면 튜터 내부(채팅)만 스크롤되고 요약 영역과 분리된 독립 스크롤이 된다.
+  fill?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
@@ -164,6 +167,7 @@ export const AITutorDrawer = ({
   disabledReason = "요약 생성 후 AI 튜터를 사용할 수 있습니다",
   resetHistory = false,
   layout = "drawer",
+  fill = false,
   open,
   onOpenChange,
 }: AITutorDrawerProps) => {
@@ -483,13 +487,14 @@ export const AITutorDrawer = ({
         left: isExpanded ? "50%" : undefined,
         right: isExpanded ? "auto" : layout === "embedded" ? "auto" : 0,
         width: isExpanded ? "min(1080px, calc(100vw - 48px))" : layout === "embedded" ? "100%" : "min(420px, 100vw)",
-        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? 1100 : "100vh",
-        minHeight: isExpanded ? undefined : layout === "embedded" ? 1100 : undefined,
+        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? (fill ? "100%" : 1100) : "100vh",
+        minHeight: isExpanded ? undefined : layout === "embedded" ? (fill ? 0 : 1100) : undefined,
         zIndex: isExpanded ? 260 : layout === "embedded" ? "auto" : 190,
         border: "1px solid #f0f0f0",
         borderRight: isExpanded || layout === "embedded" ? "1px solid #f0f0f0" : "none",
         borderRadius: isExpanded ? 16 : layout === "embedded" ? 0 : "16px 0 0 16px",
         padding: 20,
+        boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
         background: "#fff",

@@ -1930,7 +1930,7 @@ const MaterialDetailView = ({
                 >
                   {activeSummary && (
                     <div style={{ flex: isSummaryTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflowY: "auto", overflowX: "hidden" }}>
-                      <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0 }}>
+                      <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0, minHeight: "100%", boxSizing: "border-box" }}>
                         <div style={{ marginBottom: 18 }}>
                           <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
                           <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
@@ -2272,7 +2272,6 @@ export default function Summary() {
   const [loadingStep, setLoadingStep] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
-  const [courseSummaries, setCourseSummaries] = useState<SavedSummary[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
@@ -2332,7 +2331,6 @@ export default function Summary() {
       .then(([nextMaterials, summaries]) => {
         if (ignore) return;
         setMaterials(nextMaterials);
-        setCourseSummaries(summaries);
         const pendingMaterialId = pendingMaterialIdRef.current;
         if (pendingMaterialId) {
           pendingMaterialIdRef.current = "";
@@ -2766,7 +2764,6 @@ export default function Summary() {
         deleteSummariesByMaterialId(selectedCourse, material.id),
       ]);
       setMaterials(nextMaterials);
-      setCourseSummaries(prev => prev.filter(s => !(s.materialIds || []).includes(material.id)));
       setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
       setFiles(prev => {
         const nextFiles = prev.filter(file =>
@@ -2813,10 +2810,9 @@ export default function Summary() {
             materialIds: selectedMaterialIds,
             materialNames: selectedMaterialNames,
           };
+          // 중복 허용: 같은 자료·템플릿이어도 기존 요약을 지우지 않고 항상 새로 저장한다.
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
           setActiveSummaryId(persistedSummary.id || null);
-          // 중복 허용: 같은 자료·템플릿이어도 기존 요약을 지우지 않고 새 항목으로 추가한다.
-          setCourseSummaries(prev => [persistedSummary, ...prev]);
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
       } catch (err) {

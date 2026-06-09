@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import base64
 import zipfile
 import shutil
@@ -205,6 +206,15 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 """
 
 
+SUMMARY_SYSTEM_PROMPT = """너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
+사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.
+일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
+템플릿 간 출력 스타일이 서로 비슷해지지 않도록 각 템플릿 지시를 최우선으로 따라.
+텍스트 상자가 필요하면 '>' 인용문만 사용하고, HTML aside, 이모지, 색상 지시는 사용하지 마.
+중요 용어와 공식은 **굵게** 표시하고, 필요한 경우 제목·bullet list·번호 목록·표·코드블록만 사용해.
+후속 질문, 추가 제안, 작성 완료 멘트는 절대 붙이지 마."""
+
+
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
@@ -215,6 +225,10 @@ class SummarizeRequest(BaseModel):
     template: SummaryTemplate = "GENERAL"
     model: Literal["GPT", "Gemini"] = "GPT"
     thread_id: str | None = None
+    # 사용자가 "1-5, 8"처럼 지정한 반영 페이지. 비우면 전체.
+    pages: str | None = None
+    # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
+    focus_prompt: str | None = None
 
 
 class AgentRequest(BaseModel):
@@ -584,6 +598,61 @@ def _extract_pdf_markdown_with_page_markers(file_path: str) -> str:
     return "\n\n".join(pages)
 
 
+def _parse_page_selection(spec: str) -> set[int]:
+    """"1-5, 8, 10-12" 같은 입력을 페이지 번호 집합으로 변환한다."""
+    pages: set[int] = set()
+    for part in spec.replace(" ", "").split(","):
+        if not part:
+            continue
+        if "-" in part:
+            start_str, _, end_str = part.partition("-")
+            try:
+                start, end = int(start_str), int(end_str)
+            except ValueError:
+                continue
+            if start > end:
+                start, end = end, start
+            pages.update(range(start, end + 1))
+        else:
+            try:
+                pages.add(int(part))
+            except ValueError:
+                continue
+    return pages
+
+
+_PAGE_MARKER_RE = re.compile(r"<!--\s*p\.(\d+)\s*-->")
+
+
+def _filter_markdown_by_pages(markdown: str, spec: str | None) -> str:
+    """`<!-- p.N -->` 마커 기준으로 선택한 페이지 블록만 남긴다.
+
+    마커가 없거나(이미지 OCR 등) 선택이 비면 원본을 그대로 돌려준다.
+    """
+    if not spec or not spec.strip():
+        return markdown
+    selected = _parse_page_selection(spec)
+    if not selected:
+        return markdown
+    matches = list(_PAGE_MARKER_RE.finditer(markdown))
+    if not matches:
+        return markdown
+    preamble = markdown[: matches[0].start()].strip()
+    kept: list[str] = [preamble] if preamble else []
+    for idx, match in enumerate(matches):
+        page_no = int(match.group(1))
+        if page_no not in selected:
+            continue
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(markdown)
+        block = markdown[match.start():end].strip()
+        if block:
+            kept.append(block)
+    # 선택한 페이지가 자료에 하나도 없으면 빈 요약을 막기 위해 원본을 쓴다.
+    if len(kept) <= (1 if preamble else 0):
+        return markdown
+    return "\n\n".join(kept)
+
+
 def _pdf_page_has_image(page) -> bool:
     page_dict = page.get_text("dict")
     for block in page_dict.get("blocks", []):
@@ -888,23 +957,28 @@ async def extract_text_with_google_vision(
 
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
+    markdown = _filter_markdown_by_pages(req.markdown, req.pages)
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
-        markdown=req.markdown,
+        markdown=markdown,
     )
+
+    system_content = SUMMARY_SYSTEM_PROMPT
+    if req.focus_prompt and req.focus_prompt.strip():
+        system_content = (
+            f"{SUMMARY_SYSTEM_PROMPT}\n\n"
+            "[사용자 집중 요청]\n"
+            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {req.focus_prompt.strip()}\n"
+            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
+            "원문에 없는 내용을 지어내지 마."
+        )
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
         llm = build_llm(req.model, max_tokens=SUMMARY_MAX_TOKENS)
         response = llm.invoke([
-            SystemMessage(content="""너는 대학 강의자료를 템플릿별 목적에 맞춰 Markdown으로 정리하는 전문가다.
-사용자가 제공한 강의자료에 근거해서만 작성하고, 원문에 없는 내용을 단정하지 마.
-일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
-템플릿 간 출력 스타일이 서로 비슷해지지 않도록 각 템플릿 지시를 최우선으로 따라.
-텍스트 상자가 필요하면 '>' 인용문만 사용하고, HTML aside, 이모지, 색상 지시는 사용하지 마.
-중요 용어와 공식은 **굵게** 표시하고, 필요한 경우 제목·bullet list·번호 목록·표·코드블록만 사용해.
-후속 질문, 추가 제안, 작성 완료 멘트는 절대 붙이지 마."""),
+            SystemMessage(content=system_content),
             HumanMessage(content=prompt),
         ])
         return {"result": _message_content_to_text(response.content).strip()}

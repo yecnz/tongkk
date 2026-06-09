@@ -7,7 +7,7 @@ import { loadDashboardState, saveDashboardState } from "../services/dashboardSta
 import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
-import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
+import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
 import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 import {
   isPaceSprint,
@@ -46,7 +46,6 @@ type CourseDetailModalProps = {
   onGoSummary: () => void;
   onGoQuiz: () => void;
   onOpenMaterial: (material: CourseMaterial, initialTab?: "original" | "summary" | "quiz") => void;
-  onOpenQuiz: (quizSet: SavedQuizSet) => void;
 };
 type PlanSource = {
   key: string;
@@ -67,9 +66,6 @@ type CourseStats = {
 };
 
 const defaultStats: CourseStats = { materials: 0, summaries: 0, quizzes: 0, loading: true, error: "" };
-
-const formatDate = (timestamp: number) =>
-  new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
 
 const materialMeta = (material: CourseMaterial) => {
   if (material.pages) return `${material.pages}페이지`;
@@ -168,24 +164,16 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
 
 const CourseDetailModal = ({
   course,
-  initialSection = "materials",
   onClose,
   onGoSummary,
   onGoQuiz,
   onOpenMaterial,
-  onOpenQuiz,
 }: CourseDetailModalProps) => {
-  const [activeTab, setActiveTab] = useState<CourseDetailSection>(initialSection);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
-  const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setActiveTab(initialSection);
-  }, [initialSection]);
 
   useEffect(() => {
     let ignore = false;
@@ -193,17 +181,15 @@ const CourseDetailModal = ({
       setLoading(true);
       setError("");
       try {
-        const [nextMaterials, nextSummaries, nextQuizSets, nextQuizAttempts] = await Promise.all([
+        const [nextMaterials, nextSummaries, nextQuizSets] = await Promise.all([
           loadCourseMaterialsFromServer(course),
           loadSummariesFromServer(course),
           loadQuizSetsFromServer(course),
-          loadQuizAttemptsFromServer(course),
         ]);
         if (ignore) return;
         setMaterials(nextMaterials);
         setSummaries(nextSummaries);
         setQuizSets(nextQuizSets);
-        setQuizAttempts(nextQuizAttempts);
       } catch (err) {
         if (!ignore) setError(err instanceof Error ? err.message : "강의 상세 정보를 불러오지 못했습니다.");
       } finally {
@@ -216,31 +202,9 @@ const CourseDetailModal = ({
     };
   }, [course]);
 
-  const emptyText = loading ? "불러오는 중..." : "아직 기록이 없습니다";
-  const tabCount = {
-    materials: materials.length,
-    summaries: summaries.length,
-    quizzes: quizSets.length,
-  };
-  const tabs: Array<{ key: CourseDetailSection; label: string; accent: string }> = [
-    { key: "materials", label: "자료", accent: "#555" },
-    { key: "summaries", label: "요약", accent: PINK },
-    { key: "quizzes", label: "퀴즈", accent: CYAN },
-  ];
-
-  const tabButtonStyle = (tab: CourseDetailSection, accent: string) => {
-    const selected = activeTab === tab;
-    return {
-      padding: "10px 16px",
-      borderRadius: 999,
-      border: selected ? `1px solid ${accent}` : "1px solid #eeeeee",
-      background: selected ? (tab === "quizzes" ? "#E8FAFE" : tab === "summaries" ? "#FFF0F6" : "#f8f8f8") : "#fff",
-      color: selected ? accent : "#777",
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: selected ? 850 : 700,
-    };
-  };
+  const emptyText = loading ? "불러오는 중..." : "아직 자료가 없습니다";
+  const summaryCountFor = (materialId: string) => summaries.filter(s => s.materialIds?.includes(materialId)).length;
+  const quizCountFor = (materialId: string) => quizSets.filter(q => q.materialIds?.includes(materialId)).length;
 
   return (
     <div style={{
@@ -262,7 +226,7 @@ const CourseDetailModal = ({
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "#222" }}>{course}</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>탭을 선택해 강의별 자료, 요약, 퀴즈 내역을 확인하세요.</p>
+            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
           </div>
           <button onClick={onClose} aria-label="강의 상세 닫기" style={{
             width: 32,
@@ -285,21 +249,15 @@ const CourseDetailModal = ({
           </div>
         )}
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-          {tabs.map(tab => (
-            <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} style={tabButtonStyle(tab.key, tab.accent)}>
-              {tab.label} {tabCount[tab.key] > 0 ? tabCount[tab.key] : ""}
-            </button>
-          ))}
-        </div>
-
         <div style={{ border: "1px solid #eeeeee", borderRadius: 14, background: "#fff", minHeight: 320, padding: 18 }}>
-          {activeTab === "materials" && (
-            materials.length === 0 ? (
-              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {materials.map((material, index) => (
+          {materials.length === 0 ? (
+            <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {materials.map((material, index) => {
+                const summaryCount = summaryCountFor(material.id);
+                const quizCount = quizCountFor(material.id);
+                return (
                   <button
                     key={material.id}
                     type="button"
@@ -312,116 +270,28 @@ const CourseDetailModal = ({
                       background: "none",
                       cursor: "pointer",
                       textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
                     }}
                   >
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
-                      {material.name}
-                    </div>
-                    <div style={{ marginTop: 5, fontSize: 12, color: "#999" }}>
-                      {materialMeta(material)} · 수정일 {formatDate(material.updatedAt)}
-                    </div>
+                    <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                        {material.name}
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#c4c4c4" }}>
+                        {materialMeta(material)}
+                      </span>
+                    </span>
+                    <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
+                      <span style={{ color: summaryCount > 0 ? PINK : "#ccc" }}>요약 {summaryCount}</span>
+                      <span style={{ color: quizCount > 0 ? CYAN : "#ccc" }}>퀴즈 {quizCount}</span>
+                    </span>
                   </button>
-                ))}
-              </div>
-            )
-          )}
-
-          {activeTab === "summaries" && (
-            materials.length === 0 ? (
-              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {[...materials]
-                  .sort((a, b) => {
-                    const aCount = summaries.filter(s => s.materialIds?.includes(a.id)).length;
-                    const bCount = summaries.filter(s => s.materialIds?.includes(b.id)).length;
-                    return bCount - aCount;
-                  })
-                  .map((material, index, sorted) => {
-                    const summaryCount = summaries.filter(s => s.materialIds?.includes(material.id)).length;
-                    const hasSummary = summaryCount > 0;
-                    return (
-                      <button
-                        key={material.id}
-                        type="button"
-                        onClick={() => onOpenMaterial(material, hasSummary ? "summary" : "original")}
-                        style={{
-                          width: "100%",
-                          padding: "14px 0",
-                          border: "none",
-                          borderBottom: index < sorted.length - 1 ? "1px solid #f3f3f3" : "none",
-                          background: "none",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 10,
-                        }}
-                      >
-                        <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>{material.name}</span>
-                        {hasSummary ? (
-                          <span style={{
-                            background: `${PINK}22`, color: PINK,
-                            borderRadius: 20, padding: "3px 12px",
-                            fontSize: 12, fontWeight: 700, flexShrink: 0,
-                          }}>
-                            요약 {summaryCount}개
-                          </span>
-                        ) : (
-                          <span style={{ color: "#bbb", fontSize: 12, flexShrink: 0 }}>요약 없음</span>
-                        )}
-                      </button>
-                    );
-                  })}
-              </div>
-            )
-          )}
-
-          {activeTab === "quizzes" && (
-            quizSets.length === 0 ? (
-              <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {quizSets.map((quizSet, index) => {
-                  const latestAttempt = quizAttempts.find(attempt => attempt.quizSetId === quizSet.id);
-                  return (
-                    <button
-                      key={quizSet.id}
-                      type="button"
-                      onClick={() => onOpenQuiz(quizSet)}
-                      style={{
-                        width: "100%",
-                        padding: "14px 0",
-                        border: "none",
-                        borderBottom: index < quizSets.length - 1 ? "1px solid #f3f3f3" : "none",
-                        background: "none",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
-                        {quizSet.title}
-                      </div>
-                      <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 12, color: "#999" }}>
-                          {quizSet.questionType} · {quizSet.difficulty} · {quizSet.count}문항
-                        </span>
-                        {latestAttempt ? (
-                          <span style={{ flexShrink: 0, fontSize: 12, color: latestAttempt.scorePercent < 70 ? PINK : CYAN, fontWeight: 850 }}>
-                            최근 점수 {latestAttempt.scorePercent}%
-                          </span>
-                        ) : (
-                          <span style={{ flexShrink: 0, fontSize: 12, color: "#aaa", fontWeight: 800 }}>
-                            풀이 전
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -435,7 +305,7 @@ const CourseDetailModal = ({
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
-          }}>자료 요약으로</button>
+          }}>요약 새로 생성</button>
           <button onClick={onGoQuiz} style={{
             padding: "10px 18px",
             borderRadius: 10,
@@ -445,7 +315,7 @@ const CourseDetailModal = ({
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
-          }}>퀴즈 생성으로</button>
+          }}>퀴즈 새로 생성</button>
         </div>
       </Card>
     </div>
@@ -827,11 +697,6 @@ export default function Dashboard() {
           onOpenMaterial={(material, initialTab) => {
             navigate(pageRoutes["자료 요약"], {
               state: { selectedCourse: detailCourse, materialId: material.id, viewMaterial: true, materialDetailTab: initialTab, fromDashboard: true },
-            });
-          }}
-          onOpenQuiz={(quizSet) => {
-            navigate(pageRoutes["퀴즈 생성"], {
-              state: { course: detailCourse, quizSetId: quizSet.id, openQuiz: true, fromDashboard: true },
             });
           }}
         />
