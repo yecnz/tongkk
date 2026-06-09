@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -84,6 +84,7 @@ type MaterialDetailViewProps = {
   reviewTitle?: string;
   relatedMaterials?: CourseMaterial[];
   onSelectRelatedMaterial?: (material: CourseMaterial) => void;
+  onTabChange?: (tab: MaterialDetailTab) => void;
 };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
@@ -205,6 +206,56 @@ const sameMaterialIds = (a: string[] = [], b: string[] = []) =>
   a.length === b.length && [...a].sort().every((id, index) => id === [...b].sort()[index]);
 
 const isInitialRouteEntry = (locationKey: string) => locationKey === "default";
+
+// ── 새로고침/딥링크 화면 복원 ─────────────────────────────────────────────
+// 보던 화면을 URL(위치: 과목·단계·자료)과 sessionStorage(세부: 탭·요약식별·선택자료)에
+// 나눠 저장해, 새로고침해도 같은 화면으로 되돌린다. URL은 자료 단위 공유·북마크도 가능하게 한다.
+const VIEW_TO_URL_TOKEN: Record<SummaryView, string> = {
+  upload: "upload",
+  materialList: "list",
+  templates: "templates",
+  summaryResult: "summary",
+  quizCreate: "quiz",
+  materialDetail: "material",
+};
+const URL_TOKEN_TO_VIEW: Record<string, SummaryView> = {
+  upload: "upload",
+  list: "materialList",
+  templates: "templates",
+  summary: "summaryResult",
+  quiz: "quizCreate",
+  material: "materialDetail",
+};
+
+const SUMMARY_VIEW_DETAIL_KEY = "tongkk:summaryViewDetail";
+type SummaryViewDetail = {
+  tab?: MaterialDetailTab;
+  summaryId?: string;
+  template?: SummaryTemplate;
+  materialIds?: string[];
+};
+const readSummaryViewDetail = (): SummaryViewDetail => {
+  try {
+    const raw = sessionStorage.getItem(SUMMARY_VIEW_DETAIL_KEY);
+    return raw ? (JSON.parse(raw) as SummaryViewDetail) : {};
+  } catch {
+    return {};
+  }
+};
+const writeSummaryViewDetail = (detail: SummaryViewDetail) => {
+  try {
+    sessionStorage.setItem(SUMMARY_VIEW_DETAIL_KEY, JSON.stringify(detail));
+  } catch {
+    // 세션 저장 실패는 복원 편의 기능일 뿐이므로 조용히 무시한다.
+  }
+};
+const clearSummaryViewDetail = () => {
+  try {
+    sessionStorage.removeItem(SUMMARY_VIEW_DETAIL_KEY);
+  } catch {
+    // noop
+  }
+};
 
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
@@ -1155,6 +1206,7 @@ const MaterialDetailView = ({
   reviewTitle = "",
   relatedMaterials = [],
   onSelectRelatedMaterial,
+  onTabChange,
 }: MaterialDetailViewProps) => {
   const [activeTab, setActiveTab] = useState<MaterialDetailTab>(initialTab);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -1278,6 +1330,11 @@ const MaterialDetailView = ({
     setIsOriginalTutorOpen(false);
     setIsSummaryTutorOpen(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
   }, [material.id, initialTab, initialTutorQuestion]);
+
+  // 사용자가 탭을 바꾸면 부모에 알려 현재 탭을 세션에 저장하게 한다(새로고침 복원용).
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab, onTabChange]);
 
   useEffect(() => {
     let ignore = false;
@@ -2084,39 +2141,82 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const locationState = (location.state as LocationState) || null;
   const isInitialRouteEntryRef = useRef(isInitialRouteEntry(location.key));
   const shouldRestoreLocationView = !isInitialRouteEntryRef.current;
-  const initialCourse = (locationState?.selectedCourse || "").trim();
-  const fromDashboardRef = useRef(Boolean(initialCourse && locationState?.fromDashboard));
-  const pendingMaterialIdRef = useRef(shouldRestoreLocationView && locationState?.viewMaterial
-    ? locationState.materialId || locationState.materialIds?.[0] || ""
-    : "");
-  const pendingCreateSummaryRef = useRef(Boolean(shouldRestoreLocationView && locationState?.createSummary));
+
+  // 복원 소스 결정: 다른 페이지에서 넘어온 핸드오프(location.state)가 최우선이고,
+  // 핸드오프가 없고 URL 쿼리에 과목이 있으면 새로고침/딥링크로 보고 URL+세션에서 복원한다.
+  const hasHandoff = shouldRestoreLocationView && Boolean(
+    locationState?.viewMaterial || locationState?.createSummary || locationState?.openSummary,
+  );
+  const urlCourse = (searchParams.get("course") || "").trim();
+  const urlView = URL_TOKEN_TO_VIEW[searchParams.get("view") || ""];
+  const urlMaterialId = searchParams.get("material") || "";
+  const restoreFromUrl = !hasHandoff && Boolean(urlCourse);
+  const sessionDetailRef = useRef<SummaryViewDetail>(restoreFromUrl ? readSummaryViewDetail() : {});
+  const sessionDetail = sessionDetailRef.current;
+
+  const initialCourse = ((locationState?.selectedCourse || (restoreFromUrl ? urlCourse : "")) || "").trim();
+  const fromDashboardRef = useRef(Boolean(locationState?.selectedCourse?.trim() && locationState?.fromDashboard));
+  const pendingMaterialIdRef = useRef(
+    hasHandoff && locationState?.viewMaterial
+      ? locationState.materialId || locationState.materialIds?.[0] || ""
+      : restoreFromUrl && urlView === "materialDetail"
+        ? urlMaterialId
+        : "",
+  );
+  const pendingCreateSummaryRef = useRef(
+    (hasHandoff && Boolean(locationState?.createSummary)) ||
+    (restoreFromUrl && urlView === "templates"),
+  );
   const pendingMaterialDetailTabRef = useRef<MaterialDetailTab>(
-    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.materialDetailTab || "original" : "original"
+    hasHandoff && locationState?.viewMaterial
+      ? locationState.materialDetailTab || "original"
+      : restoreFromUrl && urlView === "materialDetail"
+        ? sessionDetail.tab || "original"
+        : "original",
   );
   const pendingMaterialTutorQuestionRef = useRef(
-    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.tutorQuestion || "" : "",
+    hasHandoff && locationState?.viewMaterial ? locationState.tutorQuestion || "" : "",
   );
   const pendingMaterialReviewContextRef = useRef(
-    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.quizReviewContext || "" : "",
+    hasHandoff && locationState?.viewMaterial ? locationState.quizReviewContext || "" : "",
   );
   const pendingMaterialReviewTitleRef = useRef(
-    shouldRestoreLocationView && locationState?.viewMaterial ? locationState.quizReviewTitle || "" : "",
+    hasHandoff && locationState?.viewMaterial ? locationState.quizReviewTitle || "" : "",
   );
   const pendingMaterialIdsRef = useRef<string[]>(
-    shouldRestoreLocationView && (locationState?.viewMaterial || locationState?.createSummary)
+    hasHandoff && (locationState?.viewMaterial || locationState?.createSummary)
       ? locationState.materialIds || (locationState.materialId ? [locationState.materialId] : [])
-      : [],
+      : restoreFromUrl
+        ? sessionDetail.materialIds || (urlMaterialId ? [urlMaterialId] : [])
+        : [],
   );
-  const pendingSummaryRef = useRef(shouldRestoreLocationView && locationState?.openSummary ? {
-    id: locationState.summaryId || "",
-    template: locationState.summaryTemplate,
-    content: locationState.summaryContent || "",
-    createdAt: locationState.summaryCreatedAt || Date.now(),
-    materialIds: locationState.materialIds || [],
-  } : null);
+  const pendingSummaryRef = useRef(
+    hasHandoff && locationState?.openSummary
+      ? {
+          id: locationState.summaryId || "",
+          template: locationState.summaryTemplate,
+          content: locationState.summaryContent || "",
+          createdAt: locationState.summaryCreatedAt || Date.now(),
+          materialIds: locationState.materialIds || [],
+        }
+      : restoreFromUrl && urlView === "summaryResult"
+        ? {
+            id: sessionDetail.summaryId || "",
+            template: sessionDetail.template,
+            content: "",
+            createdAt: Date.now(),
+            materialIds: sessionDetail.materialIds || [],
+          }
+        : null,
+  );
+  // URL 복원인데 자료 상세/요약을 못 살릴 때(자료 삭제, 요약 생성 중 새로고침 등) 돌아갈 화면.
+  const pendingViewRef = useRef<SummaryView | null>(
+    restoreFromUrl ? urlView || "materialList" : null,
+  );
   const { courses } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -2143,6 +2243,7 @@ export default function Summary() {
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
+  const [activeMaterialTab, setActiveMaterialTab] = useState<MaterialDetailTab>("original");
   const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
   const [materialDetailReviewContext, setMaterialDetailReviewContext] = useState("");
   const [materialDetailReviewTitle, setMaterialDetailReviewTitle] = useState("");
@@ -2277,6 +2378,16 @@ export default function Summary() {
             ? validPreviousIds
             : nextMaterials.map(material => material.id);
         });
+
+        // URL에서 자료 목록을 복원하거나, 자료 상세·요약 복원이 실패한 경우(자료 삭제 등)의 안전 착지.
+        if (pendingViewRef.current) {
+          const fallbackView = pendingViewRef.current;
+          pendingViewRef.current = null;
+          if (fallbackView !== "upload" && nextMaterials.length > 0) {
+            setSearched(true);
+            setView("materialList");
+          }
+        }
       })
       .catch(error => {
         setExtractError(error instanceof Error ? error.message : "강의자료 불러오기 실패");
@@ -2286,6 +2397,36 @@ export default function Summary() {
       ignore = true;
     };
   }, [selectedCourse]);
+
+  // 보던 화면을 URL(위치)과 세션(세부)에 반영해 새로고침/딥링크 복원을 지원한다.
+  // state -> URL/세션 단방향 동기화이며, replace로 갱신해 히스토리를 더럽히지 않는다.
+  useEffect(() => {
+    if (!selectedCourse) {
+      if (searchParams.toString()) setSearchParams(new URLSearchParams(), { replace: true });
+      clearSummaryViewDetail();
+      return;
+    }
+
+    const nextParams = new URLSearchParams();
+    nextParams.set("course", selectedCourse);
+    nextParams.set("view", VIEW_TO_URL_TOKEN[view]);
+    if ((view === "materialDetail" || view === "summaryResult") && activeMaterial?.id) {
+      nextParams.set("material", activeMaterial.id);
+    }
+    if (searchParams.toString() !== nextParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
+
+    // 세부 UI는 세션에 저장. 요약 생성 중에도 식별자만 저장하고 본문(휘발성)은 저장하지 않는다.
+    writeSummaryViewDetail({
+      tab: activeMaterialTab,
+      summaryId: activeSummaryId || undefined,
+      template: selectedTemplate || undefined,
+      materialIds: selectedMaterialIds,
+    });
+    // searchParams/setSearchParams는 비교·갱신용이며 stable하므로 의존성에서 제외한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedCourse, activeMaterial?.id, activeMaterialTab, activeSummaryId, selectedTemplate, selectedMaterialIds]);
 
   useEffect(() => {
     if (!duplicateNotice) return;
@@ -2979,6 +3120,7 @@ export default function Summary() {
             reviewTitle={materialDetailReviewTitle}
             relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
             onSelectRelatedMaterial={handleSelectRelatedMaterial}
+            onTabChange={setActiveMaterialTab}
           />
         )}
 
