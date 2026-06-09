@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { PINK, normalizeBoldSpacing } from "../common";
+import { PINK, CYAN, normalizeBoldSpacing } from "../common";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   createSummaryChatSession,
@@ -526,22 +526,22 @@ export const AITutorDrawer = ({
                 style={{
                   padding: "4px 10px",
                   borderRadius: 8,
-                  border: `1px solid ${isExpanded ? PINK + "55" : "#e0e0e0"}`,
-                  background: isExpanded ? "#FFF0F6" : "#fafafa",
-                  color: isExpanded ? PINK : "#777",
+                  border: `1px solid ${CYAN}55`,
+                  background: "#E8FAFE",
+                  color: CYAN,
                   fontSize: 12,
                   fontWeight: 800,
                   cursor: "pointer",
                 }}
               >
-                {isExpanded ? "작게 보기" : "확대 보기"}
+                <i className={isExpanded ? "fa-solid fa-down-left-and-up-right-to-center" : "fa-solid fa-up-right-and-down-left-from-center"} />
               </button>
             )}
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="AI 튜터 닫기"
-              style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", color: "#999", cursor: "pointer", fontSize: 18, lineHeight: "28px", padding: 0 }}
+              style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid #e0e0e0", background: "#f3f4f6", color: "#999", cursor: "pointer", fontSize: 18, fontWeight: 800, lineHeight: "28px", padding: 0 }}
             >
               ×
             </button>
