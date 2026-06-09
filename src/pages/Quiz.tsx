@@ -4,12 +4,15 @@ import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFA
 import {
   generateQuiz,
   gradeSubjectiveAnswer,
+  analyzeWrongAnswers,
   type QuizQuestion,
   type QuizDifficulty,
   type QuizQuestionType,
   type SubjectiveGradeResult,
   type SummaryTemplate,
+  type WrongAnalysisItem,
 } from "../services/gpt";
+import { saveWrongAnswerAnalysisToServer } from "../services/wrongAnswerAnalyses";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
@@ -238,6 +241,9 @@ export default function Quiz() {
   const [attemptSavedKey, setAttemptSavedKey] = useState("");
   const [attemptSaveNotice, setAttemptSaveNotice] = useState("");
   const [reviewAttempt, setReviewAttempt] = useState<SavedQuizAttempt | null>(null);
+  // 과목 오답 분석(오답 다시 풀기 결과 화면)
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState("");
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
@@ -602,8 +608,13 @@ export default function Quiz() {
     setView("generating");
     setError(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
+    // 이미 풀었던/출제된 문제를 모아 중복 출제를 막는다(풀이 기록의 문항 + 직전 퀴즈 문항).
+    const excludeQuestions = Array.from(new Set([
+      ...quizAttempts.flatMap(attempt => attempt.answers.map(answer => answer.question)),
+      ...quizzes.map(quiz => quiz.question),
+    ].filter(Boolean))).slice(0, 80);
     try {
-      const generated = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
+      const generated = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
       const questions = shuffleQuizOptions(generated, questionType);
       setQuizzes(questions);
       const savedQuizSet = await saveQuizSetToServer(selectedCourse, {
@@ -1059,7 +1070,6 @@ export default function Quiz() {
               ))}
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>시험 모드</label>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", cursor: "pointer" }}>
                 <input
@@ -1067,9 +1077,10 @@ export default function Quiz() {
                   checked={examMode}
                   onChange={e => setExamMode(e.target.checked)}
                 />
-                시간 제한 켜기
+                시험 모드
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-muted)", opacity: examMode ? 1 : 0.5 }}>시간 제한</span>
                 {[5, 10, 20].map(minutes => (
                   <button
                     key={minutes}
@@ -1137,7 +1148,6 @@ export default function Quiz() {
       ? selectedMaterials
       : materials.filter(material => selectedMaterialIds.includes(material.id));
     const primaryReviewMaterial = reviewMaterials[0] || materials[0];
-    const primaryWeakTopic = resultWeakTopics[0] || "틀린 문제";
     const formatAnswerForReview = (
       quiz: QuizQuestion,
       answerValue: number | string | undefined,
@@ -1232,11 +1242,57 @@ export default function Quiz() {
       setDifficulty(nextDifficulty);
       setView("quiz");
     };
+    const handleResultBack = () => {
+      // 오답 다시 풀기(복습 노트)·저장된 풀이 바로 열기(자료 요약)는 courseDetail을 거치지 않고
+      // 결과로 바로 들어왔으므로, 들어온 이전 화면(라우트)으로 되돌아간다.
+      // (오답 복습 흐름은 과목 자료를 로드하지 않아 courseDetail이 빈 화면이 되므로 setView 금지)
+      if (reviewActiveRef.current || reviewAttempt) {
+        navigate(-1);
+        return;
+      }
+      // 과목 설정(과목 세부) 화면에서 직접 만들어 푼 경우에는 그 설정 화면으로 돌아간다.
+      setView("courseDetail");
+    };
+    const handleAnalyzeWrong = async () => {
+      if (analyzing || !selectedCourse.trim()) return;
+      // 이번에 다시 푼 문항 전체(정오답 포함)를 넘겨 약점을 분석한다. 백엔드가 오답을 중심으로 정리한다.
+      const items: WrongAnalysisItem[] = quizzes.map((quiz, index) => {
+        const answerValue = answers[index];
+        return {
+          question: quiz.question,
+          type: quiz.type || questionType,
+          studentAnswer: formatAnswerForReview(quiz, answerValue),
+          correctAnswer: formatAnswerForReview(quiz, answerValue, true),
+          explanation: subjectiveGrades[index]?.feedback || quiz.explanation,
+          isCorrect: isQuestionCorrect(quiz, index, answerValue),
+        };
+      });
+      if (items.length === 0) {
+        setAnalyzeError("분석할 문항이 없습니다.");
+        return;
+      }
+      setAnalyzing(true);
+      setAnalyzeError("");
+      try {
+        const analysis = await analyzeWrongAnswers(selectedCourse, items);
+        await saveWrongAnswerAnalysisToServer(selectedCourse, analysis);
+        navigate(pageRoutes["오답 노트"]);
+      } catch (err) {
+        setAnalyzeError(err instanceof Error ? err.message : "오답 분석에 실패했습니다.");
+      } finally {
+        setAnalyzing(false);
+      }
+    };
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
+          <div style={{ textAlign: "left", marginBottom: 16 }}>
+            <button onClick={handleResultBack} style={{
+              background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, padding: 0
+            }}>← 돌아가기</button>
+          </div>
           <Card style={{ padding: 40 }}>
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
@@ -1422,15 +1478,27 @@ export default function Quiz() {
               </div>
             )}
 
+            {analyzeError && (
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: PINK }}>{analyzeError}</p>
+            )}
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(primaryWeakTopic) })} style={{
+              <button onClick={retryQuiz} disabled={analyzing} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
-                background: "var(--color-card)", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "var(--color-text)"
-              }}>AI 튜터로 복습</button>
-              <button onClick={retryQuiz} style={{
-                padding: "12px 24px", borderRadius: 12, border: "none",
-                background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-on-brand)"
+                background: "var(--color-card)", fontSize: 14, fontWeight: 700,
+                cursor: analyzing ? "default" : "pointer", color: "var(--color-text)", opacity: analyzing ? 0.6 : 1
               }}>다시 풀기</button>
+              {reviewActiveRef.current ? (
+                <button onClick={handleAnalyzeWrong} disabled={analyzing} style={{
+                  padding: "12px 24px", borderRadius: 12, border: "none",
+                  background: PINK, fontSize: 14, fontWeight: 600,
+                  cursor: analyzing ? "default" : "pointer", color: "var(--color-on-brand)", opacity: analyzing ? 0.7 : 1
+                }}>{analyzing ? "분석 중..." : "과목 오답 분석"}</button>
+              ) : (
+                <button onClick={() => setView("courseDetail")} style={{
+                  padding: "12px 24px", borderRadius: 12, border: "none",
+                  background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-on-brand)"
+                }}>새로 풀기</button>
+              )}
             </div>
           </Card>
         </div>

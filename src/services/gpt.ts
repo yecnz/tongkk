@@ -26,6 +26,7 @@ export async function generateQuiz(
   markdown?: string,
   signal?: AbortSignal,
   questionType: QuizQuestionType = '객관식',
+  excludeQuestions: string[] = [],
 ): Promise<QuizQuestion[]> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90_000);
@@ -37,7 +38,7 @@ export async function generateQuiz(
     const response = await fetch(`${BACKEND_URL}/quiz`, {
       method: 'POST',
       headers: await getJsonRequestHeaders(),
-      body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType }),
+      body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType, exclude_questions: excludeQuestions }),
       signal: controller.signal,
     });
 
@@ -148,6 +149,84 @@ export async function gradeSubjectiveAnswer(
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error('주관식 채점 시간이 초과되었습니다. 다시 시도해주세요.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onExternalAbort);
+  }
+}
+
+export type WrongAnswerAnalysis = {
+  summary: string;
+  weaknesses: string[];
+  studyPoints: string[];
+  studyMethod: string;
+  memorize: string[];
+};
+
+export type WrongAnalysisItem = {
+  question: string;
+  type: string;
+  studentAnswer: string;
+  correctAnswer: string;
+  explanation: string;
+  isCorrect: boolean;
+};
+
+export async function analyzeWrongAnswers(
+  subject: string,
+  items: WrongAnalysisItem[],
+  signal?: AbortSignal,
+): Promise<WrongAnswerAnalysis> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener('abort', onExternalAbort);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/quiz/analyze-wrong`, {
+      method: 'POST',
+      headers: await getJsonRequestHeaders(),
+      body: JSON.stringify({
+        subject,
+        items: items.map(item => ({
+          question: item.question,
+          type: item.type,
+          student_answer: item.studentAnswer,
+          correct_answer: item.correctAnswer,
+          explanation: item.explanation,
+          is_correct: item.isCorrect,
+        })),
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseApiError(response));
+    }
+
+    const data = await response.json() as {
+      summary?: unknown;
+      weaknesses?: unknown;
+      studyPoints?: unknown;
+      studyMethod?: unknown;
+      memorize?: unknown;
+    };
+    const toStrList = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+
+    return {
+      summary: typeof data.summary === 'string' ? data.summary : '',
+      weaknesses: toStrList(data.weaknesses),
+      studyPoints: toStrList(data.studyPoints),
+      studyMethod: typeof data.studyMethod === 'string' ? data.studyMethod : '',
+      memorize: toStrList(data.memorize),
+    };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('오답 분석 시간이 초과되었습니다. 다시 시도해주세요.');
     }
     throw err;
   } finally {

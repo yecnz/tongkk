@@ -178,6 +178,8 @@ export const AITutorDrawer = ({
   const [internalOpen, setInternalOpen] = useState(false);
   const [localThreadId, setLocalThreadId] = useState(threadId);
   const [agentInput, setAgentInput] = useState("");
+  // 핸드오프(퀴즈 오답 복습 등)로 전달된 첫 질문. 대화 기록 로딩이 끝나는 대로 자동 전송한다.
+  const [autoSendQuestion, setAutoSendQuestion] = useState("");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [chatSessions, setChatSessions] = useState<SummaryChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -242,6 +244,7 @@ export const AITutorDrawer = ({
     setActiveSessionId(null);
     setAgentMessages([]);
     setChatSessions([]);
+    setAutoSendQuestion("");
     initialQuestionRef.current = "";
     // pendingQuestion 중복 적용 가드도 함께 리셋한다. 리셋하지 않으면 StrictMode가
     // 마운트 시 이펙트를 두 번 실행할 때, 2번째 패스에서 입력 초기화는 다시 일어나지만
@@ -308,7 +311,9 @@ export const AITutorDrawer = ({
     if (!question || initialQuestionRef.current === question || !canUseAgent) return;
     initialQuestionRef.current = question;
     setOpen(true);
+    // 입력창에 채워두면 로딩 중에도 질문이 보이고, 로딩이 끝나면 아래 이펙트가 자동 전송한다.
     setAgentInput(question);
+    setAutoSendQuestion(question);
     onInitialQuestionConsumed?.();
   }, [initialQuestion, canUseAgent, setOpen, onInitialQuestionConsumed]);
 
@@ -442,6 +447,15 @@ export const AITutorDrawer = ({
       setAgentLoading(false);
     }
   };
+
+  // 핸드오프로 전달된 첫 질문은 대화 기록 로딩이 끝나고 튜터를 쓸 수 있게 되면 자동 전송한다.
+  useEffect(() => {
+    if (!autoSendQuestion || !canUseAgent || chatLoading || agentLoading) return;
+    const question = autoSendQuestion;
+    setAutoSendQuestion("");
+    void sendAgentQuestion(question);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSendQuestion, canUseAgent, chatLoading, agentLoading]);
 
   const handleSubmit = async () => {
     await sendAgentQuestion(agentInput);

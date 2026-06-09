@@ -4,7 +4,8 @@ import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, pageRoutes, SidebarIcon, Sid
 import { useToast } from "../ToastContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
 import { loadQuizSetsFromServer } from "../services/quizSets";
-import type { QuizQuestion, QuizQuestionType } from "../services/gpt";
+import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer } from "../services/wrongAnswerAnalyses";
+import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type WrongAnswerAnalysis, type WrongAnalysisItem } from "../services/gpt";
 
 const ALL = "전체";
 
@@ -26,15 +27,25 @@ export default function ReviewNotes() {
   const page: PageRouteLabel = "오답 노트";
   const [sidebar, setSidebar] = useState(false);
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
+  const [analyses, setAnalyses] = useState<Map<string, WrongAnswerAnalysis>>(new Map());
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>(ALL);
   const [retryingCourse, setRetryingCourse] = useState<string | null>(null);
+  const [analyzingCourse, setAnalyzingCourse] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
     setLoading(true);
-    loadAllQuizAttemptsFromServer()
-      .then(rows => { if (!ignore) setAttempts(rows); })
+    Promise.all([
+      loadAllQuizAttemptsFromServer(),
+      // 분석 테이블이 아직 없거나 실패해도 오답 노트 본문은 보이도록 빈 Map으로 흘려보낸다.
+      loadAllWrongAnswerAnalysesFromServer().catch(() => new Map<string, WrongAnswerAnalysis>()),
+    ])
+      .then(([rows, analysisMap]) => {
+        if (ignore) return;
+        setAttempts(rows);
+        setAnalyses(analysisMap);
+      })
       .catch(err => { if (!ignore) showToast(err instanceof Error ? err.message : "오답 노트를 불러오지 못했습니다.", "error"); })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
@@ -136,6 +147,31 @@ export default function ReviewNotes() {
     }
   };
 
+  // 퀴즈를 다시 풀지 않고도, 누적된 오답만으로 과목 오답 분석을 바로 생성한다.
+  const handleAnalyze = async (courseName: string) => {
+    const entries = entriesByCourse.get(courseName) || [];
+    if (entries.length === 0 || analyzingCourse) return;
+    setAnalyzingCourse(courseName);
+    try {
+      const items: WrongAnalysisItem[] = entries.map(entry => ({
+        question: entry.question,
+        type: entry.type,
+        studentAnswer: entry.studentAnswer != null ? String(entry.studentAnswer) : "미응답",
+        correctAnswer: entry.correctAnswer != null ? String(entry.correctAnswer) : "정답 정보 없음",
+        explanation: entry.feedback || entry.explanation,
+        isCorrect: false,
+      }));
+      const analysis = await analyzeWrongAnswers(courseName, items);
+      await saveWrongAnswerAnalysisToServer(courseName, analysis);
+      setAnalyses(prev => new Map(prev).set(courseName, analysis));
+      showToast("오답 분석을 완료했어요.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "오답 분석에 실패했습니다.", "error");
+    } finally {
+      setAnalyzingCourse(null);
+    }
+  };
+
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
@@ -182,12 +218,29 @@ export default function ReviewNotes() {
         ) : (
           visibleCourses.map(courseName => {
             const entries = entriesByCourse.get(courseName) || [];
+            const analysis = analyses.get(courseName);
             return (
               <div key={courseName} style={{ marginBottom: 28 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{courseName}</span>
                     <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: "var(--color-muted)" }}>{entries.length}문항</span>
+                    <button
+                      type="button"
+                      onClick={() => handleAnalyze(courseName)}
+                      disabled={analyzingCourse !== null}
+                      style={{
+                        flexShrink: 0,
+                        padding: "7px 12px", borderRadius: 999,
+                        border: `1px solid ${analyzingCourse === courseName ? CYAN : BORDER_COLOR}`,
+                        background: analyzingCourse === courseName ? "var(--color-tint-cyan)" : "var(--color-card)",
+                        color: analyzingCourse !== null && analyzingCourse !== courseName ? "var(--color-muted)" : CYAN,
+                        fontSize: 12, fontWeight: 800,
+                        cursor: analyzingCourse !== null ? "default" : "pointer",
+                      }}
+                    >
+                      {analyzingCourse === courseName ? "분석 중..." : "과목 오답 분석"}
+                    </button>
                   </div>
                   <button
                     type="button"
@@ -205,6 +258,34 @@ export default function ReviewNotes() {
                     {retryingCourse === courseName ? "준비 중..." : "이 과목 오답만 다시 풀기"}
                   </button>
                 </div>
+
+                {analysis && (
+                  <div style={{
+                    marginBottom: 14, padding: "14px 16px", borderRadius: 12,
+                    border: "1px solid var(--color-tint-cyan)", background: "var(--color-surface)",
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 850, color: "var(--color-text-strong)", marginBottom: 8 }}>
+                      오답 분석
+                    </div>
+                    {analysis.summary && (
+                      <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>{analysis.summary}</p>
+                    )}
+                    <div style={{ display: "grid", gap: 6, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                      {analysis.weaknesses.length > 0 && (
+                        <span><strong style={{ color: PINK }}>취약점</strong> · {analysis.weaknesses.join(" / ")}</span>
+                      )}
+                      {analysis.studyPoints.length > 0 && (
+                        <span><strong style={{ color: CYAN }}>더 공부할 내용</strong> · {analysis.studyPoints.join(" / ")}</span>
+                      )}
+                      {analysis.memorize.length > 0 && (
+                        <span><strong style={{ color: "var(--color-text-strong)" }}>암기 포인트</strong> · {analysis.memorize.join(" / ")}</span>
+                      )}
+                      {analysis.studyMethod && (
+                        <span><strong>공부 방법</strong> · {analysis.studyMethod}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: "grid", gap: 10 }}>
                   {entries.map((entry, index) => (

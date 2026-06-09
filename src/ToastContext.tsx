@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
-import { CYAN, PINK } from "./common";
 
 type ToastType = "success" | "error" | "info";
 type Toast = { id: number; message: string; type: ToastType };
@@ -11,12 +10,6 @@ type ToastContextValue = {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TOAST_DURATION = 3500;
-
-const toastAccent: Record<ToastType, string> = {
-  success: CYAN,
-  error: "#E53E3E",
-  info: PINK,
-};
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -59,8 +52,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               padding: "12px 18px",
               borderRadius: 12,
               background: "#fff",
-              border: `1px solid ${toastAccent[toast.type]}33`,
-              borderLeft: `4px solid ${toastAccent[toast.type]}`,
+              border: "1px solid #e5e5e5",
               boxShadow: "0 12px 30px rgba(15, 23, 42, 0.12)",
               color: "#333",
               fontSize: 14,

@@ -2235,32 +2235,6 @@ const MaterialDetailView = ({
                           <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "var(--color-text-strong)" }}>{templateLabels[activeSummary.template]}</h3>
                           <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted)" }}>{formatHubDate(activeSummary.createdAt)}</p>
                         </div>
-                        {hasReviewContext && (
-                          <div style={{
-                            marginBottom: 18,
-                            padding: 16,
-                            borderRadius: 12,
-                            border: "1px solid #F8DFA8",
-                            background: "#FFF8E8",
-                          }}>
-                            <h4 style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 850, color: "#7A5200" }}>
-                              {reviewTitle || "이번 퀴즈 오답 복습"}
-                            </h4>
-                            <pre style={{
-                              margin: 0,
-                              maxHeight: 220,
-                              overflowY: "auto",
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                              fontFamily: "inherit",
-                              fontSize: 13,
-                              lineHeight: 1.65,
-                              color: "#6A4B00",
-                            }}>
-                              {reviewContext.trim()}
-                            </pre>
-                          </div>
-                        )}
                         <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
                           <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
                         </SelectionAskButton>
