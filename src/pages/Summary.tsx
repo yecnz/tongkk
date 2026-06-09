@@ -69,7 +69,7 @@ type LocationState = {
 } | null;
 type FileIconProps = { type: FileKind };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate) => void; onBack: () => void };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
   selectedCourse: string;
@@ -727,7 +727,7 @@ const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   );
 };
 
-const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -977,7 +977,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
       )}
       <button onClick={onBack} style={{
         background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-      }}>← 템플릿 선택으로</button>
+      }}>{backLabel}</button>
       <Card style={{ padding: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -2154,6 +2154,9 @@ export default function Summary() {
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
+  // templates(템플릿 선택) 화면에서 "돌아가기" 시 돌아갈 화면.
+  // 자료 상세에서 진입하면 materialDetail, 그 외에는 upload(과목 자료)로 돌아간다.
+  const [templatesBackView, setTemplatesBackView] = useState<SummaryView>("upload");
   const [pendingTutorQuestion] = useState(
     shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
   );
@@ -2222,6 +2225,7 @@ export default function Summary() {
           setLoadingStep("");
           setAgentThreadId("");
           setResultBackView("upload");
+          setTemplatesBackView("upload");
           setSearched(true);
           setView("templates");
           return;
@@ -2713,7 +2717,7 @@ export default function Summary() {
     setMaterialDetailTutorQuestion("");
     setMaterialDetailReviewContext("");
     setMaterialDetailReviewTitle("");
-    setResultBackView("materialDetail");
+    setTemplatesBackView("materialDetail");
     setView("templates");
   };
 
@@ -2963,13 +2967,18 @@ export default function Summary() {
         margin: "0 auto",
       }}>
         {view === "templates" && (
-          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView("upload")} />
+          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} />
         )}
 
         {view === "summaryResult" && selectedTemplate && (
           <SummaryResultView
             template={selectedTemplate}
             onBack={() => setView(resultBackView)}
+            backLabel={
+              resultBackView === "materialDetail" ? "← 자료 상세로"
+              : resultBackView === "upload" ? "← 과목 자료로"
+              : "← 템플릿 선택으로"
+            }
             contextTitle={`${selectedMaterials.map(material => material.name).join(", ") || "현재 자료"} · ${templateLabels[selectedTemplate]}`}
             realContent={summaryText}
             isLoading={isSummarizing}
@@ -3318,7 +3327,7 @@ export default function Summary() {
                     체크한 강의자료를 기준으로 요약을 만들거나 바로 퀴즈를 생성할 수 있습니다.
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <button onClick={() => setView("templates")} disabled={!selectedMarkdown || isExtracting} style={{
+                    <button onClick={() => { setTemplatesBackView("upload"); setView("templates"); }} disabled={!selectedMarkdown || isExtracting} style={{
                       padding: "18px 14px", borderRadius: 12, border: "none",
                       background: selectedMarkdown && !isExtracting ? "#FFF0F6" : "#f0f0f0",
                       color: selectedMarkdown && !isExtracting ? PINK : "#aaa",

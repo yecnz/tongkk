@@ -212,6 +212,9 @@ export default function Quiz() {
   const pendingMaterialIdsRef = useRef<string[] | null>(null);
   const pendingQuizSetIdRef = useRef<string | null>(null);
   const fromDashboardRef = useRef(false);
+  // courseDetail(과목 세부)에 외부 라우트(자료 요약/대시보드)에서 직접 진입했는지 여부.
+  // materialList(자료 목록)를 거쳐 들어왔다면 false로 두어 "돌아가기"가 자료 목록으로 가게 한다.
+  const courseDetailFromRouteRef = useRef(false);
   const [openedQuizTitle, setOpenedQuizTitle] = useState(
     hasReviewQuestions ? (reviewState?.reviewTitle || "오답 다시 풀기") : "",
   );
@@ -246,6 +249,7 @@ export default function Quiz() {
       if (state.template) pendingTemplateRef.current = state.template;
       if (state.materialIds) pendingMaterialIdsRef.current = state.materialIds;
       if (state.openQuiz && state.quizSetId) pendingQuizSetIdRef.current = state.quizSetId;
+      courseDetailFromRouteRef.current = true;
       setSelectedCourse(course);
       setView("courseDetail");
     }
@@ -409,6 +413,12 @@ export default function Quiz() {
   }, [view]);
 
   const handleCourseBack = () => {
+    // 자료 목록(materialList)을 거쳐 들어온 경우 이전 화면인 자료 목록으로 돌아간다.
+    if (!courseDetailFromRouteRef.current) {
+      setView("materialList");
+      return;
+    }
+    // 자료 요약/대시보드 등 외부 라우트에서 직접 진입한 경우에만 해당 라우트로 이동.
     navigate(pageRoutes["자료 요약"], {
       state: { selectedCourse, fromDashboard: fromDashboardRef.current },
     });
@@ -813,7 +823,6 @@ export default function Quiz() {
   if (view === "courseList" || view === "materialList") {
     return <Navigate to={pageRoutes["대시보드"]} replace />;
   }
-
 
   // ── 과목 세부 (자료 + 설정) ──
   if (view === "courseDetail") {
