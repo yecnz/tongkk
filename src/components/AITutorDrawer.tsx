@@ -306,7 +306,8 @@ export const AITutorDrawer = ({
     requestAnimationFrame(() => {
       const el = agentInputRef.current;
       if (el) {
-        el.focus();
+        // preventScroll: 입력창에 포커스해도 페이지가 입력창 위치로 스크롤되지 않게 한다.
+        el.focus({ preventScroll: true });
         el.setSelectionRange(el.value.length, el.value.length);
       }
     });

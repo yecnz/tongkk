@@ -524,9 +524,20 @@ const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (
           onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
           onMouseUp={e => e.stopPropagation()}
           onClick={() => {
+            // 튜터가 열리면 요약 칸 폭이 줄어드는 reflow가 일어난다.
+            // 선택 영역의 화면상 위치를 기록해 두고, reflow 후 같은 위치를 유지하도록 스크롤을 보정한다.
+            const sel = window.getSelection();
+            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            const anchorTop = range ? range.getBoundingClientRect().top : null;
             onAsk(selection.text);
             setSelection(null);
-            window.getSelection()?.removeAllRanges();
+            sel?.removeAllRanges();
+            if (range && anchorTop != null) {
+              requestAnimationFrame(() => {
+                const delta = range.getBoundingClientRect().top - anchorTop;
+                if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+              });
+            }
           }}
           style={{
             position: "absolute",
