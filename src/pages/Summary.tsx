@@ -31,6 +31,7 @@ import {
 } from "../services/materials";
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
+import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -2131,6 +2132,18 @@ export default function Summary() {
   const filesRef = useRef<UploadedFile[]>([]);
 
   const [view, setView] = useState<SummaryView>("upload");
+  // 요약 안내 팝업 '다시 보지 않기' 설정은 계정별(Supabase 프로필)로 저장한다.
+  // 로드 전에는 true(숨김)로 두어, 불러오기 전에 팝업이 깜빡이지 않게 한다.
+  const [hideSummaryNoticePref, setHideSummaryNoticePref] = useState(true);
+
+  useEffect(() => {
+    let ignore = false;
+    loadUserProfile()
+      .then(profile => { if (!ignore) setHideSummaryNoticePref(profile.hideSummaryNotice); })
+      .catch(() => { if (!ignore) setHideSummaryNoticePref(false); });
+    return () => { ignore = true; };
+  }, []);
+
   // 업로드 화면에 '실제로' 머무를 때만 요약 안내 팝업을 띄운다.
   // 딥링크 진입 시 비동기 로딩이 끝나기 전까지 view가 잠깐 'upload'였다가
   // materialDetail/summaryResult 등으로 바뀌는데, 그 transient 동안 팝업이
@@ -2140,12 +2153,12 @@ export default function Summary() {
       Boolean(pendingMaterialIdRef.current) ||
       pendingCreateSummaryRef.current ||
       Boolean(pendingSummaryRef.current);
-    if (view === "upload" && !hasPendingNav && localStorage.getItem("hideMultiSummaryNotice") !== "1") {
+    if (view === "upload" && !hasPendingNav && !hideSummaryNoticePref) {
       setShowMultiSummaryNotice(true);
     } else {
       setShowMultiSummaryNotice(false);
     }
-  }, [view]);
+  }, [view, hideSummaryNoticePref]);
   const [selectedTemplate, setSelectedTemplate] = useState<SummaryTemplate | null>(null);
   const [activeSummaryId, setActiveSummaryId] = useState<string | null>(null);
   const [summaryText, setSummaryText] = useState("");
@@ -2789,7 +2802,10 @@ export default function Summary() {
           aria-modal="true"
           aria-label="요약 안내"
           onClick={() => {
-            if (dontShowMultiSummaryNotice) localStorage.setItem("hideMultiSummaryNotice", "1");
+            if (dontShowMultiSummaryNotice) {
+              setHideSummaryNoticePref(true);
+              updateHideSummaryNotice(true).catch(() => {});
+            }
             setShowMultiSummaryNotice(false);
           }}
           style={{
@@ -2836,7 +2852,10 @@ export default function Summary() {
               <button
                 type="button"
                 onClick={() => {
-                  if (dontShowMultiSummaryNotice) localStorage.setItem("hideMultiSummaryNotice", "1");
+                  if (dontShowMultiSummaryNotice) {
+                    setHideSummaryNoticePref(true);
+                    updateHideSummaryNotice(true).catch(() => {});
+                  }
                   setShowMultiSummaryNotice(false);
                 }}
                 style={{

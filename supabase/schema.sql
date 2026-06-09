@@ -143,6 +143,7 @@ create table if not exists public.profiles (
   avatar_url text,
   dark_mode boolean not null default false,
   notifications_enabled boolean not null default true,
+  hide_summary_notice boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
