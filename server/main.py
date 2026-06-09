@@ -246,6 +246,23 @@ class QuizRequest(BaseModel):
     question_type: Literal["객관식", "OX", "단답형", "주관식"] = "객관식"
     model: Literal["GPT", "Gemini"] = "GPT"
     markdown: str | None = None
+    # 이전에 출제된 문제 텍스트. 이 문제들과 중복/유사하게 내지 않도록 프롬프트에 반영한다.
+    exclude_questions: list[str] = Field(default_factory=list)
+
+
+class WrongAnswerItem(BaseModel):
+    question: str = Field(min_length=1)
+    type: str = ""
+    student_answer: str = ""
+    correct_answer: str = ""
+    explanation: str = ""
+    is_correct: bool = True
+
+
+class WrongAnalysisRequest(BaseModel):
+    subject: str = Field(min_length=1)
+    items: list[WrongAnswerItem] = Field(default_factory=list)
+    model: Literal["GPT", "Gemini"] = "GPT"
 
 
 class SubjectiveGradeRequest(BaseModel):
@@ -292,7 +309,7 @@ QUIZ_USER_PROMPT = """과목: {subject}
 문항 수: {count}
 난이도: {difficulty}
 문항 유형: {question_type}
-{markdown_section}
+{markdown_section}{exclude_section}
 위 조건에 맞는 문제 {count}개를 JSON 배열로만 출력해."""
 
 STUDY_PLAN_MODEL = "gpt-5.4-nano"
@@ -325,6 +342,28 @@ STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
 {incomplete_json}
 
 위 정보를 보고 오늘의 학습계획을 JSON으로만 생성해."""
+
+
+WRONG_ANALYSIS_SYSTEM_PROMPT = """너는 대학생의 퀴즈 오답을 분석해 약점과 학습 처방을 정리하는 학습 코치다.
+반드시 순수 JSON 객체만 출력해. 설명, 마크다운, 코드 블록, 기타 텍스트 없이 JSON만 출력한다.
+
+분석 원칙:
+- 문항별 정답/학생답/해설을 근거로, 학생이 어떤 개념에서 왜 틀렸는지 패턴을 묶어 짚는다.
+- 자료에 없는 사실을 지어내지 않는다. 문항·정답·해설에서 드러나는 내용만 근거로 쓴다.
+- 각 항목은 한국어로 간결하게(한 줄), 추상적 조언이 아니라 이 과목 내용에 밀착해서 쓴다.
+
+출력 형식:
+{"summary":"한 줄 총평","weaknesses":["취약 개념과 왜 틀렸는지 1~4개"],"studyPoints":["덜 틀리려면 더 공부할 내용 1~4개"],"studyMethod":"어떻게 공부하면 좋을지 한두 문장","memorize":["반드시 외워야 할 핵심 1~4개"]}"""
+
+WRONG_ANALYSIS_USER_PROMPT = """과목: {subject}
+
+아래는 이 과목에서 학생이 (과거에 틀려서) 다시 푼 문항과 채점 결과다.
+is_correct가 false인 문항을 중심으로 약점을 분석해.
+
+[문항 목록]
+{items_json}
+
+위 결과를 바탕으로 이 과목의 취약점과 학습 처방을 JSON으로만 정리해."""
 
 
 def quiz_format_instruction(question_type: str) -> str:
@@ -495,6 +534,30 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
         "model": STUDY_PLAN_MODEL,
         "message": raw_message.strip()[:140] if isinstance(raw_message, str) and raw_message.strip() else "오늘 할 일을 작게 나눠봤어요.",
         "items": items,
+    }
+
+
+def _coerce_str_list(value, limit: int = 4) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            result.append(item.strip()[:160])
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _validate_wrong_analysis(parsed: dict[str, object]) -> dict[str, object]:
+    summary = parsed.get("summary")
+    study_method = parsed.get("studyMethod")
+    return {
+        "summary": summary.strip()[:200] if isinstance(summary, str) and summary.strip() else "오답을 바탕으로 약점을 정리했어요.",
+        "weaknesses": _coerce_str_list(parsed.get("weaknesses")),
+        "studyPoints": _coerce_str_list(parsed.get("studyPoints")),
+        "studyMethod": study_method.strip()[:240] if isinstance(study_method, str) and study_method.strip() else "",
+        "memorize": _coerce_str_list(parsed.get("memorize")),
     }
 
 
@@ -1037,12 +1100,22 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
 @app.post("/quiz")
 async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
     markdown_section = f"\n강의자료:\n{req.markdown}\n" if req.markdown else ""
+    exclude_section = ""
+    excluded = [q.strip() for q in req.exclude_questions if isinstance(q, str) and q.strip()][:80]
+    if excluded:
+        joined = "\n".join(f"- {q}" for q in excluded)
+        exclude_section = (
+            "\n[이미 출제된 문제 — 아래와 중복되거나 거의 같은 문제는 절대 내지 마라. "
+            "다른 개념·다른 관점으로 새로운 문제를 만들어라]\n"
+            f"{joined}\n"
+        )
     prompt = QUIZ_USER_PROMPT.format(
         subject=req.subject,
         count=req.count,
         difficulty=req.difficulty,
         question_type=req.question_type,
         markdown_section=markdown_section,
+        exclude_section=exclude_section,
     )
 
     def _call_llm():
@@ -1124,6 +1197,39 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"주관식 채점 실패: {str(e)}") from e
+
+
+@app.post("/quiz/analyze-wrong")
+async def analyze_wrong_answers(req: WrongAnalysisRequest, _user=Depends(require_api_user)):
+    if not req.items:
+        raise HTTPException(status_code=400, detail="분석할 문항이 없습니다.")
+
+    items_json = json.dumps(
+        [item.model_dump() for item in req.items[:40]],
+        ensure_ascii=False,
+    )
+    prompt = WRONG_ANALYSIS_USER_PROMPT.format(subject=req.subject, items_json=items_json)
+
+    def _call_llm():
+        llm = build_llm(req.model)
+        from langchain_core.messages import HumanMessage, SystemMessage
+        response = llm.invoke([
+            SystemMessage(content=WRONG_ANALYSIS_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+        parsed = _parse_json_object(_message_content_to_text(response.content))
+        return _validate_wrong_analysis(parsed)
+
+    try:
+        return await run_in_threadpool(_call_llm)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"오답 분석 파싱 실패: {str(e)}") from e
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"오답 분석 응답 형식 오류: {str(e)}") from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"오답 분석 실패: {str(e)}") from e
 
 
 @app.post("/study-plan")
