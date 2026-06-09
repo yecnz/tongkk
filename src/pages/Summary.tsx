@@ -1627,6 +1627,8 @@ const MaterialDetailView = ({
   const [isSummaryTutorExpanded, setIsSummaryTutorExpanded] = useState(false);
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const [showSummaryList, setShowSummaryList] = useState(false);
+  // 퀴즈 탭에서 카드를 눌러 펼친 퀴즈 세트(최신 풀이 채점 이력 표시)
+  const [expandedQuizSetId, setExpandedQuizSetId] = useState<string | null>(null);
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
@@ -2289,35 +2291,111 @@ const MaterialDetailView = ({
               <div style={{ display: "grid", gap: 12 }}>
                 {quizSets.map(quizSet => {
                   const latestAttempt = latestAttemptByQuizSetId.get(quizSet.id);
+                  const isExpanded = expandedQuizSetId === quizSet.id;
                   return (
-                    <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "var(--color-card)", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                          <h3 style={{ margin: 0, fontSize: 16, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{quizSet.title}</h3>
-                          {multiSourceBadge(quizSet.materialIds)}
-                          {latestAttempt && (
-                            <span style={{
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              background: latestAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD ? "#FFF5F5" : "#F1FFF5",
-                              color: latestAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD ? "#E53E3E" : "#2F9E44",
-                              fontSize: 11,
-                              fontWeight: 850,
-                            }}>
-                              풀이 {latestAttempt.scorePercent}%
-                            </span>
-                          )}
+                    <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "var(--color-card)", border: `1px solid ${BORDER_COLOR}` }}>
+                      <div
+                        onClick={latestAttempt ? () => setExpandedQuizSetId(prev => (prev === quizSet.id ? null : quizSet.id)) : undefined}
+                        style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", cursor: latestAttempt ? "pointer" : "default" }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                            <h3 style={{ margin: 0, fontSize: 16, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{quizSet.title}</h3>
+                            {multiSourceBadge(quizSet.materialIds)}
+                            {latestAttempt && (
+                              <span style={{
+                                padding: "4px 8px",
+                                borderRadius: 999,
+                                background: "var(--color-muted-surface)",
+                                color: "var(--color-text-secondary)",
+                                fontSize: 11,
+                                fontWeight: 850,
+                              }}>
+                                풀이 {latestAttempt.scorePercent}%
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>
+                            <span>난이도 {quizSet.difficulty}</span>
+                            <span>{quizSet.questionType}</span>
+                            <span>{quizSet.count || quizSet.questions.length}문항</span>
+                            <span>{formatHubDate(quizSet.createdAt)}</span>
+                            {latestAttempt && <span style={{ color: CYAN }}>{isExpanded ? "풀이 이력 접기 ▴" : "풀이 이력 보기 ▾"}</span>}
+                          </div>
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>
-                          <span>난이도 {quizSet.difficulty}</span>
-                          <span>{quizSet.questionType}</span>
-                          <span>{quizSet.count || quizSet.questions.length}문항</span>
-                          <span>{formatHubDate(quizSet.createdAt)}</span>
-                        </div>
+                        <button onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                          {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
+                        </button>
                       </div>
-                      <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
-                        {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
-                      </button>
+                      {isExpanded && latestAttempt && (
+                        <div style={{ marginTop: 14, borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: 14, display: "grid", gap: 12 }}>
+                          {latestAttempt.answers.map((ans, i) => {
+                            // 저장된 퀴즈 세트의 같은 인덱스 문항에서 선지/정답 인덱스를 가져온다(문항 순서는 보존됨).
+                            const q = quizSet.questions[i];
+                            const options = (ans.type === "객관식" || ans.type === "OX") ? q?.options : undefined;
+                            return (
+                              <div key={`${quizSet.id}-${i}`} style={{ padding: 14, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
+                                  <span style={{
+                                    flexShrink: 0,
+                                    padding: "2px 8px",
+                                    borderRadius: 999,
+                                    background: ans.isCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
+                                    color: ans.isCorrect ? CYAN : PINK,
+                                    fontSize: 11,
+                                    fontWeight: 850,
+                                  }}>{ans.isCorrect ? "정답" : "오답"}</span>
+                                  <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text-strong)", lineHeight: 1.5, wordBreak: "break-word" }}>
+                                    Q{i + 1}. {ans.question}
+                                  </span>
+                                </div>
+                                {options && options.length > 0 ? (
+                                  <div style={{ display: "grid", gap: 6 }}>
+                                    {options.map((opt, oi) => {
+                                      const isCorrectOpt = q?.answer === oi;
+                                      const isMyChoice = opt === ans.studentAnswer;
+                                      // 내 선택은 연한 회색, 실제 정답은 오답일 때만 핑크로 강조. 나머지 선지는 중립.
+                                      const showCorrect = isCorrectOpt && !ans.isCorrect;
+                                      return (
+                                        <div key={oi} style={{
+                                          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                                          padding: "9px 12px", borderRadius: 9,
+                                          background: showCorrect ? "var(--color-tint-pink)" : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
+                                          border: `1px solid ${showCorrect ? PINK : "var(--color-border-soft)"}`,
+                                        }}>
+                                          <span style={{ minWidth: 0, fontSize: 13, color: showCorrect ? PINK : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 750 : 600, lineHeight: 1.45, wordBreak: "break-word" }}>
+                                            {String.fromCharCode(65 + oi)}. {opt}
+                                          </span>
+                                          {(isMyChoice || showCorrect) && (
+                                            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? PINK : "var(--color-text-secondary)" }}>
+                                              {showCorrect ? "정답" : "내 답"}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                    {q?.explanation && (
+                                      <div style={{ marginTop: 2, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                                        <strong style={{ color: "var(--color-text)" }}>해설</strong> {q.explanation}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: "grid", gap: 6, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6, paddingLeft: 2 }}>
+                                    <span>내 답: <span style={{ padding: "2px 8px", borderRadius: 6, background: "var(--color-muted-surface)", color: "var(--color-text)", fontWeight: 700 }}>{ans.studentAnswer ?? "미응답"}</span></span>
+                                    {!ans.isCorrect && (
+                                      <span>정답: <strong style={{ color: PINK }}>{ans.correctAnswer ?? "정답 정보 없음"}</strong></span>
+                                    )}
+                                    {(ans.feedback || q?.explanation) && (
+                                      <span><strong style={{ color: "var(--color-text)" }}>해설</strong> {ans.feedback || q?.explanation}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
