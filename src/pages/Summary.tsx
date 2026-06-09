@@ -763,6 +763,8 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const [pdfSaving, setPdfSaving] = useState(false);
   const [showPrintGuide, setShowPrintGuide] = useState(false);
   const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
+  // 확대 시 요약 본문 칸을 숨기고 튜터가 그 영역을 꽉 채운다.
+  const [isResultExpanded, setIsResultExpanded] = useState(false);
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
@@ -777,6 +779,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   // 튜터를 닫으면 그리드가 2열→1열로 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
   const handleTutorOpenChange = (next: boolean) => {
     setIsTutorOpen(next);
+    if (!next) setIsResultExpanded(false); // 닫으면 확대 상태도 해제(본문이 숨겨진 빈 화면 방지).
     if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 확대/채움을 막는다.
     const anchor = dragAnchorRef.current;
     if (next || !anchor) return;
@@ -1164,31 +1167,35 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
         ) : (
           <div style={{
             display: "grid",
-            gridTemplateColumns: isTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
-            gap: isTutorOpen ? 12 : 0,
+            gridTemplateColumns: isResultExpanded ? "minmax(0, 1fr)" : isTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+            gap: isTutorOpen && !isResultExpanded ? 12 : 0,
             alignItems: "stretch",
           }}>
-            <div style={{
-              background: "#fff", borderRadius: 12, padding: 28,
-              border: "1px solid #f0f0f0",
-              fontSize: 15, color: "#444", lineHeight: 1.85,
-              overflowX: "auto",
-              minWidth: 0,
-            }}>
-              {mindmapData ? (
-                <MindmapView key={displayContent} data={mindmapData} />
-              ) : (
-                <SelectionAskButton onAsk={askTutorWithSelection}>
-                  <FormattedAiText content={displayContent} template={template} />
-                </SelectionAskButton>
-              )}
-            </div>
+            {!isResultExpanded && (
+              <div style={{
+                background: "#fff", borderRadius: 12, padding: 28,
+                border: "1px solid #f0f0f0",
+                fontSize: 15, color: "#444", lineHeight: 1.85,
+                overflowX: "auto",
+                minWidth: 0,
+              }}>
+                {mindmapData ? (
+                  <MindmapView key={displayContent} data={mindmapData} />
+                ) : (
+                  <SelectionAskButton onAsk={askTutorWithSelection}>
+                    <FormattedAiText content={displayContent} template={template} />
+                  </SelectionAskButton>
+                )}
+              </div>
+            )}
 
             {isTutorOpen && (
               <AITutorDrawer
                 layout="embedded"
                 open={isTutorOpen}
                 onOpenChange={handleTutorOpenChange}
+                expanded={isResultExpanded}
+                onExpandedChange={setIsResultExpanded}
                 contextTitle={contextTitle}
                 contextMarkdown={realContent}
                 summaryId={summaryId}
@@ -1597,6 +1604,9 @@ const MaterialDetailView = ({
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
   const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
+  // 확대 시 본문 칸을 숨기고 튜터가 그 영역을 꽉 채운다.
+  const [isOriginalTutorExpanded, setIsOriginalTutorExpanded] = useState(false);
+  const [isSummaryTutorExpanded, setIsSummaryTutorExpanded] = useState(false);
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const [showSummaryList, setShowSummaryList] = useState(false);
   const lowerMaterialName = material.name.toLowerCase();
@@ -1614,6 +1624,7 @@ const MaterialDetailView = ({
   // 튜터를 닫으면 그리드가 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
   const handleSummaryTutorOpenChange = (next: boolean) => {
     setIsSummaryTutorOpen(next);
+    if (!next) setIsSummaryTutorExpanded(false); // 닫으면 확대 상태도 해제(본문이 숨겨진 빈 화면 방지).
     if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 확대/채움을 막는다.
     const anchor = dragAnchorRef.current;
     if (next || !anchor) return;
@@ -1705,6 +1716,8 @@ const MaterialDetailView = ({
     setTutorPrompt(initialTutorQuestion);
     setIsOriginalTutorOpen(false);
     setIsSummaryTutorOpen(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
+    setIsOriginalTutorExpanded(false);
+    setIsSummaryTutorExpanded(false);
   }, [material.id, initialTab, initialTutorQuestion]);
 
   // 사용자가 탭을 바꾸면 부모에 알려 현재 탭을 세션에 저장하게 한다(새로고침 복원용).
@@ -2056,7 +2069,7 @@ const MaterialDetailView = ({
                 </button>
               )}
               {activeTab === "original" && (
-                <button type="button" onClick={() => setIsOriginalTutorOpen(prev => !prev)} style={{
+                <button type="button" onClick={() => { const next = !isOriginalTutorOpen; setIsOriginalTutorOpen(next); if (!next) setIsOriginalTutorExpanded(false); }} style={{
                   height: 34,
                   padding: "0 12px",
                   borderRadius: 8,
@@ -2109,18 +2122,22 @@ const MaterialDetailView = ({
               minHeight: SPLIT_ROW_MIN_HEIGHT,
             }}
           >
-            <div style={{ flex: isOriginalTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflow: "hidden" }}>
-              {renderOriginalTab()}
-            </div>
+            {!isOriginalTutorExpanded && (
+              <div style={{ flex: isOriginalTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflow: "hidden" }}>
+                {renderOriginalTab()}
+              </div>
+            )}
             {isOriginalTutorOpen && (
               <>
-                <TutorSplitDivider onPointerDown={tutorSplit.startDrag} />
-                <div style={{ flex: `${1 - tutorSplit.ratio} 1 0`, minWidth: 0, minHeight: 0 }}>
+                {!isOriginalTutorExpanded && <TutorSplitDivider onPointerDown={tutorSplit.startDrag} />}
+                <div style={{ flex: isOriginalTutorExpanded ? "1 1 0" : `${1 - tutorSplit.ratio} 1 0`, minWidth: 0, minHeight: 0 }}>
                   <AITutorDrawer
                     layout="embedded"
                     fill
                     open={isOriginalTutorOpen}
-                    onOpenChange={setIsOriginalTutorOpen}
+                    onOpenChange={(next) => { setIsOriginalTutorOpen(next); if (!next) setIsOriginalTutorExpanded(false); }}
+                    expanded={isOriginalTutorExpanded}
+                    onExpandedChange={setIsOriginalTutorExpanded}
                     contextTitle={tutorContextTitle}
                     contextMarkdown={combinedTutorContextMarkdown}
                     summaryId={activeSummary?.id || null}
@@ -2152,7 +2169,7 @@ const MaterialDetailView = ({
               </div>
             ) : (
               <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
-                {showSummaryList && (
+                {showSummaryList && !isSummaryTutorExpanded && (
                   <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (
                       <button
@@ -2180,7 +2197,7 @@ const MaterialDetailView = ({
                   ref={tutorSplit.containerRef}
                   style={{ flex: "1 1 0", minWidth: 0, display: "flex", alignItems: "stretch" }}
                 >
-                  {activeSummary && (
+                  {activeSummary && !isSummaryTutorExpanded && (
                     <div style={{ flex: isSummaryTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflowY: "auto", overflowX: "hidden" }}>
                       <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0, minHeight: "100%", boxSizing: "border-box" }}>
                         <div style={{ marginBottom: 18 }}>
@@ -2221,13 +2238,15 @@ const MaterialDetailView = ({
                   )}
                   {isSummaryTutorOpen && activeSummary && (
                     <>
-                      <TutorSplitDivider onPointerDown={tutorSplit.startDrag} />
-                      <div style={{ flex: `${1 - tutorSplit.ratio} 1 0`, minWidth: 0, minHeight: 0 }}>
+                      {!isSummaryTutorExpanded && <TutorSplitDivider onPointerDown={tutorSplit.startDrag} />}
+                      <div style={{ flex: isSummaryTutorExpanded ? "1 1 0" : `${1 - tutorSplit.ratio} 1 0`, minWidth: 0, minHeight: 0 }}>
                         <AITutorDrawer
                           layout="embedded"
                           fill
                           open={isSummaryTutorOpen}
                           onOpenChange={handleSummaryTutorOpenChange}
+                          expanded={isSummaryTutorExpanded}
+                          onExpandedChange={setIsSummaryTutorExpanded}
                           contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
                           contextMarkdown={combinedTutorContextMarkdown}
                           summaryId={activeSummary.id || null}

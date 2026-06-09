@@ -32,6 +32,9 @@ type AITutorDrawerProps = {
   fill?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  // 확대 상태를 부모가 제어할 수 있게 한다. embedded일 때는 부모가 본문 칸을 숨기고 튜터를 꽉 채운다.
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 const markdownStyles = {
@@ -169,6 +172,8 @@ export const AITutorDrawer = ({
   fill = false,
   open,
   onOpenChange,
+  expanded,
+  onExpandedChange,
 }: AITutorDrawerProps) => {
   const [internalOpen, setInternalOpen] = useState(false);
   const [localThreadId, setLocalThreadId] = useState(threadId);
@@ -183,7 +188,7 @@ export const AITutorDrawer = ({
   const [agentError, setAgentError] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
   const initialQuestionRef = useRef("");
@@ -193,11 +198,16 @@ export const AITutorDrawer = ({
   const canPersistChat = Boolean(summaryId || materialId);
   const chatTarget = { summaryId, materialId };
   const isOpen = open ?? internalOpen;
-  const isExpanded = expanded && isOpen;
+  const isExpanded = (expanded ?? internalExpanded) && isOpen;
   const setOpen = useCallback((nextOpen: boolean) => {
     if (open === undefined) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
   }, [open, onOpenChange]);
+  // 확대 토글. controlled면 부모에 위임하고, 아니면 내부 상태로 처리한다.
+  const setExpanded = useCallback((nextExpanded: boolean) => {
+    if (expanded === undefined) setInternalExpanded(nextExpanded);
+    onExpandedChange?.(nextExpanded);
+  }, [expanded, onExpandedChange]);
 
   const scrollToBottom = () => {
     const el = chatContainerRef.current;
@@ -321,11 +331,11 @@ export const AITutorDrawer = ({
         el.setSelectionRange(el.value.length, el.value.length);
       }
     });
-  }, [pendingQuestion, canUseAgent, setOpen]);
+  }, [pendingQuestion, canUseAgent, setOpen, setExpanded]);
 
   useEffect(() => {
     if (!isOpen) setExpanded(false);
-  }, [isOpen]);
+  }, [isOpen, setExpanded]);
 
   const startNewConversation = async () => {
     if (chatLoading || agentLoading) return;
@@ -469,7 +479,7 @@ export const AITutorDrawer = ({
           AI 튜터
         </button>
       )}
-      {isExpanded && (
+      {isExpanded && layout === "drawer" && (
         <div
           onClick={() => setExpanded(false)}
           style={{
@@ -481,24 +491,24 @@ export const AITutorDrawer = ({
         />
       )}
       <aside style={{
-        position: isExpanded ? "fixed" : layout === "embedded" ? "relative" : "fixed",
-        top: isExpanded ? 24 : layout === "embedded" ? "auto" : 0,
-        left: isExpanded ? "50%" : undefined,
-        right: isExpanded ? "auto" : layout === "embedded" ? "auto" : 0,
-        width: isExpanded ? "min(1080px, calc(100vw - 48px))" : layout === "embedded" ? "100%" : "min(420px, 100vw)",
-        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? (fill ? "100%" : 1100) : "100vh",
-        minHeight: isExpanded ? undefined : layout === "embedded" ? (fill ? 0 : 1100) : undefined,
-        zIndex: isExpanded ? 260 : layout === "embedded" ? "auto" : 190,
+        position: layout === "embedded" ? "relative" : "fixed",
+        top: layout === "embedded" ? "auto" : isExpanded ? 24 : 0,
+        left: layout === "embedded" ? undefined : isExpanded ? "50%" : undefined,
+        right: layout === "embedded" ? "auto" : isExpanded ? "auto" : 0,
+        width: layout === "embedded" ? "100%" : isExpanded ? "min(1080px, calc(100vw - 48px))" : "min(420px, 100vw)",
+        height: layout === "embedded" ? (fill ? "100%" : 1100) : isExpanded ? "calc(100vh - 48px)" : "100vh",
+        minHeight: layout === "embedded" ? (fill ? 0 : 1100) : undefined,
+        zIndex: layout === "embedded" ? "auto" : isExpanded ? 260 : 190,
         border: "1px solid #f0f0f0",
-        borderRight: isExpanded || layout === "embedded" ? "1px solid #f0f0f0" : "none",
-        borderRadius: isExpanded ? 16 : layout === "embedded" ? 0 : "16px 0 0 16px",
+        borderRight: layout === "embedded" ? "1px solid #f0f0f0" : isExpanded ? "1px solid #f0f0f0" : "none",
+        borderRadius: layout === "embedded" ? 0 : isExpanded ? 16 : "16px 0 0 16px",
         padding: 20,
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
         background: "#fff",
-        boxShadow: isExpanded ? "0 24px 80px rgba(0,0,0,0.22)" : layout === "drawer" && isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
-        transform: isExpanded ? "translateX(-50%)" : layout === "embedded" || isOpen ? "translateX(0)" : "translateX(104%)",
+        boxShadow: layout === "embedded" ? "none" : isExpanded ? "0 24px 80px rgba(0,0,0,0.22)" : isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
+        transform: layout === "embedded" ? "translateX(0)" : isExpanded ? "translateX(-50%)" : isOpen ? "translateX(0)" : "translateX(104%)",
         transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease, width 0.18s ease, height 0.18s ease",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
@@ -650,7 +660,7 @@ export const AITutorDrawer = ({
             {canUseAgent && (
               <button
                 type="button"
-                onClick={() => setExpanded(prev => !prev)}
+                onClick={() => setExpanded(!isExpanded)}
                 aria-label={isExpanded ? "AI 튜터 작게 보기" : "AI 튜터 확대 보기"}
                 title={isExpanded ? "작게 보기" : "확대 보기"}
                 style={{
