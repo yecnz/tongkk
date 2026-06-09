@@ -682,7 +682,7 @@ const SummaryContentView = ({ content, template }: { content: string; template?:
 
 const TemplateSelectView = ({ onSelect, onBack }: TemplateSelectViewProps) => {
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
-    { key: "GENERAL", name: "일반 요약", desc: "핵심 내용과 결론을 빠르게 정리", accent: "#555" },
+    { key: "GENERAL", name: "일반 요약", desc: "강의 자료 내용을 깔끔하게 정리", accent: "#555" },
     { key: "LECTURE_NOTE", name: "강의 노트", desc: "개념, 흐름, 시험 포인트를 구조화", accent: PINK },
     { key: "MINDMAP", name: "마인드맵", desc: "중심 주제와 하위 개념의 관계를 구조화", accent: CYAN },
     { key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 빠르게 보는 암기표", accent: "#7C3AED" },
