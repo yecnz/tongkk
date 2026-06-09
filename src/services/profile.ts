@@ -6,6 +6,7 @@ export type UserProfile = {
   avatarUrl: string | null;
   darkMode: boolean;
   notificationsEnabled: boolean;
+  hideSummaryNotice: boolean;
 };
 
 type ProfileRow = {
@@ -13,7 +14,10 @@ type ProfileRow = {
   avatar_url: string | null;
   dark_mode: boolean;
   notifications_enabled: boolean;
+  hide_summary_notice: boolean;
 };
+
+const PROFILE_COLUMNS = 'nickname, avatar_url, dark_mode, notifications_enabled, hide_summary_notice';
 
 const defaultNickname = (user: User) =>
   user.user_metadata?.nickname ||
@@ -25,6 +29,7 @@ const toProfile = (row: ProfileRow): UserProfile => ({
   avatarUrl: row.avatar_url,
   darkMode: row.dark_mode,
   notificationsEnabled: row.notifications_enabled,
+  hideSummaryNotice: row.hide_summary_notice,
 });
 
 const listStorageFilePaths = async (bucket: string, prefix: string): Promise<string[]> => {
@@ -63,7 +68,7 @@ export async function loadUserProfile(): Promise<UserProfile> {
   const user = await requireSupabaseUser();
   const { data, error } = await supabase
     .from('profiles')
-    .select('nickname, avatar_url, dark_mode, notifications_enabled')
+    .select(PROFILE_COLUMNS)
     .eq('id', user.id)
     .maybeSingle<ProfileRow>();
 
@@ -75,6 +80,7 @@ export async function loadUserProfile(): Promise<UserProfile> {
     avatarUrl: null,
     darkMode: false,
     notificationsEnabled: true,
+    hideSummaryNotice: false,
   });
 }
 
@@ -88,14 +94,26 @@ export async function saveUserProfile(profile: UserProfile): Promise<UserProfile
       avatar_url: profile.avatarUrl,
       dark_mode: profile.darkMode,
       notifications_enabled: profile.notificationsEnabled,
+      hide_summary_notice: profile.hideSummaryNotice,
     }, {
       onConflict: 'id',
     })
-    .select('nickname, avatar_url, dark_mode, notifications_enabled')
+    .select(PROFILE_COLUMNS)
     .single<ProfileRow>();
 
   if (error) throw new Error(formatSupabaseError(error));
   return toProfile(data);
+}
+
+// '요약 안내 팝업 다시 보지 않기' 설정만 가볍게 갱신한다. (다른 프로필 필드는 건드리지 않음)
+export async function updateHideSummaryNotice(hide: boolean): Promise<void> {
+  const user = await requireSupabaseUser();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ hide_summary_notice: hide })
+    .eq('id', user.id);
+
+  if (error) throw new Error(formatSupabaseError(error));
 }
 
 export async function uploadAvatar(file: File): Promise<string> {

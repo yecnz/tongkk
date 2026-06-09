@@ -205,6 +205,7 @@ export default function MyPage() {
     avatarUrl: null,
     darkMode: false,
     notificationsEnabled: true,
+    hideSummaryNotice: false,
   });
   const [error, setError] = useState("");
 
