@@ -149,9 +149,9 @@ const SettingsModal = ({
 
         {type === "notice" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "#555" }}>
-            <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다.</p>
-            <p style={{ margin: "0 0 10px" }}>자료 변환, 요약, 퀴즈, 마이페이지 데이터는 Supabase에 사용자별로 저장됩니다.</p>
-            <p style={{ margin: 0 }}>시연 전에는 Supabase SQL 스키마 적용과 환경변수 설정을 먼저 확인하세요.</p>
+            <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.</p>
+            <p style={{ margin: "0 0 10px" }}>사용하시다 불편한 점이나 "이런 기능이 있으면 좋겠다" 싶은 아이디어가 있다면 언제든 알려주세요. 여러분의 피드백이 Tongkk을 더 좋게 만듭니다..</p>
+            <p style={{ margin: 0 }}>문의 메일: tongkk.team@gmail.com</p>
           </div>
         )}
 
