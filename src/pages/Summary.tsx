@@ -294,12 +294,12 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
       if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
-        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
+        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
       }
       // CommonMark 경계 규칙(닫는 ** 앞이 ')' 등 문장부호 + 뒤가 한글)으로 굵게 처리에
       // 실패해 그대로 남은 **...**를 폴백으로 굵게 렌더링한다.
       if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-        return <strong key={index} style={{ fontWeight: 800, color: "#222" }}>{part.slice(2, -2)}</strong>;
+        return <strong key={index} style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{part.slice(2, -2)}</strong>;
       }
       return part;
     });
@@ -313,26 +313,26 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
 };
 
 const markdownStyles = {
-  paragraph: { margin: "0 0 10px", lineHeight: 1.8, color: "#444" } satisfies CSSProperties,
+  paragraph: { margin: "0 0 10px", lineHeight: 1.8, color: "var(--color-text)" } satisfies CSSProperties,
   list: { margin: "6px 0 14px", paddingLeft: 24, lineHeight: 1.75 } satisfies CSSProperties,
   tableWrap: { overflowX: "auto", margin: "12px 0 16px" } satisfies CSSProperties,
 };
 
 const markdownComponents: Components = {
   h1: ({ children }) => (
-    <h1 style={{ margin: "0 0 18px", paddingBottom: 12, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>
+    <h1 style={{ margin: "0 0 18px", paddingBottom: 12, borderBottom: "2px solid var(--color-border-soft)", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>
       {renderHighlightSyntax(children)}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 style={{ margin: "26px 0 12px", padding: "9px 12px", borderRadius: 8, background: "#f3f4f6", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "#222" }}>
+    <h2 style={{ margin: "26px 0 12px", padding: "9px 12px", borderRadius: 8, background: "var(--color-surface)", fontSize: 20, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>
       {renderHighlightSyntax(children)}
     </h2>
   ),
-  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "20px 0 10px", padding: "4px 8px", borderRadius: 6, background: "#f6f6f6", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "#222" }}>{renderHighlightSyntax(children)}</h3>,
-  h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "#333" }}>{renderHighlightSyntax(children)}</h4>,
-  h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "#444" }}>{renderHighlightSyntax(children)}</h5>,
-  h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "#555" }}>{renderHighlightSyntax(children)}</h6>,
+  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "20px 0 10px", padding: "4px 8px", borderRadius: 6, background: "var(--color-surface)", fontSize: 17, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{renderHighlightSyntax(children)}</h3>,
+  h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{renderHighlightSyntax(children)}</h4>,
+  h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</h5>,
+  h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</h6>,
   p: ({ children }) => <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>,
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
@@ -340,10 +340,10 @@ const markdownComponents: Components = {
     const isAnswerLabel = getNodeText(children).trimStart().startsWith("답:");
     return <li style={{ marginBottom: 6, paddingLeft: 4, ...(isAnswerLabel ? { listStyleType: "none" } : {}) }}>{renderHighlightSyntax(children)}</li>;
   },
-  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{renderHighlightSyntax(children)}</strong>,
-  em: ({ children }) => <em style={{ color: "#555" }}>{children}</em>,
+  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{renderHighlightSyntax(children)}</strong>,
+  em: ({ children }) => <em style={{ color: "var(--color-text)" }}>{children}</em>,
   blockquote: ({ children }) => (
-    <blockquote style={{ margin: "14px 0", padding: "13px 15px", border: "1px solid #e8e8e8", borderRadius: 12, background: "#fafafa", color: "#555", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+    <blockquote style={{ margin: "14px 0", padding: "13px 15px", border: "1px solid var(--color-border-soft)", borderRadius: 12, background: "var(--color-surface)", color: "var(--color-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
       {children}
     </blockquote>
   ),
@@ -352,43 +352,43 @@ const markdownComponents: Components = {
       return <code className={className} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 13 }}>{children}</code>;
     }
     return (
-      <code style={{ padding: "2px 6px", borderRadius: 6, background: "#f3f4f6", color: "#555", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em", fontWeight: 700 }}>
+      <code style={{ padding: "2px 6px", borderRadius: 6, background: "var(--color-surface)", color: "var(--color-text)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em", fontWeight: 700 }}>
         {children}
       </code>
     );
   },
   pre: ({ children }) => (
-    <pre style={{ margin: "14px 0", padding: 16, borderRadius: 12, background: "#f6f7f9", border: "1px solid #eceff3", overflowX: "auto", lineHeight: 1.6 }}>
+    <pre style={{ margin: "14px 0", padding: 16, borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", overflowX: "auto", lineHeight: 1.6 }}>
       {children}
     </pre>
   ),
-  hr: () => <hr style={{ margin: "22px 0", border: "none", borderTop: "1px solid #ededed" }} />,
+  hr: () => <hr style={{ margin: "22px 0", border: "none", borderTop: "1px solid var(--color-border-soft)" }} />,
   table: ({ children }) => (
     <div style={markdownStyles.tableWrap}>
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 480, fontSize: 13 }}>{children}</table>
     </div>
   ),
   th: ({ children }) => (
-    <th style={{ padding: "9px 12px", background: "#FFF0F6", color: "#333", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
+    <th style={{ padding: "9px 12px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
       {children}
     </th>
   ),
-  td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.6 }}>{children}</td>,
+  td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid #f0e0e8", color: "var(--color-text)", lineHeight: 1.6 }}>{children}</td>,
 };
 
 const cheatSheetMarkdownComponents: Components = {
   ...markdownComponents,
   h1: ({ children }) => (
-    <h1 style={{ margin: "0 0 14px", paddingBottom: 10, borderBottom: "2px solid #f0f0f0", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "#222", breakInside: "avoid" }}>
+    <h1 style={{ margin: "0 0 14px", paddingBottom: 10, borderBottom: "2px solid var(--color-border-soft)", fontSize: 24, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)", breakInside: "avoid" }}>
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 style={{ margin: "20px 0 10px", padding: "8px 10px", borderRadius: 8, background: "#f3f4f6", fontSize: 18, lineHeight: 1.4, fontWeight: 850, color: "#222", breakInside: "avoid" }}>
+    <h2 style={{ margin: "20px 0 10px", padding: "8px 10px", borderRadius: 8, background: "var(--color-surface)", fontSize: 18, lineHeight: 1.4, fontWeight: 850, color: "var(--color-text-strong)", breakInside: "avoid" }}>
       {children}
     </h2>
   ),
-  p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "#444" }}>{renderHighlightSyntax(children)}</p>,
+  p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</p>,
   ul: ({ children }) => <ul style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "decimal" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 4, paddingLeft: 3 }}>{renderHighlightSyntax(children)}</li>,
@@ -398,11 +398,11 @@ const cheatSheetMarkdownComponents: Components = {
     </div>
   ),
   th: ({ children }) => (
-    <th style={{ padding: "8px 9px", background: "#FFF0F6", color: "#333", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left" }}>
+    <th style={{ padding: "8px 9px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left" }}>
       {children}
     </th>
   ),
-  td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid #f0e0e8", color: "#444", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
+  td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid #f0e0e8", color: "var(--color-text)", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
 
 const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
@@ -649,7 +649,7 @@ const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (
             borderRadius: 999,
             border: "none",
             background: PINK,
-            color: "#fff",
+            color: "var(--color-on-brand)",
             fontSize: 12,
             fontWeight: 800,
             whiteSpace: "nowrap",
@@ -676,7 +676,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
         columnCount: 2,
         columnWidth: 420,
         columnGap: 34,
-        columnRule: "1px solid #f1f1f1",
+        columnRule: "1px solid var(--color-border-soft)",
       }}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={cheatSheetMarkdownComponents}>
           {cleaned}
@@ -713,36 +713,36 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   return (
     <div>
       <button onClick={onBack} style={{
-        background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
 
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#222" }}>출력 템플릿 선택</h2>
-        <p style={{ margin: 0, fontSize: 13, color: "#999" }}>반영할 범위와 집중할 내용을 정한 뒤, 요약 형식을 선택하세요</p>
+        <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>출력 템플릿 선택</h2>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>반영할 범위와 집중할 내용을 정한 뒤, 요약 형식을 선택하세요</p>
       </div>
 
       <div style={{ display: "grid", gap: 14, marginBottom: 24, maxWidth: 720 }}>
         <div>
-          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "#444" }}>
-            반영할 페이지 <span style={{ fontWeight: 600, color: "#aaa" }}>(선택 · 비우면 전체)</span>
+          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>
+            반영할 페이지 <span style={{ fontWeight: 600, color: "var(--color-muted)" }}>(선택 · 비우면 전체)</span>
           </label>
           <input
             value={pageRange}
             onChange={e => setPageRange(e.target.value)}
             placeholder={pageHint ? `예: 1-5, 8  (${pageHint})` : "예: 1-5, 8"}
-            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 14, color: "#333" }}
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)" }}
           />
         </div>
         <div>
-          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "#444" }}>
-            집중할 내용 <span style={{ fontWeight: 600, color: "#aaa" }}>(선택)</span>
+          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>
+            집중할 내용 <span style={{ fontWeight: 600, color: "var(--color-muted)" }}>(선택)</span>
           </label>
           <textarea
             value={focusPrompt}
             onChange={e => setFocusPrompt(e.target.value)}
             placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
             rows={3}
-            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 14, color: "#333", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
           />
         </div>
       </div>
@@ -755,7 +755,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
               minHeight: 190,
               padding: 24,
               border: "none",
-              background: "#fff",
+              background: "var(--color-card)",
               cursor: "pointer",
               textAlign: "left",
               display: "flex",
@@ -764,8 +764,8 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
             }}>
               <div>
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: t.accent, marginBottom: 18 }} />
-                <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 800, color: "#222" }}>{t.name}</h3>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#666" }}>{t.desc}</p>
+                <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>{t.name}</h3>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>{t.desc}</p>
               </div>
               <span style={{ marginTop: 20, fontSize: 13, fontWeight: 700, color: t.accent }}>선택하기</span>
             </button>
@@ -976,29 +976,29 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            width: "min(440px, 100%)", background: "#fff", borderRadius: 20, padding: "32px 30px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+            width: "min(440px, 100%)", background: "var(--color-card)", borderRadius: 20, padding: "32px 30px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
               <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "#E8FAFD",
+                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-cyan)",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
               }}>📄</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>PDF로 저장하기</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>PDF로 저장하기</h3>
             </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "#555", wordBreak: "keep-all" }}>
-              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "#222" }}>인쇄 창</b>이 열립니다.<br />
-              프린터 대신 <b style={{ color: "#222" }}>PDF로 저장</b>을 선택하면 돼요.
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "var(--color-text)", wordBreak: "keep-all" }}>
+              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "var(--color-text-strong)" }}>인쇄 창</b>이 열립니다.<br />
+              프린터 대신 <b style={{ color: "var(--color-text-strong)" }}>PDF로 저장</b>을 선택하면 돼요.
             </p>
             <div style={{
-              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "#f7f8fb",
-              fontSize: 13, lineHeight: 1.8, color: "#666", wordBreak: "keep-all",
+              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "var(--color-page)",
+              fontSize: 13, lineHeight: 1.8, color: "var(--color-text-secondary)", wordBreak: "keep-all",
               display: "flex", gap: 8, alignItems: "flex-start",
             }}>
               <span style={{ flexShrink: 0 }}>💡</span>
               <span>
                 저장된 PDF는 이미지가 아니라 문서 형태라서,<br />
-                <b style={{ color: "#222" }}>텍스트 선택과 복사</b>가 가능해요.
+                <b style={{ color: "var(--color-text-strong)" }}>텍스트 선택과 복사</b>가 가능해요.
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -1006,8 +1006,8 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 type="button"
                 onClick={() => setShowPrintGuide(false)}
                 style={{
-                  padding: "9px 18px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  background: "#fff", color: "#555", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  padding: "9px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 14, fontWeight: 700, cursor: "pointer",
                 }}
               >취소</button>
               <button
@@ -1015,7 +1015,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 onClick={runPrint}
                 style={{
                   padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
                 }}
               >계속</button>
             </div>
@@ -1023,18 +1023,18 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
         </div>
       )}
       <button onClick={onBack} style={{
-        background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>{backLabel}</button>
       <Card style={{ padding: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <span style={{
-              padding: "9px 18px", borderRadius: 999, border: "2px solid #eeeeee",
-              background: "#fff", fontSize: 17, fontWeight: 600, flex: "0 0 auto",
+              padding: "9px 18px", borderRadius: 999, border: "2px solid var(--color-border-soft)",
+              background: "var(--color-card)", fontSize: 17, fontWeight: 600, flex: "0 0 auto",
               color: template === "GENERAL" ? "#555" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "#7C3AED"
             }}>{templateLabels[template]}</span>
             {isLoading && (
-              <span style={{ fontSize: 13, color: "#aaa", fontWeight: 700 }}>
+              <span style={{ fontSize: 13, color: "var(--color-muted)", fontWeight: 700 }}>
                 AI가 요약 중...
               </span>
             )}
@@ -1048,15 +1048,15 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             )}
             {!isLoading && elapsedTime && (
               <span style={{
-                padding: "6px 10px", borderRadius: 999, background: "#fafafa",
-                color: "#999", fontSize: 12, fontWeight: 700
+                padding: "6px 10px", borderRadius: 999, background: "var(--color-surface)",
+                color: "var(--color-muted)", fontSize: 12, fontWeight: 700
               }}>{elapsedTime}초</span>
             )}
             {!isLoading && (
               <>
                 <button onClick={handleCopyAll} style={{
-                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  background: "#fff", color: "#555", fontSize: 13, fontWeight: 700, cursor: "pointer"
+                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer"
                 }}>전체 복사</button>
                 <button onClick={handleDownload} disabled={pdfSaving} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
@@ -1068,16 +1068,16 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 {realContent && !error && onGoToQuiz && (
                   <button onClick={onGoToQuiz} style={{
                     height: 34, padding: "0 14px", borderRadius: 10, border: "none",
-                    background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
+                    background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 700, cursor: "pointer"
                   }}>퀴즈 생성하기</button>
                 )}
                 <button onClick={() => handleTutorOpenChange(!isTutorOpen)} style={{
                   height: 34,
                   padding: "0 14px",
                   borderRadius: 10,
-                  border: isTutorOpen ? `1px solid ${PINK}55` : "1px solid #e0e0e0",
-                  background: isTutorOpen ? "#FFF0F6" : "#fff",
-                  color: isTutorOpen ? PINK : "#555",
+                  border: isTutorOpen ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: isTutorOpen ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: isTutorOpen ? PINK : "var(--color-text)",
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: "pointer",
@@ -1087,18 +1087,18 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           </div>
         </div>
         {actionMessage && !isLoading && (
-          <div style={{ margin: "-6px 0 16px", fontSize: 12, color: "#888", textAlign: "right" }}>
+          <div style={{ margin: "-6px 0 16px", fontSize: 12, color: "var(--color-muted)", textAlign: "right" }}>
             {actionMessage}
           </div>
         )}
         {!isLoading && !error && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, borderBottom: "1px solid var(--color-border-soft)" }}>
             <button type="button" style={{
               padding: "10px 4px 12px",
               border: "none",
               borderBottom: `2px solid ${PINK}`,
               background: "transparent",
-              color: "#222",
+              color: "var(--color-text-strong)",
               fontSize: 14,
               fontWeight: 800,
               cursor: "default",
@@ -1109,7 +1109,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 border: "none",
                 borderBottom: "2px solid transparent",
                 background: "transparent",
-                color: "#888",
+                color: "var(--color-muted)",
                 fontSize: 14,
                 fontWeight: 800,
                 cursor: "pointer",
@@ -1122,6 +1122,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           <div
             ref={pdfExportRef}
             className="pdf-print-area"
+            data-theme="light"
             aria-hidden="true"
             style={{
               position: "fixed",
@@ -1160,7 +1161,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
 
         {isLoading ? (
           <div style={{
-            background: "#fafafa", borderRadius: 12, padding: 48,
+            background: "var(--color-surface)", borderRadius: 12, padding: 48,
             display: "flex", flexDirection: "column", alignItems: "center", gap: 16
           }}>
             <div style={{
@@ -1169,14 +1170,14 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
               borderRadius: "50%", animation: "spin 0.8s linear infinite"
             }}/>
             <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
-            <p style={{ margin: 0, fontSize: 14, color: "#888" }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--color-muted)" }}>
               {loadingStep || "처리 중..."}
             </p>
           </div>
         ) : error ? (
           <div style={{
-            background: "#FFF5F5", borderRadius: 12, padding: 24,
-            fontSize: 14, color: "#E53E3E", lineHeight: 1.6
+            background: "var(--color-tint-pink)", borderRadius: 12, padding: 24,
+            fontSize: 14, color: "var(--color-danger)", lineHeight: 1.6
           }}>
             <strong>요약 실패:</strong> {error}
           </div>
@@ -1189,9 +1190,9 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           }}>
             {!isResultExpanded && (
               <div style={{
-                background: "#fff", borderRadius: 12, padding: 28,
-                border: "1px solid #f0f0f0",
-                fontSize: 15, color: "#444", lineHeight: 1.85,
+                background: "var(--color-card)", borderRadius: 12, padding: 28,
+                border: "1px solid var(--color-border-soft)",
+                fontSize: 15, color: "var(--color-text)", lineHeight: 1.85,
                 overflowX: "auto",
                 minWidth: 0,
               }}>
@@ -1383,29 +1384,29 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            width: "min(440px, 100%)", background: "#fff", borderRadius: 20, padding: "32px 30px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+            width: "min(440px, 100%)", background: "var(--color-card)", borderRadius: 20, padding: "32px 30px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
               <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "#E8FAFD",
+                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-cyan)",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
               }}>📄</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>PDF로 저장하기</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>PDF로 저장하기</h3>
             </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "#555", wordBreak: "keep-all" }}>
-              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "#222" }}>인쇄 창</b>이 열립니다.<br />
-              프린터 대신 <b style={{ color: "#222" }}>PDF로 저장</b>을 선택하면 돼요.
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "var(--color-text)", wordBreak: "keep-all" }}>
+              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "var(--color-text-strong)" }}>인쇄 창</b>이 열립니다.<br />
+              프린터 대신 <b style={{ color: "var(--color-text-strong)" }}>PDF로 저장</b>을 선택하면 돼요.
             </p>
             <div style={{
-              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "#f7f8fb",
-              fontSize: 13, lineHeight: 1.8, color: "#666", wordBreak: "keep-all",
+              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "var(--color-page)",
+              fontSize: 13, lineHeight: 1.8, color: "var(--color-text-secondary)", wordBreak: "keep-all",
               display: "flex", gap: 8, alignItems: "flex-start",
             }}>
               <span style={{ flexShrink: 0 }}>💡</span>
               <span>
                 저장된 PDF는 이미지가 아니라 문서 형태라서,<br />
-                <b style={{ color: "#222" }}>텍스트 선택과 복사</b>가 가능해요.
+                <b style={{ color: "var(--color-text-strong)" }}>텍스트 선택과 복사</b>가 가능해요.
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -1413,8 +1414,8 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
                 type="button"
                 onClick={() => setShowPrintGuide(false)}
                 style={{
-                  padding: "9px 18px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  background: "#fff", color: "#555", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  padding: "9px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 14, fontWeight: 700, cursor: "pointer",
                 }}
               >취소</button>
               <button
@@ -1422,7 +1423,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
                 onClick={runPrint}
                 style={{
                   padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
                 }}
               >계속</button>
             </div>
@@ -1431,7 +1432,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
       )}
       <button onClick={handleCopyAll} style={{
         padding: "9px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
-        background: "#fff", color: "#555", fontSize: 12, fontWeight: 800, cursor: "pointer",
+        background: "var(--color-card)", color: "var(--color-text)", fontSize: 12, fontWeight: 800, cursor: "pointer",
       }}>전체 복사</button>
       <button onClick={handleDownload} disabled={pdfSaving} style={{
         padding: "9px 12px", borderRadius: 8, border: "none",
@@ -1443,12 +1444,13 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
       {onGoToQuiz && (
         <button onClick={onGoToQuiz} style={{
           padding: "9px 12px", borderRadius: 8, border: "none",
-          background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer",
+          background: PINK, color: "var(--color-on-brand)", fontSize: 12, fontWeight: 800, cursor: "pointer",
         }}>퀴즈 생성하기</button>
       )}
       <div
         ref={pdfExportRef}
         className="pdf-print-area"
+        data-theme="light"
         aria-hidden="true"
         style={{
           position: "fixed",
@@ -1816,9 +1818,9 @@ const MaterialDetailView = ({
   const tabButtonStyle = (tab: MaterialDetailTab): CSSProperties => ({
     height: 34,
     borderRadius: 10,
-    border: activeTab === tab ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-    background: activeTab === tab ? "#FFF0F6" : "#fff",
-    color: activeTab === tab ? PINK : "#777",
+    border: activeTab === tab ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+    background: activeTab === tab ? "var(--color-tint-pink)" : "var(--color-card)",
+    color: activeTab === tab ? PINK : "var(--color-text-secondary)",
     fontSize: 13,
     fontWeight: 800,
     cursor: "pointer",
@@ -1829,7 +1831,7 @@ const MaterialDetailView = ({
       alignItems: "center",
       padding: "4px 8px",
       borderRadius: 999,
-      background: "#F3FBFD",
+      background: "var(--color-tint-cyan)",
       color: CYAN,
       fontSize: 11,
       fontWeight: 800,
@@ -1842,7 +1844,7 @@ const MaterialDetailView = ({
   const renderOriginalTab = () => {
     if (fileLoading || previewLoading) {
       return (
-        <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "#f2f2f2", color: "#666", fontSize: 14 }}>
+        <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
           {previewLoading ? "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다." : "원본 파일을 불러오는 중입니다."}
         </div>
       );
@@ -1858,7 +1860,7 @@ const MaterialDetailView = ({
             height: "100%",
             minHeight: 0,
             border: "none",
-            background: "#f2f2f2",
+            background: "var(--color-surface)",
             display: "block",
           }}
         />
@@ -1875,7 +1877,7 @@ const MaterialDetailView = ({
             height: "100%",
             minHeight: 0,
             border: "none",
-            background: "#f2f2f2",
+            background: "var(--color-surface)",
             display: "block",
           }}
         />
@@ -1891,10 +1893,10 @@ const MaterialDetailView = ({
 
     return (
       <div style={{
-        background: "#f7f7f7",
+        background: "var(--color-surface)",
         padding: 24,
         fontSize: 14,
-        color: "#444",
+        color: "var(--color-text)",
         lineHeight: 1.8,
         height: "100%",
         overflowY: "auto",
@@ -1904,8 +1906,8 @@ const MaterialDetailView = ({
           marginBottom: 18,
           padding: "12px 14px",
           borderRadius: 10,
-          background: fileError || previewError ? "#FFF5F5" : "#FFF8E8",
-          color: fileError || previewError ? "#E53E3E" : "#9A6B00",
+          background: fileError || previewError ? "var(--color-tint-pink)" : "#FFF8E8",
+          color: fileError || previewError ? "var(--color-danger)" : "#9A6B00",
           fontSize: 13,
           fontWeight: 700,
           lineHeight: 1.55,
@@ -1936,7 +1938,7 @@ const MaterialDetailView = ({
   return (
     <div>
       <button onClick={onBack} style={{
-        background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 과목 자료로</button>
       <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{
@@ -1947,19 +1949,19 @@ const MaterialDetailView = ({
         }}>
         <div style={{
           padding: "9px 18px",
-          borderBottom: "1px solid #f0f0f0",
-          background: "#f2f2f2",
-          color: "#222",
+          borderBottom: "1px solid var(--color-border-soft)",
+          background: "var(--color-surface)",
+          color: "var(--color-text-strong)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
         }}>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 800, color: "#222", wordBreak: "break-word" }}>
+            <h2 style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", wordBreak: "break-word" }}>
               {material.name}
             </h2>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#777" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "var(--color-text-secondary)" }}>
               <span>{fileTypeLabel}</span>
               <span>{pageInfo}</span>
               <span>업데이트 {formatHubDate(material.updatedAt)}</span>
@@ -1967,12 +1969,12 @@ const MaterialDetailView = ({
           </div>
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
               {materialProgressSteps.map((step, index) => {
-                const color = step.done ? "#999" : step.current ? PINK : "#bbb";
+                const color = step.done ? "var(--color-muted)" : step.current ? PINK : "var(--color-muted)";
                 const connectorFilled = index > 0 && materialProgressSteps[index - 1].done;
                 return (
                   <div key={step.label} style={{ display: "flex", alignItems: "center" }}>
                     {index > 0 && (
-                      <div style={{ width: 18, height: 2, background: connectorFilled ? "#999" : "#e0e0e0" }} />
+                      <div style={{ width: 18, height: 2, background: connectorFilled ? "var(--color-muted)" : "var(--color-border-soft)" }} />
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{
@@ -1981,8 +1983,8 @@ const MaterialDetailView = ({
                         borderRadius: "50%",
                         flexShrink: 0,
                         border: `2px solid ${color}`,
-                        background: step.done ? "#999" : step.current ? PINK : "#fff",
-                        color: step.done || step.current ? "#fff" : "#bbb",
+                        background: step.done ? "var(--color-muted)" : step.current ? PINK : "var(--color-card)",
+                        color: step.done || step.current ? "var(--color-on-brand)" : "var(--color-muted)",
                         fontSize: 10,
                         fontWeight: 900,
                         display: "flex",
@@ -2001,14 +2003,14 @@ const MaterialDetailView = ({
           </div>
         </div>
           {relatedMaterials.length > 1 && (
-            <div style={{ padding: "0 18px 12px", background: "#fff" }}>
+            <div style={{ padding: "0 18px 12px", background: "var(--color-card)" }}>
               <div style={{
                 padding: "12px 14px",
                 borderRadius: 12,
                 border: `1px solid ${BORDER_COLOR}`,
-                background: "#fff",
+                background: "var(--color-card)",
               }}>
-                <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
+                <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "var(--color-muted)" }}>
                   이 퀴즈에 연결된 자료
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -2023,9 +2025,9 @@ const MaterialDetailView = ({
                           maxWidth: 280,
                           padding: "7px 10px",
                           borderRadius: 999,
-                          border: isActive ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                          background: isActive ? "#FFF0F6" : "#fafafa",
-                          color: isActive ? PINK : "#666",
+                          border: isActive ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                          background: isActive ? "var(--color-tint-pink)" : "var(--color-surface)",
+                          color: isActive ? PINK : "var(--color-text-secondary)",
                           fontSize: 12,
                           fontWeight: 800,
                           cursor: isActive ? "default" : "pointer",
@@ -2047,9 +2049,9 @@ const MaterialDetailView = ({
         <div style={{
           flexShrink: 0,
           zIndex: 20,
-          background: "#fff",
+          background: "var(--color-card)",
           padding: "10px 18px",
-          borderBottom: "1px solid #f0f0f0",
+          borderBottom: "1px solid var(--color-border-soft)",
         }}>
           {hasSummaries && activeTab !== "quiz" && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 10 }}>
@@ -2068,9 +2070,9 @@ const MaterialDetailView = ({
                     width: 34,
                     height: 34,
                     borderRadius: 8,
-                    border: showSummaryList ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                    background: showSummaryList ? "#FFF0F6" : "#fff",
-                    color: showSummaryList ? PINK : "#555",
+                    border: showSummaryList ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                    background: showSummaryList ? "var(--color-tint-pink)" : "var(--color-card)",
+                    color: showSummaryList ? PINK : "var(--color-text)",
                     fontSize: 16,
                     lineHeight: 1,
                     cursor: "pointer",
@@ -2084,9 +2086,9 @@ const MaterialDetailView = ({
                   height: 34,
                   padding: "0 12px",
                   borderRadius: 8,
-                  border: isOriginalTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                  background: isOriginalTutorOpen ? "#FFF0F6" : "#fff",
-                  color: isOriginalTutorOpen ? PINK : "#555",
+                  border: isOriginalTutorOpen ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                  background: isOriginalTutorOpen ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: isOriginalTutorOpen ? PINK : "var(--color-text)",
                   fontSize: 13,
                   fontWeight: 800,
                   display: "inline-flex",
@@ -2101,9 +2103,9 @@ const MaterialDetailView = ({
                   <button onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
                     padding: "9px 12px",
                     borderRadius: 8,
-                    border: isSummaryTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                    background: isSummaryTutorOpen ? "#FFF0F6" : "#fff",
-                    color: isSummaryTutorOpen ? PINK : "#555",
+                    border: isSummaryTutorOpen ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                    background: isSummaryTutorOpen ? "var(--color-tint-pink)" : "var(--color-card)",
+                    color: isSummaryTutorOpen ? PINK : "var(--color-text)",
                     fontSize: 12,
                     fontWeight: 800,
                     cursor: "pointer",
@@ -2119,7 +2121,7 @@ const MaterialDetailView = ({
             <button type="button" onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
             <button type="button" onClick={() => setActiveTab("quiz")} style={tabButtonStyle("quiz")}>퀴즈 {quizSets.length > 0 ? quizSets.length : ""}</button>
           </div>
-          {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "#E53E3E", fontWeight: 700 }}>{hubError}</p>}
+          {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "var(--color-danger)", fontWeight: 700 }}>{hubError}</p>}
         </div>
 
         <div style={{ overflow: "hidden", borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
@@ -2165,15 +2167,15 @@ const MaterialDetailView = ({
         )}
 
         {activeTab === "summary" && (
-          <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
+          <div style={{ padding: 24, background: "var(--color-surface)", minHeight: 520 }}>
             {hubLoading ? (
-              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "#888", fontSize: 14 }}>연결된 요약을 불러오는 중입니다.</div>
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "var(--color-muted)", fontSize: 14 }}>연결된 요약을 불러오는 중입니다.</div>
             ) : summaries.length === 0 ? (
               <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
                 <div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "#222" }}>아직 요약이 없습니다</h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "#888" }}>이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.</p>
-                  <button onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 요약이 없습니다</h3>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.</p>
+                  <button onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     요약 생성하기
                   </button>
                 </div>
@@ -2190,16 +2192,16 @@ const MaterialDetailView = ({
                         style={{
                           padding: "12px 13px",
                           borderRadius: 10,
-                          border: activeSummary?.id === summary.id ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                          background: activeSummary?.id === summary.id ? "#FFF0F6" : "#fff",
-                          color: activeSummary?.id === summary.id ? PINK : "#555",
+                          border: activeSummary?.id === summary.id ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                          background: activeSummary?.id === summary.id ? "var(--color-tint-pink)" : "var(--color-card)",
+                          color: activeSummary?.id === summary.id ? PINK : "var(--color-text)",
                           textAlign: "left",
                           cursor: "pointer",
                           flexShrink: 0,
                         }}
                       >
                         <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
-                        <span style={{ display: "block", fontSize: 11, color: "#999" }}>{formatHubDate(summary.createdAt)}</span>
+                        <span style={{ display: "block", fontSize: 11, color: "var(--color-muted)" }}>{formatHubDate(summary.createdAt)}</span>
                       </button>
                     ))}
                     <button
@@ -2208,8 +2210,8 @@ const MaterialDetailView = ({
                       style={{
                         padding: "12px 13px",
                         borderRadius: 10,
-                        border: `1px dashed ${PINK}66`,
-                        background: "#fff",
+                        border: "1px dashed color-mix(in srgb, var(--color-pink) 40%, transparent)",
+                        background: "var(--color-card)",
                         color: PINK,
                         fontSize: 13,
                         fontWeight: 850,
@@ -2228,10 +2230,10 @@ const MaterialDetailView = ({
                 >
                   {activeSummary && !isSummaryTutorExpanded && (
                     <div style={{ flex: isSummaryTutorOpen ? `${tutorSplit.ratio} 1 0` : "1 1 0", minWidth: 0, overflowY: "auto", overflowX: "hidden" }}>
-                      <div style={{ padding: 22, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, minWidth: 0, minHeight: "100%", boxSizing: "border-box" }}>
+                      <div style={{ padding: 22, borderRadius: 12, background: "var(--color-card)", border: `1px solid ${BORDER_COLOR}`, minWidth: 0, minHeight: "100%", boxSizing: "border-box" }}>
                         <div style={{ marginBottom: 18 }}>
-                          <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "#222" }}>{templateLabels[activeSummary.template]}</h3>
-                          <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{formatHubDate(activeSummary.createdAt)}</p>
+                          <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "var(--color-text-strong)" }}>{templateLabels[activeSummary.template]}</h3>
+                          <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted)" }}>{formatHubDate(activeSummary.createdAt)}</p>
                         </div>
                         {hasReviewContext && (
                           <div style={{
@@ -2296,15 +2298,15 @@ const MaterialDetailView = ({
         )}
 
         {activeTab === "quiz" && (
-          <div style={{ padding: 24, background: "#fafafa", minHeight: 520 }}>
+          <div style={{ padding: 24, background: "var(--color-surface)", minHeight: 520 }}>
             {hubLoading ? (
-              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "#888", fontSize: 14 }}>연결된 퀴즈를 불러오는 중입니다.</div>
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "var(--color-muted)", fontSize: 14 }}>연결된 퀴즈를 불러오는 중입니다.</div>
             ) : quizSets.length === 0 ? (
               <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
                 <div>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "#222" }}>아직 퀴즈가 없습니다</h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "#888" }}>이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.</p>
-                  <button onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 퀴즈가 없습니다</h3>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.</p>
+                  <button onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     퀴즈 생성하기
                   </button>
                 </div>
@@ -2314,10 +2316,10 @@ const MaterialDetailView = ({
                 {quizSets.map(quizSet => {
                   const latestAttempt = latestAttemptByQuizSetId.get(quizSet.id);
                   return (
-                    <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "#fff", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
+                    <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "var(--color-card)", border: `1px solid ${BORDER_COLOR}`, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                          <h3 style={{ margin: 0, fontSize: 16, color: "#222", wordBreak: "break-word" }}>{quizSet.title}</h3>
+                          <h3 style={{ margin: 0, fontSize: 16, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{quizSet.title}</h3>
                           {multiSourceBadge(quizSet.materialIds)}
                           {latestAttempt && (
                             <span style={{
@@ -2332,20 +2334,20 @@ const MaterialDetailView = ({
                             </span>
                           )}
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "#888", fontWeight: 700 }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>
                           <span>난이도 {quizSet.difficulty}</span>
                           <span>{quizSet.questionType}</span>
                           <span>{quizSet.count || quizSet.questions.length}문항</span>
                           <span>{formatHubDate(quizSet.createdAt)}</span>
                         </div>
                       </div>
-                      <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                      <button onClick={() => onOpenQuiz(quizSet)} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                         {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
                       </button>
                     </div>
                   );
                 })}
-                <button onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: `1px solid ${CYAN}33`, background: "#E8FAFE", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                <button onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                   새 퀴즈 만들기
                 </button>
               </div>
@@ -2370,20 +2372,20 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
   return (
     <div>
       <button onClick={onBack} style={{
-        background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
-      <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "#222" }}>퀴즈 생성</h2>
+      <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>퀴즈 생성</h2>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
         <Card style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f0f0f0" }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#888" }}>요약된 파일 미리보기</span>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border-soft)" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)" }}>요약된 파일 미리보기</span>
           </div>
           <div style={{
-            padding: 24, minHeight: 360, background: "#fafafa",
-            fontSize: 13, color: "#555", lineHeight: 1.8
+            padding: 24, minHeight: 360, background: "var(--color-surface)",
+            fontSize: 13, color: "var(--color-text)", lineHeight: 1.8
           }}>
-            <p style={{ fontWeight: 600, color: "#333", marginTop: 0 }}>{fileName || "업로드된 파일"} - 요약본</p>
+            <p style={{ fontWeight: 600, color: "var(--color-text-strong)", marginTop: 0 }}>{fileName || "업로드된 파일"} - 요약본</p>
             <p>이번 강의에서는 동적 프로그래밍(DP)의 핵심 개념을 다루었습니다. DP는 큰 문제를 작은 하위 문제로 나누어 해결하는 알고리즘 설계 기법입니다.</p>
             <p>메모이제이션과 타뷸레이션 두 가지 접근 방식이 있으며, 최적 부분 구조와 중복 부분 문제라는 두 가지 조건이 필요합니다.</p>
             <p>피보나치 수열, 배낭 문제, 최장 공통 부분 수열(LCS) 등의 대표적인 예제를 통해 DP의 적용 방법을 학습했습니다.</p>
@@ -2392,14 +2394,14 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
           <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "#222" }}>난이도</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>난이도</h3>
             <div style={{ display: "flex", gap: 10 }}>
               {["낮음", "보통", "높음"].map(d => (
                 <button key={d} onClick={() => setDifficulty(d)} style={{
                   padding: "10px 24px", borderRadius: 10,
-                  border: difficulty === d ? "none" : "1px solid #e0e0e0",
-                  background: difficulty === d ? PINK : "#fff",
-                  color: difficulty === d ? "#fff" : "#555",
+                  border: difficulty === d ? "none" : "1px solid var(--color-border-soft)",
+                  background: difficulty === d ? PINK : "var(--color-card)",
+                  color: difficulty === d ? "var(--color-on-brand)" : "var(--color-text)",
                   fontSize: 14, fontWeight: 600, cursor: "pointer"
                 }}>{d}</button>
               ))}
@@ -2407,27 +2409,27 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
           </div>
 
           <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "#222" }}>문항수</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>문항수</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value) || 1))}
                 style={{
-                  width: 80, padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+                  width: 80, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
                   fontSize: 14, textAlign: "center", outline: "none"
                 }}
               />
-              <span style={{ fontSize: 14, color: "#888" }}>개</span>
+              <span style={{ fontSize: 14, color: "var(--color-muted)" }}>개</span>
             </div>
           </div>
 
           <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "#222" }}>문제 유형</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>문제 유형</h3>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {["O/X", "객관식", "단답형", "주관식"].map(t => (
                 <button key={t} onClick={() => toggleType(t)} style={{
                   padding: "10px 20px", borderRadius: 10,
-                  border: types.includes(t) ? "none" : "1px solid #e0e0e0",
-                  background: types.includes(t) ? CYAN : "#fff",
-                  color: types.includes(t) ? "#fff" : "#555",
+                  border: types.includes(t) ? "none" : "1px solid var(--color-border-soft)",
+                  background: types.includes(t) ? CYAN : "var(--color-card)",
+                  color: types.includes(t) ? "var(--color-on-brand)" : "var(--color-text)",
                   fontSize: 14, fontWeight: 600, cursor: "pointer"
                 }}>{t}</button>
               ))}
@@ -2436,7 +2438,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 
           <button onClick={onCreate} style={{
             padding: "16px 0", borderRadius: 14, border: "none",
-            background: PINK, color: "#fff", fontSize: 16, fontWeight: 700,
+            background: PINK, color: "var(--color-on-brand)", fontSize: 16, fontWeight: 700,
             cursor: "pointer", marginTop: 8
           }}>퀴즈 생성하기</button>
         </div>
@@ -3194,22 +3196,22 @@ export default function Summary() {
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            width: "min(440px, 100%)", background: "#fff", borderRadius: 20, padding: "32px 30px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+            width: "min(440px, 100%)", background: "var(--color-card)", borderRadius: 20, padding: "32px 30px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
               <span style={{
                 width: 36, height: 36, borderRadius: "50%", background: "#FFF7ED",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
               }}>📝</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>요약 안내</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>요약 안내</h3>
             </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "#555", wordBreak: "keep-all" }}>
-              출력 토큰이 제한되어 있어, <b style={{ color: "#222" }}>여러 개 요약해도</b> <b style={{ color: "#222" }}>하나만 </b>생성돼요.
+            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "var(--color-text)", wordBreak: "keep-all" }}>
+              출력 토큰이 제한되어 있어, <b style={{ color: "var(--color-text-strong)" }}>여러 개 요약해도</b> <b style={{ color: "var(--color-text-strong)" }}>하나만 </b>생성돼요.
             </p>
             <div style={{
-              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "#f7f8fb",
-              fontSize: 13, lineHeight: 1.8, color: "#666", wordBreak: "keep-all",
+              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "var(--color-page)",
+              fontSize: 13, lineHeight: 1.8, color: "var(--color-text-secondary)", wordBreak: "keep-all",
               display: "flex", gap: 8, alignItems: "flex-start",
             }}>
               <span style={{ flexShrink: 0 }}>💡</span>
@@ -3219,7 +3221,7 @@ export default function Summary() {
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#888", cursor: "pointer", userSelect: "none" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--color-muted)", cursor: "pointer", userSelect: "none" }}>
                 <input
                   type="checkbox"
                   checked={dontShowMultiSummaryNotice}
@@ -3239,7 +3241,7 @@ export default function Summary() {
                 }}
                 style={{
                   padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
                 }}
               >확인</button>
             </div>
@@ -3259,27 +3261,27 @@ export default function Summary() {
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            width: "min(380px, 100%)", background: "#fff", borderRadius: 18, padding: 24,
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid #eee",
+            width: "min(380px, 100%)", background: "var(--color-card)", borderRadius: 18, padding: 24,
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <span style={{
                 width: 36, height: 36, borderRadius: "50%", background: "#FFF7ED", color: "#F59E0B",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0,
               }}>!</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#222" }}>원본은 저장하지 않았어요</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>원본은 저장하지 않았어요</h3>
             </div>
-            <p style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.6, color: "#555" }}>
-              아래 파일은 <b style={{ color: "#222" }}>50MB 저장 한도</b>를 넘어 원본을 저장하지 않았어요.{" "}
-              <b style={{ color: "#222" }}>텍스트는 저장돼 요약·퀴즈에 그대로 사용</b>할 수 있어요.
+            <p style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text)" }}>
+              아래 파일은 <b style={{ color: "var(--color-text-strong)" }}>50MB 저장 한도</b>를 넘어 원본을 저장하지 않았어요.{" "}
+              <b style={{ color: "var(--color-text-strong)" }}>텍스트는 저장돼 요약·퀴즈에 그대로 사용</b>할 수 있어요.
             </p>
             <div style={{
-              margin: "0 0 14px", padding: "10px 12px", borderRadius: 10, background: "#f7f8fb",
-              fontSize: 12.5, fontWeight: 700, color: "#444", wordBreak: "break-word", lineHeight: 1.5,
+              margin: "0 0 14px", padding: "10px 12px", borderRadius: 10, background: "var(--color-page)",
+              fontSize: 12.5, fontWeight: 700, color: "var(--color-text)", wordBreak: "break-word", lineHeight: 1.5,
             }}>
               {sizeLimitNotice.names.join(", ")}
             </div>
-            <p style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "#888" }}>
+            <p style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
               원본까지 저장하려면 파일을 50MB 미만으로 줄이거나 나눠서 올려주세요.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -3288,7 +3290,7 @@ export default function Summary() {
                 onClick={() => setSizeLimitNotice(null)}
                 style={{
                   padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer",
+                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
                 }}
               >확인</button>
             </div>
@@ -3310,7 +3312,7 @@ export default function Summary() {
             padding: "14px 16px",
             borderRadius: 12,
             border: "1px solid #f6c8df",
-            background: "#fff",
+            background: "var(--color-card)",
             boxShadow: "0 14px 36px rgba(0,0,0,0.14)",
           }}
         >
@@ -3324,7 +3326,7 @@ export default function Summary() {
               flexShrink: 0,
             }} />
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#222", marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text-strong)", marginBottom: 4 }}>
                 {duplicateNotice.reattached ? "기존 자료에 원본 파일을 다시 연결했어요" : "이미 등록된 파일입니다"}
               </div>
               <div style={{
@@ -3336,7 +3338,7 @@ export default function Summary() {
               }}>
                 {duplicateNotice.names.join(", ")}
               </div>
-              <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.45, color: "#777" }}>
+              <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.45, color: "var(--color-text-secondary)" }}>
                 {duplicateNotice.reattached
                   ? "요약 내용은 그대로 두고, 원본 미리보기에 필요한 파일만 연결했습니다."
                   : "기존 자료를 그대로 사용할게요. 원본 파일 연결이 없던 자료는 다시 연결을 시도합니다."}
@@ -3350,8 +3352,8 @@ export default function Summary() {
                 height: 24,
                 borderRadius: 8,
                 border: "none",
-                background: "#fafafa",
-                color: "#aaa",
+                background: "var(--color-surface)",
+                color: "var(--color-muted)",
                 cursor: "pointer",
                 fontSize: 16,
                 lineHeight: "24px",
@@ -3365,12 +3367,12 @@ export default function Summary() {
         </div>
       )}
 
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-        <span style={{ color: "#bbb", fontSize: 14 }}>/ 자료 요약</span>
+        <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
       <div style={{
@@ -3430,7 +3432,7 @@ export default function Summary() {
         {view === "upload" && selectedCourse && (
           <div>
             <button onClick={() => navigate(pageRoutes["대시보드"])} style={{
-              background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+              background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
             }}>← 대시보드로</button>
             <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
             <div>
@@ -3444,9 +3446,9 @@ export default function Summary() {
                       style={{
                         padding: "10px 0",
                         borderRadius: 10,
-                        border: inputMode === mode ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
-                        background: inputMode === mode ? "#FFF0F6" : "#fff",
-                        color: inputMode === mode ? PINK : "#777",
+                        border: inputMode === mode ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                        background: inputMode === mode ? "var(--color-tint-pink)" : "var(--color-card)",
+                        color: inputMode === mode ? PINK : "var(--color-text-secondary)",
                         fontSize: 13,
                         fontWeight: 800,
                         cursor: "pointer",
@@ -3471,10 +3473,10 @@ export default function Summary() {
                   >
                     <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
                       onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
-                    <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>강의자료 파일을 드래그하거나</p>
+                    <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--color-muted)" }}>강의자료 파일을 드래그하거나</p>
                     <button style={{
-                      marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid #ddd",
-                      background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
+                      marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                      background: "var(--color-card)", fontSize: 13, cursor: "pointer", color: "var(--color-text)"
                     }}>파일 선택</button>
                   </div>
                 ) : (
@@ -3500,8 +3502,8 @@ export default function Summary() {
                         padding: "11px 0",
                         borderRadius: 10,
                         border: "none",
-                        background: textMaterialTitle.trim() && textMaterialContent.trim() ? PINK : "#e5e5e5",
-                        color: "#fff",
+                        background: textMaterialTitle.trim() && textMaterialContent.trim() ? PINK : "var(--color-border-soft)",
+                        color: "var(--color-on-brand)",
                         fontSize: 13,
                         fontWeight: 800,
                         cursor: textMaterialTitle.trim() && textMaterialContent.trim() ? "pointer" : "default",
@@ -3537,14 +3539,14 @@ export default function Summary() {
                   </div>
                 )}
                 {extractError && (
-                  <div style={{ padding: "8px 0", fontSize: 12, color: "#E53E3E" }}>
+                  <div style={{ padding: "8px 0", fontSize: 12, color: "var(--color-danger)" }}>
                     분석 실패: {extractError}
                   </div>
                 )}
 
                 {uploadStatuses.length > 0 && (
                   <div style={{ marginBottom: 18 }}>
-                    <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "#999" }}>
+                    <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 850, color: "var(--color-muted)" }}>
                       파일별 처리 상태
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -3560,8 +3562,8 @@ export default function Summary() {
                           <div key={status.id} style={{
                             padding: 12,
                             borderRadius: 12,
-                            border: `1px solid ${isFailed ? "#FED7D7" : "#eeeeee"}`,
-                            background: "#fff",
+                            border: `1px solid ${isFailed ? "#FED7D7" : "var(--color-border-soft)"}`,
+                            background: "var(--color-card)",
                           }}>
                             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                               <div style={{ minWidth: 0 }}>
@@ -3569,9 +3571,9 @@ export default function Summary() {
                                   <span style={{ padding: "4px 8px", borderRadius: 999, background, color: tone, fontSize: 11, fontWeight: 850 }}>
                                     {status.label}
                                   </span>
-                                  <strong style={{ fontSize: 13, color: "#333", wordBreak: "break-word" }}>{status.name}</strong>
+                                  <strong style={{ fontSize: 13, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{status.name}</strong>
                                 </div>
-                                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "#777" }}>
+                                <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)" }}>
                                   {status.message}
                                 </p>
                               </div>
@@ -3582,7 +3584,7 @@ export default function Summary() {
                                   <button
                                     type="button"
                                     onClick={() => void handleSelectedFiles([status.file as File])}
-                                    style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid #eeeeee", background: "#fff", color: "#555", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                    style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text)", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
                                   >
                                     다시 시도
                                   </button>
@@ -3599,7 +3601,7 @@ export default function Summary() {
                                       setMaterialDetailReviewTitle("");
                                       setView("materialDetail");
                                     }}
-                                    style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${CYAN}33`, background: "#E8FAFE", color: CYAN, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                    style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
                                   >
                                     자료 열기
                                   </button>
@@ -3609,14 +3611,14 @@ export default function Summary() {
                                     <button
                                       type="button"
                                       onClick={() => fileRef.current?.click()}
-                                      style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid #eeeeee", background: "#fff", color: "#777", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                      style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text-secondary)", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
                                     >
                                       다른 파일 업로드
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setInputMode("text")}
-                                      style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${PINK}33`, background: "#FFF0F6", color: PINK, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                                      style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--color-pink) 20%, transparent)", background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
                                     >
                                       텍스트 붙여넣기
                                     </button>
@@ -3634,12 +3636,12 @@ export default function Summary() {
                 {materials.length > 0 && (
                   <div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
-                      <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#555" }}>
+                      <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>
                         강의자료 선택
                       </h4>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 선택</button>
-                        <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 해제</button>
+                        <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 선택</button>
+                        <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 해제</button>
                       </div>
                     </div>
                     {materials.map(material => {
@@ -3655,7 +3657,7 @@ export default function Summary() {
                         style={{
                           display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
                           background: isSelected ? "#fff7fa" : MUTED_SURFACE,
-                          border: isSelected ? `1.5px solid ${PINK}44` : `1px solid ${BORDER_COLOR}`,
+                          border: isSelected ? "1.5px solid color-mix(in srgb, var(--color-pink) 27%, transparent)" : `1px solid ${BORDER_COLOR}`,
                           borderRadius: 10, marginBottom: 8, cursor: "pointer",
                         }}>
                         <div style={{
@@ -3665,11 +3667,11 @@ export default function Summary() {
                           transition: "all 0.15s",
                           display: "flex", alignItems: "center", justifyContent: "center",
                         }}>
-                          {isSelected && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1, fontWeight: 800 }}>✓</span>}
+                          {isSelected && <span style={{ color: "var(--color-on-brand)", fontSize: 10, lineHeight: 1, fontWeight: 800 }}>✓</span>}
                         </div>
                         <FileIcon type={material.type} />
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#333" }}>{material.name}</span>
-                        <span style={{ fontSize: 12, color: "#aaa" }}>
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--color-text-strong)" }}>{material.name}</span>
+                        <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
                           {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : ""}
                         </span>
                         <button
@@ -3688,8 +3690,8 @@ export default function Summary() {
                             height: 26,
                             padding: "0 8px",
                             borderRadius: 8,
-                            border: `1px solid ${CYAN}33`,
-                            background: "#E8FAFE",
+                            border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)",
+                            background: "var(--color-tint-cyan)",
                             color: CYAN,
                             cursor: "pointer",
                             fontSize: 11,
@@ -3710,7 +3712,7 @@ export default function Summary() {
                             borderRadius: 8,
                             border: `1px solid ${BORDER_COLOR}`,
                             background: CARD_BACKGROUND,
-                            color: "#bbb",
+                            color: "var(--color-muted)",
                             cursor: "pointer",
                             fontSize: 16,
                             lineHeight: "24px",
@@ -3731,25 +3733,25 @@ export default function Summary() {
             {searched && (
               <div>
                 <Card style={{ padding: 24 }}>
-                  <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 800, color: "#222" }}>
+                  <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>
                     선택한 자료로 만들기
                   </h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.6, color: "#888" }}>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.6, color: "var(--color-muted)" }}>
                     체크한 강의자료를 기준으로 요약을 만들거나 바로 퀴즈를 생성할 수 있습니다.
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <button onClick={() => { setTemplatesBackView("upload"); setView("templates"); }} disabled={!selectedMarkdown || isExtracting} style={{
                       padding: "18px 14px", borderRadius: 12, border: "none",
-                      background: selectedMarkdown && !isExtracting ? "#FFF0F6" : "#f0f0f0",
-                      color: selectedMarkdown && !isExtracting ? PINK : "#aaa",
+                      background: selectedMarkdown && !isExtracting ? "var(--color-tint-pink)" : "var(--color-surface)",
+                      color: selectedMarkdown && !isExtracting ? PINK : "var(--color-muted)",
                       fontSize: 14, fontWeight: 800,
                       cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
                       textAlign: "center", lineHeight: 1.4,
                     }}>요약<br/>새로 생성</button>
                     <button onClick={handleGoToQuiz} disabled={!selectedMarkdown || isExtracting} style={{
                       padding: "18px 14px", borderRadius: 12, border: "none",
-                      background: selectedMarkdown && !isExtracting ? "#E8FAFE" : "#f0f0f0",
-                      color: selectedMarkdown && !isExtracting ? CYAN : "#aaa",
+                      background: selectedMarkdown && !isExtracting ? "var(--color-tint-cyan)" : "var(--color-surface)",
+                      color: selectedMarkdown && !isExtracting ? CYAN : "var(--color-muted)",
                       fontSize: 14, fontWeight: 800,
                       cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
                       textAlign: "center", lineHeight: 1.4,

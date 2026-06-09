@@ -1,27 +1,113 @@
 @import "tailwindcss";
 
+/* ── 디자인 토큰 (라이트 기본값) ──
+   인라인 style에서는 var(--color-...)로, Tailwind 유틸(bg-card·border-border·text-muted 등)로도 쓰인다.
+   다크 값은 아래 [data-theme="dark"] 블록에서 같은 변수를 재정의한다. */
 @theme {
+  /* 브랜드 — 다크에서도 유지 */
   --color-pink: #F070AE;
   --color-cyan: #00C0E8;
-  --color-page: #f7f8fb;
-  --color-card: #fbfcfe;
-  --color-border: #e2e6ee;
-  --color-muted: #888888;
+
+  /* 표면 */
+  --color-page: #f7f8fb;           /* 페이지 배경 */
+  --color-card: #fbfcfe;           /* 카드·기본 표면 */
+  --color-surface: #fafafa;        /* 한 단계 위 표면·입력칸 */
+  --color-muted-surface: #f1f4f8;  /* 은은한 표면·호버 */
+
+  /* 테두리 */
+  --color-border: #e2e6ee;         /* 기본 */
+  --color-border-soft: #e0e0e0;    /* 옅은 */
+
+  /* 텍스트 */
+  --color-text-strong: #222222;    /* 제목·강조 */
+  --color-text: #444444;           /* 본문 */
+  --color-text-secondary: #666666; /* 보조 */
+  --color-muted: #888888;          /* muted */
+  --color-on-brand: #ffffff;       /* 브랜드색 배경 위 글자 */
+
+  /* 틴트·상태 */
+  --color-tint-pink: #fff0f6;
+  --color-tint-cyan: #e8fafe;
+  --color-violet: #8b5cf6;
+  --color-tint-violet: #ede9fe;
+  --color-danger: #e53e3e;
+
   --radius-card: 18px;
   --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.85);
 }
 
 /* 기존 다크모드 방식(html[data-theme="dark"])을 Tailwind dark: 변형에 연결 */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* ── 다크 토큰 재정의 — 같은 변수를 어두운 값으로 덮어쓴다 ── */
+[data-theme="dark"] {
+  color-scheme: dark;
+  /* 배경 — 완전한 검정이 아닌 중성 다크 그레이. page→card→surface로 갈수록 밝아져 깊이감을 준다. */
+  --color-page: #16181d;
+  --color-card: #1d2027;
+  --color-surface: #252932;
+  --color-muted-surface: #2c313b;
+  /* 테두리 — 표면보다 약간 밝게 */
+  --color-border: #333944;
+  --color-border-soft: #2a2f39;
+  /* 텍스트 — 순백 대신 오프화이트로 과대비를 피한다 */
+  --color-text-strong: #e6e9ef;
+  --color-text: #c5cad3;
+  --color-text-secondary: #9298a4;
+  --color-muted: #6b7280;
+  --color-on-brand: #ffffff;
+  /* 브랜드 — 라이트의 쨍한 원색보다는 차분하되, 다크 배경에서 정체성이 살도록 적당한 채도 유지 */
+  --color-pink: #e57dab;
+  --color-cyan: #33aed1;
+  /* 틴트·상태 — 채도를 낮춰 배경에 가라앉힌다 */
+  --color-tint-pink: #2a1f26;
+  --color-tint-cyan: #18272e;
+  --color-violet: #9d88d4;
+  --color-tint-violet: #241f33;
+  --color-danger: #e08585;
+  --shadow-card: 0 1px 8px rgba(0, 0, 0, .28);
+  --glass-bg: rgba(26, 30, 38, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.10);
+}
+
+/* 라이트 강제 — 다크 컨텍스트 안에서도 라이트로 캡처해야 하는 영역(예: PDF 내보내기 노드)용.
+   가장 가까운 조상의 data-theme="light"가 다크 토큰 상속을 끊고 라이트 값으로 되돌린다. */
+[data-theme="light"] {
+  color-scheme: light;
+  --color-pink: #F070AE;
+  --color-cyan: #00C0E8;
+  --color-page: #f7f8fb;
+  --color-card: #fbfcfe;
+  --color-surface: #fafafa;
+  --color-muted-surface: #f1f4f8;
+  --color-border: #e2e6ee;
+  --color-border-soft: #e0e0e0;
+  --color-text-strong: #222222;
+  --color-text: #444444;
+  --color-text-secondary: #666666;
+  --color-muted: #888888;
+  --color-on-brand: #ffffff;
+  --color-tint-pink: #fff0f6;
+  --color-tint-cyan: #e8fafe;
+  --color-violet: #8b5cf6;
+  --color-tint-violet: #ede9fe;
+  --color-danger: #e53e3e;
+  --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.85);
+}
+
 html {
-  background: #f7f8fb;
+  background: var(--color-page);
+  color-scheme: light;
 }
 
 body {
   margin: 0;
-  background: #f7f8fb;
-  color: #111827;
+  background: var(--color-page);
+  color: var(--color-text-strong);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -32,6 +118,41 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+/* 입력 컨트롤 — 인라인 색이 없는 폼 요소도 토큰을 따르도록 보강.
+   인라인 style이 있으면 그쪽이 우선이므로(이미 토큰화됨) 라이트에선 시각 변화가 없다. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--color-card);
+  border-color: var(--color-border);
+  color: var(--color-text-strong);
+}
+
+/* 스크롤바 — 다크에서 밝은 기본 스크롤바가 튀지 않도록 */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+  background-clip: content-box;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 * {
@@ -47,12 +168,12 @@ select {
 /* 캘린더 월 이동 화살표 · 날짜 칸 hover 피드백 */
 .tongkk-cal-nav {
   background: none;
-  color: #94a3b8;
+  color: var(--color-muted);
   transition: background .15s, color .15s;
 }
 .tongkk-cal-nav:hover {
-  background: #f1f4f8;
-  color: #475569;
+  background: var(--color-muted-surface);
+  color: var(--color-text-secondary);
 }
 .tongkk-cal-cell {
   transition: box-shadow .15s, background .15s;
@@ -103,9 +224,9 @@ select {
   gap: 18px;
   align-items: center;
   padding: 14px;
-  border: 1px solid #e2e6ee;
+  border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--color-card);
 }
 
 @media (max-width: 920px) {

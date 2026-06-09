@@ -141,18 +141,18 @@ export default function ReviewNotes() {
       {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />}
 
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-        <span style={{ color: "#bbb", fontSize: 14 }}>/ 오답 노트</span>
+        <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
       </div>
 
       <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
         <div style={{ marginBottom: 18 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#222" }}>오답 노트</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "#999" }}>모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.</p>
+          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>오답 노트</h2>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.</p>
         </div>
 
         {courseNames.length > 0 && (
@@ -163,8 +163,8 @@ export default function ReviewNotes() {
                 <button key={name} onClick={() => setFilter(name)} style={{
                   padding: "8px 14px", borderRadius: 999,
                   border: active ? `1px solid ${PINK}` : `1px solid ${BORDER_COLOR}`,
-                  background: active ? "#FFF0F6" : "#fff",
-                  color: active ? PINK : "#777", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  background: active ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: active ? PINK : "var(--color-text-secondary)", fontSize: 13, fontWeight: 700, cursor: "pointer",
                 }}>{name}</button>
               );
             })}
@@ -173,11 +173,11 @@ export default function ReviewNotes() {
 
         {loading ? (
           <Card style={{ padding: 40, textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>불러오는 중...</p>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--color-muted)" }}>불러오는 중...</p>
           </Card>
         ) : wrongEntries.length === 0 ? (
           <Card style={{ padding: 40, textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 14, color: "#aaa" }}>아직 오답이 없습니다</p>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--color-muted)" }}>아직 오답이 없습니다</p>
           </Card>
         ) : (
           visibleCourses.map(courseName => {
@@ -186,8 +186,8 @@ export default function ReviewNotes() {
               <div key={courseName} style={{ marginBottom: 28 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{courseName}</span>
-                    <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: "#aaa" }}>{entries.length}문항</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{courseName}</span>
+                    <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: "var(--color-muted)" }}>{entries.length}문항</span>
                   </div>
                   <button
                     type="button"
@@ -196,8 +196,8 @@ export default function ReviewNotes() {
                     style={{
                       flexShrink: 0,
                       padding: "9px 14px", borderRadius: 10, border: "none",
-                      background: retryingCourse !== null ? "#e0e0e0" : PINK,
-                      color: retryingCourse !== null ? "#bbb" : "#fff",
+                      background: retryingCourse !== null ? "var(--color-border-soft)" : PINK,
+                      color: retryingCourse !== null ? "var(--color-muted)" : "var(--color-on-brand)",
                       fontSize: 13, fontWeight: 800,
                       cursor: retryingCourse !== null ? "default" : "pointer",
                     }}
@@ -210,13 +210,13 @@ export default function ReviewNotes() {
                   {entries.map((entry, index) => (
                     <Card key={`${entry.question}-${index}`} style={{ padding: 16 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <span style={{ padding: "3px 8px", borderRadius: 999, background: "#FFF0F6", color: PINK, fontSize: 11, fontWeight: 800 }}>{entry.courseName}</span>
-                        <span style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>{entry.type}</span>
+                        <span style={{ padding: "3px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>{entry.courseName}</span>
+                        <span style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 700 }}>{entry.type}</span>
                       </div>
-                      <div style={{ marginBottom: 8, fontSize: 14, color: "#333", fontWeight: 800, lineHeight: 1.5 }}>
+                      <div style={{ marginBottom: 8, fontSize: 14, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
                         {entry.question}
                       </div>
-                      <div style={{ display: "grid", gap: 5, fontSize: 12.5, color: "#666", lineHeight: 1.6 }}>
+                      <div style={{ display: "grid", gap: 5, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                         <span>내 답: <strong style={{ color: PINK }}>{entry.studentAnswer ?? "미응답"}</strong></span>
                         <span>정답: <strong style={{ color: CYAN }}>{entry.correctAnswer ?? "정답 정보 없음"}</strong></span>
                         <span>해설: {entry.feedback || entry.explanation}</span>

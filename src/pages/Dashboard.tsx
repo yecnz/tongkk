@@ -87,13 +87,13 @@ const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
       <Card style={{ padding: 28, width: 340 }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
         <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="과목명 입력" style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
         }}/>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
       </Card>
@@ -124,18 +124,18 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
           autoFocus
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10,
-            border: isDuplicate ? "1px solid #E53E3E" : "1px solid #e0e0e0",
+            border: isDuplicate ? "1px solid var(--color-danger)" : "1px solid var(--color-border-soft)",
             fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: isDuplicate ? 8 : 16
           }}
         />
         {isDuplicate && (
-          <p style={{ margin: "0 0 16px", fontSize: 12, color: "#E53E3E" }}>이미 등록된 강의 이름입니다.</p>
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-danger)" }}>이미 등록된 강의 이름입니다.</p>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={handleSave} disabled={!canSave} style={{
             padding: "8px 18px", borderRadius: 10, border: "none",
-            background: canSave ? PINK : "#ddd", color: "#fff",
+            background: canSave ? PINK : "var(--color-border-soft)", color: "var(--color-on-brand)",
             cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600
           }}>저장</button>
         </div>
@@ -147,15 +147,15 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
 const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
     <Card style={{ padding: 28, width: 360 }}>
-      <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#222" }}>강의를 삭제할까요?</h3>
-      <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "#666" }}>
+      <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>강의를 삭제할까요?</h3>
+      <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
         {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
       </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+        <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
         <button onClick={() => { onDelete(course); onClose(); }} style={{
           padding: "8px 18px", borderRadius: 10, border: "none",
-          background: "#E53E3E", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700
+          background: "var(--color-danger)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 700
         }}>삭제</button>
       </div>
     </Card>
@@ -225,16 +225,16 @@ const CourseDetailModal = ({
       }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
-            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "#222" }}>{course}</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
+            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
           </div>
           <button onClick={onClose} aria-label="강의 상세 닫기" style={{
             width: 32,
             height: 32,
             borderRadius: 9,
             border: "none",
-            background: "#fafafa",
-            color: "#999",
+            background: "var(--color-surface)",
+            color: "var(--color-muted)",
             cursor: "pointer",
             fontSize: 18,
             lineHeight: "32px",
@@ -244,14 +244,14 @@ const CourseDetailModal = ({
         </div>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "#FFF5F5", color: "#E53E3E", fontSize: 13 }}>
+          <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 13 }}>
             {error}
           </div>
         )}
 
-        <div style={{ border: "1px solid #eeeeee", borderRadius: 14, background: "#fff", minHeight: 320, padding: 18 }}>
+        <div style={{ border: "1px solid var(--color-border-soft)", borderRadius: 14, background: "var(--color-card)", minHeight: 320, padding: 18 }}>
           {materials.length === 0 ? (
-            <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "#aaa" }}>{emptyText}</p>
+            <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {materials.map((material, index) => {
@@ -277,7 +277,7 @@ const CourseDetailModal = ({
                     }}
                   >
                     <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "#333", lineHeight: 1.45, wordBreak: "break-word" }}>
+                      <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", lineHeight: 1.45, wordBreak: "break-word" }}>
                         {material.name}
                       </span>
                       <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#c4c4c4" }}>
@@ -300,7 +300,7 @@ const CourseDetailModal = ({
             padding: "10px 18px",
             borderRadius: 10,
             border: "none",
-            background: "#FFF0F6",
+            background: "var(--color-tint-pink)",
             color: PINK,
             fontSize: 14,
             fontWeight: 800,
@@ -310,7 +310,7 @@ const CourseDetailModal = ({
             padding: "10px 18px",
             borderRadius: 10,
             border: "none",
-            background: "#E8FAFE",
+            background: "var(--color-tint-cyan)",
             color: CYAN,
             fontSize: 14,
             fontWeight: 800,
@@ -747,13 +747,13 @@ export default function Dashboard() {
             {courses.length === 0 ? (
               <div style={{
                 minHeight: 300, display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center", textAlign: "center", color: "#777",
+                alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--color-text-secondary)",
               }}>
-                <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 850, color: "#222" }}>아직 등록된 강의가 없습니다.</h2>
-                <p style={{ margin: "0 0 20px", fontSize: 14, color: "#888" }}>강의를 추가하면 자료, 요약, 퀴즈를 관리할 수 있어요.</p>
+                <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 850, color: "var(--color-text-strong)" }}>아직 등록된 강의가 없습니다.</h2>
+                <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--color-muted)" }}>강의를 추가하면 자료, 요약, 퀴즈를 관리할 수 있어요.</p>
                 <button onClick={() => setShowAddCourse(true)} style={{
                   padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
-                  color: "#fff", fontSize: 14, fontWeight: 850, cursor: "pointer",
+                  color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
                   boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
                 }}>+ 강의 추가하기</button>
               </div>
@@ -778,10 +778,10 @@ export default function Dashboard() {
                       }}
                     >
                       <div>
-                        <h2 style={{ margin: "0 34px 10px 0", fontSize: 17, fontWeight: 850, color: "#222", lineHeight: 1.35, wordBreak: "break-word" }}>
+                        <h2 style={{ margin: "0 34px 10px 0", fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
                           {course}
                         </h2>
-                        <p style={{ margin: 0, fontSize: 13, color: stats.error ? "#E53E3E" : "#777", fontWeight: 700 }}>
+                        <p style={{ margin: 0, fontSize: 13, color: stats.error ? "var(--color-danger)" : "var(--color-text-secondary)", fontWeight: 700 }}>
                           {stats.error ? "정보를 불러오지 못했습니다" : statsLabel}
                         </p>
                       </div>
@@ -791,19 +791,19 @@ export default function Dashboard() {
                         onClick={e => { e.stopPropagation(); setOpenCourseMenu(prev => prev === course ? null : course); }}
                         style={{
                           position: "absolute", top: 14, right: 14,
-                          width: 30, height: 30, borderRadius: 9, border: "1px solid #eeeeee",
-                          background: openCourseMenu === course ? "#fafafa" : "#fff",
-                          color: "#999", cursor: "pointer", fontSize: 18, lineHeight: "26px", padding: 0,
+                          width: 30, height: 30, borderRadius: 9, border: "1px solid var(--color-border-soft)",
+                          background: openCourseMenu === course ? "var(--color-surface)" : "var(--color-card)",
+                          color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "26px", padding: 0,
                         }}
                       >...</button>
                       {openCourseMenu === course && (
                         <div onClick={e => e.stopPropagation()} style={{
                           position: "absolute", right: 14, top: 48, width: 128, padding: 6,
-                          borderRadius: 12, border: "1px solid #eeeeee", background: "#fff",
+                          borderRadius: 12, border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
                           boxShadow: "0 12px 28px rgba(0,0,0,0.12)", zIndex: 20,
                         }}>
-                          <button type="button" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "#fff", color: "#333", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
-                          <button type="button" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "#fff", color: "#E53E3E", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
+                          <button type="button" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
+                          <button type="button" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-danger)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
                         </div>
                       )}
                     </Card>
@@ -811,7 +811,7 @@ export default function Dashboard() {
                 })}
                 <button onClick={() => setShowAddCourse(true)} style={{
                   minHeight: 120, borderRadius: 18, border: "1px dashed #d8dde8",
-                  background: "#fbfcfe", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
+                  background: "var(--color-card)", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
                 }}>+ 강의 추가하기</button>
               </div>
             )}
@@ -828,7 +828,7 @@ export default function Dashboard() {
                 }}>+</button>
               </div>
               {sortedDdays.length === 0 ? (
-                <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "10px 0" }}>설정된 D-day가 없습니다</p>
+                <p style={{ color: "var(--color-muted)", fontSize: 13, textAlign: "center", padding: "10px 0" }}>설정된 D-day가 없습니다</p>
               ) : (
                 <>
                   {displayDdays.map((d, i) => {
@@ -846,7 +846,7 @@ export default function Dashboard() {
                             color: ddayTypeColors[type].solid,
                             fontSize: 11, fontWeight: 800,
                           }}>{ddayTypeLabels[type]}</span>
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#333", wordBreak: "break-word" }}>{d.subj}</span>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{d.subj}</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
@@ -857,8 +857,8 @@ export default function Dashboard() {
                             aria-label={`${d.subj} D-day 삭제`}
                             title="삭제"
                             style={{
-                              width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
-                              background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                              width: 24, height: 24, borderRadius: 8, border: "1px solid var(--color-border-soft)",
+                              background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 15,
                               lineHeight: "22px", padding: 0,
                             }}
                           >×</button>
@@ -879,7 +879,7 @@ export default function Dashboard() {
             {/* 오늘의 학습계획 */}
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#222" }}>오늘의 학습계획</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>오늘의 학습계획</h3>
                 <button
                   type="button"
                   onClick={() => navigate(pageRoutes["학습 캘린더"])}
@@ -887,8 +887,8 @@ export default function Dashboard() {
                   title="학습 캘린더"
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    width: 30, height: 30, borderRadius: 9, border: "1px solid #eeeeee",
-                    background: "#fff", color: "#64748b", cursor: "pointer", padding: 0,
+                    width: 30, height: 30, borderRadius: 9, border: "1px solid var(--color-border-soft)",
+                    background: "var(--color-card)", color: "var(--color-text-secondary)", cursor: "pointer", padding: 0,
                   }}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -900,9 +900,9 @@ export default function Dashboard() {
                 </button>
               </div>
               {studyPlanMessage ? (
-                <p style={{ margin: "0 0 12px", color: "#555", fontSize: 13, lineHeight: 1.6 }}>{studyPlanMessage}</p>
+                <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>{studyPlanMessage}</p>
               ) : (
-                <p style={{ margin: "0 0 12px", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+                <p style={{ margin: "0 0 12px", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                   D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
                 </p>
               )}
@@ -914,9 +914,9 @@ export default function Dashboard() {
                     disabled={!canGenerateStudyPlan || studyPlanLoading}
                     style={{
                       flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 8,
-                      border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "#e5e5e5" : CYAN}`,
-                      background: "#fff",
-                      color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : CYAN,
+                      border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN}`,
+                      background: "var(--color-card)",
+                      color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : CYAN,
                       cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
                       fontSize: 13, fontWeight: 800,
                     }}
@@ -930,7 +930,7 @@ export default function Dashboard() {
                     title="AI 계획 옵션"
                     style={{
                       width: 30, flexShrink: 0, borderRadius: 8,
-                      border: "1px solid #eaf7fa", background: "#fff",
+                      border: "1px solid #eaf7fa", background: "var(--color-card)",
                       color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
                     }}
                   >
@@ -942,7 +942,7 @@ export default function Dashboard() {
                   onClick={() => setShowAddPlan(true)}
                   style={{
                     flex: 1, padding: "8px 10px", borderRadius: 8,
-                    border: `1px solid ${CYAN}`, background: "#fff",
+                    border: `1px solid ${CYAN}`, background: "var(--color-card)",
                     color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800,
                   }}
                 >
@@ -964,8 +964,8 @@ export default function Dashboard() {
                       disabled={!canGenerateStudyPlan || studyPlanLoading}
                       style={{
                         padding: "6px 9px", borderRadius: 8, border: "1px solid #f0f0f0",
-                        background: !canGenerateStudyPlan || studyPlanLoading ? "#f2f2f2" : "#fff",
-                        color: !canGenerateStudyPlan || studyPlanLoading ? "#aaa" : "#666",
+                        background: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-surface)" : "var(--color-card)",
+                        color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : "var(--color-text-secondary)",
                         cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
                         fontSize: 12, fontWeight: 700,
                       }}
@@ -980,7 +980,7 @@ export default function Dashboard() {
                   marginBottom: 14, padding: 12, borderRadius: 12,
                   border: "1px solid #eef7f9", background: "#fbfeff",
                 }}>
-                  <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "#555" }}>
+                  <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "var(--color-text)" }}>
                     {planSourceMessage}
                   </p>
                   {([
@@ -989,11 +989,11 @@ export default function Dashboard() {
                   ] as const).map(group => (
                     group.sources.length > 0 && (
                       <div key={group.title} style={{ marginBottom: 12 }}>
-                        <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "#999" }}>{group.title}</p>
+                        <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "var(--color-muted)" }}>{group.title}</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                           {group.sources.map(source => {
                             const selected = selectedPlanSourceKeys.includes(source.key);
-                            const accent = source.kind === "carryover" ? "#777" : ddayTypeColors[source.kind].solid;
+                            const accent = source.kind === "carryover" ? "var(--color-text-secondary)" : ddayTypeColors[source.kind].solid;
                             return (
                               <button
                                 key={source.key}
@@ -1001,9 +1001,9 @@ export default function Dashboard() {
                                 onClick={() => togglePlanSource(source.key)}
                                 style={{
                                   maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
-                                  border: `1px solid ${selected ? accent : "#eeeeee"}`,
-                                  background: selected ? (source.kind === "carryover" ? "#f7f7f7" : ddayTypeColors[source.kind].soft) : "#fff",
-                                  color: selected ? accent : "#777",
+                                  border: `1px solid ${selected ? accent : "var(--color-border-soft)"}`,
+                                  background: selected ? (source.kind === "carryover" ? "var(--color-surface)" : ddayTypeColors[source.kind].soft) : "var(--color-card)",
+                                  color: selected ? accent : "var(--color-text-secondary)",
                                   cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                                   textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                 }}
@@ -1021,8 +1021,8 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => setShowPlanSourcePicker(false)}
                       style={{
-                        padding: "7px 11px", borderRadius: 8, border: "1px solid #eeeeee",
-                        background: "#fff", color: "#777", cursor: "pointer", fontSize: 12, fontWeight: 750,
+                        padding: "7px 11px", borderRadius: 8, border: "1px solid var(--color-border-soft)",
+                        background: "var(--color-card)", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, fontWeight: 750,
                       }}
                     >취소</button>
                     <button
@@ -1031,8 +1031,8 @@ export default function Dashboard() {
                       disabled={selectedPlanSources.length === 0 || studyPlanLoading}
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "none",
-                        background: selectedPlanSources.length === 0 || studyPlanLoading ? "#ddd" : CYAN,
-                        color: "#fff",
+                        background: selectedPlanSources.length === 0 || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
+                        color: "var(--color-on-brand)",
                         cursor: selectedPlanSources.length === 0 || studyPlanLoading ? "default" : "pointer",
                         fontSize: 12, fontWeight: 800,
                       }}
@@ -1043,17 +1043,17 @@ export default function Dashboard() {
                 </div>
               )}
               {studyPlanError && (
-                <p style={{ margin: "0 0 12px", padding: 10, borderRadius: 9, background: "#FFF5F5", color: "#E53E3E", fontSize: 12, lineHeight: 1.5 }}>
+                <p style={{ margin: "0 0 12px", padding: 10, borderRadius: 9, background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 12, lineHeight: 1.5 }}>
                   {studyPlanError}
                 </p>
               )}
               {!canGenerateStudyPlan && (
-                <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "6px 0 12px", margin: 0 }}>
+                <p style={{ color: "var(--color-muted)", fontSize: 13, textAlign: "center", padding: "6px 0 12px", margin: 0 }}>
                   먼저 D-day에 과제나 일정을 추가해보세요
                 </p>
               )}
               {todayPlanEntries.length === 0 ? (
-                <p style={{ color: "#bbb", fontSize: 13, textAlign: "center", padding: "6px 0", margin: 0 }}>아직 생성된 계획이 없습니다</p>
+                <p style={{ color: "var(--color-muted)", fontSize: 13, textAlign: "center", padding: "6px 0", margin: 0 }}>아직 생성된 계획이 없습니다</p>
               ) : (
                 <>
                   {todayPlanEntries.map(({ plan: p, index: i }, idx) => {
@@ -1068,11 +1068,11 @@ export default function Dashboard() {
                         <button onClick={() => {
                           setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));
                         }} style={{
-                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "#ddd"}`,
-                          background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
+                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "var(--color-border-soft)"}`,
+                          background: p.done ? CYAN : "var(--color-card)", cursor: "pointer", display: "flex",
                           alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
                         }}>
-                          {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                          {p.done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                         </button>
                         {isEditing ? (
                           <input
@@ -1090,7 +1090,7 @@ export default function Dashboard() {
                             style={{
                               flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
                               border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
-                              color: "#333", boxSizing: "border-box",
+                              color: "var(--color-text-strong)", boxSizing: "border-box",
                             }}
                           />
                         ) : (
@@ -1101,7 +1101,7 @@ export default function Dashboard() {
                             style={{
                               flex: 1, minWidth: 0, border: "none", background: "none",
                               padding: 0, cursor: "text", textAlign: "left", fontSize: 14,
-                              color: p.done ? "#bbb" : "#444",
+                              color: p.done ? "var(--color-muted)" : "var(--color-text)",
                               textDecoration: p.done ? "line-through" : "none",
                               lineHeight: 1.45, wordBreak: "break-word",
                             }}
@@ -1114,8 +1114,8 @@ export default function Dashboard() {
                           aria-label={`${p.text} 학습 계획 삭제`}
                           title="삭제"
                           style={{
-                            width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
-                            background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+                            width: 24, height: 24, borderRadius: 8, border: "1px solid var(--color-border-soft)",
+                            background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 15,
                             lineHeight: "22px", padding: 0, flexShrink: 0,
                           }}
                         >×</button>

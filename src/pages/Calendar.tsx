@@ -187,17 +187,17 @@ export default function Calendar() {
       : p)));
 
   const addBtnStyle: CSSProperties = {
-    border: `1px solid ${CYAN}`, background: "#fff", color: CYAN,
+    border: `1px solid ${CYAN}`, background: "var(--color-card)", color: CYAN,
     borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 800, cursor: "pointer",
   };
   const deleteBtnStyle: CSSProperties = {
-    width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
-    background: "#fff", color: "#bbb", cursor: "pointer", fontSize: 15,
+    width: 24, height: 24, borderRadius: 8, border: "1px solid var(--color-border-soft)",
+    background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 15,
     lineHeight: "22px", padding: 0, flexShrink: 0,
   };
   const editBtnStyle: CSSProperties = {
-    width: 24, height: 24, borderRadius: 8, border: "1px solid #eeeeee",
-    background: "#fff", color: "#94a3b8", cursor: "pointer", fontSize: 12,
+    width: 24, height: 24, borderRadius: 8, border: "1px solid var(--color-border-soft)",
+    background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 12,
     lineHeight: "22px", padding: 0, flexShrink: 0,
   };
 
@@ -228,7 +228,7 @@ export default function Calendar() {
         />
       )}
 
-      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-surface)" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
@@ -237,8 +237,8 @@ export default function Calendar() {
 
       <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ marginBottom: 18 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 850, color: "#222" }}>학습 캘린더</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "#888" }}>날짜별 페이스 학습 · D-day · 할 일을 한 화면에서 관리하세요.</p>
+          <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>학습 캘린더</h2>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>날짜별 페이스 학습 · D-day · 할 일을 한 화면에서 관리하세요.</p>
         </div>
 
         <div className="grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -254,7 +254,7 @@ export default function Calendar() {
                 { label: "일정", color: ddayTypeColors.event.solid, soft: ddayTypeColors.event.soft, shape: "chip" as const },
                 { label: "시험", color: ddayTypeColors.exam.solid, soft: ddayTypeColors.exam.soft, shape: "chip" as const },
               ].map(item => (
-                <span key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#666" }}>
+                <span key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-secondary)" }}>
                   {item.shape === "dot" ? (
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
                   ) : (
@@ -270,22 +270,22 @@ export default function Calendar() {
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>{formatPanelDate(selectedDate)}</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>{formatPanelDate(selectedDate)}</h3>
                 {selectedIsToday && (
-                  <span style={{ fontSize: 11, fontWeight: 800, color: CYAN, background: "#E8FAFE", borderRadius: 999, padding: "2px 8px" }}>오늘</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: CYAN, background: "var(--color-tint-cyan)", borderRadius: 999, padding: "2px 8px" }}>오늘</span>
                 )}
               </div>
 
               {/* 그 날의 할 일: 페이스 분량 + 일반 할 일 (모두 할 일로 통합) */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#444" }}>할 일</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>할 일</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button type="button" onClick={() => setShowAddPlan(true)} style={addBtnStyle}>+ 할 일</button>
                   <button type="button" onClick={() => setShowAddPace(true)} style={addBtnStyle}>+ 페이스</button>
                 </div>
               </div>
               {dayPaceEntries.length === 0 && dayPlanEntries.length === 0 ? (
-                <p style={{ margin: "0 0 6px", fontSize: 13, color: "#bbb", padding: "4px 0" }}>이 날의 할 일이 없습니다</p>
+                <p style={{ margin: "0 0 6px", fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>이 날의 할 일이 없습니다</p>
               ) : (
                 <>
                   {dayPaceEntries.map((entry, idx) => {
@@ -297,7 +297,7 @@ export default function Calendar() {
                     return (
                       <div key={`pace-${entry.planId}-${idx}`} style={{
                         display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
-                        borderTop: idx > 0 ? "1px solid #f5f5f5" : "none",
+                        borderTop: idx > 0 ? "1px solid var(--color-border-soft)" : "none",
                       }}>
                         {entry.readOnly ? (
                           <span aria-hidden style={{
@@ -313,18 +313,18 @@ export default function Calendar() {
                             aria-label={`${entry.course} 오늘 분량 완료`}
                             style={{
                               width: 22, height: 22, borderRadius: "50%",
-                              border: `2px solid ${done ? CYAN : "#ddd"}`, background: done ? CYAN : "#fff",
+                              border: `2px solid ${done ? CYAN : "var(--color-border-soft)"}`, background: done ? CYAN : "var(--color-card)",
                               cursor: canCheck ? "pointer" : "default", display: "flex",
                               alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
                             }}
                           >
-                            {done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                            {done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                           </button>
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
                             fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
-                            color: done ? "#bbb" : "#444", textDecoration: done ? "line-through" : "none",
+                            color: done ? "var(--color-muted)" : "var(--color-text)", textDecoration: done ? "line-through" : "none",
                           }}>{entry.readOnly ? `${entry.course} 퀴즈` : entry.label}</div>
                           <span style={{ fontSize: 11, fontWeight: 700, color: entry.readOnly ? CYAN : meta.color }}>
                             {entry.readOnly ? "퀴즈 자동 집계" : meta.label}
@@ -342,23 +342,23 @@ export default function Calendar() {
                   {dayPlanEntries.map(({ plan: p, index: i }, idx) => (
                     <div key={p.id || `${p.text}-${i}`} style={{
                       display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
-                      borderTop: (idx > 0 || dayPaceEntries.length > 0) ? "1px solid #f5f5f5" : "none",
+                      borderTop: (idx > 0 || dayPaceEntries.length > 0) ? "1px solid var(--color-border-soft)" : "none",
                     }}>
                       <button
                         type="button"
                         onClick={() => togglePlan(i)}
                         aria-label={`${p.text} 완료 토글`}
                         style={{
-                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "#ddd"}`,
-                          background: p.done ? CYAN : "#fff", cursor: "pointer", display: "flex",
+                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "var(--color-border-soft)"}`,
+                          background: p.done ? CYAN : "var(--color-card)", cursor: "pointer", display: "flex",
                           alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
                         }}
                       >
-                        {p.done && <span style={{ color: "#fff", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                        {p.done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                       </button>
                       <span style={{
                         flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
-                        color: p.done ? "#bbb" : "#444", textDecoration: p.done ? "line-through" : "none",
+                        color: p.done ? "var(--color-muted)" : "var(--color-text)", textDecoration: p.done ? "line-through" : "none",
                       }}>{p.text}</span>
                       <button type="button" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                     </div>
@@ -368,11 +368,11 @@ export default function Calendar() {
 
               {/* 그 날의 마감 / 일정 */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#444" }}>마감 · 일정</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>마감 · 일정</span>
                 <button type="button" onClick={() => setShowAddDday(true)} style={addBtnStyle}>+ D-day</button>
               </div>
               {dayDdays.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 13, color: "#bbb", padding: "4px 0" }}>이 날의 D-day가 없습니다</p>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>이 날의 D-day가 없습니다</p>
               ) : (
                 dayDdays.map((d, idx) => {
                   const type = d.type || "assignment";
@@ -380,7 +380,7 @@ export default function Calendar() {
                   return (
                     <div key={d.id || `${d.subj}-${d.date}-${idx}`} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                      padding: "8px 0", borderTop: idx > 0 ? "1px solid #f5f5f5" : "none",
+                      padding: "8px 0", borderTop: idx > 0 ? "1px solid var(--color-border-soft)" : "none",
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                         <span style={{
@@ -388,7 +388,7 @@ export default function Calendar() {
                           background: ddayTypeColors[type].soft, color: ddayTypeColors[type].solid,
                           fontSize: 11, fontWeight: 800,
                         }}>{ddayTypeLabels[type]}</span>
-                        <span style={{ fontSize: 14, color: "#333", wordBreak: "break-word" }}>{d.subj}</span>
+                        <span style={{ fontSize: 14, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{d.subj}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>

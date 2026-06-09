@@ -162,13 +162,13 @@ const shuffleQuizOptions = (questions: QuizQuestion[], fallbackType?: QuizQuesti
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
-  <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+  <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <button onClick={onOpenSidebar} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
       <button onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-      <span style={{ color: "#bbb", fontSize: 14 }}>/ {label}</span>
+      <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ {label}</span>
     </div>
     {extra}
   </div>
@@ -833,22 +833,22 @@ export default function Quiz() {
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
           <button onClick={handleCourseBack} style={{
-            background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+            background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
           }}>← 돌아가기</button>
 
-          <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "#222" }}>{selectedCourse}</h2>
+          <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>{selectedCourse}</h2>
 
           {error && (
-            <div style={{ marginBottom: 20, padding: "12px 16px", borderRadius: 10, background: "#FFF0F6", border: `1px solid ${PINK}`, fontSize: 13, color: PINK }}>
+            <div style={{ marginBottom: 20, padding: "12px 16px", borderRadius: 10, background: "var(--color-tint-pink)", border: `1px solid ${PINK}`, fontSize: 13, color: PINK }}>
               {error}
             </div>
           )}
 
-          <Card style={{ padding: 20, marginBottom: 16, border: "1px solid #E8FAFE", background: "#F7FDFF" }}>
+          <Card style={{ padding: 20, marginBottom: 16, border: "1px solid var(--color-tint-cyan)", background: "#F7FDFF" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
               <div>
-                <h3 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 800, color: "#222" }}>페이스메이커</h3>
-                <p style={{ margin: 0, fontSize: 13, color: "#666", lineHeight: 1.6 }}>
+                <h3 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>페이스메이커</h3>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                   {getDifficultyReason(quizAttempts)}
                 </p>
               </div>
@@ -862,7 +862,7 @@ export default function Quiz() {
                     borderRadius: 10,
                     border: "none",
                     background: CYAN,
-                    color: "#fff",
+                    color: "var(--color-on-brand)",
                     fontSize: 12,
                     fontWeight: 800,
                     cursor: "pointer",
@@ -873,7 +873,7 @@ export default function Quiz() {
               )}
             </div>
             {quizAttempts[0] && (
-              <div style={{ marginTop: 12, fontSize: 12, color: "#888" }}>
+              <div style={{ marginTop: 12, fontSize: 12, color: "var(--color-muted)" }}>
                 최근 점수 {quizAttempts[0].scorePercent}% · {quizAttempts[0].questionType} · {quizAttempts[0].difficulty}
               </div>
             )}
@@ -881,7 +881,7 @@ export default function Quiz() {
 
           {/* 강의자료 업로드 */}
           <Card style={{ padding: 24, marginBottom: 16 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#222" }}>강의자료</h3>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>강의자료</h3>
 
             <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
               onChange={e => { handleFiles(e.target.files); e.target.value = ""; }}
@@ -889,7 +889,7 @@ export default function Quiz() {
 
             {materials.length > 0 && (
               <div style={{
-                padding: "12px 16px", borderRadius: 10, background: "#E8FAFE",
+                padding: "12px 16px", borderRadius: 10, background: "var(--color-tint-cyan)",
                 fontSize: 13, color: CYAN, marginBottom: 14, fontWeight: 800
               }}>
                 저장된 강의자료 {materials.length}개 중 {selectedMaterials.length}개가 퀴즈에 반영됩니다
@@ -897,8 +897,8 @@ export default function Quiz() {
             )}
             {materials.length === 0 && (
               <div style={{
-                padding: "12px 16px", borderRadius: 10, background: "#fafafa",
-                fontSize: 13, color: "#aaa", marginBottom: 14
+                padding: "12px 16px", borderRadius: 10, background: "var(--color-surface)",
+                fontSize: 13, color: "var(--color-muted)", marginBottom: 14
               }}>
                 저장된 자료가 없습니다. PDF나 이미지를 업로드하거나 과목명으로만 퀴즈를 생성할 수 있습니다.
               </div>
@@ -907,8 +907,8 @@ export default function Quiz() {
             {materials.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 10 }}>
-                  <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 선택</button>
-                  <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "#fff", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "#777", cursor: "pointer" }}>전체 해제</button>
+                  <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 선택</button>
+                  <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 해제</button>
                 </div>
                 {materials.map(material => {
                   const isSelected = selectedMaterialIds.includes(material.id);
@@ -941,7 +941,7 @@ export default function Quiz() {
                             );
                           }}
                         />
-                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "var(--color-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {material.name}
                         </span>
                       </label>
@@ -960,7 +960,7 @@ export default function Quiz() {
                               style={{
                                 border: isActiveSource ? "1px solid rgba(240, 112, 174, 0.24)" : `1px solid ${BORDER_COLOR}`,
                                 background: isActiveSource ? "rgba(240, 112, 174, 0.07)" : CARD_BACKGROUND,
-                                color: isActiveSource ? PINK : "#777",
+                                color: isActiveSource ? PINK : "var(--color-text-secondary)",
                                 borderRadius: 999,
                                 padding: "6px 10px",
                                 fontSize: 12,
@@ -993,12 +993,12 @@ export default function Quiz() {
                 transition: "all 0.2s", marginBottom: 12
               }}
             >
-              <p style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>
+              <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--color-muted)" }}>
                 강의자료 파일을 여러 개 드래그하거나
               </p>
               <button style={{
-                padding: "7px 18px", borderRadius: 10, border: "1px solid #ddd",
-                background: "#fff", fontSize: 13, cursor: "pointer", color: "#555"
+                padding: "7px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                background: "var(--color-card)", fontSize: 13, cursor: "pointer", color: "var(--color-text)"
               }}>파일 선택</button>
             </div>
 
@@ -1015,15 +1015,15 @@ export default function Quiz() {
               <span style={{ display: "block", marginTop: 8, fontSize: 13, color: CYAN }}>{materialNotice}</span>
             )}
             {!isExtracting && extractError && (
-              <span style={{ fontSize: 13, color: "#E53E3E" }}>분석 실패: {extractError}</span>
+              <span style={{ fontSize: 13, color: "var(--color-danger)" }}>분석 실패: {extractError}</span>
             )}
           </Card>
 
           {/* 퀴즈 설정 */}
           <Card style={{ padding: 24, marginBottom: 20 }}>
-            <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#222" }}>퀴즈 설정</h3>
+            <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>퀴즈 설정</h3>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#888", marginBottom: 8, display: "block" }}>문제 수</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 수</label>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[5, 10, 15, 20].map(n => (
                 <button key={n} onClick={() => setCount(n)} style={{
@@ -1035,7 +1035,7 @@ export default function Quiz() {
               ))}
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#888", marginBottom: 8, display: "block" }}>난이도</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>난이도</label>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {(["쉬움", "보통", "어려움"] as QuizDifficulty[]).map(d => (
                 <button key={d} onClick={() => setDifficulty(d)} style={{
@@ -1047,7 +1047,7 @@ export default function Quiz() {
               ))}
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#888", marginBottom: 8, display: "block" }}>문제 유형</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 유형</label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
                 <button key={t} onClick={() => setQuestionType(t)} style={{
@@ -1059,9 +1059,9 @@ export default function Quiz() {
               ))}
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#888", marginBottom: 8, display: "block" }}>시험 모드</label>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#fafafa", border: "1px solid #f0f0f0" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "#333", cursor: "pointer" }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>시험 모드</label>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={examMode}
@@ -1079,9 +1079,9 @@ export default function Quiz() {
                     style={{
                       padding: "7px 10px",
                       borderRadius: 9,
-                      border: examMinutes === minutes ? `1px solid ${CYAN}` : "1px solid #e5e5e5",
-                      background: examMinutes === minutes ? "#E8FAFE" : "#fff",
-                      color: examMinutes === minutes ? CYAN : "#888",
+                      border: examMinutes === minutes ? `1px solid ${CYAN}` : "1px solid var(--color-border-soft)",
+                      background: examMinutes === minutes ? "var(--color-tint-cyan)" : "var(--color-card)",
+                      color: examMinutes === minutes ? CYAN : "var(--color-muted)",
                       fontSize: 12,
                       fontWeight: 800,
                       cursor: examMode ? "pointer" : "not-allowed",
@@ -1097,8 +1097,8 @@ export default function Quiz() {
 
           <button onClick={generate} disabled={!canGenerate} style={{
             width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-            background: canGenerate ? PINK : "#e0e0e0",
-            color: canGenerate ? "#fff" : "#bbb",
+            background: canGenerate ? PINK : "var(--color-border-soft)",
+            color: canGenerate ? "var(--color-on-brand)" : "var(--color-muted)",
             fontSize: 16, fontWeight: 700,
             cursor: canGenerate ? "pointer" : "not-allowed"
           }}>
@@ -1115,15 +1115,15 @@ export default function Quiz() {
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ width: 48, height: 48, border: "3px solid #f0f0f0", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#333" }}>AI가 퀴즈를 생성하고 있습니다...</p>
-          <p style={{ fontSize: 13, color: "#999" }}>
+          <div style={{ width: 48, height: 48, border: "3px solid var(--color-border-soft)", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
+          <p style={{ fontSize: 16, fontWeight: 600, color: "var(--color-text-strong)" }}>AI가 퀴즈를 생성하고 있습니다...</p>
+          <p style={{ fontSize: 13, color: "var(--color-muted)" }}>
             {selectedCourse} · {count}문제 · {difficulty} · {questionType}{sourceName ? ` · ${sourceName}` : ""}
           </p>
           <button onClick={cancelGeneration} style={{
             marginTop: 20, padding: "10px 28px", borderRadius: 10,
-            border: "1px solid #e0e0e0", background: "#fff",
-            fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#999"
+            border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
+            fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-muted)"
           }}>취소</button>
         </div>
       </div>
@@ -1240,16 +1240,16 @@ export default function Quiz() {
           <Card style={{ padding: 40 }}>
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
-              background: scorePercent >= 80 ? "#E8FAFE" : scorePercent >= 50 ? "#FFF8E8" : "#FFF0F6",
+              background: scorePercent >= 80 ? "var(--color-tint-cyan)" : scorePercent >= 50 ? "#FFF8E8" : "var(--color-tint-pink)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 32, fontWeight: 800, color: scorePercent >= 80 ? CYAN : scorePercent >= 50 ? "#E8A800" : PINK
             }}>{scorePercent}%</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700 }}>
               {timedOut ? "시간이 종료되었습니다" : scorePercent >= 80 ? "훌륭해요!" : scorePercent >= 50 ? "좋은 시작이에요!" : "조금 더 노력해봐요!"}
             </h2>
-            <p style={{ fontSize: 15, color: "#666", margin: "0 0 28px" }}>{quizzes.length}문제 중 {correctCount}문제 정답</p>
+            <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>{quizzes.length}문제 중 {correctCount}문제 정답</p>
             {attemptSaveNotice && (
-              <p style={{ margin: "0 0 20px", fontSize: 12, color: attemptSaveNotice.includes("실패") ? PINK : "#999" }}>
+              <p style={{ margin: "0 0 20px", fontSize: 12, color: attemptSaveNotice.includes("실패") ? PINK : "var(--color-muted)" }}>
                 {attemptSaveNotice}
               </p>
             )}
@@ -1258,22 +1258,22 @@ export default function Quiz() {
                 margin: "0 0 24px",
                 padding: 16,
                 borderRadius: 14,
-                background: "#fafafa",
+                background: "var(--color-surface)",
                 border: `1px solid ${BORDER_COLOR}`,
                 textAlign: "left",
               }}>
-                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "#222" }}>분석 리포트</h3>
+                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>분석 리포트</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
-                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>풀이 시간</div>
-                    <div style={{ fontSize: 15, color: "#333", fontWeight: 850 }}>{reviewAttempt.durationSeconds === null ? "-" : formatSeconds(reviewAttempt.durationSeconds)}</div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "var(--color-card)" }}>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 800, marginBottom: 4 }}>풀이 시간</div>
+                    <div style={{ fontSize: 15, color: "var(--color-text-strong)", fontWeight: 850 }}>{reviewAttempt.durationSeconds === null ? "-" : formatSeconds(reviewAttempt.durationSeconds)}</div>
                   </div>
-                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
-                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>오답</div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "var(--color-card)" }}>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 800, marginBottom: 4 }}>오답</div>
                     <div style={{ fontSize: 15, color: PINK, fontWeight: 850 }}>{Math.max(0, reviewAttempt.count - reviewAttempt.correctCount)}문항</div>
                   </div>
-                  <div style={{ padding: 12, borderRadius: 12, background: "#fff" }}>
-                    <div style={{ fontSize: 11, color: "#999", fontWeight: 800, marginBottom: 4 }}>약점</div>
+                  <div style={{ padding: 12, borderRadius: 12, background: "var(--color-card)" }}>
+                    <div style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 800, marginBottom: 4 }}>약점</div>
                     <div style={{ fontSize: 15, color: CYAN, fontWeight: 850 }}>{reviewAttempt.weakTopics.length || resultWeakTopics.length}개</div>
                   </div>
                 </div>
@@ -1285,11 +1285,11 @@ export default function Quiz() {
               padding: 18,
               borderRadius: 14,
               background: "#F7FDFF",
-              border: "1px solid #E8FAFE",
+              border: "1px solid var(--color-tint-cyan)",
               textAlign: "left",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#222" }}>개인 맞춤 복습</h3>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>개인 맞춤 복습</h3>
                 <span style={{ fontSize: 12, fontWeight: 800, color: CYAN }}>다음 추천: {nextDifficulty}</span>
               </div>
               {resultWeakTopics.length > 0 ? (
@@ -1307,20 +1307,20 @@ export default function Quiz() {
                         gap: 10,
                         padding: "10px 12px",
                         borderRadius: 12,
-                        border: "1px solid #E8FAFE",
-                        background: "#fff",
+                        border: "1px solid var(--color-tint-cyan)",
+                        background: "var(--color-card)",
                         cursor: "pointer",
                         textAlign: "left",
                       }}
                     >
-                      <span style={{ minWidth: 0, fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+                      <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>
                         약점 후보: <strong>{topic}</strong>
                       </span>
                       <span style={{
                         flexShrink: 0,
                         padding: "7px 10px",
                         borderRadius: 9,
-                        background: "#FFF0F6",
+                        background: "var(--color-tint-pink)",
                         color: PINK,
                         fontSize: 12,
                         fontWeight: 800,
@@ -1331,7 +1331,7 @@ export default function Quiz() {
                   ))}
                 </div>
               ) : (
-                <p style={{ margin: 0, fontSize: 13, color: "#666", lineHeight: 1.6 }}>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                   이번 회차에서는 뚜렷한 약점 문항이 없습니다. 다음에는 {nextDifficulty} 난이도로 실전 감각을 이어가세요.
                 </p>
               )}
@@ -1342,11 +1342,11 @@ export default function Quiz() {
                 margin: "0 0 24px",
                 padding: 18,
                 borderRadius: 14,
-                background: "#fff",
+                background: "var(--color-card)",
                 border: `1px solid ${BORDER_COLOR}`,
                 textAlign: "left",
               }}>
-                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "#222" }}>
+                <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>
                   이 퀴즈에 사용한 자료
                 </h3>
                 <div style={{ display: "grid", gap: 8 }}>
@@ -1363,12 +1363,12 @@ export default function Quiz() {
                         padding: "10px 12px",
                         borderRadius: 10,
                         border: `1px solid ${BORDER_COLOR}`,
-                        background: "#fafafa",
+                        background: "var(--color-surface)",
                         cursor: "pointer",
                         textAlign: "left",
                       }}
                     >
-                      <span style={{ minWidth: 0, color: "#444", fontSize: 13, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span style={{ minWidth: 0, color: "var(--color-text)", fontSize: 13, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {material.name}
                       </span>
                       <span style={{ flexShrink: 0, color: CYAN, fontSize: 12, fontWeight: 850 }}>
@@ -1385,11 +1385,11 @@ export default function Quiz() {
                 margin: "0 0 24px",
                 padding: 18,
                 borderRadius: 14,
-                background: "#fff",
+                background: "var(--color-card)",
                 border: `1px solid ${BORDER_COLOR}`,
                 textAlign: "left",
               }}>
-                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: "#222" }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>
                   오답 복습
                 </h3>
                 <div style={{ display: "grid", gap: 10 }}>
@@ -1406,11 +1406,11 @@ export default function Quiz() {
                         ? typeof quiz.answer === "number" ? quiz.options?.[quiz.answer] : null
                         : quiz.answerText);
                     return (
-                      <div key={`${quiz.question}-${wrongIndex}`} style={{ padding: 14, borderRadius: 12, background: "#fafafa", border: "1px solid #f0f0f0" }}>
-                        <div style={{ marginBottom: 8, fontSize: 13, color: "#333", fontWeight: 800, lineHeight: 1.5 }}>
+                      <div key={`${quiz.question}-${wrongIndex}`} style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
+                        <div style={{ marginBottom: 8, fontSize: 13, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
                           Q{questionIndex + 1}. {quiz.question}
                         </div>
-                        <div style={{ display: "grid", gap: 5, fontSize: 12, color: "#666", lineHeight: 1.6 }}>
+                        <div style={{ display: "grid", gap: 5, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                           <span>내 답: <strong style={{ color: PINK }}>{userAnswer ?? "미응답"}</strong></span>
                           <span>정답: <strong style={{ color: CYAN }}>{correctAnswer ?? "정답 정보 없음"}</strong></span>
                           <span>틀린 이유: {attemptAnswer?.feedback || quiz.explanation}</span>
@@ -1424,12 +1424,12 @@ export default function Quiz() {
 
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <button onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(primaryWeakTopic) })} style={{
-                padding: "12px 24px", borderRadius: 12, border: "1px solid #e0e0e0",
-                background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "#555"
+                padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
+                background: "var(--color-card)", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "var(--color-text)"
               }}>AI 튜터로 복습</button>
               <button onClick={retryQuiz} style={{
                 padding: "12px 24px", borderRadius: 12, border: "none",
-                background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#fff"
+                background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-on-brand)"
               }}>다시 풀기</button>
             </div>
           </Card>
@@ -1452,10 +1452,10 @@ export default function Quiz() {
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 600, margin: "40px auto" }}>
           <Card style={{ padding: 28, textAlign: "center" }}>
-            <p style={{ margin: "0 0 16px", fontSize: 14, color: "#666" }}>표시할 퀴즈가 없습니다.</p>
+            <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--color-text-secondary)" }}>표시할 퀴즈가 없습니다.</p>
             <button onClick={() => setView("courseDetail")} style={{
               padding: "10px 20px", borderRadius: 10, border: "none",
-              background: PINK, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer"
+              background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700, cursor: "pointer"
             }}>설정으로 돌아가기</button>
           </Card>
         </div>
@@ -1473,16 +1473,16 @@ export default function Quiz() {
                 {formatSeconds(remainingSeconds)}
               </span>
             )}
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#999" }}>{current + 1} / {quizzes.length}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-muted)" }}>{current + 1} / {quizzes.length}</span>
           </div>
         } />
-      <div style={{ height: 3, background: "#f0f0f0" }}>
+      <div style={{ height: 3, background: "var(--color-border-soft)" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
       </div>
       <div style={{ padding: 24, maxWidth: 600, margin: "30px auto" }}>
         <Card style={{ padding: 28 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: CYAN, marginBottom: 10, display: "block" }}>Q{current + 1}</span>
-          <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "#222", lineHeight: 1.5 }}>{q.question}</h3>
+          <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}>{q.question}</h3>
           {isShortAnswer || isSubjective ? (
             <div>
               <div style={{ display: "flex", gap: 10, alignItems: isSubjective ? "flex-end" : "stretch" }}>
@@ -1497,10 +1497,10 @@ export default function Quiz() {
                       flex: 1,
                       padding: "14px 16px",
                       borderRadius: 12,
-                      border: "1.5px solid #f0f0f0",
-                      background: selected !== undefined ? "#fafafa" : "#fff",
+                      border: "1.5px solid var(--color-border-soft)",
+                      background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)",
                       fontSize: 14,
-                      color: "#444",
+                      color: "var(--color-text)",
                       outline: "none",
                       resize: "vertical",
                       lineHeight: 1.6,
@@ -1515,8 +1515,8 @@ export default function Quiz() {
                     disabled={selected !== undefined}
                     placeholder="정답을 입력하세요"
                     style={{
-                      flex: 1, padding: "14px 16px", borderRadius: 12, border: "1.5px solid #f0f0f0",
-                      background: selected !== undefined ? "#fafafa" : "#fff", fontSize: 14, color: "#444", outline: "none"
+                      flex: 1, padding: "14px 16px", borderRadius: 12, border: "1.5px solid var(--color-border-soft)",
+                      background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)", fontSize: 14, color: "var(--color-text)", outline: "none"
                     }}
                   />
                 )}
@@ -1525,8 +1525,8 @@ export default function Quiz() {
                   disabled={!shortAnswerInput.trim() || selected !== undefined || grading}
                   style={{
                     padding: isSubjective ? "14px 20px" : "0 20px", borderRadius: 12, border: "none",
-                    background: shortAnswerInput.trim() && selected === undefined && !grading ? PINK : "#e0e0e0",
-                    color: "#fff", fontSize: 14, fontWeight: 700,
+                    background: shortAnswerInput.trim() && selected === undefined && !grading ? PINK : "var(--color-border-soft)",
+                    color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700,
                     cursor: shortAnswerInput.trim() && selected === undefined && !grading ? "pointer" : "default"
                   }}
                 >{grading ? "채점 중..." : "제출"}</button>
@@ -1534,7 +1534,7 @@ export default function Quiz() {
               {selected !== undefined && isShortAnswer && !examMode && (
                 <div style={{
                   marginTop: 12, padding: "12px 16px", borderRadius: 12,
-                  background: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? "#E8FAFE" : "#FFF0F6",
+                  background: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
                   color: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? CYAN : PINK,
                   fontSize: 13, fontWeight: 700
                 }}>
@@ -1546,13 +1546,13 @@ export default function Quiz() {
                   marginTop: 12,
                   padding: "12px 16px",
                   borderRadius: 12,
-                  background: subjectiveGrade.isCorrect ? "#E8FAFE" : "#FFF0F6",
+                  background: subjectiveGrade.isCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
                   color: subjectiveGrade.isCorrect ? CYAN : PINK,
                   fontSize: 13,
                   lineHeight: 1.6,
                 }}>
                   <strong>{subjectiveGrade.score}점</strong> · {subjectiveGrade.feedback}
-                  <div style={{ marginTop: 8, color: "#555" }}>
+                  <div style={{ marginTop: 8, color: "var(--color-text)" }}>
                     모범답안: {subjectiveGrade.referenceAnswer}
                   </div>
                 </div>
@@ -1565,10 +1565,10 @@ export default function Quiz() {
                 const isCorrect = q.answer === i;
                 const answered = selected !== undefined;
                 const revealAnswer = answered && !examMode;
-                let bg = "#fafafa", border = "#f0f0f0", color = "#444";
+                let bg = "var(--color-surface)", border = "var(--color-border-soft)", color = "var(--color-text)";
                 if (answered) {
-                  if (revealAnswer && isCorrect) { bg = "#E8FAFE"; border = CYAN; color = CYAN; }
-                  else if (revealAnswer && isSelected && !isCorrect) { bg = "#FFF0F6"; border = PINK; color = PINK; }
+                  if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = CYAN; }
+                  else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
                   else if (isSelected) { bg = "#f3f3f3"; border = "#d8d8d8"; color = "#333"; }
                 }
                 return (
@@ -1587,14 +1587,14 @@ export default function Quiz() {
             </div>
           )}
           {showExplanation && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#FAFAFA", fontSize: 13, color: "#555", lineHeight: 1.6 }}>
+            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
               <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
             </div>
           )}
           {selected !== undefined && (
             <button onClick={next} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-              background: PINK, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer"
+              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
             }}>{current < quizzes.length - 1 ? "다음 문제" : "결과 보기"}</button>
           )}
         </Card>

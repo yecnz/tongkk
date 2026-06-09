@@ -10,9 +10,9 @@ export type DdayType = "assignment" | "event" | "exam";
 export const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정", exam: "시험" };
 // 타입별 색(과제=핑크, 일정=청록, 시험=보라). soft=배경, solid=글자/포인트.
 export const ddayTypeColors: Record<DdayType, { solid: string; soft: string }> = {
-  assignment: { solid: PINK, soft: "#FFF0F6" },
-  event: { solid: CYAN, soft: "#E8FAFE" },
-  exam: { solid: "#8B5CF6", soft: "#EDE9FE" },
+  assignment: { solid: PINK, soft: "var(--color-tint-pink)" },
+  event: { solid: CYAN, soft: "var(--color-tint-cyan)" },
+  exam: { solid: "var(--color-violet)", soft: "var(--color-tint-violet)" },
 };
 
 export type Dday = { id?: string; type?: DdayType; subj: string; date: string };

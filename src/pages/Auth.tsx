@@ -16,14 +16,14 @@ const inputStyle = (focused: boolean): CSSProperties => ({
   boxSizing: "border-box",
   background: focused ? "rgba(0,192,232,0.04)" : MUTED_SURFACE,
   transition: "border 0.2s, background 0.2s",
-  color: "#111827",
+  color: "var(--color-text-strong)",
 });
 
 const linkStyle: CSSProperties = {
   background: "none",
   border: "none",
   fontSize: 12,
-  color: "#94a3b8",
+  color: "var(--color-muted)",
   cursor: "pointer",
   padding: 0,
 };
@@ -115,10 +115,10 @@ export default function Auth() {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
               <div>
-                <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 500, color: "#111827" }}>
+                <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 500, color: "var(--color-text-strong)" }}>
                   {mode === "signIn" ? "로그인" : "회원가입"}
                 </h2>
-                <p style={{ margin: 0, fontSize: 13, color: "#667085" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)" }}>
                   {mode === "signIn" ? "계정에 로그인하세요" : "계정을 생성하세요"}
                 </p>
               </div>
@@ -137,7 +137,7 @@ export default function Auth() {
                   height: 34,
                   cursor: "pointer",
                   fontSize: 16,
-                  color: "#64748b",
+                  color: "var(--color-text-secondary)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -148,7 +148,7 @@ export default function Auth() {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
                 이메일
               </label>
               <input
@@ -165,7 +165,7 @@ export default function Auth() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
                 비밀번호
               </label>
               <input
@@ -183,7 +183,7 @@ export default function Auth() {
             </div>
 
             {error && (
-              <p style={{ margin: "0 0 14px", color: "#E53E3E", fontSize: 12, lineHeight: 1.5 }}>
+              <p style={{ margin: "0 0 14px", color: "var(--color-danger)", fontSize: 12, lineHeight: 1.5 }}>
                 {error}
               </p>
             )}
@@ -197,7 +197,7 @@ export default function Auth() {
                 borderRadius: 14,
                 border: "none",
                 background: PINK,
-                color: "#fff",
+                color: "var(--color-on-brand)",
                 fontSize: 15,
                 fontWeight: 600,
                 cursor: submitting ? "default" : "pointer",
@@ -247,10 +247,10 @@ export default function Auth() {
           boxShadow: SOFT_SHADOW,
           boxSizing: "border-box",
         }}>
-          <h1 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 500, color: "#111827" }}>
+          <h1 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 500, color: "var(--color-text-strong)" }}>
             로그인이 필요합니다
           </h1>
-          <p style={{ fontSize: 14, color: "#667085", margin: "0 0 28px" }}>
+          <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>
             Tongkk를 이용하려면 로그인해주세요
           </p>
           <button
@@ -262,7 +262,7 @@ export default function Auth() {
               borderRadius: 14,
               background: PINK,
               border: "none",
-              color: "#fff",
+              color: "var(--color-on-brand)",
               fontSize: 15,
               fontWeight: 600,
               cursor: "pointer",

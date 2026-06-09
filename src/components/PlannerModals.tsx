@@ -91,11 +91,11 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
   };
 
   return (
-    <div style={{ background: "rgba(255,255,255,0.55)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid rgba(255,255,255,0.8)" }}>
+    <div style={{ background: "var(--glass-bg)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid var(--glass-border)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <button onClick={prevMonth} aria-label="이전 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>‹</button>
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: "#222" }}>{viewYear}년 {MONTH_NAMES[viewMonth]}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-strong)" }}>{viewYear}년 {MONTH_NAMES[viewMonth]}</span>
           {planner && offCurrentMonth && (
             <button type="button" onClick={goToToday} style={{
               border: "none", cursor: "pointer", fontSize: 11, fontWeight: 800,
@@ -126,7 +126,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           const dayMarkers = markers?.[dateStr] ?? [];
           const shownMarkers = dayMarkers.slice(0, 3);
           const extraMarkers = dayMarkers.length - shownMarkers.length;
-          const weekdayColor = i % 7 === 0 ? "#FF6B6B" : i % 7 === 6 ? "#5B9CF6" : "#555";
+          const weekdayColor = i % 7 === 0 ? "#FF6B6B" : i % 7 === 6 ? "#5B9CF6" : "var(--color-text)";
 
           // 월간 계획표 모드: 큰 칸 + 날짜 위 작은 점(마감/할 일) + 학습 칩.
           if (planner) {
@@ -143,14 +143,14 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
               }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 3, paddingLeft: 1 }}>
                   <span style={{ fontSize: 11, lineHeight: 1, fontWeight: isSelected || isToday ? 800 : 600,
-                    color: isSelected ? "#1f2937" : isToday ? "#0a7491" : weekdayColor }}>{day}</span>
+                    color: isSelected ? "var(--color-text-strong)" : isToday ? "#0a7491" : weekdayColor }}>{day}</span>
                   {dayMarkers.length > 0 && (
                     <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
                       {shownMarkers.map((marker, mi) => (
                         <span key={mi} style={{ width: 4, height: 4, borderRadius: "50%", background: marker.color }} />
                       ))}
                       {extraMarkers > 0 && (
-                        <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: "#64748b" }}>+{extraMarkers}</span>
+                        <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: "var(--color-text-secondary)" }}>+{extraMarkers}</span>
                       )}
                     </span>
                   )}
@@ -168,7 +168,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
                   );
                 })}
                 {extraChips > 0 && (
-                  <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1.2, color: "#64748b", paddingLeft: 2 }}>+{extraChips}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1.2, color: "var(--color-text-secondary)", paddingLeft: 2 }}>+{extraChips}</span>
                 )}
               </button>
             );
@@ -179,7 +179,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
               width: "100%", aspectRatio: "1", borderRadius: "50%",
               border: isSelected ? "none" : isToday ? "1px solid rgba(0,192,232,0.55)" : "none",
               background: isSelected ? PINK : "transparent",
-              color: isSelected ? "#fff" : isToday ? "#0a7491" : "#333",
+              color: isSelected ? "var(--color-on-brand)" : isToday ? "#0a7491" : "var(--color-text-strong)",
               fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
               cursor: "pointer", transition: "background 0.15s",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
@@ -191,7 +191,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
                     <span key={mi} style={{ width: 5, height: 5, borderRadius: "50%", background: isSelected ? "#fff" : marker.color }} />
                   ))}
                   {extraMarkers > 0 && (
-                    <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: isSelected ? "#fff" : "#94a3b8" }}>+{extraMarkers}</span>
+                    <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: isSelected ? "var(--color-on-brand)" : "var(--color-muted)" }}>+{extraMarkers}</span>
                   )}
                 </span>
               )}
@@ -220,7 +220,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const placeholder = `${ddayTypeLabels[type]}명`;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 380, background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid rgba(255,255,255,0.9)" }}>
+      <div style={{ width: 380, background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
           {(["assignment", "event", "exam"] as const).map(item => {
@@ -234,9 +234,9 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
                 style={{
                   padding: "9px 0",
                   borderRadius: 10,
-                  border: selected ? `1px solid ${color.solid}` : "1px solid #e0e0e0",
-                  background: selected ? color.soft : "rgba(255,255,255,0.8)",
-                  color: selected ? color.solid : "#666",
+                  border: selected ? `1px solid ${color.solid}` : "1px solid var(--color-border-soft)",
+                  background: selected ? color.soft : "var(--glass-bg)",
+                  color: selected ? color.solid : "var(--color-text-secondary)",
                   fontSize: 13,
                   fontWeight: 800,
                   cursor: "pointer",
@@ -248,9 +248,9 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
           })}
         </div>
         <input value={subj} onChange={e => setSubj(e.target.value)} placeholder={placeholder} aria-label={placeholder} style={{
-          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, boxSizing: "border-box", marginBottom: 14,
-          background: "rgba(255,255,255,0.8)"
+          background: "var(--glass-bg)"
         }}/>
         {date && (
           <div style={{ marginBottom: 10, fontSize: 13, color: PINK, fontWeight: 600, textAlign: "center" }}>
@@ -259,9 +259,9 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         )}
         <CustomCalendar value={date} onChange={setDate} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>{submitLabel}</button>
         </div>
       </div>
@@ -291,14 +291,14 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           placeholder="학습 계획을 입력하세요"
           autoFocus
           style={{
-            width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
+            width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
             fontSize: 14, boxSizing: "border-box", marginBottom: 16
           }}
         />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
       </Card>
@@ -576,16 +576,16 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
   };
 
   const inputStyle: CSSProperties = {
-    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-    fontSize: 14, boxSizing: "border-box", background: "rgba(255,255,255,0.8)",
+    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+    fontSize: 14, boxSizing: "border-box", background: "var(--glass-bg)",
   };
-  const labelStyle: CSSProperties = { display: "block", marginBottom: 6, fontSize: 12, fontWeight: 800, color: "#667085" };
+  const labelStyle: CSSProperties = { display: "block", marginBottom: 6, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 380, background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid rgba(255,255,255,0.9)" }}>
+      <div style={{ width: 380, background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
         <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>페이스 플랜 수정</h3>
-        <p style={{ margin: "0 0 16px", fontSize: 13, color: "#888" }}>{plan.course}</p>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)" }}>{plan.course}</p>
 
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>연결할 D-day</label>
@@ -631,13 +631,13 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
         )}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid #e0e0e0", background: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button
             onClick={handleSave}
             disabled={!canSave}
             style={{
               padding: "8px 18px", borderRadius: 10, border: "none",
-              background: canSave ? PINK : "#d8d8d8", color: "#fff",
+              background: canSave ? PINK : "#d8d8d8", color: "var(--color-on-brand)",
               cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600,
             }}
           >저장</button>

@@ -38,7 +38,7 @@ type AITutorDrawerProps = {
 };
 
 const markdownStyles = {
-  paragraph: { margin: "0 0 8px", lineHeight: 1.65, color: "#444" } satisfies CSSProperties,
+  paragraph: { margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" } satisfies CSSProperties,
   list: { margin: "6px 0 10px", paddingLeft: 20, lineHeight: 1.65 } satisfies CSSProperties,
 };
 
@@ -48,22 +48,22 @@ const AGENT_INPUT_BORDER = 2;
 const AGENT_INPUT_MAX_HEIGHT = AGENT_INPUT_LINE_HEIGHT * 5 + 22 + AGENT_INPUT_BORDER;
 
 const markdownComponents: Components = {
-  h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>{children}</h1>,
-  h2: ({ children }) => <h2 style={{ margin: "16px 0 10px", fontSize: 16, lineHeight: 1.4, fontWeight: 850, color: "#222" }}>{children}</h2>,
-  h3: ({ children }) => <h3 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.4, fontWeight: 800, color: "#222" }}>{children}</h3>,
+  h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
+  h2: ({ children }) => <h2 style={{ margin: "16px 0 10px", fontSize: 16, lineHeight: 1.4, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.4, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
   p: ({ children }) => <p style={markdownStyles.paragraph}>{children}</p>,
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 5, paddingLeft: 3 }}>{children}</li>,
-  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "#222" }}>{children}</strong>,
-  em: ({ children }) => <em style={{ color: "#555" }}>{children}</em>,
+  strong: ({ children }) => <strong style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</strong>,
+  em: ({ children }) => <em style={{ color: "var(--color-text)" }}>{children}</em>,
   code: ({ children, className }) => (
-    <code className={className} style={{ padding: className ? 0 : "1px 5px", borderRadius: 5, background: className ? "transparent" : "#f3f4f6", color: className ? "inherit" : "#d6336c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
+    <code className={className} style={{ padding: className ? 0 : "1px 5px", borderRadius: 5, background: className ? "transparent" : "var(--color-surface)", color: className ? "inherit" : "#d6336c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
       {children}
     </code>
   ),
   pre: ({ children }) => (
-    <pre style={{ margin: "10px 0", padding: 12, borderRadius: 10, background: "#f6f7f9", border: "1px solid #eceff3", overflowX: "auto", lineHeight: 1.55 }}>
+    <pre style={{ margin: "10px 0", padding: 12, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", overflowX: "auto", lineHeight: 1.55 }}>
       {children}
     </pre>
   ),
@@ -456,11 +456,11 @@ export const AITutorDrawer = ({
     minWidth: 44,
     height: 104,
     padding: "10px 8px",
-    border: `1px solid ${PINK}33`,
+    border: "1px solid color-mix(in srgb, var(--color-pink) 20%, transparent)",
     borderRight: "none",
     borderRadius: "14px 0 0 14px",
-    background: canUseAgent ? "#FFF0F6" : "#f2f2f2",
-    color: canUseAgent ? PINK : "#999",
+    background: canUseAgent ? "var(--color-tint-pink)" : "var(--color-surface)",
+    color: canUseAgent ? PINK : "var(--color-muted)",
     boxShadow: "-6px 0 18px rgba(0,0,0,0.10)",
     fontSize: 12,
     fontWeight: 900,
@@ -499,20 +499,20 @@ export const AITutorDrawer = ({
         height: layout === "embedded" ? (fill ? "100%" : 1100) : isExpanded ? "calc(100vh - 48px)" : "100vh",
         minHeight: layout === "embedded" ? (fill ? 0 : 1100) : undefined,
         zIndex: layout === "embedded" ? "auto" : isExpanded ? 260 : 190,
-        border: "1px solid #f0f0f0",
-        borderRight: layout === "embedded" ? "1px solid #f0f0f0" : isExpanded ? "1px solid #f0f0f0" : "none",
+        border: "1px solid var(--color-border-soft)",
+        borderRight: layout === "embedded" ? "1px solid var(--color-border-soft)" : isExpanded ? "1px solid var(--color-border-soft)" : "none",
         borderRadius: layout === "embedded" ? 0 : isExpanded ? 16 : "16px 0 0 16px",
         padding: 20,
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
-        background: "#fff",
+        background: "var(--color-card)",
         boxShadow: layout === "embedded" ? "none" : isExpanded ? "0 24px 80px rgba(0,0,0,0.22)" : isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
         transform: layout === "embedded" ? "translateX(0)" : isExpanded ? "translateX(-50%)" : isOpen ? "translateX(0)" : "translateX(104%)",
         transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease, width 0.18s ease, height 0.18s ease",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "#222" }}>AI 튜터</h3>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>AI 튜터</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {canUseAgent && (
               canPersistChat ? (
@@ -529,9 +529,9 @@ export const AITutorDrawer = ({
                       gap: 6,
                       padding: "4px 10px",
                       borderRadius: 8,
-                      border: sessionMenuOpen ? `1px solid ${PINK}55` : "1px solid #e0e0e0",
-                      background: sessionMenuOpen ? "#FFF0F6" : "#fafafa",
-                      color: sessionMenuOpen ? PINK : "#777",
+                      border: sessionMenuOpen ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : "1px solid var(--color-border-soft)",
+                      background: sessionMenuOpen ? "var(--color-tint-pink)" : "var(--color-surface)",
+                      color: sessionMenuOpen ? PINK : "var(--color-text-secondary)",
                       fontSize: 12,
                       fontWeight: 800,
                       cursor: "pointer",
@@ -553,7 +553,7 @@ export const AITutorDrawer = ({
                           width: 260,
                           maxHeight: 320,
                           overflowY: "auto",
-                          background: "#fff",
+                          background: "var(--color-card)",
                           borderRadius: 12,
                           border: "1px solid #ececec",
                           boxShadow: "0 12px 32px rgba(0,0,0,0.16)",
@@ -564,7 +564,7 @@ export const AITutorDrawer = ({
                         }}
                       >
                         {chatSessions.length === 0 && (
-                          <div style={{ padding: "10px 12px", fontSize: 12, color: "#aaa", fontWeight: 800, textAlign: "center" }}>
+                          <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-muted)", fontWeight: 800, textAlign: "center" }}>
                             저장된 대화가 없습니다
                           </div>
                         )}
@@ -585,19 +585,19 @@ export const AITutorDrawer = ({
                                 padding: "9px 10px",
                                 borderRadius: 8,
                                 border: "none",
-                                background: isActive ? "#FFF0F6" : "transparent",
-                                color: isActive ? PINK : "#444",
+                                background: isActive ? "var(--color-tint-pink)" : "transparent",
+                                color: isActive ? PINK : "var(--color-text)",
                                 textAlign: "left",
                                 cursor: chatLoading || agentLoading ? "default" : "pointer",
                                 opacity: chatLoading || agentLoading ? 0.6 : 1,
                               }}
                             >
-                              <i className="fa-regular fa-message" style={{ fontSize: 12, color: isActive ? PINK : "#bbb", flexShrink: 0 }} />
+                              <i className="fa-regular fa-message" style={{ fontSize: 12, color: isActive ? PINK : "var(--color-muted)", flexShrink: 0 }} />
                               <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ display: "block", fontSize: 12.5, fontWeight: 800, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {session.title}
                                 </span>
-                                <span style={{ display: "block", fontSize: 10, color: "#aaa", fontWeight: 700 }}>
+                                <span style={{ display: "block", fontSize: 10, color: "var(--color-muted)", fontWeight: 700 }}>
                                   {formatSessionDate(session.updatedAt)}
                                 </span>
                               </span>
@@ -605,7 +605,7 @@ export const AITutorDrawer = ({
                             </button>
                           );
                         })}
-                        <div style={{ height: 1, background: "#f0f0f0", margin: "4px 2px" }} />
+                        <div style={{ height: 1, background: "var(--color-border-soft)", margin: "4px 2px" }} />
                         <button
                           type="button"
                           role="menuitem"
@@ -620,7 +620,7 @@ export const AITutorDrawer = ({
                             borderRadius: 8,
                             border: "none",
                             background: "transparent",
-                            color: chatLoading || agentLoading ? "#bbb" : PINK,
+                            color: chatLoading || agentLoading ? "var(--color-muted)" : PINK,
                             fontSize: 12.5,
                             fontWeight: 850,
                             textAlign: "left",
@@ -644,9 +644,9 @@ export const AITutorDrawer = ({
                   style={{
                     padding: "4px 10px",
                     borderRadius: 8,
-                    border: "1px solid #e0e0e0",
-                    background: "#fafafa",
-                    color: chatLoading || agentLoading ? "#bbb" : "#777",
+                    border: "1px solid var(--color-border-soft)",
+                    background: "var(--color-surface)",
+                    color: chatLoading || agentLoading ? "var(--color-muted)" : "var(--color-text-secondary)",
                     fontSize: 12,
                     fontWeight: 800,
                     cursor: chatLoading || agentLoading ? "default" : "pointer",
@@ -666,8 +666,8 @@ export const AITutorDrawer = ({
                 style={{
                   padding: "4px 10px",
                   borderRadius: 8,
-                  border: `1px solid ${CYAN}55`,
-                  background: "#E8FAFE",
+                  border: "1px solid color-mix(in srgb, var(--color-cyan) 33%, transparent)",
+                  background: "var(--color-tint-cyan)",
                   color: CYAN,
                   fontSize: 12,
                   fontWeight: 800,
@@ -681,7 +681,7 @@ export const AITutorDrawer = ({
               type="button"
               onClick={() => setOpen(false)}
               aria-label="AI 튜터 닫기"
-              style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid #e0e0e0", background: "#f3f4f6", color: "#999", cursor: "pointer", fontSize: 18, fontWeight: 800, lineHeight: "28px", padding: 0 }}
+              style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-surface)", color: "var(--color-muted)", cursor: "pointer", fontSize: 18, fontWeight: 800, lineHeight: "28px", padding: 0 }}
             >
               ×
             </button>
@@ -697,9 +697,9 @@ export const AITutorDrawer = ({
                   width: "100%",
                   padding: "8px 10px",
                   borderRadius: 10,
-                  border: "1px solid #eeeeee",
-                  background: "#fafafa",
-                  color: "#666",
+                  border: "1px solid var(--color-border-soft)",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text-secondary)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -710,10 +710,10 @@ export const AITutorDrawer = ({
                 }}
               >
                 <span>추천 질문 {suggestedQuestions.length}</span>
-                <span style={{ color: "#aaa", fontSize: 13 }}>{suggestionsCollapsed ? "펼치기" : "접기"}</span>
+                <span style={{ color: "var(--color-muted)", fontSize: 13 }}>{suggestionsCollapsed ? "펼치기" : "접기"}</span>
               </button>
             ) : (
-              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
+              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "var(--color-muted)" }}>추천 질문</div>
             )}
             {(agentMessages.length === 0 || !suggestionsCollapsed) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: agentMessages.length > 0 ? 8 : 0 }}>
@@ -726,9 +726,9 @@ export const AITutorDrawer = ({
                   style={{
                     padding: "7px 10px",
                     borderRadius: 999,
-                    border: "1px solid #eeeeee",
-                    background: "#fafafa",
-                    color: "#555",
+                    border: "1px solid var(--color-border-soft)",
+                    background: "var(--color-surface)",
+                    color: "var(--color-text)",
                     fontSize: 12,
                     fontWeight: 700,
                     lineHeight: 1.35,
@@ -748,15 +748,15 @@ export const AITutorDrawer = ({
         <div style={{ flex: 1, minHeight: 0, position: "relative", marginBottom: 14 }}>
           <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
             {!canUseAgent ? (
-              <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                 {disabledReason}
               </div>
             ) : chatLoading ? (
-              <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                 이전 AI 튜터 대화를 불러오는 중입니다.
               </div>
             ) : agentMessages.length === 0 ? (
-              <div style={{ padding: 14, borderRadius: 12, background: "#fafafa", color: "#888", fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                 예: “이 개념을 쉬운 예시로 설명해줘” 또는 “시험에 나올 만한 포인트를 알려줘”
               </div>
             ) : (
@@ -768,12 +768,12 @@ export const AITutorDrawer = ({
                     : { mainContent: msg.content, suggestions: [] };
                   return (
                     <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "#E8FAFE" : "#fafafa", color: "#444", fontSize: 13, lineHeight: 1.6 }}>
+                      <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
                         <FormattedTutorText content={mainContent} />
                       </div>
                       {isLastAssistant && suggestions.length > 0 && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", letterSpacing: "0.04em" }}>바로 이어서</span>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "var(--color-muted)", letterSpacing: "0.04em" }}>바로 이어서</span>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {suggestions.map(suggestion => (
                               <button
@@ -781,7 +781,7 @@ export const AITutorDrawer = ({
                                 type="button"
                                 onClick={() => { skipNextScrollRef.current = true; void sendAgentQuestion(suggestion); }}
                                 disabled={agentLoading}
-                                style={{ padding: "6px 10px", borderRadius: 999, border: `1px solid ${PINK}33`, background: "#FFF0F6", color: PINK, fontSize: 12, fontWeight: 400, lineHeight: 1.35, cursor: agentLoading ? "default" : "pointer", opacity: agentLoading ? 0.55 : 1, textAlign: "left" }}
+                                style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid color-mix(in srgb, var(--color-pink) 20%, transparent)", background: "var(--color-tint-pink)", color: PINK, fontSize: 12, fontWeight: 400, lineHeight: 1.35, cursor: agentLoading ? "default" : "pointer", opacity: agentLoading ? 0.55 : 1, textAlign: "left" }}
                               >
                                 {suggestion.replace(/\*\*/g, "")}
                               </button>
@@ -793,7 +793,7 @@ export const AITutorDrawer = ({
                   );
                 })}
                 {agentLoading && (
-                  <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: 12, background: "#fafafa", color: "#aaa", fontSize: 13 }}>
+                  <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13 }}>
                     응답 중...
                   </div>
                 )}
@@ -805,14 +805,14 @@ export const AITutorDrawer = ({
               type="button"
               onClick={scrollToBottom}
               title="맨 아래로"
-              style={{ position: "absolute", bottom: 8, right: 8, width: 32, height: 32, borderRadius: "50%", border: "1px solid #e0e0e0", background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", color: "#888", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}
+              style={{ position: "absolute", bottom: 8, right: 8, width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--color-border-soft)", background: "var(--color-card)", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", color: "var(--color-muted)", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}
             >
               ↓
             </button>
           )}
         </div>
 
-        {agentError && <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>}
+        {agentError && <div style={{ marginBottom: 10, fontSize: 12, color: "var(--color-danger)" }}>{agentError}</div>}
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
           <textarea
             ref={agentInputRef}
@@ -828,13 +828,13 @@ export const AITutorDrawer = ({
             disabled={!canUseAgent || chatLoading || agentLoading}
             placeholder="요약본에 대해 질문하기"
             rows={1}
-            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
+            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
           />
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
-            style={{ padding: "11px 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
+            style={{ padding: "11px 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "var(--color-border-soft)" : PINK, color: "var(--color-on-brand)", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
           >
             {agentLoading ? "응답 중" : "전송"}
           </button>
