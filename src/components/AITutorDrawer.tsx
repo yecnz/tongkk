@@ -230,6 +230,10 @@ export const AITutorDrawer = ({
     setAgentMessages([]);
     setChatSessions([]);
     initialQuestionRef.current = "";
+    // pendingQuestion 중복 적용 가드도 함께 리셋한다. 리셋하지 않으면 StrictMode가
+    // 마운트 시 이펙트를 두 번 실행할 때, 2번째 패스에서 입력 초기화는 다시 일어나지만
+    // pendingQuestion 채움은 nonce 가드에 막혀 입력칸이 비는 회귀가 생긴다.
+    pendingNonceRef.current = null;
 
     if (!canPersistChat || resetHistory) {
       setChatLoading(false);
@@ -304,6 +308,7 @@ export const AITutorDrawer = ({
     if (!text) return;
     pendingNonceRef.current = pendingQuestion.nonce;
     setOpen(true);
+    setExpanded(true); // 드래그 질문이면 확대 화면으로 띄운다.
     setAgentInput(text);
     requestAnimationFrame(() => {
       const el = agentInputRef.current;

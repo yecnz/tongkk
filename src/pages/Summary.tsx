@@ -482,7 +482,7 @@ const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(conte
 
 // 요약 본문을 감싸 드래그 선택 시 "AI 튜터에게 묻기" 플로팅 버튼을 띄운다.
 // 버튼 클릭 시 선택 텍스트를 onAsk로 넘긴다.
-const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (text: string) => void }) => {
+const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (text: string, anchor: { range: Range; top: number } | null) => void }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [selection, setSelection] = useState<{ text: string; top: number; left: number } | null>(null);
 
@@ -529,7 +529,7 @@ const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (
             const sel = window.getSelection();
             const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
             const anchorTop = range ? range.getBoundingClientRect().top : null;
-            onAsk(selection.text);
+            onAsk(selection.text, range && anchorTop != null ? { range, top: anchorTop } : null);
             setSelection(null);
             sel?.removeAllRanges();
             if (range && anchorTop != null) {
@@ -758,10 +758,28 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
+  // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
+  const dragAnchorRef = useRef<{ range: Range; top: number } | null>(null);
 
-  const askTutorWithSelection = (text: string) => {
+  const askTutorWithSelection = (text: string, anchor: { range: Range; top: number } | null) => {
+    dragAnchorRef.current = anchor;
     setIsTutorOpen(true);
     setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
+
+  // 튜터를 닫으면 그리드가 2열→1열로 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
+  const handleTutorOpenChange = (next: boolean) => {
+    setIsTutorOpen(next);
+    if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 확대/채움을 막는다.
+    const anchor = dragAnchorRef.current;
+    if (next || !anchor) return;
+    dragAnchorRef.current = null;
+    requestAnimationFrame(() => {
+      const rect = anchor.range.getBoundingClientRect();
+      if (rect.top === 0 && rect.bottom === 0) return; // Range가 떨어져 나간 경우 무시
+      const delta = rect.top - anchor.top;
+      if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+    });
   };
   const questions = suggestedTutorQuestions[template];
 
@@ -928,7 +946,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
                     background: PINK, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer"
                   }}>퀴즈 생성하기</button>
                 )}
-                <button onClick={() => setIsTutorOpen(prev => !prev)} style={{
+                <button onClick={() => handleTutorOpenChange(!isTutorOpen)} style={{
                   height: 34,
                   padding: "0 14px",
                   borderRadius: 10,
@@ -1061,7 +1079,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
               <AITutorDrawer
                 layout="embedded"
                 open={isTutorOpen}
-                onOpenChange={setIsTutorOpen}
+                onOpenChange={handleTutorOpenChange}
                 contextTitle={contextTitle}
                 contextMarkdown={realContent}
                 summaryId={summaryId}
@@ -1126,10 +1144,28 @@ const MaterialDetailView = ({
   const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const lowerMaterialName = material.name.toLowerCase();
+  // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
+  const dragAnchorRef = useRef<{ range: Range; top: number } | null>(null);
 
-  const askSummaryTutorWithSelection = (text: string) => {
+  const askSummaryTutorWithSelection = (text: string, anchor: { range: Range; top: number } | null) => {
+    dragAnchorRef.current = anchor;
     setIsSummaryTutorOpen(true);
     setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
+
+  // 튜터를 닫으면 그리드가 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
+  const handleSummaryTutorOpenChange = (next: boolean) => {
+    setIsSummaryTutorOpen(next);
+    if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 확대/채움을 막는다.
+    const anchor = dragAnchorRef.current;
+    if (next || !anchor) return;
+    dragAnchorRef.current = null;
+    requestAnimationFrame(() => {
+      const rect = anchor.range.getBoundingClientRect();
+      if (rect.top === 0 && rect.bottom === 0) return; // Range가 떨어져 나간 경우 무시
+      const delta = rect.top - anchor.top;
+      if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+    });
   };
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || lowerMaterialName.endsWith(".pdf");
   const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
@@ -1800,7 +1836,7 @@ const MaterialDetailView = ({
                         <button onClick={() => onOpenSummary(activeSummary)} style={{ padding: "9px 12px", borderRadius: 8, border: "none", background: PINK, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                           자세히 보기
                         </button>
-                        <button onClick={() => setIsSummaryTutorOpen(prev => !prev)} style={{
+                        <button onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
                           padding: "9px 12px",
                           borderRadius: 8,
                           border: isSummaryTutorOpen ? `1px solid ${PINK}55` : `1px solid ${BORDER_COLOR}`,
@@ -1849,7 +1885,7 @@ const MaterialDetailView = ({
                   <AITutorDrawer
                     layout="embedded"
                     open={isSummaryTutorOpen}
-                    onOpenChange={setIsSummaryTutorOpen}
+                    onOpenChange={handleSummaryTutorOpenChange}
                     contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
                     contextMarkdown={combinedTutorContextMarkdown}
                     summaryId={activeSummary.id || null}
