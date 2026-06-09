@@ -1059,7 +1059,6 @@ export default function Quiz() {
               ))}
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>시험 모드</label>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", cursor: "pointer" }}>
                 <input
@@ -1067,9 +1066,10 @@ export default function Quiz() {
                   checked={examMode}
                   onChange={e => setExamMode(e.target.checked)}
                 />
-                시간 제한 켜기
+                시험 모드
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-muted)", opacity: examMode ? 1 : 0.5 }}>시간 제한</span>
                 {[5, 10, 20].map(minutes => (
                   <button
                     key={minutes}
@@ -1137,7 +1137,6 @@ export default function Quiz() {
       ? selectedMaterials
       : materials.filter(material => selectedMaterialIds.includes(material.id));
     const primaryReviewMaterial = reviewMaterials[0] || materials[0];
-    const primaryWeakTopic = resultWeakTopics[0] || "틀린 문제";
     const formatAnswerForReview = (
       quiz: QuizQuestion,
       answerValue: number | string | undefined,
@@ -1423,14 +1422,14 @@ export default function Quiz() {
             )}
 
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <button onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(primaryWeakTopic) })} style={{
+              <button onClick={retryQuiz} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
                 background: "var(--color-card)", fontSize: 14, fontWeight: 700, cursor: "pointer", color: "var(--color-text)"
-              }}>AI 튜터로 복습</button>
-              <button onClick={retryQuiz} style={{
+              }}>다시 풀기</button>
+              <button onClick={generate} style={{
                 padding: "12px 24px", borderRadius: 12, border: "none",
                 background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-on-brand)"
-              }}>다시 풀기</button>
+              }}>새로 풀기</button>
             </div>
           </Card>
         </div>
