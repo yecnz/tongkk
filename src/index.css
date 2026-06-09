@@ -1,107 +1,65 @@
 @import "tailwindcss";
 
-/* ── 디자인 토큰 (라이트 기본값) ──
-   인라인 style에서는 var(--color-...)로, Tailwind 유틸(bg-card·border-border·text-muted 등)로도 쓰인다.
-   다크 값은 아래 [data-theme="dark"] 블록에서 같은 변수를 재정의한다. */
+/* ── 디자인 토큰 ──
+   각 토큰을 light-dark(라이트값, 다크값)로 한 곳에서 정의한다. 실제 적용 값은
+   color-scheme에 따라 자동 선택된다(아래 :root / [data-theme] 참고).
+   색을 바꿀 때 이 블록의 해당 한 줄만 고치면 라이트·다크가 함께 갱신된다.
+   인라인 style에서는 var(--color-...)로, Tailwind 유틸(bg-card·text-muted 등)로도 쓰인다. */
 @theme {
-  /* 브랜드 — 다크에서도 유지 */
-  --color-pink: #F070AE;
-  --color-cyan: #00C0E8;
+  /* 브랜드 — 다크에선 채도를 약간 낮춰 형광기를 뺀다 */
+  --color-pink: light-dark(#F070AE, #e57dab);
+  --color-cyan: light-dark(#00C0E8, #33aed1);
+  --color-violet: light-dark(#8b5cf6, #9d88d4);
 
-  /* 표면 */
-  --color-page: #f7f8fb;           /* 페이지 배경 */
-  --color-card: #fbfcfe;           /* 카드·기본 표면 */
-  --color-surface: #fafafa;        /* 한 단계 위 표면·입력칸 */
-  --color-muted-surface: #f1f4f8;  /* 은은한 표면·호버 */
+  /* 표면 — page→card→surface 순으로 밝아져 깊이감을 준다 */
+  --color-page: light-dark(#f7f8fb, #16181d);
+  --color-card: light-dark(#fbfcfe, #1d2027);
+  --color-surface: light-dark(#fafafa, #252932);
+  --color-muted-surface: light-dark(#f1f4f8, #2c313b);
 
   /* 테두리 */
-  --color-border: #e2e6ee;         /* 기본 */
-  --color-border-soft: #e0e0e0;    /* 옅은 */
+  --color-border: light-dark(#e2e6ee, #333944);
+  --color-border-soft: light-dark(#e0e0e0, #2a2f39);
 
-  /* 텍스트 */
-  --color-text-strong: #222222;    /* 제목·강조 */
-  --color-text: #444444;           /* 본문 */
-  --color-text-secondary: #666666; /* 보조 */
-  --color-muted: #888888;          /* muted */
-  --color-on-brand: #ffffff;       /* 브랜드색 배경 위 글자 */
+  /* 텍스트 — 다크는 순백 대신 오프화이트로 과대비를 피한다 */
+  --color-text-strong: light-dark(#222222, #e6e9ef);
+  --color-text: light-dark(#444444, #c5cad3);
+  --color-text-secondary: light-dark(#666666, #9298a4);
+  --color-muted: light-dark(#888888, #6b7280);
+  --color-on-brand: #ffffff;       /* 브랜드색 배경 위 글자 — 라이트·다크 공통 */
 
   /* 틴트·상태 */
-  --color-tint-pink: #fff0f6;
-  --color-tint-cyan: #e8fafe;
-  --color-violet: #8b5cf6;
-  --color-tint-violet: #ede9fe;
-  --color-danger: #e53e3e;
+  --color-tint-pink: light-dark(#fff0f6, #2a1f26);
+  --color-tint-cyan: light-dark(#e8fafe, #18272e);
+  --color-tint-violet: light-dark(#ede9fe, #241f33);
+  --color-danger: light-dark(#e53e3e, #e08585);
 
+  /* 비색상 토큰 */
   --radius-card: 18px;
-  --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
-  --glass-bg: rgba(255, 255, 255, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.85);
+  --shadow-card: light-dark(0 10px 28px rgba(15, 23, 42, .045), 0 1px 8px rgba(0, 0, 0, .28));
+  --glass-bg: light-dark(rgba(255, 255, 255, 0.75), rgba(26, 30, 38, 0.72));
+  --glass-border: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.10));
 }
 
-/* 기존 다크모드 방식(html[data-theme="dark"])을 Tailwind dark: 변형에 연결 */
+/* Tailwind dark: 변형을 data-theme="dark"에 연결 */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ── 다크 토큰 재정의 — 같은 변수를 어두운 값으로 덮어쓴다 ── */
+/* color-scheme이 light-dark()의 선택 기준이다.
+   - 기본은 라이트
+   - <html data-theme="dark">면 다크 (applyTheme가 토글)
+   - data-theme="light"는 다크 화면 안에서도 라이트로 강제(예: PDF 내보내기 노드) */
+:root {
+  color-scheme: light;
+}
 [data-theme="dark"] {
   color-scheme: dark;
-  /* 배경 — 완전한 검정이 아닌 중성 다크 그레이. page→card→surface로 갈수록 밝아져 깊이감을 준다. */
-  --color-page: #16181d;
-  --color-card: #1d2027;
-  --color-surface: #252932;
-  --color-muted-surface: #2c313b;
-  /* 테두리 — 표면보다 약간 밝게 */
-  --color-border: #333944;
-  --color-border-soft: #2a2f39;
-  /* 텍스트 — 순백 대신 오프화이트로 과대비를 피한다 */
-  --color-text-strong: #e6e9ef;
-  --color-text: #c5cad3;
-  --color-text-secondary: #9298a4;
-  --color-muted: #6b7280;
-  --color-on-brand: #ffffff;
-  /* 브랜드 — 라이트의 쨍한 원색보다는 차분하되, 다크 배경에서 정체성이 살도록 적당한 채도 유지 */
-  --color-pink: #e57dab;
-  --color-cyan: #33aed1;
-  /* 틴트·상태 — 채도를 낮춰 배경에 가라앉힌다 */
-  --color-tint-pink: #2a1f26;
-  --color-tint-cyan: #18272e;
-  --color-violet: #9d88d4;
-  --color-tint-violet: #241f33;
-  --color-danger: #e08585;
-  --shadow-card: 0 1px 8px rgba(0, 0, 0, .28);
-  --glass-bg: rgba(26, 30, 38, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.10);
 }
-
-/* 라이트 강제 — 다크 컨텍스트 안에서도 라이트로 캡처해야 하는 영역(예: PDF 내보내기 노드)용.
-   가장 가까운 조상의 data-theme="light"가 다크 토큰 상속을 끊고 라이트 값으로 되돌린다. */
 [data-theme="light"] {
   color-scheme: light;
-  --color-pink: #F070AE;
-  --color-cyan: #00C0E8;
-  --color-page: #f7f8fb;
-  --color-card: #fbfcfe;
-  --color-surface: #fafafa;
-  --color-muted-surface: #f1f4f8;
-  --color-border: #e2e6ee;
-  --color-border-soft: #e0e0e0;
-  --color-text-strong: #222222;
-  --color-text: #444444;
-  --color-text-secondary: #666666;
-  --color-muted: #888888;
-  --color-on-brand: #ffffff;
-  --color-tint-pink: #fff0f6;
-  --color-tint-cyan: #e8fafe;
-  --color-violet: #8b5cf6;
-  --color-tint-violet: #ede9fe;
-  --color-danger: #e53e3e;
-  --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
-  --glass-bg: rgba(255, 255, 255, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.85);
 }
 
 html {
   background: var(--color-page);
-  color-scheme: light;
 }
 
 body {
@@ -121,7 +79,7 @@ select {
 }
 
 /* 입력 컨트롤 — 인라인 색이 없는 폼 요소도 토큰을 따르도록 보강.
-   인라인 style이 있으면 그쪽이 우선이므로(이미 토큰화됨) 라이트에선 시각 변화가 없다. */
+   토큰이 light-dark()라 라이트/다크가 자동 전환되며, 인라인 style이 있으면 그쪽이 우선이다. */
 input::placeholder,
 textarea::placeholder {
   color: var(--color-muted);
@@ -179,7 +137,7 @@ textarea::placeholder {
   transition: box-shadow .15s, background .15s;
 }
 .tongkk-cal-cell:hover {
-  box-shadow: inset 0 0 0 1.5px rgba(240, 112, 174, .28);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-pink) 28%, transparent);
 }
 
 .stats-shell {
