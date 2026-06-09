@@ -137,6 +137,29 @@ const buildAnswersFromAttempt = (quizSet: SavedQuizSet, attempt: SavedQuizAttemp
   return { answers, subjectiveGrades };
 };
 
+// 백엔드가 객관식 정답을 항상 0번(첫 보기)으로 내려보내므로, 렌더 전에 보기를 Fisher–Yates로 섞고
+// answer 인덱스를 정답 보기의 새 위치로 재매핑한다. OX·단답형·주관식은 보기 순서를 그대로 둔다.
+// type이 비어 있으면 동질 세트는 fallbackType(세트 단위 유형)으로, 혼합 세트(오답 다시 풀기)는
+// 보기 개수로 객관식을 판별한다(객관식 4개 / OX 2개).
+const shuffleQuizOptions = (questions: QuizQuestion[], fallbackType?: QuizQuestionType): QuizQuestion[] =>
+  questions.map(quiz => {
+    const { options, answer } = quiz;
+    const type = quiz.type ?? fallbackType;
+    if (typeof answer !== "number" || !options) return quiz;
+    const isMultipleChoice = type === "객관식" ? options.length >= 2 : type === undefined && options.length >= 3;
+    if (!isMultipleChoice) return quiz;
+
+    // 보기 텍스트가 중복돼도 정답이 정확히 따라가도록 인덱스 순열을 섞는다.
+    const order = options.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const newAnswer = order.indexOf(answer);
+    if (newAnswer < 0) return quiz;
+    return { ...quiz, options: order.map(idx => options[idx]), answer: newAnswer };
+  });
+
 type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => void; extra?: ReactNode };
 
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
@@ -197,7 +220,7 @@ export default function Quiz() {
   const [courseQuizSets, setCourseQuizSets] = useState<SavedQuizSet[]>([]);
 
   // 퀴즈
-  const [quizzes, setQuizzes] = useState<QuizQuestion[]>(hasReviewQuestions && reviewQuestions ? reviewQuestions : []);
+  const [quizzes, setQuizzes] = useState<QuizQuestion[]>(() => hasReviewQuestions && reviewQuestions ? shuffleQuizOptions(reviewQuestions) : []);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number | string>>({});
   const [shortAnswerInput, setShortAnswerInput] = useState("");
@@ -319,12 +342,13 @@ export default function Quiz() {
         const savedQuizSet = quizSets.find(item => item.id === pendingQuizSetId);
         if (savedQuizSet) {
           const latestAttempt = attempts.find(attempt => attempt.quizSetId === savedQuizSet.id);
-          const restored = latestAttempt ? buildAnswersFromAttempt(savedQuizSet, latestAttempt) : null;
+          const shuffledQuestions = shuffleQuizOptions(savedQuizSet.questions, savedQuizSet.questionType);
+          const restored = latestAttempt ? buildAnswersFromAttempt({ ...savedQuizSet, questions: shuffledQuestions }, latestAttempt) : null;
           setDifficulty(savedQuizSet.difficulty);
           setQuestionType(savedQuizSet.questionType);
           setCount(savedQuizSet.count);
           setSelectedMaterialIds(savedQuizSet.materialIds.filter(id => courseMaterials.some(material => material.id === id)));
-          setQuizzes(savedQuizSet.questions);
+          setQuizzes(shuffledQuestions);
           setCurrent(0);
           setAnswers(restored?.answers || {});
           setShortAnswerInput("");
@@ -395,12 +419,13 @@ export default function Quiz() {
   const openExistingQuizSet = (quizSet: SavedQuizSet) => {
     const attempts = quizAttempts.filter(a => a.quizSetId === quizSet.id);
     const latestAttempt = attempts[0] || null;
-    const restored = latestAttempt ? buildAnswersFromAttempt(quizSet, latestAttempt) : null;
+    const shuffledQuestions = shuffleQuizOptions(quizSet.questions, quizSet.questionType);
+    const restored = latestAttempt ? buildAnswersFromAttempt({ ...quizSet, questions: shuffledQuestions }, latestAttempt) : null;
     setDifficulty(quizSet.difficulty);
     setQuestionType(quizSet.questionType);
     setCount(quizSet.count);
     setSelectedMaterialIds(quizSet.materialIds.filter(id => materials.some(m => m.id === id)));
-    setQuizzes(quizSet.questions);
+    setQuizzes(shuffledQuestions);
     setCurrent(0);
     setAnswers(restored?.answers || {});
     setShortAnswerInput("");
@@ -602,7 +627,8 @@ export default function Quiz() {
     setError(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
     try {
-      const questions = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
+      const generated = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType);
+      const questions = shuffleQuizOptions(generated, questionType);
       setQuizzes(questions);
       const savedQuizSet = await saveQuizSetToServer(selectedCourse, {
         title: `${selectedCourse} ${questionType} 퀴즈`,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { PINK } from "../common";
+import { PINK, CYAN, normalizeBoldSpacing } from "../common";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   createSummaryChatSession,
@@ -21,6 +21,9 @@ type AITutorDrawerProps = {
   suggestedQuestions?: string[];
   initialQuestion?: string;
   onInitialQuestionConsumed?: () => void;
+  // 마운트 후에도 사용자가 본문을 선택할 때마다 새 질문을 입력창에 채워 넣기 위한 prop.
+  // nonce가 바뀔 때마다 같은 텍스트라도 다시 반영된다.
+  pendingQuestion?: { text: string; nonce: number };
   disabledReason?: string;
   resetHistory?: boolean;
   layout?: "drawer" | "embedded";
@@ -32,6 +35,11 @@ const markdownStyles = {
   paragraph: { margin: "0 0 8px", lineHeight: 1.65, color: "#444" } satisfies CSSProperties,
   list: { margin: "6px 0 10px", paddingLeft: 20, lineHeight: 1.65 } satisfies CSSProperties,
 };
+
+// AI 튜터 입력창(textarea) 자동 높이: 줄높이 20px 기준 최대 5줄 + 상하 패딩(11*2) + 테두리(1*2).
+const AGENT_INPUT_LINE_HEIGHT = 20;
+const AGENT_INPUT_BORDER = 2;
+const AGENT_INPUT_MAX_HEIGHT = AGENT_INPUT_LINE_HEIGHT * 5 + 22 + AGENT_INPUT_BORDER;
 
 const markdownComponents: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "#222" }}>{children}</h1>,
@@ -56,7 +64,7 @@ const markdownComponents: Components = {
 };
 
 const FormattedTutorText = ({ content }: { content: string }) => {
-  const cleaned = content.replace(/\r\n/g, "\n").trim();
+  const cleaned = normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
   if (!cleaned) return null;
 
   return (
@@ -152,6 +160,7 @@ export const AITutorDrawer = ({
   suggestedQuestions = [],
   initialQuestion,
   onInitialQuestionConsumed,
+  pendingQuestion,
   disabledReason = "요약 생성 후 AI 튜터를 사용할 수 있습니다",
   resetHistory = false,
   layout = "drawer",
@@ -165,6 +174,8 @@ export const AITutorDrawer = ({
   const [chatSessions, setChatSessions] = useState<SummaryChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
+  // 기존 대화가 있을 때는 추천 질문을 접어두고 토글로 열어보게 한다(기본 접힘).
+  const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(true);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -173,6 +184,8 @@ export const AITutorDrawer = ({
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const skipNextScrollRef = useRef(false);
   const initialQuestionRef = useRef("");
+  const pendingNonceRef = useRef<number | null>(null);
+  const agentInputRef = useRef<HTMLTextAreaElement>(null);
   const canUseAgent = Boolean(contextMarkdown.trim());
   const canPersistChat = Boolean(summaryId || materialId);
   const chatTarget = { summaryId, materialId };
@@ -187,6 +200,14 @@ export const AITutorDrawer = ({
     const el = chatContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   };
+
+  // 입력 길이에 따라 textarea 높이를 1~5줄 범위에서 자동 조절한다.
+  useEffect(() => {
+    const el = agentInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight + AGENT_INPUT_BORDER, AGENT_INPUT_MAX_HEIGHT)}px`;
+  }, [agentInput]);
 
   const handleChatScroll = () => {
     const el = chatContainerRef.current;
@@ -273,6 +294,26 @@ export const AITutorDrawer = ({
     setAgentInput(question);
     onInitialQuestionConsumed?.();
   }, [initialQuestion, canUseAgent, setOpen, onInitialQuestionConsumed]);
+
+  // 본문 선택 → "AI 튜터에게 묻기"로 전달된 질문을 입력창에 채운다.
+  // initialQuestion과 달리 nonce 기반이라 같은 텍스트를 다시 선택해도 매번 반영된다.
+  useEffect(() => {
+    if (!pendingQuestion || !canUseAgent) return;
+    if (pendingNonceRef.current === pendingQuestion.nonce) return;
+    const text = pendingQuestion.text.trim();
+    if (!text) return;
+    pendingNonceRef.current = pendingQuestion.nonce;
+    setOpen(true);
+    setAgentInput(text);
+    requestAnimationFrame(() => {
+      const el = agentInputRef.current;
+      if (el) {
+        // preventScroll: 입력창에 포커스해도 페이지가 입력창 위치로 스크롤되지 않게 한다.
+        el.focus({ preventScroll: true });
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  }, [pendingQuestion, canUseAgent, setOpen]);
 
   useEffect(() => {
     if (!isOpen) setExpanded(false);
@@ -437,8 +478,8 @@ export const AITutorDrawer = ({
         left: isExpanded ? "50%" : undefined,
         right: isExpanded ? "auto" : layout === "embedded" ? "auto" : 0,
         width: isExpanded ? "min(1080px, calc(100vw - 48px))" : layout === "embedded" ? "100%" : "min(420px, 100vw)",
-        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? "calc(100vh - 292px)" : "100vh",
-        minHeight: isExpanded ? undefined : layout === "embedded" ? 620 : undefined,
+        height: isExpanded ? "calc(100vh - 48px)" : layout === "embedded" ? 1100 : "100vh",
+        minHeight: isExpanded ? undefined : layout === "embedded" ? 1100 : undefined,
         zIndex: isExpanded ? 260 : layout === "embedded" ? "auto" : 190,
         border: "1px solid #f0f0f0",
         borderRight: isExpanded || layout === "embedded" ? "1px solid #f0f0f0" : "none",
@@ -485,22 +526,22 @@ export const AITutorDrawer = ({
                 style={{
                   padding: "4px 10px",
                   borderRadius: 8,
-                  border: `1px solid ${isExpanded ? PINK + "55" : "#e0e0e0"}`,
-                  background: isExpanded ? "#FFF0F6" : "#fafafa",
-                  color: isExpanded ? PINK : "#777",
+                  border: `1px solid ${CYAN}55`,
+                  background: "#E8FAFE",
+                  color: CYAN,
                   fontSize: 12,
                   fontWeight: 800,
                   cursor: "pointer",
                 }}
               >
-                {isExpanded ? "작게 보기" : "확대 보기"}
+                <i className={isExpanded ? "fa-solid fa-down-left-and-up-right-to-center" : "fa-solid fa-up-right-and-down-left-from-center"} />
               </button>
             )}
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="AI 튜터 닫기"
-              style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid #e0e0e0", background: "#fff", color: "#999", cursor: "pointer", fontSize: 18, lineHeight: "28px", padding: 0 }}
+              style={{ width: 30, height: 30, borderRadius: 10, border: "1px solid #e0e0e0", background: "#f3f4f6", color: "#999", cursor: "pointer", fontSize: 18, fontWeight: 800, lineHeight: "28px", padding: 0 }}
             >
               ×
             </button>
@@ -590,8 +631,34 @@ export const AITutorDrawer = ({
 
         {canUseAgent && suggestedQuestions.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {agentMessages.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setSuggestionsCollapsed(prev => !prev)}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #eeeeee",
+                  background: "#fafafa",
+                  color: "#666",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 850,
+                }}
+              >
+                <span>추천 질문 {suggestedQuestions.length}</span>
+                <span style={{ color: "#aaa", fontSize: 13 }}>{suggestionsCollapsed ? "펼치기" : "접기"}</span>
+              </button>
+            ) : (
+              <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 800, color: "#999" }}>추천 질문</div>
+            )}
+            {(agentMessages.length === 0 || !suggestionsCollapsed) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: agentMessages.length > 0 ? 8 : 0 }}>
               {suggestedQuestions.map(question => (
                 <button
                   key={question}
@@ -616,6 +683,7 @@ export const AITutorDrawer = ({
                 </button>
               ))}
             </div>
+            )}
           </div>
         )}
 
@@ -687,20 +755,28 @@ export const AITutorDrawer = ({
         </div>
 
         {agentError && <div style={{ marginBottom: 10, fontSize: 12, color: "#E53E3E" }}>{agentError}</div>}
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea
+            ref={agentInputRef}
             value={agentInput}
             onChange={e => setAgentInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") void handleSubmit(); }}
+            onKeyDown={e => {
+              // Enter는 전송, Shift+Enter는 줄바꿈. 한글 IME 조합 중 Enter는 전송하지 않는다.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void handleSubmit();
+              }
+            }}
             disabled={!canUseAgent || chatLoading || agentLoading}
             placeholder="요약본에 대해 질문하기"
-            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 13, outline: "none" }}
+            rows={1}
+            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid #e0e0e0", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
           />
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
-            style={{ padding: "0 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff", fontSize: 13, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
+            style={{ padding: "11px 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "#ddd" : PINK, color: "#fff", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
           >
             {agentLoading ? "응답 중" : "전송"}
           </button>

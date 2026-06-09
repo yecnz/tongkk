@@ -8,6 +8,16 @@ export const BORDER_COLOR = "#e2e6ee";
 export const MUTED_SURFACE = "#f1f4f8";
 export const SOFT_SHADOW = "0 10px 28px rgba(15, 23, 42, 0.045)";
 
+// LLM이 별표 안쪽에 공백을 넣어(`** 텍스트 **`) 출력하면 react-markdown이 굵게로 파싱하지
+// 못하고 별표를 그대로 보여준다. 마크다운 렌더 직전에 한 줄 안에서 별표와 텍스트 사이의 공백을
+// 제거해 정상적으로 굵게 처리되도록 한다.
+// - 여는 **는 줄 시작/공백 뒤(여는 위치), 닫는 **는 줄 끝·공백·문장부호 앞(닫는 위치)에서만
+//   매칭해, 한 줄에 굵게가 여러 개일 때 앞 굵게의 닫는 **가 뒤 굵게의 여는 **와 잘못 짝지어져
+//   `**첫째** 그리고 **둘째**`가 깨지는 것을 막는다.
+// - 내용을 공백·별표가 아닌 문자로 시작/끝나게 강제해 공백 수량자 모호성(역추적 폭주)을 없앤다.
+export const normalizeBoldSpacing = (text: string): string =>
+  text.replace(/(^|\s)\*\*[^\S\n]+([^*\n\s](?:[^*\n]*[^*\n\s])?)[^\S\n]+\*\*(?=$|\s|[.,!?;:)\]])/g, "$1**$2**");
+
 export const pageRoutes = {
   "대시보드": "/",
   "학습 캘린더": "/calendar",

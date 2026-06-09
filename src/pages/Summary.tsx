@@ -4,7 +4,7 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { useCourses } from "../CourseContext";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
@@ -478,7 +478,91 @@ const hoistSourceToHeadings = (markdown: string): string => {
   return result.join("\n");
 };
 
-const normalizeMarkdownContent = (content: string) => content.replace(/\r\n/g, "\n").trim();
+const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
+
+// 요약 본문을 감싸 드래그 선택 시 "AI 튜터에게 묻기" 플로팅 버튼을 띄운다.
+// 버튼 클릭 시 선택 텍스트를 onAsk로 넘긴다.
+const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (text: string) => void }) => {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [selection, setSelection] = useState<{ text: string; top: number; left: number } | null>(null);
+
+  const captureSelection = () => {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim() ?? "";
+    const wrap = wrapRef.current;
+    if (!text || !sel || sel.rangeCount === 0 || !wrap) {
+      setSelection(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!wrap.contains(range.commonAncestorContainer)) {
+      setSelection(null);
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    setSelection({
+      text,
+      top: rect.top - wrapRect.top,
+      left: Math.min(Math.max(rect.left - wrapRect.left + rect.width / 2, 70), wrapRect.width - 70),
+    });
+  };
+
+  // 본문 밖을 클릭하면 버튼을 숨긴다(버튼 자체 클릭은 stopPropagation으로 제외).
+  useEffect(() => {
+    const clear = () => setSelection(null);
+    document.addEventListener("mousedown", clear);
+    return () => document.removeEventListener("mousedown", clear);
+  }, []);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }} onMouseUp={captureSelection}>
+      {children}
+      {selection && (
+        <button
+          type="button"
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+          onMouseUp={e => e.stopPropagation()}
+          onClick={() => {
+            // 튜터가 열리면 요약 칸 폭이 줄어드는 reflow가 일어난다.
+            // 선택 영역의 화면상 위치를 기록해 두고, reflow 후 같은 위치를 유지하도록 스크롤을 보정한다.
+            const sel = window.getSelection();
+            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+            const anchorTop = range ? range.getBoundingClientRect().top : null;
+            onAsk(selection.text);
+            setSelection(null);
+            sel?.removeAllRanges();
+            if (range && anchorTop != null) {
+              requestAnimationFrame(() => {
+                const delta = range.getBoundingClientRect().top - anchorTop;
+                if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+              });
+            }
+          }}
+          style={{
+            position: "absolute",
+            top: selection.top,
+            left: selection.left,
+            transform: "translate(-50%, calc(-100% - 8px))",
+            zIndex: 50,
+            padding: "7px 12px",
+            borderRadius: 999,
+            border: "none",
+            background: PINK,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            whiteSpace: "nowrap",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+            cursor: "pointer",
+          }}
+        >
+          AI 튜터에게 묻기
+        </button>
+      )}
+    </div>
+  );
+};
 
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
   const normalized = normalizeMarkdownContent(content);
@@ -672,7 +756,13 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
   const [actionMessage, setActionMessage] = useState("");
   const [pdfSaving, setPdfSaving] = useState(false);
   const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
+  const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
+
+  const askTutorWithSelection = (text: string) => {
+    setIsTutorOpen(true);
+    setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
   const questions = suggestedTutorQuestions[template];
 
   // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
@@ -961,7 +1051,9 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
               {mindmapData ? (
                 <MindmapView key={displayContent} data={mindmapData} />
               ) : (
-                <FormattedAiText content={displayContent} template={template} />
+                <SelectionAskButton onAsk={askTutorWithSelection}>
+                  <FormattedAiText content={displayContent} template={template} />
+                </SelectionAskButton>
               )}
             </div>
 
@@ -976,6 +1068,7 @@ const SummaryResultView = ({ template, onBack, contextTitle, realContent, isLoad
                 threadId={threadId}
                 suggestedQuestions={questions}
                 initialQuestion={!isLoading ? initialTutorQuestion : undefined}
+                pendingQuestion={tutorSelectionQuestion ?? undefined}
                 disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
                 resetHistory={resetTutorHistory}
               />
@@ -1031,7 +1124,13 @@ const MaterialDetailView = ({
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
   const [isSummaryTutorOpen, setIsSummaryTutorOpen] = useState(Boolean(initialTutorQuestion.trim() && initialTab === "summary"));
+  const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const lowerMaterialName = material.name.toLowerCase();
+
+  const askSummaryTutorWithSelection = (text: string) => {
+    setIsSummaryTutorOpen(true);
+    setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
   const isPdf = material.type === "pdf" || material.mimeType === "application/pdf" || lowerMaterialName.endsWith(".pdf");
   const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
   const isLegacyPpt = lowerMaterialName.endsWith(".ppt");
@@ -1741,7 +1840,9 @@ const MaterialDetailView = ({
                         </pre>
                       </div>
                     )}
-                    <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
+                    <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
+                      <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
+                    </SelectionAskButton>
                   </div>
                 )}
                 {isSummaryTutorOpen && activeSummary && (
@@ -1756,6 +1857,7 @@ const MaterialDetailView = ({
                     suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
                     initialQuestion={tutorPrompt}
                     onInitialQuestionConsumed={() => setTutorPrompt("")}
+                    pendingQuestion={tutorSelectionQuestion ?? undefined}
                     disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
                   />
                 )}
