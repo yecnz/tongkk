@@ -121,6 +121,17 @@ create table if not exists public.quiz_attempts (
   created_at timestamptz not null default now()
 );
 
+-- 과목별 오답 분석(취약점/공부 포인트/암기 항목). 과목당 최신 1건만 유지(course_id unique upsert).
+create table if not exists public.wrong_answer_analyses (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid not null references public.courses(id) on delete cascade,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  analysis jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (course_id)
+);
+
 create table if not exists public.dashboard_state (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   key text not null check (key in ('ddays', 'plans', 'pacePlans', 'paceLog', 'community') or key like 'todayBudget:%'),
@@ -216,6 +227,7 @@ alter table public.summary_chat_sessions enable row level security;
 alter table public.summary_chat_messages enable row level security;
 alter table public.quiz_sets enable row level security;
 alter table public.quiz_attempts enable row level security;
+alter table public.wrong_answer_analyses enable row level security;
 alter table public.dashboard_state enable row level security;
 alter table public.profiles enable row level security;
 
@@ -264,6 +276,13 @@ with check (auth.uid() = user_id);
 drop policy if exists "users can manage own quiz attempts" on public.quiz_attempts;
 create policy "users can manage own quiz attempts"
 on public.quiz_attempts
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "users can manage own wrong answer analyses" on public.wrong_answer_analyses;
+create policy "users can manage own wrong answer analyses"
+on public.wrong_answer_analyses
 for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
