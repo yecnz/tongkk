@@ -801,7 +801,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const handleTutorOpenChange = (next: boolean) => {
     setIsTutorOpen(next);
     if (!next) setIsResultExpanded(false); // 닫으면 확대 상태도 해제(본문이 숨겨진 빈 화면 방지).
-    if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 확대/채움을 막는다.
+    if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 채움을 막는다.
     const anchor = dragAnchorRef.current;
     if (next || !anchor) return;
     dragAnchorRef.current = null;
@@ -1641,7 +1641,7 @@ const MaterialDetailView = ({
   const handleSummaryTutorOpenChange = (next: boolean) => {
     setIsSummaryTutorOpen(next);
     if (!next) setIsSummaryTutorExpanded(false); // 닫으면 확대 상태도 해제(본문이 숨겨진 빈 화면 방지).
-    if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 확대/채움을 막는다.
+    if (!next) setTutorSelectionQuestion(null); // 닫으면 대기 중인 선택 질문을 비워 재오픈 시 자동 채움을 막는다.
     const anchor = dragAnchorRef.current;
     if (next || !anchor) return;
     dragAnchorRef.current = null;
