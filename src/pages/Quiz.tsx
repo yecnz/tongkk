@@ -1231,11 +1231,27 @@ export default function Quiz() {
       setDifficulty(nextDifficulty);
       setView("quiz");
     };
+    const handleResultBack = () => {
+      // 오답 다시 풀기(복습 노트)·저장된 풀이 바로 열기(자료 요약)는 courseDetail을 거치지 않고
+      // 결과로 바로 들어왔으므로, 들어온 이전 화면(라우트)으로 되돌아간다.
+      // (오답 복습 흐름은 과목 자료를 로드하지 않아 courseDetail이 빈 화면이 되므로 setView 금지)
+      if (reviewActiveRef.current || reviewAttempt) {
+        navigate(-1);
+        return;
+      }
+      // 과목 설정(과목 세부) 화면에서 직접 만들어 푼 경우에는 그 설정 화면으로 돌아간다.
+      setView("courseDetail");
+    };
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
+          <div style={{ textAlign: "left", marginBottom: 16 }}>
+            <button onClick={handleResultBack} style={{
+              background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, padding: 0
+            }}>← 돌아가기</button>
+          </div>
           <Card style={{ padding: 40 }}>
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
