@@ -314,9 +314,14 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
 
 const markdownStyles = {
   paragraph: { margin: "0 0 10px", lineHeight: 1.8, color: "var(--color-text)" } satisfies CSSProperties,
+  // '근거로 본 자료: ...' 출처 줄 — 본문보다 작고 흐리게 보여 보조 정보임을 드러낸다.
+  sourceNote: { margin: "0 0 10px", fontSize: 12.5, lineHeight: 1.6, color: "var(--color-muted)" } satisfies CSSProperties,
   list: { margin: "6px 0 14px", paddingLeft: 24, lineHeight: 1.75 } satisfies CSSProperties,
   tableWrap: { overflowX: "auto", margin: "12px 0 16px" } satisfies CSSProperties,
 };
+
+// 튜터·요약 답변의 '근거로 본 자료: ...' 출처 안내 줄을 식별한다.
+const isSourceNoteText = (text: string) => /^근거(?:로)?\s*본\s*자료/.test(text.trimStart());
 
 const markdownComponents: Components = {
   h1: ({ children }) => (
@@ -333,7 +338,10 @@ const markdownComponents: Components = {
   h4: ({ children }) => <h4 style={{ margin: "16px 0 8px", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{renderHighlightSyntax(children)}</h4>,
   h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</h5>,
   h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</h6>,
-  p: ({ children }) => <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>,
+  p: ({ children }) => {
+    const style = isSourceNoteText(getNodeText(children)) ? markdownStyles.sourceNote : markdownStyles.paragraph;
+    return <p style={style}>{renderHighlightSyntax(children)}</p>;
+  },
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
   li: ({ children }) => {
@@ -388,7 +396,10 @@ const cheatSheetMarkdownComponents: Components = {
       {children}
     </h2>
   ),
-  p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</p>,
+  p: ({ children }) => {
+    const muted = isSourceNoteText(getNodeText(children));
+    return <p style={{ margin: "0 0 8px", fontSize: muted ? 12.5 : undefined, lineHeight: muted ? 1.55 : 1.65, color: muted ? "var(--color-muted)" : "var(--color-text)" }}>{renderHighlightSyntax(children)}</p>;
+  },
   ul: ({ children }) => <ul style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "decimal" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 4, paddingLeft: 3 }}>{renderHighlightSyntax(children)}</li>,

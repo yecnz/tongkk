@@ -45,8 +45,23 @@ type AITutorDrawerProps = {
 
 const markdownStyles = {
   paragraph: { margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" } satisfies CSSProperties,
+  // '근거로 본 자료: ...' 출처 줄 — 본문보다 작고 흐리게 보여 보조 정보임을 드러낸다.
+  sourceNote: { margin: "0 0 8px", fontSize: 12, lineHeight: 1.55, color: "var(--color-muted)" } satisfies CSSProperties,
   list: { margin: "6px 0 10px", paddingLeft: 20, lineHeight: 1.65 } satisfies CSSProperties,
 };
+
+// 마크다운 노드에서 순수 텍스트만 뽑아낸다(출처 안내 줄 식별용).
+const nodeToText = (node: unknown): string => {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeToText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return nodeToText((node as { props?: { children?: unknown } }).props?.children);
+  }
+  return "";
+};
+
+// '근거로 본 자료: ...' 출처 안내 줄인지 판별한다.
+const isSourceNoteText = (text: string) => /^근거(?:로)?\s*본\s*자료/.test(text.trimStart());
 
 // AI 튜터 입력창(textarea) 자동 높이: 줄높이 20px 기준 최대 5줄 + 상하 패딩(11*2) + 테두리(1*2).
 const AGENT_INPUT_LINE_HEIGHT = 20;
@@ -57,7 +72,7 @@ const markdownComponents: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
   h2: ({ children }) => <h2 style={{ margin: "16px 0 10px", fontSize: 16, lineHeight: 1.4, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
   h3: ({ children }) => <h3 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.4, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
-  p: ({ children }) => <p style={markdownStyles.paragraph}>{children}</p>,
+  p: ({ children }) => <p style={isSourceNoteText(nodeToText(children)) ? markdownStyles.sourceNote : markdownStyles.paragraph}>{children}</p>,
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 5, paddingLeft: 3 }}>{children}</li>,
