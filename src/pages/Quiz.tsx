@@ -223,6 +223,8 @@ export default function Quiz() {
   );
   const [activeQuizSetId, setActiveQuizSetId] = useState<string | null>(null);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
+  // 이 과목에서 이미 출제된 퀴즈 세트들(중복 출제 방지용 제외 목록 구성에 사용).
+  const [priorQuizSets, setPriorQuizSets] = useState<SavedQuizSet[]>([]);
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>(() => hasReviewQuestions && reviewQuestions ? shuffleQuizOptions(reviewQuestions) : []);
@@ -280,6 +282,7 @@ export default function Quiz() {
       setOpenedQuizTitle("");
       setActiveQuizSetId(null);
       setQuizAttempts([]);
+      setPriorQuizSets([]);
       return;
     }
 
@@ -292,6 +295,7 @@ export default function Quiz() {
       if (ignore) return;
       setMaterials(courseMaterials);
       setQuizAttempts(attempts);
+      setPriorQuizSets(quizSets);
 
       // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
       const usable = summaries.filter(s => s.template !== "MINDMAP");
@@ -611,14 +615,45 @@ export default function Quiz() {
     setView("generating");
     setError(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
-    // 이미 풀었던/출제된 문제를 모아 중복 출제를 막는다(풀이 기록의 문항 + 직전 퀴즈 문항).
-    const excludeQuestions = Array.from(new Set([
+    // 이미 풀었거나 출제된 문제(풀이 기록 + 저장된 퀴즈 세트 + 직전 퀴즈)를 모아 중복 출제를 막는다.
+    const priorQuestions = Array.from(new Set([
       ...quizAttempts.flatMap(attempt => attempt.answers.map(answer => answer.question)),
+      ...priorQuizSets.flatMap(set => set.questions.map(question => question.question)),
       ...quizzes.map(quiz => quiz.question),
-    ].filter(Boolean))).slice(0, 80);
+    ].filter(Boolean)));
+    // 정규화 키 집합. 백엔드가 제외 지시를 어겨도 생성 결과에서 과거 문제와 같은(거의 같은) 문항을 프런트에서 한 번 더 걸러낸다.
+    const seenKeys = new Set(priorQuestions.map(normalizeAnswer));
     try {
-      const generated = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
-      const questions = shuffleQuizOptions(generated, questionType);
+      const collected: QuizQuestion[] = [];
+      let lastGenerated: QuizQuestion[] = [];
+      // 중복으로 문항이 모자라면 모자란 만큼 더 생성해 채운다(최대 3회). 같은 문제가 반복되지 않게 한다.
+      for (let round = 0; round < 3 && collected.length < count; round++) {
+        const excludeQuestions = Array.from(new Set([
+          ...priorQuestions,
+          ...collected.map(quiz => quiz.question),
+        ])).slice(0, 80);
+        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
+        lastGenerated = generated;
+        for (const question of generated) {
+          const key = normalizeAnswer(question.question || "");
+          if (!key || seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          collected.push(question);
+          if (collected.length >= count) break;
+        }
+      }
+      // 극단적으로 모두 걸러진 경우엔 빈 퀴즈를 피하려 마지막 생성분의 자체 중복만 제거해 사용한다.
+      let deduped = collected;
+      if (deduped.length === 0) {
+        const selfSeen = new Set<string>();
+        deduped = lastGenerated.filter(question => {
+          const key = normalizeAnswer(question.question || "");
+          if (!key || selfSeen.has(key)) return false;
+          selfSeen.add(key);
+          return true;
+        });
+      }
+      const questions = shuffleQuizOptions(deduped, questionType);
       setQuizzes(questions);
       const savedQuizSet = await saveQuizSetToServer(selectedCourse, {
         title: `${selectedCourse} ${questionType} 퀴즈`,
@@ -628,6 +663,7 @@ export default function Quiz() {
         materialIds: selectedMaterialIds,
         questions,
       });
+      setPriorQuizSets(prev => [savedQuizSet, ...prev]);
       setOpenedQuizTitle(savedQuizSet.title);
       setActiveQuizSetId(savedQuizSet.id);
       setCurrent(0);
