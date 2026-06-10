@@ -294,11 +294,13 @@ for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+-- 프로필은 본인 것만 조회 가능. (앱은 타인 프로필을 조회하지 않으므로 전체 공개가 불필요)
+-- 향후 닉네임/아바타를 다른 사용자에게 노출하는 기능(커뮤니티·랭킹 등)이 생기면 별도 공유 정책을 추가한다.
 drop policy if exists "users can view profiles" on public.profiles;
 create policy "users can view profiles"
 on public.profiles
 for select
-using (auth.role() = 'authenticated');
+using (auth.uid() = id);
 
 drop policy if exists "users can manage own profile" on public.profiles;
 create policy "users can manage own profile"
