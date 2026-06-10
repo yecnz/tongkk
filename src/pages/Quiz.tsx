@@ -1113,9 +1113,9 @@ export default function Quiz() {
               {[5, 10, 15, 20].map(n => (
                 <button key={n} onClick={() => setCount(n)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
-                  border: count === n ? "1px solid #d9d9d9" : "1px solid #eaeaea",
-                  background: count === n ? "#efefef" : "#fafafa",
-                  color: count === n ? "#666" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                  border: count === n ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: count === n ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: count === n ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: count === n ? 800 : 600, cursor: "pointer"
                 }}>{n}문제</button>
               ))}
             </div>
@@ -1125,9 +1125,9 @@ export default function Quiz() {
               {(["쉬움", "보통", "어려움"] as QuizDifficulty[]).map(d => (
                 <button key={d} onClick={() => setDifficulty(d)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
-                  border: difficulty === d ? "1px solid #d9d9d9" : "1px solid #eaeaea",
-                  background: difficulty === d ? "#efefef" : "#fafafa",
-                  color: difficulty === d ? "#666" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                  border: difficulty === d ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: difficulty === d ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: difficulty === d ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: difficulty === d ? 800 : 600, cursor: "pointer"
                 }}>{d}</button>
               ))}
             </div>
@@ -1137,9 +1137,9 @@ export default function Quiz() {
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
                 <button key={t} onClick={() => setQuestionType(t)} style={{
                   padding: "10px 0", borderRadius: 10,
-                  border: questionType === t ? "1px solid #d9d9d9" : "1px solid #eaeaea",
-                  background: questionType === t ? "#efefef" : "#fafafa",
-                  color: questionType === t ? "#666" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                  border: questionType === t ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: questionType === t ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: questionType === t ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: questionType === t ? 800 : 600, cursor: "pointer"
                 }}>{t}</button>
               ))}
             </div>

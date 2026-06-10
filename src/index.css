@@ -14,7 +14,7 @@
   /* 표면 — page→card→surface 순으로 밝아져 깊이감을 준다 */
   --color-page: light-dark(#f7f8fb, #16181d);
   --color-card: light-dark(#fbfcfe, #1d2027);
-  --color-surface: light-dark(#fafafa, #252932);
+  --color-surface: light-dark(#f0f1f4, #252932);
   --color-muted-surface: light-dark(#f1f4f8, #2c313b);
 
   /* 테두리 */

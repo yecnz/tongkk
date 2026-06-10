@@ -2693,6 +2693,10 @@ export default function Summary() {
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  // 요약 진입 화면의 "요약 설정"(퀴즈 설정처럼)에서 고른 값. 하단 "요약 생성하기"가 이 값으로 바로 생성한다.
+  const [summaryTemplate, setSummaryTemplate] = useState<SummaryTemplate>("GENERAL");
+  const [summaryPageRange, setSummaryPageRange] = useState("");
+  const [summaryFocusPrompt, setSummaryFocusPrompt] = useState("");
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
   const [activeMaterialTab, setActiveMaterialTab] = useState<MaterialDetailTab>("original");
   const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
@@ -3197,7 +3201,7 @@ export default function Summary() {
     }
   };
 
-  const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => {
+  const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates") => {
     setSelectedTemplate(template);
     setSummaryPages(opts?.pageRange || ""); // 요약에 쓴 페이지 범위를 보관해 튜터의 원본 본문도 같은 범위로 좁힌다.
     setSummaryError("");
@@ -3211,7 +3215,7 @@ export default function Summary() {
       setSummaryError("");
       setElapsedTime(null);
       setAgentThreadId("");
-      setResultBackView("templates");
+      setResultBackView(backView);
       const startTime = Date.now();
       try {
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 중...`);
@@ -3553,8 +3557,6 @@ export default function Summary() {
             <button onClick={() => navigate(pageRoutes["대시보드"])} style={{
               background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
             }}>← 대시보드로</button>
-            <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 28 }}>
-            <div>
               <Card style={{ padding: 24 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
                   {(["file", "text"] as const).map(mode => (
@@ -3650,11 +3652,6 @@ export default function Summary() {
                       borderRadius: "50%", animation: "spin 0.8s linear infinite"
                     }}/>
                     <span style={{ fontSize: 13, color: PINK, fontWeight: 500 }}>파일 분석 중...</span>
-                  </div>
-                )}
-                {!isExtracting && selectedMarkdown && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>
-                    <span style={{ fontSize: 13, color: "#4CAF50", fontWeight: 700 }}>선택됨: {selectedMaterials.length}개</span>
                   </div>
                 )}
                 {extractError && (
@@ -3753,6 +3750,15 @@ export default function Summary() {
                 )}
 
                 {materials.length > 0 && (
+                  <div style={{
+                    padding: "12px 16px", borderRadius: 10, background: "var(--color-tint-pink)",
+                    fontSize: 13, color: PINK, marginBottom: 14, fontWeight: 800,
+                  }}>
+                    저장된 강의자료 {materials.length}개 중 {selectedMaterials.length}개가 요약에 반영됩니다
+                  </div>
+                )}
+
+                {materials.length > 0 && (
                   <div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
                       <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>
@@ -3847,39 +3853,69 @@ export default function Summary() {
                   </div>
                 )}
               </Card>
-            </div>
 
-            {searched && (
-              <div>
-                <Card style={{ padding: 24 }}>
-                  <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>
-                    선택한 자료로 만들기
-                  </h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.6, color: "var(--color-muted)" }}>
-                    체크한 강의자료를 기준으로 요약을 만들거나 바로 퀴즈를 생성할 수 있습니다.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <button onClick={() => { setTemplatesBackView("upload"); setView("templates"); }} disabled={!selectedMarkdown || isExtracting} style={{
-                      padding: "18px 14px", borderRadius: 12, border: "none",
-                      background: selectedMarkdown && !isExtracting ? "var(--color-tint-pink)" : "var(--color-surface)",
-                      color: selectedMarkdown && !isExtracting ? PINK : "var(--color-muted)",
-                      fontSize: 14, fontWeight: 800,
-                      cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
-                      textAlign: "center", lineHeight: 1.4,
-                    }}>요약<br/>새로 생성</button>
-                    <button onClick={handleGoToQuiz} disabled={!selectedMarkdown || isExtracting} style={{
-                      padding: "18px 14px", borderRadius: 12, border: "none",
-                      background: selectedMarkdown && !isExtracting ? "var(--color-tint-cyan)" : "var(--color-surface)",
-                      color: selectedMarkdown && !isExtracting ? CYAN : "var(--color-muted)",
-                      fontSize: 14, fontWeight: 800,
-                      cursor: selectedMarkdown && !isExtracting ? "pointer" : "default",
-                      textAlign: "center", lineHeight: 1.4,
-                    }}>퀴즈<br/>새로 생성</button>
+              {searched && (
+                <Card style={{ padding: 24, marginTop: 16 }}>
+                  <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>요약 설정</h3>
+
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>요약 종류</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+                    {([
+                      { key: "GENERAL", name: "일반 요약" },
+                      { key: "LECTURE_NOTE", name: "강의 노트" },
+                      { key: "MINDMAP", name: "마인드맵" },
+                      { key: "CHEAT_SHEET", name: "치트시트" },
+                    ] as const).map(t => {
+                      const active = summaryTemplate === t.key;
+                      return (
+                        <button key={t.key} type="button" onClick={() => setSummaryTemplate(t.key)} style={{
+                          padding: "10px 0", borderRadius: 10,
+                          border: active ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                          background: active ? "var(--color-tint-pink)" : "var(--color-card)",
+                          color: active ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: active ? 800 : 600, cursor: "pointer",
+                        }}>{t.name}</button>
+                      );
+                    })}
                   </div>
+
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                    반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
+                  </label>
+                  <input
+                    value={summaryPageRange}
+                    onChange={e => setSummaryPageRange(e.target.value)}
+                    placeholder={summaryPageHint ? `예: 1-5, 8  (${summaryPageHint})` : "예: 1-5, 8"}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", marginBottom: 16 }}
+                  />
+
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                    집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
+                  </label>
+                  <textarea
+                    value={summaryFocusPrompt}
+                    onChange={e => setSummaryFocusPrompt(e.target.value)}
+                    placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
+                    rows={2}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+                  />
                 </Card>
-              </div>
-            )}
-            </div>
+              )}
+
+              {searched && (
+                <button
+                  onClick={() => handleTemplateSelect(summaryTemplate, { pageRange: summaryPageRange, focusPrompt: summaryFocusPrompt }, "upload")}
+                  disabled={!selectedMarkdown || isExtracting}
+                  style={{
+                    width: "100%", padding: "14px 0", borderRadius: 12, border: "none", marginTop: 16,
+                    background: selectedMarkdown && !isExtracting ? PINK : "var(--color-border-soft)",
+                    color: selectedMarkdown && !isExtracting ? "var(--color-on-brand)" : "var(--color-muted)",
+                    fontSize: 16, fontWeight: 700,
+                    cursor: selectedMarkdown && !isExtracting ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {isExtracting ? "자료 분석 중..." : "요약 생성하기"}
+                </button>
+              )}
           </div>
         )}
       </div>
