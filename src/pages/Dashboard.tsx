@@ -251,7 +251,16 @@ const CourseDetailModal = ({
 
         <div style={{ border: "1px solid var(--color-border-soft)", borderRadius: 14, background: "var(--color-card)", minHeight: 320, padding: 18 }}>
           {materials.length === 0 ? (
-            <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
+            <div style={{ minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
+              {!loading && (
+                <button onClick={onGoSummary} style={{
+                  padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
+                  color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
+                  boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+                }}>+ 자료 추가하기</button>
+              )}
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {materials.map((material, index) => {
