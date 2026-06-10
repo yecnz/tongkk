@@ -203,6 +203,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
   const [dragging, setDragging] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [offsets, setOffsets] = useState<OffsetMap>(() => loadOffsets(persistKey));
+  const [studyMode, setStudyMode] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -309,6 +310,16 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
     resetView();
   };
 
+  // 학습 모드: 켜면 노드 클릭으로 포커스+AI 튜터 질문, 끄면 노드 드래그로 위치를 조정한다.
+  const toggleStudyMode = () =>
+    setStudyMode(prev => {
+      if (prev) {
+        setFocusId(null); // 끄면 포커스를 해제해 전체 보기로 되돌린다.
+        resetView();
+      }
+      return !prev;
+    });
+
   const hasOffsets = Object.keys(offsets).length > 0;
   const resetLayout = () => setOffsets({});
 
@@ -336,7 +347,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
 
   // ── 노드 재배치: 전체 보기에서 노드를 끌어 위치를 미세 조정한다(엣지는 좌표 기반이라 자동으로 따라옴) ──
   const onNodePointerDown = (e: React.PointerEvent, node: LayoutNode) => {
-    if (printMode || focusId || e.button !== 0) return; // 전체 보기에서만 재배치 허용
+    if (printMode || studyMode || focusId || e.button !== 0) return; // 학습 모드가 아닐 때만 재배치 허용
     e.stopPropagation(); // 뷰포트 pan 시작을 막는다
     const o = offsets[node.id];
     nodeDragRef.current = { id: node.id, sx: e.clientX, sy: e.clientY, bx: o ? o.dx : 0, by: o ? o.dy : 0 };
@@ -423,7 +434,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
         return (
           <div
             key={node.id}
-            onClick={printMode ? undefined : () => enterFocus(node)}
+            onClick={printMode ? undefined : () => { if (studyMode) enterFocus(node); }}
             onPointerDown={printMode ? undefined : e => onNodePointerDown(e, node)}
             onPointerMove={printMode ? undefined : onNodePointerMove}
             onPointerUp={printMode ? undefined : onNodePointerUp}
@@ -443,7 +454,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
               paddingRight: node.hasChildren ? 4 : 12,
               gap: 4,
               boxSizing: "border-box",
-              cursor: printMode ? "default" : focusId ? "pointer" : "move",
+              cursor: printMode ? "default" : studyMode ? "pointer" : "move",
               touchAction: "none",
             }}
           >
@@ -529,7 +540,33 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
         >
           {exporting ? "PNG 생성 중…" : "PNG 저장"}
         </button>
+        <button
+          onClick={toggleStudyMode}
+          aria-pressed={studyMode}
+          title="켜면 노드를 클릭해 AI 튜터에게 질문할 수 있어요"
+          style={{
+            ...toolBtn,
+            background: studyMode ? "var(--color-tint-cyan)" : "var(--color-card)",
+            color: studyMode ? CYAN : "var(--color-text)",
+            border: studyMode ? "1px solid color-mix(in srgb, var(--color-cyan) 33%, transparent)" : "1px solid var(--color-border-soft)",
+          }}
+        >
+          {studyMode ? "학습 모드 켜짐" : "학습 모드"}
+        </button>
       </div>
+
+      {studyMode && !focusId && (
+        <div style={{
+          fontSize: 12,
+          color: "var(--color-text-secondary)",
+          padding: "8px 12px",
+          borderRadius: 8,
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border-soft)",
+        }}>
+          💡 노드를 클릭하면 그 주제에 집중하고, AI 튜터에게 바로 질문할 수 있어요.
+        </div>
+      )}
 
       <div
         ref={viewportRef}
