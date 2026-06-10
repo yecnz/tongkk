@@ -237,6 +237,7 @@ class AgentRequest(BaseModel):
     model: Literal["GPT", "Gemini"] = "GPT"
     thread_id: str | None = None
     markdown: str | None = None
+    source_markdown: str | None = None
 
 
 class QuizRequest(BaseModel):
@@ -1080,7 +1081,24 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
 @app.post("/agent")
 async def agent(req: AgentRequest, _user=Depends(require_api_user)):
     messages = [message.model_dump() for message in req.messages]
-    if req.markdown:
+    if req.source_markdown:
+        # 원본 본문과 요약을 구분해 제공하고, 사실·근거는 원본을 우선하도록 안내한다.
+        parts = [f"[원본 강의자료 본문]\n{req.source_markdown}"]
+        if req.markdown:
+            parts.append(f"[정리된 요약]\n{req.markdown}")
+        messages.insert(
+            0,
+            {
+                "role": "user",
+                "content": (
+                    "다음 자료를 현재 대화의 참고 자료로 사용해. "
+                    "사실과 내용의 근거는 [원본 강의자료 본문]을 우선하고, "
+                    "[정리된 요약]은 구조·정리 참고용으로만 사용해.\n\n"
+                    + "\n\n".join(parts)
+                ),
+            },
+        )
+    elif req.markdown:
         messages.insert(
             0,
             {

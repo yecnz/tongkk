@@ -74,7 +74,7 @@ type FileIconProps = { type: FileKind };
 // range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
 type DragAnchor = { range: Range; top: number; scrollY: number };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
   selectedCourse: string;
@@ -782,7 +782,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   );
 };
 
-const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, sourceMarkdown, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -1244,6 +1244,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 onExpandedChange={setIsResultExpanded}
                 contextTitle={contextTitle}
                 contextMarkdown={realContent}
+                sourceMarkdown={sourceMarkdown}
                 summaryId={summaryId}
                 threadId={threadId}
                 suggestedQuestions={questions}
@@ -2188,6 +2189,7 @@ const MaterialDetailView = ({
                     onExpandedChange={setIsOriginalTutorExpanded}
                     contextTitle={tutorContextTitle}
                     contextMarkdown={combinedTutorContextMarkdown}
+                    sourceMarkdown={material.markdown}
                     summaryId={activeSummary?.id || null}
                     materialId={material.id}
                     suggestedQuestions={tutorSuggestions}
@@ -2289,6 +2291,7 @@ const MaterialDetailView = ({
                           onExpandedChange={setIsSummaryTutorExpanded}
                           contextTitle={`${material.name} · ${templateLabels[activeSummary.template]}`}
                           contextMarkdown={combinedTutorContextMarkdown}
+                          sourceMarkdown={material.markdown}
                           summaryId={activeSummary.id || null}
                           materialId={material.id}
                           suggestedQuestions={suggestedTutorQuestions[activeSummary.template]}
@@ -3480,6 +3483,7 @@ export default function Summary() {
             }
             contextTitle={`${selectedMaterials.map(material => material.name).join(", ") || "현재 자료"} · ${templateLabels[selectedTemplate]}`}
             realContent={summaryText}
+            sourceMarkdown={selectedMaterials.map(m => `# ${m.name}\n\n${m.markdown}`).join("\n\n")}
             isLoading={isSummarizing}
             error={summaryError}
             loadingStep={loadingStep}

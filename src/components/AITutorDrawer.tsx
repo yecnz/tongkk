@@ -15,6 +15,8 @@ import {
 type AITutorDrawerProps = {
   contextTitle: string;
   contextMarkdown: string;
+  // 원본 강의자료 본문. 있으면 요약과 함께 보내 사실·근거의 우선 기준이 된다.
+  sourceMarkdown?: string;
   summaryId?: string | null;
   materialId?: string | null;
   threadId?: string;
@@ -161,6 +163,7 @@ const formatSessionDate = (timestamp: number) =>
 
 export const AITutorDrawer = ({
   contextMarkdown,
+  sourceMarkdown,
   summaryId,
   materialId,
   threadId = "",
@@ -428,6 +431,7 @@ export const AITutorDrawer = ({
         localThreadId,
         localThreadId ? [userMessage] : nextMessages,
         localThreadId ? undefined : contextMarkdown,
+        localThreadId ? undefined : sourceMarkdown,
       );
       const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
       setLocalThreadId(response.threadId);
