@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import base64
@@ -31,6 +32,8 @@ from agent import run_study_agent, build_llm, build_openai_llm
 
 
 app = FastAPI()
+
+logger = logging.getLogger("tongkk")
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 ALLOWED_ORIGINS = [
@@ -80,6 +83,11 @@ PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 # 요약 출력 토큰 한도. 기본 8192로는 긴 강의자료(예: 100p+) 요약이 중간에 잘리므로 넉넉히 둔다.
 # gpt-5.4-mini 출력 하드 상한은 128000이라 32768은 안전한 헤드룸(약 300p+ 커버).
 SUMMARY_MAX_TOKENS = _env_int("SUMMARY_MAX_TOKENS", 32768)
+
+# 요청 본문 입력 길이 상한(문자 수). 과도한 입력으로 인한 LLM 비용 폭증·메모리 남용을 막는다.
+MAX_MARKDOWN_CHARS = _env_int("MAX_MARKDOWN_CHARS", 2_000_000)
+MAX_CHAT_CONTENT_CHARS = _env_int("MAX_CHAT_CONTENT_CHARS", 100_000)
+MAX_CHAT_MESSAGES = _env_int("MAX_CHAT_MESSAGES", 100)
 
 
 async def require_api_user(authorization: str | None = Header(default=None)):
@@ -218,11 +226,11 @@ SUMMARY_SYSTEM_PROMPT = """너는 대학 강의자료를 템플릿별 목적에 
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=MAX_CHAT_CONTENT_CHARS)
 
 
 class SummarizeRequest(BaseModel):
-    markdown: str = Field(min_length=1)
+    markdown: str = Field(min_length=1, max_length=MAX_MARKDOWN_CHARS)
     template: SummaryTemplate = "GENERAL"
     model: Literal["GPT", "Gemini"] = "GPT"
     thread_id: str | None = None
@@ -233,11 +241,11 @@ class SummarizeRequest(BaseModel):
 
 
 class AgentRequest(BaseModel):
-    messages: list[ChatMessage] = Field(min_length=1)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_MESSAGES)
     model: Literal["GPT", "Gemini"] = "GPT"
     thread_id: str | None = None
-    markdown: str | None = None
-    source_markdown: str | None = None
+    markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
+    source_markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
     pages: str | None = None
 
 
@@ -247,7 +255,7 @@ class QuizRequest(BaseModel):
     difficulty: Literal["쉬움", "보통", "어려움"] = "보통"
     question_type: Literal["객관식", "OX", "단답형", "주관식"] = "객관식"
     model: Literal["GPT", "Gemini"] = "GPT"
-    markdown: str | None = None
+    markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
     # 이전에 출제된 문제 텍스트. 이 문제들과 중복/유사하게 내지 않도록 프롬프트에 반영한다.
     exclude_questions: list[str] = Field(default_factory=list)
 
@@ -268,11 +276,11 @@ class WrongAnalysisRequest(BaseModel):
 
 
 class SubjectiveGradeRequest(BaseModel):
-    question: str = Field(min_length=1)
-    reference_answer: str = Field(min_length=1)
-    student_answer: str = Field(min_length=1)
+    question: str = Field(min_length=1, max_length=MAX_CHAT_CONTENT_CHARS)
+    reference_answer: str = Field(min_length=1, max_length=MAX_CHAT_CONTENT_CHARS)
+    student_answer: str = Field(min_length=1, max_length=MAX_CHAT_CONTENT_CHARS)
     model: Literal["GPT", "Gemini"] = "GPT"
-    markdown: str | None = None
+    markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
 
 
 class StudyPlanDday(BaseModel):
@@ -568,6 +576,10 @@ SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENS
 SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
+# PDF/PPT 등 비이미지 문서 업로드 크기 상한(메모리·디스크 보호). 이미지(OCR)는 MAX_OCR_IMAGE_BYTES를 따른다.
+MAX_DOCUMENT_BYTES = _env_int("MAX_DOCUMENT_BYTES", 100 * 1024 * 1024)
+# zip 기반 파일(PPTX 등)의 압축 해제 총량 상한(zip bomb 방어).
+MAX_ARCHIVE_UNCOMPRESSED_BYTES = _env_int("MAX_ARCHIVE_UNCOMPRESSED_BYTES", 200 * 1024 * 1024)
 
 
 def _find_office_binary() -> str | None:
@@ -766,6 +778,12 @@ def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -
 def _extract_pptx_images_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
     images: list[dict[str, str]] = []
     with zipfile.ZipFile(file_path) as archive:
+        total_uncompressed = sum(info.file_size for info in archive.infolist())
+        if total_uncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+            raise RuntimeError(
+                f"압축 해제 크기가 너무 큽니다({total_uncompressed // (1024 * 1024)}MB). "
+                "손상되었거나 비정상적인 파일일 수 있습니다."
+            )
         media_names = [
             name for name in archive.namelist()
             if name.startswith("ppt/media/")
@@ -898,10 +916,17 @@ async def convert_document_to_markdown(
     if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
         raise HTTPException(status_code=400, detail="PDF, PPT, PPTX, 이미지 파일만 지원합니다.")
 
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        file_bytes = await file.read()
-        if suffix in SUPPORTED_IMAGE_EXTENSIONS and len(file_bytes) > MAX_OCR_IMAGE_BYTES:
+    file_bytes = await file.read()
+    if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+        if len(file_bytes) > MAX_OCR_IMAGE_BYTES:
             raise HTTPException(status_code=413, detail="이미지 파일은 10MB 이하만 OCR할 수 있습니다.")
+    elif len(file_bytes) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"문서 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 변환할 수 있습니다.",
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
@@ -924,12 +949,14 @@ async def convert_document_to_markdown(
         visual_markdown = ""
         try:
             visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
-        except Exception as visual_error:
-            visual_markdown = f"# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석 실패: {str(visual_error)}"
+        except Exception:
+            logger.exception("이미지/손글씨 분석 실패")
+            visual_markdown = "# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석을 완료하지 못했습니다."
         markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
         return {"markdown": "\n\n---\n\n".join(markdown_parts)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"변환 실패: {str(e)}") from e
+        logger.exception("/convert 처리 실패")
+        raise HTTPException(status_code=500, detail="문서 변환 중 오류가 발생했습니다.") from e
     finally:
         os.unlink(tmp_path)
 
@@ -946,6 +973,11 @@ async def convert_document_to_pdf_preview(
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(status_code=400, detail="미리보기 파일이 비어 있습니다.")
+    if len(file_bytes) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"미리보기 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 지원합니다.",
+        )
 
     if suffix == ".pdf":
         return Response(
@@ -968,7 +1000,8 @@ async def convert_document_to_pdf_preview(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"PPT/PPTX 미리보기 변환 실패: {str(e)}") from e
+        logger.exception("/preview/pdf 변환 실패")
+        raise HTTPException(status_code=502, detail="미리보기 변환 중 오류가 발생했습니다.") from e
     finally:
         try:
             os.unlink(tmp_path)
@@ -1008,7 +1041,7 @@ async def extract_text_with_google_vision(
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 "https://vision.googleapis.com/v1/images:annotate",
-                params={"key": GOOGLE_VISION_API_KEY},
+                headers={"x-goog-api-key": GOOGLE_VISION_API_KEY},
                 json=payload,
             )
     except httpx.HTTPError as e:
@@ -1076,7 +1109,8 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"요약 실패: {str(e)}") from e
+        logger.exception("/summarize 실패")
+        raise HTTPException(status_code=502, detail="요약 생성 중 오류가 발생했습니다.") from e
 
 
 @app.post("/agent")
@@ -1122,7 +1156,8 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Agent 실행 실패: {str(e)}") from e
+        logger.exception("/agent 실행 실패")
+        raise HTTPException(status_code=502, detail="AI 튜터 응답 생성 중 오류가 발생했습니다.") from e
 
 
 @app.post("/quiz")
@@ -1167,7 +1202,8 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"퀴즈 생성 실패: {str(e)}") from e
+        logger.exception("/quiz 생성 실패")
+        raise HTTPException(status_code=502, detail="퀴즈 생성 중 오류가 발생했습니다.") from e
 
 
 @app.post("/quiz/grade-subjective")
@@ -1224,7 +1260,8 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"주관식 채점 실패: {str(e)}") from e
+        logger.exception("/quiz/grade-subjective 실패")
+        raise HTTPException(status_code=502, detail="주관식 채점 중 오류가 발생했습니다.") from e
 
 
 @app.post("/quiz/analyze-wrong")
@@ -1257,7 +1294,8 @@ async def analyze_wrong_answers(req: WrongAnalysisRequest, _user=Depends(require
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"오답 분석 실패: {str(e)}") from e
+        logger.exception("/quiz/analyze-wrong 실패")
+        raise HTTPException(status_code=502, detail="오답 분석 중 오류가 발생했습니다.") from e
 
 
 @app.post("/study-plan")
@@ -1290,7 +1328,8 @@ async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_u
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"학습 계획 생성 실패: {str(e)}") from e
+        logger.exception("/study-plan 생성 실패")
+        raise HTTPException(status_code=502, detail="학습 계획 생성 중 오류가 발생했습니다.") from e
 
 
 @app.get("/health")
