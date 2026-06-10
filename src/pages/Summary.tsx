@@ -2717,7 +2717,7 @@ export default function Summary() {
     let ignore = false;
 
     Promise.all([
-      loadCourseMaterialsFromServer(selectedCourse),
+      loadCourseMaterialsFromServer(selectedCourse, { includeMarkdown: true }),
       loadSummariesFromServer(selectedCourse),
     ])
       .then(([nextMaterials, summaries]) => {

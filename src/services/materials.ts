@@ -49,7 +49,7 @@ const toCourseMaterial = (material: {
   type: MaterialKind;
   pages: number | null;
   slides: number | null;
-  markdown: string;
+  markdown?: string | null;
   filePath?: string | null;
   file_path?: string | null;
   mimeType?: string | null;
@@ -63,7 +63,7 @@ const toCourseMaterial = (material: {
   type: material.type,
   pages: material.pages,
   slides: material.slides,
-  markdown: material.markdown,
+  markdown: material.markdown ?? '',
   filePath: material.filePath ?? material.file_path ?? null,
   mimeType: material.mimeType ?? material.mime_type ?? null,
   updatedAt: material.updatedAt || material.updated_at || Date.now(),
@@ -136,15 +136,27 @@ export const createCourseMaterialFileUrl = async (material: CourseMaterial): Pro
   return data.signedUrl;
 };
 
-export const loadCourseMaterialsFromServer = async (course: string): Promise<CourseMaterial[]> => {
+// markdown(변환 본문)은 자료 한 건당 수백 KB~수 MB라 목록 조회에 함께 받으면 Egress가 급증한다.
+// 본문이 실제로 필요한 화면(퀴즈 생성·요약 상세·AI 튜터)만 includeMarkdown로 받고,
+// 목록/개수/통계 용도는 기본값(제외)으로 호출한다.
+export const loadCourseMaterialsFromServer = async (
+  course: string,
+  options?: { includeMarkdown?: boolean },
+): Promise<CourseMaterial[]> => {
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return [];
 
-  const { data, error } = await supabase
-    .from('materials')
-    .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
-    .eq('course_id', courseId)
-    .order('updated_at', { ascending: false });
+  const { data, error } = options?.includeMarkdown
+    ? await supabase
+        .from('materials')
+        .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
+        .eq('course_id', courseId)
+        .order('updated_at', { ascending: false })
+    : await supabase
+        .from('materials')
+        .select('id, name, size, type, pages, slides, file_path, mime_type, updated_at')
+        .eq('course_id', courseId)
+        .order('updated_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
 
