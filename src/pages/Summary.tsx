@@ -1786,8 +1786,8 @@ const MaterialDetailView = ({
 
     Promise.all([
       loadSummariesFromServer(selectedCourse),
-      loadQuizSetsFromServer(selectedCourse),
-      loadQuizAttemptsFromServer(selectedCourse),
+      loadQuizSetsFromServer(selectedCourse, { includeQuestions: true }),
+      loadQuizAttemptsFromServer(selectedCourse, { includeAnswers: true }),
     ])
       .then(([nextSummaries, nextQuizSets, nextQuizAttempts]) => {
         if (ignore) return;

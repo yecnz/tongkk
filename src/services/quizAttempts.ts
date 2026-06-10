@@ -38,7 +38,7 @@ type QuizAttemptRow = {
   correct_count: number;
   score_percent: number;
   weak_topics: string[] | null;
-  answers: QuizAttemptAnswer[];
+  answers?: QuizAttemptAnswer[] | null;
   duration_seconds: number | null;
   timed_out: boolean;
   material_ids: string[] | null;
@@ -66,15 +66,26 @@ const getCourseId = async (course: string) => {
   return courses.find(item => item.name === course)?.id || null;
 };
 
-export async function loadQuizAttemptsFromServer(course: string): Promise<SavedQuizAttempt[]> {
+// answers(문항별 응답 JSONB)는 응시당 수십 KB라 통계·페이스·개수 조회에 함께 받으면 Egress가 커진다.
+// 응답 본문이 실제로 필요한 화면(퀴즈 리뷰/이어풀기, 복습노트 오답 추출)만 includeAnswers로 받는다.
+export async function loadQuizAttemptsFromServer(
+  course: string,
+  options?: { includeAnswers?: boolean },
+): Promise<SavedQuizAttempt[]> {
   const courseId = await getCourseId(course);
   if (!courseId) return [];
 
-  const { data, error } = await supabase
-    .from('quiz_attempts')
-    .select('id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, answers, duration_seconds, timed_out, material_ids, created_at')
-    .eq('course_id', courseId)
-    .order('created_at', { ascending: false });
+  const { data, error } = options?.includeAnswers
+    ? await supabase
+        .from('quiz_attempts')
+        .select('id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, answers, duration_seconds, timed_out, material_ids, created_at')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false })
+    : await supabase
+        .from('quiz_attempts')
+        .select('id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, duration_seconds, timed_out, material_ids, created_at')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
   return (data || []).map(toSavedQuizAttempt);
@@ -82,16 +93,24 @@ export async function loadQuizAttemptsFromServer(course: string): Promise<SavedQ
 
 export type SavedQuizAttemptWithCourse = SavedQuizAttempt & { courseName: string };
 
-export async function loadAllQuizAttemptsFromServer(): Promise<SavedQuizAttemptWithCourse[]> {
+export async function loadAllQuizAttemptsFromServer(
+  options?: { includeAnswers?: boolean },
+): Promise<SavedQuizAttemptWithCourse[]> {
   const user = await requireSupabaseUser();
   const courses = await fetchCourses();
   const courseNameById = new Map(courses.map(course => [course.id, course.name]));
 
-  const { data, error } = await supabase
-    .from('quiz_attempts')
-    .select('id, course_id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, answers, duration_seconds, timed_out, material_ids, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  const { data, error } = options?.includeAnswers
+    ? await supabase
+        .from('quiz_attempts')
+        .select('id, course_id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, answers, duration_seconds, timed_out, material_ids, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+    : await supabase
+        .from('quiz_attempts')
+        .select('id, course_id, quiz_set_id, difficulty, question_type, count, correct_count, score_percent, weak_topics, duration_seconds, timed_out, material_ids, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
   return (data || []).map((row): SavedQuizAttemptWithCourse => ({

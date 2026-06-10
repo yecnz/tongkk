@@ -384,8 +384,8 @@ export default function Quiz() {
     Promise.all([
       loadCourseMaterialsFromServer(selectedCourse, { includeMarkdown: true }),
       loadSummariesFromServer(selectedCourse),
-      loadQuizSetsFromServer(selectedCourse),
-      loadQuizAttemptsFromServer(selectedCourse),
+      loadQuizSetsFromServer(selectedCourse, { includeQuestions: true }),
+      loadQuizAttemptsFromServer(selectedCourse, { includeAnswers: true }),
     ])
       .then(([courseMaterials, summaries, quizSets, attempts]) => {
         applyCourseMaterials(courseMaterials, summaries, quizSets, attempts);
