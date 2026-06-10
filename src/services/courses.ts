@@ -1,3 +1,6 @@
+import { invalidateMaterialsCache } from './materials';
+import { invalidateQuizSetsCache } from './quizSets';
+import { invalidateSummariesCache } from './summaries';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 
 export type CourseRecord = {
@@ -78,4 +81,9 @@ export async function removeCourse(courseId: string): Promise<void> {
 
   if (error) throw new Error(formatSupabaseError(error));
   invalidateCoursesCache();
+  // 과목 삭제 시 서버에서 자료/요약/퀴즈가 함께 삭제되므로(cascade) 관련 캐시도 비운다.
+  // courseId만 알고 캐시는 과목명 기준이라, 드문 작업인 만큼 해당 캐시를 전체 비운다.
+  invalidateMaterialsCache();
+  invalidateSummariesCache();
+  invalidateQuizSetsCache();
 }

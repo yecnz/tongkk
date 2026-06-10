@@ -1622,6 +1622,11 @@ const TutorSplitDivider = ({ onPointerDown }: { onPointerDown: (event: ReactPoin
   );
 };
 
+// 변환된 PPT/PPTX 미리보기(PDF blob)를 자료별로 보관해, 같은 자료를 다시 열 때
+// 원본 다운로드와 백엔드 변환을 반복하지 않는다. objectURL은 페이지가 살아있는 동안 유효하므로
+// revoke하지 않고 재사용한다(자료 id = 파일명+크기라 내용이 바뀌면 키도 달라진다).
+const pptPreviewUrlCache = new Map<string, string>();
+
 const MaterialDetailView = ({
   material,
   selectedCourse,
@@ -1726,7 +1731,6 @@ const MaterialDetailView = ({
 
   useEffect(() => {
     let ignore = false;
-    let objectUrl = "";
 
     setPreviewPdfUrl(null);
     setPreviewError("");
@@ -1738,15 +1742,22 @@ const MaterialDetailView = ({
       };
     }
 
+    // 이미 변환해둔 미리보기가 있으면 원본 다운로드·변환 없이 바로 재사용한다.
+    const cachedPreview = pptPreviewUrlCache.get(material.id);
+    if (cachedPreview) {
+      setPreviewPdfUrl(cachedPreview);
+      setPreviewLoading(false);
+      return () => {
+        ignore = true;
+      };
+    }
+
     setPreviewLoading(true);
     createPdfPreviewFromUrl(fileUrl, material.name)
       .then(url => {
-        objectUrl = url;
-        if (!ignore) {
-          setPreviewPdfUrl(url);
-        } else {
-          URL.revokeObjectURL(url);
-        }
+        // 변환 결과는 페이지 생존 동안 재사용하므로 revoke하지 않고 캐시에 보관한다.
+        pptPreviewUrlCache.set(material.id, url);
+        if (!ignore) setPreviewPdfUrl(url);
       })
       .catch(err => {
         if (!ignore) setPreviewError(err instanceof Error ? err.message : "PPT/PPTX 미리보기 변환에 실패했습니다.");
@@ -1757,7 +1768,6 @@ const MaterialDetailView = ({
 
     return () => {
       ignore = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [fileUrl, isPresentation, material.id, material.name]);
 
@@ -1785,9 +1795,9 @@ const MaterialDetailView = ({
     setActiveSummaryId("");
 
     Promise.all([
-      loadSummariesFromServer(selectedCourse),
-      loadQuizSetsFromServer(selectedCourse),
-      loadQuizAttemptsFromServer(selectedCourse),
+      loadSummariesFromServer(selectedCourse, { includeContent: true }),
+      loadQuizSetsFromServer(selectedCourse, { includeQuestions: true }),
+      loadQuizAttemptsFromServer(selectedCourse, { includeAnswers: true }),
     ])
       .then(([nextSummaries, nextQuizSets, nextQuizAttempts]) => {
         if (ignore) return;
@@ -2717,8 +2727,8 @@ export default function Summary() {
     let ignore = false;
 
     Promise.all([
-      loadCourseMaterialsFromServer(selectedCourse),
-      loadSummariesFromServer(selectedCourse),
+      loadCourseMaterialsFromServer(selectedCourse, { includeMarkdown: true }),
+      loadSummariesFromServer(selectedCourse, { includeContent: true }),
     ])
       .then(([nextMaterials, summaries]) => {
         if (ignore) return;

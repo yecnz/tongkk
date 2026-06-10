@@ -1,3 +1,4 @@
+import { createTtlCache } from './cache';
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import { deleteSummariesByMaterialId } from './summaries';
@@ -18,6 +19,18 @@ export type CourseMaterial = {
 };
 
 const MATERIAL_STORAGE_BUCKET = 'course-materials';
+
+// 자료 목록은 화면 이동마다 다시 받지만 업로드/삭제 때만 바뀐다 → 짧게 캐싱.
+// variant로 본문(markdown) 포함 여부를 구분해, 가벼운 캐시를 본문 필요한 화면에 잘못 주지 않게 한다.
+const materialsCache = createTtlCache<CourseMaterial[]>(30_000);
+export const invalidateMaterialsCache = (course?: string) => materialsCache.invalidate(course);
+
+// 원본 파일 서명 URL은 자료 상세를 열 때마다 새로 발급된다. URL이 매번 바뀌면 브라우저가
+// 같은 파일을 매번 다시 받아(Egress) → 30분간 같은 URL을 재사용해 브라우저 HTTP 캐시
+// (업로드 시 cacheControl 3600)가 동작하게 한다. 키는 파일 경로(filePath). 서명 만료(60분)보다
+// 짧게 잡아 재사용해도 항상 유효하다. 업로드(재업로드)·삭제 시 해당 경로를 무효화한다.
+const signedUrlCache = createTtlCache<string>(30 * 60_000);
+export const invalidateSignedUrlCache = (filePath?: string) => signedUrlCache.invalidate(filePath);
 
 // 원본 파일 저장 한도(Supabase Free 플랜 업로드 한도 ≈ 50MB). Pro로 글로벌 한도를 올리면 이 값도 함께 조정.
 export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
@@ -49,7 +62,7 @@ const toCourseMaterial = (material: {
   type: MaterialKind;
   pages: number | null;
   slides: number | null;
-  markdown: string;
+  markdown?: string | null;
   filePath?: string | null;
   file_path?: string | null;
   mimeType?: string | null;
@@ -63,7 +76,7 @@ const toCourseMaterial = (material: {
   type: material.type,
   pages: material.pages,
   slides: material.slides,
-  markdown: material.markdown,
+  markdown: material.markdown ?? '',
   filePath: material.filePath ?? material.file_path ?? null,
   mimeType: material.mimeType ?? material.mime_type ?? null,
   updatedAt: material.updatedAt || material.updated_at || Date.now(),
@@ -118,6 +131,8 @@ export const uploadCourseMaterialFile = async (
     });
 
   if (error) throw new Error(formatSupabaseError(error));
+  // 같은 경로에 새 파일이 올라왔으니(upsert) 이전 서명 URL 캐시는 버린다.
+  invalidateSignedUrlCache(filePath);
   return {
     ...material,
     filePath,
@@ -128,29 +143,50 @@ export const uploadCourseMaterialFile = async (
 export const createCourseMaterialFileUrl = async (material: CourseMaterial): Promise<string | null> => {
   if (!material.filePath) return null;
 
+  const cached = signedUrlCache.get(material.filePath);
+  if (cached) return cached;
+
   const { data, error } = await supabase.storage
     .from(MATERIAL_STORAGE_BUCKET)
     .createSignedUrl(material.filePath, 60 * 60);
 
   if (error) throw new Error(formatSupabaseError(error));
+  signedUrlCache.set(material.filePath, data.signedUrl);
   return data.signedUrl;
 };
 
-export const loadCourseMaterialsFromServer = async (course: string): Promise<CourseMaterial[]> => {
+// markdown(변환 본문)은 자료 한 건당 수백 KB~수 MB라 목록 조회에 함께 받으면 Egress가 급증한다.
+// 본문이 실제로 필요한 화면(퀴즈 생성·요약 상세·AI 튜터)만 includeMarkdown로 받고,
+// 목록/개수/통계 용도는 기본값(제외)으로 호출한다.
+export const loadCourseMaterialsFromServer = async (
+  course: string,
+  options?: { includeMarkdown?: boolean },
+): Promise<CourseMaterial[]> => {
+  const cacheKey = `${course}::${options?.includeMarkdown ? 'full' : 'light'}`;
+  const cached = materialsCache.get(cacheKey);
+  if (cached) return cached;
+
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return [];
 
-  const { data, error } = await supabase
-    .from('materials')
-    .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
-    .eq('course_id', courseId)
-    .order('updated_at', { ascending: false });
+  const { data, error } = options?.includeMarkdown
+    ? await supabase
+        .from('materials')
+        .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
+        .eq('course_id', courseId)
+        .order('updated_at', { ascending: false })
+    : await supabase
+        .from('materials')
+        .select('id, name, size, type, pages, slides, file_path, mime_type, updated_at')
+        .eq('course_id', courseId)
+        .order('updated_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
 
   const materials = (data || [])
     .map(toCourseMaterial);
 
+  materialsCache.set(cacheKey, materials);
   return materials;
 };
 
@@ -171,6 +207,7 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
       .from(MATERIAL_STORAGE_BUCKET)
       .remove([material.file_path]);
     if (removeResult.error) throw new Error(formatSupabaseError(removeResult.error));
+    invalidateSignedUrlCache(material.file_path);
   }
 
   const { error } = await supabase
@@ -181,6 +218,7 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
 
   if (error) throw new Error(formatSupabaseError(error));
 
+  invalidateMaterialsCache(course);
   await deleteSummariesByMaterialId(course, materialId);
 };
 
@@ -188,6 +226,8 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return;
 
+  // 아래 diff는 서버 실제 상태와 비교해야 하므로 캐시를 먼저 비워 최신을 읽는다.
+  invalidateMaterialsCache(course);
   const serverMaterials = await loadCourseMaterialsFromServer(course);
   const localNames = new Set(materials.map(material => material.name.trim().toLowerCase()));
 
@@ -209,6 +249,7 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
     );
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateMaterialsCache(course);
 };
 
 export const saveCourseMaterials = syncCourseMaterials;

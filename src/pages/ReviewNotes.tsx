@@ -37,7 +37,7 @@ export default function ReviewNotes() {
     let ignore = false;
     setLoading(true);
     Promise.all([
-      loadAllQuizAttemptsFromServer(),
+      loadAllQuizAttemptsFromServer({ includeAnswers: true }),
       // 분석 테이블이 아직 없거나 실패해도 오답 노트 본문은 보이도록 빈 Map으로 흘려보낸다.
       loadAllWrongAnswerAnalysesFromServer().catch(() => new Map<string, WrongAnswerAnalysis>()),
     ])
@@ -99,7 +99,7 @@ export default function ReviewNotes() {
     if (entries.length === 0 || retryingCourse) return;
     setRetryingCourse(courseName);
     try {
-      const quizSets = await loadQuizSetsFromServer(courseName);
+      const quizSets = await loadQuizSetsFromServer(courseName, { includeQuestions: true });
       const used = new Set<string>();
       const reviewQuestions: QuizQuestion[] = [];
       for (const entry of entries) {
