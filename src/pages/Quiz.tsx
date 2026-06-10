@@ -1228,6 +1228,11 @@ export default function Quiz() {
           ]),
         ].filter(Boolean).join("\n")
       : "";
+    // '오답 복습' 헤더의 'AI 튜터로 복습' 버튼이 보낼 질문. 이번 회차 오답 전체를 한 문제씩 다시 설명하도록 요청한다.
+    const reviewTutorQuestion = [
+      "이번 퀴즈에서 틀린 문제들을 한 문제씩 다시 설명해줘. 각 설명 뒤에는 내가 다시 풀어볼 수 있는 확인 질문을 이어서 내줘.",
+      quizReviewContext,
+    ].filter(Boolean).join("\n\n");
     const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
       const materialId = options?.materialId || primaryReviewMaterial?.id;
       if (!materialId) {
@@ -1413,9 +1418,28 @@ export default function Quiz() {
                 border: `1px solid ${BORDER_COLOR}`,
                 textAlign: "left",
               }}>
-                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>
-                  오답 복습
-                </h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>
+                    오답 복습
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => goToMaterialReview({ tutorQuestion: reviewTutorQuestion })}
+                    style={{
+                      flexShrink: 0,
+                      padding: "7px 12px",
+                      borderRadius: 999,
+                      border: "none",
+                      background: PINK,
+                      color: "var(--color-on-brand)",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    AI 튜터로 복습
+                  </button>
+                </div>
                 <div style={{ display: "grid", gap: 10 }}>
                   {wrongQuestions.map((quiz, wrongIndex) => {
                     const questionIndex = quizzes.indexOf(quiz);
