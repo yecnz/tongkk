@@ -694,13 +694,24 @@ export default function Quiz() {
     }
   };
 
-  const next = () => {
-    if (current < quizzes.length - 1) {
-      setCurrent(current + 1);
-      setShowExplanation(false);
-      setShortAnswerInput("");
+  // 활성 풀이: 미응답 상태로 다음으로 넘어가면 한 번 경고하고, 확인하면 이동한다.
+  const goNextActive = () => {
+    if (current >= quizzes.length - 1) return;
+    if (answers[current] === undefined && !window.confirm("정답을 선택하지 않았습니다.\n그래도 다음 문제로 이동할까요?")) return;
+    goToQuestion(current + 1);
+  };
+
+  // 퀴즈 제출: 아직 풀지 않은 문항이 있으면 번호를 알려주고, 해당 문항으로 이동할지 선택하게 한다(취소 시 그대로 제출).
+  const submitQuiz = () => {
+    const unanswered = quizzes.map((_, index) => index).filter(index => answers[index] === undefined);
+    if (unanswered.length > 0) {
+      const numbers = unanswered.map(index => index + 1).join(", ");
+      if (window.confirm(`아직 풀지 않은 문제가 있습니다: ${numbers}번\n해당 문제로 이동할까요?\n(취소를 누르면 그대로 제출합니다.)`)) {
+        goToQuestion(unanswered[0]);
+        return;
+      }
     }
-    else setView("result");
+    setView("result");
   };
 
   // 특정 문항으로 이동(복습/탐색용). 해설 표시는 모드와 응답 여부에 맞춰 갱신한다.
@@ -1551,8 +1562,23 @@ export default function Quiz() {
       <div style={{ height: 3, background: "var(--color-border-soft)" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
       </div>
-      <div style={{ padding: 24, maxWidth: 600, margin: "30px auto" }}>
-        <Card style={{ padding: 28 }}>
+      <div style={{ padding: 24, maxWidth: 700, margin: "30px auto", display: "flex", alignItems: "center", gap: 4 }}>
+        <button
+          type="button"
+          onClick={() => goToQuestion(current - 1)}
+          disabled={current === 0}
+          aria-label="이전 문제"
+          style={{
+            flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            background: "none", border: "none", padding: "10px 6px",
+            color: current === 0 ? "var(--color-border-soft)" : "var(--color-muted)",
+            cursor: current === 0 ? "default" : "pointer",
+          }}
+        >
+          <span style={{ fontSize: 26, lineHeight: 1 }}>‹</span>
+          <span style={{ fontSize: 11, fontWeight: 800 }}>이전</span>
+        </button>
+        <Card style={{ flex: 1, minWidth: 0, padding: 28 }}>
           {reviewMode && (
             <div style={{ marginBottom: 16, padding: "8px 12px", borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>
               오답 복습 · 정답과 내 답을 확인하세요
@@ -1670,33 +1696,32 @@ export default function Quiz() {
             </div>
           )}
           {reviewMode ? (
-            <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => goToQuestion(current - 1)} disabled={current === 0} style={{
-                  flex: 1, padding: "13px 0", borderRadius: 12, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: current === 0 ? "var(--color-muted)" : "var(--color-text)",
-                  fontSize: 14, fontWeight: 700, cursor: current === 0 ? "default" : "pointer"
-                }}>← 이전</button>
-                <button onClick={() => goToQuestion(current + 1)} disabled={current >= quizzes.length - 1} style={{
-                  flex: 1, padding: "13px 0", borderRadius: 12, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: current >= quizzes.length - 1 ? "var(--color-muted)" : "var(--color-text)",
-                  fontSize: 14, fontWeight: 700, cursor: current >= quizzes.length - 1 ? "default" : "pointer"
-                }}>다음 →</button>
-              </div>
-              <button onClick={exitReviewToResult} style={{
-                width: "100%", padding: "13px 0", borderRadius: 12, border: "none",
-                background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700, cursor: "pointer"
-              }}>결과로 돌아가기</button>
-            </div>
+            <button onClick={exitReviewToResult} style={{
+              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
+            }}>결과로 돌아가기</button>
           ) : (
-            selected !== undefined && (
-              <button onClick={next} style={{
-                marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-                background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
-              }}>{current < quizzes.length - 1 ? "다음 문제" : "결과 보기"}</button>
-            )
+            <button onClick={submitQuiz} style={{
+              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
+            }}>결과 보기</button>
           )}
         </Card>
+        <button
+          type="button"
+          onClick={reviewMode ? () => goToQuestion(current + 1) : goNextActive}
+          disabled={current >= quizzes.length - 1}
+          aria-label="다음 문제"
+          style={{
+            flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            background: "none", border: "none", padding: "10px 6px",
+            color: current >= quizzes.length - 1 ? "var(--color-border-soft)" : "var(--color-muted)",
+            cursor: current >= quizzes.length - 1 ? "default" : "pointer",
+          }}
+        >
+          <span style={{ fontSize: 26, lineHeight: 1 }}>›</span>
+          <span style={{ fontSize: 11, fontWeight: 800 }}>다음</span>
+        </button>
       </div>
     </div>
   );
