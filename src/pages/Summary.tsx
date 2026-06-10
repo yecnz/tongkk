@@ -1150,7 +1150,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
               Tongkk {templateLabels[template]} 요약
             </h1>
             {mindmapData ? (
-              <MindmapView key={`pdf-${displayContent}`} data={mindmapData} />
+              <MindmapView key={`pdf-${displayContent}`} data={mindmapData} printMode />
             ) : (
               // 인쇄(PDF)도 화면과 동일하게 보이도록 웹과 같은 렌더러를 사용한다.
               // (이전 PdfFormattedAiText는 출처를 가공하지 않아 문장 끝마다 출처가 노출됐다.)
@@ -1197,7 +1197,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 minWidth: 0,
               }}>
                 {mindmapData ? (
-                  <MindmapView key={displayContent} data={mindmapData} />
+                  <MindmapView key={displayContent} data={mindmapData} onNodeFocus={label => askTutorWithSelection(label, null)} persistKey={summaryId ?? undefined} />
                 ) : (
                   <SelectionAskButton onAsk={askTutorWithSelection}>
                     <FormattedAiText content={displayContent} template={template} />
@@ -1478,7 +1478,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
           Tongkk {templateLabels[template]} 요약
         </h1>
         {mindmapData ? (
-          <MindmapView key={`pdf-${content}`} data={mindmapData} />
+          <MindmapView key={`pdf-${content}`} data={mindmapData} printMode />
         ) : (
           <FormattedAiText content={content} template={template} />
         )}
