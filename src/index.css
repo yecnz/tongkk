@@ -66,9 +66,27 @@ body {
   margin: 0;
   background: var(--color-page);
   color: var(--color-text-strong);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* 사이드바 열림 — 본문을 가리지 않고 오른쪽으로 밀어 폭을 줄인다.
+   사이드바는 position:fixed라 #root의 padding-left에 영향받지 않으므로,
+   왼쪽 240px(사이드바 너비)은 사이드바가 덮고 본문만 오른쪽으로 축소된다.
+   클래스 토글은 Sidebar 컴포넌트(src/common.tsx)가 마운트/언마운트 시 처리한다. */
+#root {
+  transition: padding-left 0.25s ease;
+}
+body.tongkk-sidebar-open #root {
+  padding-left: 240px;
+}
+.tongkk-sidebar {
+  animation: tongkk-sidebar-in 0.25s ease;
+}
+@keyframes tongkk-sidebar-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
 button,
