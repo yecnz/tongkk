@@ -25,6 +25,13 @@ const MATERIAL_STORAGE_BUCKET = 'course-materials';
 const materialsCache = createTtlCache<CourseMaterial[]>(30_000);
 export const invalidateMaterialsCache = (course?: string) => materialsCache.invalidate(course);
 
+// 원본 파일 서명 URL은 자료 상세를 열 때마다 새로 발급된다. URL이 매번 바뀌면 브라우저가
+// 같은 파일을 매번 다시 받아(Egress) → 30분간 같은 URL을 재사용해 브라우저 HTTP 캐시
+// (업로드 시 cacheControl 3600)가 동작하게 한다. 키는 파일 경로(filePath). 서명 만료(60분)보다
+// 짧게 잡아 재사용해도 항상 유효하다. 업로드(재업로드)·삭제 시 해당 경로를 무효화한다.
+const signedUrlCache = createTtlCache<string>(30 * 60_000);
+export const invalidateSignedUrlCache = (filePath?: string) => signedUrlCache.invalidate(filePath);
+
 // 원본 파일 저장 한도(Supabase Free 플랜 업로드 한도 ≈ 50MB). Pro로 글로벌 한도를 올리면 이 값도 함께 조정.
 export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -124,6 +131,8 @@ export const uploadCourseMaterialFile = async (
     });
 
   if (error) throw new Error(formatSupabaseError(error));
+  // 같은 경로에 새 파일이 올라왔으니(upsert) 이전 서명 URL 캐시는 버린다.
+  invalidateSignedUrlCache(filePath);
   return {
     ...material,
     filePath,
@@ -134,11 +143,15 @@ export const uploadCourseMaterialFile = async (
 export const createCourseMaterialFileUrl = async (material: CourseMaterial): Promise<string | null> => {
   if (!material.filePath) return null;
 
+  const cached = signedUrlCache.get(material.filePath);
+  if (cached) return cached;
+
   const { data, error } = await supabase.storage
     .from(MATERIAL_STORAGE_BUCKET)
     .createSignedUrl(material.filePath, 60 * 60);
 
   if (error) throw new Error(formatSupabaseError(error));
+  signedUrlCache.set(material.filePath, data.signedUrl);
   return data.signedUrl;
 };
 
@@ -194,6 +207,7 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
       .from(MATERIAL_STORAGE_BUCKET)
       .remove([material.file_path]);
     if (removeResult.error) throw new Error(formatSupabaseError(removeResult.error));
+    invalidateSignedUrlCache(material.file_path);
   }
 
   const { error } = await supabase
