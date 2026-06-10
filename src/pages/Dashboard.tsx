@@ -323,7 +323,16 @@ const CourseDetailModal = ({
 };
 
 // 공지사항 — 백엔드 공지 테이블이 아직 없어 정적으로 관리한다. 새 공지는 이 배열에 추가하면 된다.
-const NOTICES: { date: string; tag: string; title: string; body: string }[] = [
+// link/linkLabel이 있으면 카드 하단에 바로가기 버튼이 표시된다(예: 설문 구글폼).
+const NOTICES: { date: string; tag: string; title: string; body: string; link?: string; linkLabel?: string }[] = [
+  {
+    date: "2026.06.11",
+    tag: "설문",
+    title: "사용자 설문에 참여해 주세요",
+    body: "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했어요. 잠깐이면 끝나니 아래 버튼으로 참여해 주시면 큰 도움이 됩니다.",
+    link: "https://forms.gle/cDguG46mLHqSUmu7A",
+    linkLabel: "설문 참여하기",
+  },
   {
     date: "2026.06.11",
     tag: "안내",
@@ -366,6 +375,25 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
             </div>
             <p style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>{notice.title}</p>
             <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>{notice.body}</p>
+            {notice.link && (
+              <a
+                href={notice.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12,
+                  padding: "9px 16px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "var(--color-on-brand)",
+                  fontSize: 13, fontWeight: 800, textDecoration: "none", cursor: "pointer",
+                }}
+              >
+                {notice.linkLabel || "바로가기"}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17 17 7" />
+                  <path d="M8 7h9v9" />
+                </svg>
+              </a>
+            )}
           </div>
         ))}
       </div>
