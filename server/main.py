@@ -38,6 +38,7 @@ logger = logging.getLogger("tongkk")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 ALLOWED_ORIGINS = [
     FRONTEND_ORIGIN,
+    "https://tongkk.vercel.app",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5173",
@@ -45,7 +46,6 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
 ]
-ALLOWED_ORIGIN_REGEX = r"https://.*\.trycloudflare\.com"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 GOOGLE_VISION_API_KEY = os.getenv("GOOGLE_VISION_API_KEY", "")
@@ -60,7 +60,6 @@ ALLOW_NO_AUTH = os.getenv("ALLOW_NO_AUTH", "").strip().lower() in {"1", "true", 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_methods=["*"],
     allow_headers=["*"],
 )
