@@ -14,7 +14,7 @@
   /* 표면 — page→card→surface 순으로 밝아져 깊이감을 준다 */
   --color-page: light-dark(#f7f8fb, #16181d);
   --color-card: light-dark(#fbfcfe, #1d2027);
-  --color-surface: light-dark(#f0f1f4, #252932);
+  --color-surface: light-dark(#fafafa, #252932);
   --color-muted-surface: light-dark(#f1f4f8, #2c313b);
 
   /* 테두리 */
@@ -87,6 +87,12 @@ body.tongkk-sidebar-open #root {
 @keyframes tongkk-sidebar-in {
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }
+}
+
+/* 요약 화면·AI 튜터에서만 표면색(--color-surface)을 살짝 진한 연한 회색으로 덮어쓴다.
+   나머지 화면은 @theme의 기본값(#fafafa)을 그대로 쓴다. 적용: Summary 페이지 루트에 클래스 부여. */
+.tongkk-soft-surface {
+  --color-surface: light-dark(#eceef2, #252932);
 }
 
 button,

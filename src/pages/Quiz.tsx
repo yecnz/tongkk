@@ -1784,6 +1784,11 @@ export default function Quiz() {
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
             }}>결과로 돌아가기</button>
+          ) : current < quizzes.length - 1 ? (
+            <button onClick={goNextActive} style={{
+              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
+            }}>다음</button>
           ) : (
             <button onClick={submitQuiz} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",

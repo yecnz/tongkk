@@ -3296,7 +3296,7 @@ export default function Summary() {
   if (!selectedCourse) return <Navigate to={pageRoutes["대시보드"]} replace />;
 
   return (
-    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div className="tongkk-soft-surface" style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {showMultiSummaryNotice && view === "upload" && (
         <div
