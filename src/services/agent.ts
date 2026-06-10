@@ -24,6 +24,8 @@ export async function sendAgentMessage(
   threadId: string,
   messages: AgentMessage[],
   markdown?: string,
+  sourceMarkdown?: string,
+  pages?: string,
 ): Promise<AgentResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
@@ -32,7 +34,7 @@ export async function sendAgentMessage(
     const response = await fetch(`${BACKEND_URL}/agent`, {
       method: 'POST',
       headers: await getJsonRequestHeaders(),
-      body: JSON.stringify({ thread_id: threadId || undefined, messages, markdown }),
+      body: JSON.stringify({ thread_id: threadId || undefined, messages, markdown, source_markdown: sourceMarkdown, pages }),
       signal: controller.signal,
     });
 
