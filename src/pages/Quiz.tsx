@@ -1200,10 +1200,6 @@ export default function Quiz() {
           ]),
         ].filter(Boolean).join("\n")
       : "";
-    const makeTutorQuestion = (topic: string) => [
-      `${topic} 부분을 중심으로 이번 퀴즈에서 틀린 문제들을 한 문제씩 다시 설명해줘. 설명 뒤에는 내가 다시 풀어볼 수 있는 확인 질문을 이어서 내줘.`,
-      quizReviewContext,
-    ].filter(Boolean).join("\n\n");
     const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
       const materialId = options?.materialId || primaryReviewMaterial?.id;
       if (!materialId) {
@@ -1335,63 +1331,6 @@ export default function Quiz() {
                 </div>
               </div>
             )}
-
-            <div style={{
-              margin: "0 0 24px",
-              padding: 18,
-              borderRadius: 14,
-              background: "#F7FDFF",
-              border: "1px solid var(--color-tint-cyan)",
-              textAlign: "left",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>개인 맞춤 복습</h3>
-                <span style={{ fontSize: 12, fontWeight: 800, color: CYAN }}>다음 추천: {nextDifficulty}</span>
-              </div>
-              {resultWeakTopics.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {resultWeakTopics.map(topic => (
-                    <button
-                      key={topic}
-                      type="button"
-                      onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(topic) })}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 10,
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1px solid var(--color-tint-cyan)",
-                        background: "var(--color-card)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>
-                        약점 후보: <strong>{topic}</strong>
-                      </span>
-                      <span style={{
-                        flexShrink: 0,
-                        padding: "7px 10px",
-                        borderRadius: 9,
-                        background: "var(--color-tint-pink)",
-                        color: PINK,
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}>
-                        요약과 튜터로 보기
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                  이번 회차에서는 뚜렷한 약점 문항이 없습니다. 다음에는 {nextDifficulty} 난이도로 실전 감각을 이어가세요.
-                </p>
-              )}
-            </div>
 
             {reviewMaterials.length > 1 && (
               <div style={{
