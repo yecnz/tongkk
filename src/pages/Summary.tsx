@@ -693,7 +693,13 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
 };
 
 // 요약 내용 렌더: MINDMAP은 JSON을 파싱해 시각화하고, 그 외 템플릿은 마크다운으로 렌더한다.
-const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { content: string; template?: SummaryTemplate; onNodeFocus?: (label: string) => void; persistKey?: string }) => {
+// 마인드맵 노드 클릭 시 AI 튜터에 넣을 질문. 루트부터의 경로(흐름)와 상위 개념과의 관계를 살린다(루트는 단독 설명).
+const buildMindmapQuestion = (label: string, pathLabels: string[]): string =>
+  pathLabels.length > 1
+    ? `"${pathLabels.join(" > ")}" 흐름에서 "${label}"의 의미와 상위 개념과의 관계를 설명해줘`
+    : `"${label}"에 대해 설명해줘`;
+
+const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { content: string; template?: SummaryTemplate; onNodeFocus?: (label: string, pathLabels: string[]) => void; persistKey?: string }) => {
   const mindmap = template === "MINDMAP" ? parseMindmapJson(content) : null;
   return mindmap
     ? <MindmapView data={mindmap} onNodeFocus={onNodeFocus} persistKey={persistKey} />
@@ -793,11 +799,15 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
 
-  const askTutorWithSelection = (text: string, anchor: DragAnchor | null) => {
+  // 완성된 질문을 그대로 튜터 입력창에 채운다(마인드맵 노드 질문 등).
+  const askTutorWithQuestion = (question: string, anchor: DragAnchor | null) => {
     dragAnchorRef.current = anchor;
     setIsTutorOpen(true);
-    setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
+    setTutorSelectionQuestion(prev => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
   };
+  // 본문 드래그 선택: "다음 내용을 설명해줘" 접두사를 붙인다.
+  const askTutorWithSelection = (text: string, anchor: DragAnchor | null) =>
+    askTutorWithQuestion(`다음 내용을 설명해줘:\n${text}`, anchor);
 
   // 튜터를 닫으면 그리드가 2열→1열로 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
   const handleTutorOpenChange = (next: boolean) => {
@@ -1215,7 +1225,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 minWidth: 0,
               }}>
                 {mindmapData ? (
-                  <MindmapView key={displayContent} data={mindmapData} onNodeFocus={label => askTutorWithSelection(label, null)} persistKey={summaryId ?? undefined} />
+                  <MindmapView key={displayContent} data={mindmapData} onNodeFocus={(label, pathLabels) => askTutorWithQuestion(buildMindmapQuestion(label, pathLabels), null)} persistKey={summaryId ?? undefined} />
                 ) : (
                   <SelectionAskButton onAsk={askTutorWithSelection}>
                     <FormattedAiText content={displayContent} template={template} />
@@ -1654,11 +1664,15 @@ const MaterialDetailView = ({
   // 요약/원본 ↔ AI 튜터 가로 분할 비율(드래그 조절, localStorage 기억).
   const tutorSplit = useTutorSplit();
 
-  const askSummaryTutorWithSelection = (text: string, anchor: DragAnchor | null) => {
+  // 완성된 질문을 그대로 튜터 입력창에 채운다(마인드맵 노드 질문 등).
+  const askSummaryTutorWithQuestion = (question: string, anchor: DragAnchor | null) => {
     dragAnchorRef.current = anchor;
     setIsSummaryTutorOpen(true);
-    setTutorSelectionQuestion(prev => ({ text: `다음 내용을 설명해줘:\n${text}`, nonce: (prev?.nonce ?? 0) + 1 }));
+    setTutorSelectionQuestion(prev => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
   };
+  // 본문 드래그 선택: "다음 내용을 설명해줘" 접두사를 붙인다.
+  const askSummaryTutorWithSelection = (text: string, anchor: DragAnchor | null) =>
+    askSummaryTutorWithQuestion(`다음 내용을 설명해줘:\n${text}`, anchor);
 
   // 튜터를 닫으면 그리드가 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
   const handleSummaryTutorOpenChange = (next: boolean) => {
@@ -2257,7 +2271,7 @@ const MaterialDetailView = ({
                           <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted)" }}>{formatHubDate(activeSummary.createdAt)}</p>
                         </div>
                         <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
-                          <SummaryContentView content={activeSummary.content} template={activeSummary.template} onNodeFocus={label => askSummaryTutorWithSelection(label, null)} persistKey={activeSummary.id} />
+                          <SummaryContentView content={activeSummary.content} template={activeSummary.template} onNodeFocus={(label, pathLabels) => askSummaryTutorWithQuestion(buildMindmapQuestion(label, pathLabels), null)} persistKey={activeSummary.id} />
                         </SelectionAskButton>
                       </div>
                     </div>

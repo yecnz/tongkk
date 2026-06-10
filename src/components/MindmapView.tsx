@@ -152,6 +152,17 @@ function findNodeById(node: NodeData, targetId: string, id = "root"): NodeData |
   return null;
 }
 
+// 루트부터 해당 노드까지의 라벨 경로(점표기 id 기준). 예: ["서비스 서버","다수데이터운영","트래픽 대응"]
+function nodePathLabels(root: NodeData, id: string): string[] {
+  const parts = id.split(".");
+  const labels: string[] = [];
+  for (let i = 1; i <= parts.length; i++) {
+    const found = findNodeById(root, parts.slice(0, i).join("."));
+    if (found) labels.push(found.label);
+  }
+  return labels;
+}
+
 function loadOffsets(persistKey?: string): OffsetMap {
   if (!persistKey) return {};
   try {
@@ -188,8 +199,9 @@ const divider: CSSProperties = { width: 1, height: 18, background: "var(--color-
 
 type MindmapViewProps = {
   data: NodeData;
-  // 노드를 포커스(단독 학습)할 때 부모에 알린다. 부모는 이 라벨로 AI 튜터를 옆에 띄운다.
-  onNodeFocus?: (label: string) => void;
+  // 노드를 포커스(단독 학습)할 때 부모에 알린다. 부모는 이 정보로 AI 튜터를 옆에 띄운다.
+  // pathLabels는 루트부터 이 노드까지의 라벨 경로 — 튜터 질문에 마인드맵 흐름을 싣는 데 쓴다.
+  onNodeFocus?: (label: string, pathLabels: string[]) => void;
   // PDF 캡처용 정적 렌더. 툴바·pan/zoom 없이 전체 트리를 그대로 그린다.
   printMode?: boolean;
   // 사용자가 끌어 둔 노드 위치를 localStorage에 저장할 키(보통 요약 id). 없으면 세션 메모리에만 유지.
@@ -302,7 +314,8 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
       return next;
     });
     resetView();
-    onNodeFocus?.(node.label);
+    // 루트부터 이 노드까지의 라벨 경로를 함께 넘겨 튜터 질문에 마인드맵 흐름을 싣는다.
+    onNodeFocus?.(node.label, nodePathLabels(data, node.id));
   };
 
   const clearFocus = () => {
