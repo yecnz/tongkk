@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -693,10 +693,10 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
 };
 
 // 요약 내용 렌더: MINDMAP은 JSON을 파싱해 시각화하고, 그 외 템플릿은 마크다운으로 렌더한다.
-const SummaryContentView = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
+const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { content: string; template?: SummaryTemplate; onNodeFocus?: (label: string) => void; persistKey?: string }) => {
   const mindmap = template === "MINDMAP" ? parseMindmapJson(content) : null;
   return mindmap
-    ? <MindmapView data={mindmap} />
+    ? <MindmapView data={mindmap} onNodeFocus={onNodeFocus} persistKey={persistKey} />
     : <FormattedAiText content={content} template={template} />;
 };
 
@@ -781,6 +781,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
   const [actionMessage, setActionMessage] = useState("");
+  const [mindmapPaneHeight, setMindmapPaneHeight] = useState<number | undefined>(undefined);
   const [pdfSaving, setPdfSaving] = useState(false);
   const [showPrintGuide, setShowPrintGuide] = useState(false);
   const [isTutorOpen, setIsTutorOpen] = useState(Boolean(initialTutorQuestion?.trim()));
@@ -788,6 +789,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const [isResultExpanded, setIsResultExpanded] = useState(false);
   const [tutorSelectionQuestion, setTutorSelectionQuestion] = useState<{ text: string; nonce: number } | null>(null);
   const pdfExportRef = useRef<HTMLDivElement | null>(null);
+  const mindmapPaneRef = useRef<HTMLDivElement | null>(null);
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
 
@@ -818,6 +820,22 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   useEffect(() => {
     if (initialTutorQuestion?.trim()) setIsTutorOpen(true);
   }, [initialTutorQuestion]);
+
+  // 마인드맵 칸 높이를 측정해 옆 AI 튜터 높이를 맞춘다(텍스트 요약·확대 시에는 기존 고정 높이 유지).
+  const showMindmapTutor = Boolean(mindmapData) && !isResultExpanded && isTutorOpen;
+  useLayoutEffect(() => {
+    if (!showMindmapTutor) {
+      setMindmapPaneHeight(undefined);
+      return;
+    }
+    const el = mindmapPaneRef.current;
+    if (!el) return;
+    const measure = () => setMindmapPaneHeight(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showMindmapTutor]);
 
   // 실제 인쇄(→ PDF 저장) 실행. 안내 팝업에서 '계속'을 누르면 호출된다.
   const runPrint = () => {
@@ -1189,7 +1207,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             alignItems: "stretch",
           }}>
             {!isResultExpanded && (
-              <div style={{
+              <div ref={mindmapPaneRef} style={{
                 background: "var(--color-card)", borderRadius: 12, padding: 28,
                 border: "1px solid var(--color-border-soft)",
                 fontSize: 15, color: "var(--color-text)", lineHeight: 1.85,
@@ -1209,6 +1227,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             {isTutorOpen && (
               <AITutorDrawer
                 layout="embedded"
+                embeddedHeight={mindmapData ? mindmapPaneHeight : undefined}
                 open={isTutorOpen}
                 onOpenChange={handleTutorOpenChange}
                 expanded={isResultExpanded}
@@ -2238,7 +2257,7 @@ const MaterialDetailView = ({
                           <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted)" }}>{formatHubDate(activeSummary.createdAt)}</p>
                         </div>
                         <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
-                          <SummaryContentView content={activeSummary.content} template={activeSummary.template} />
+                          <SummaryContentView content={activeSummary.content} template={activeSummary.template} onNodeFocus={label => askSummaryTutorWithSelection(label, null)} persistKey={activeSummary.id} />
                         </SelectionAskButton>
                       </div>
                     </div>

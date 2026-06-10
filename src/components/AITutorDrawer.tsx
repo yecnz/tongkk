@@ -30,6 +30,8 @@ type AITutorDrawerProps = {
   // embedded일 때 고정 높이(1100) 대신 부모 패널 높이를 100%로 채운다.
   // 이러면 튜터 내부(채팅)만 스크롤되고 요약 영역과 분리된 독립 스크롤이 된다.
   fill?: boolean;
+  // embedded일 때 부모(마인드맵 칸 등)의 측정 높이(px)에 맞춘다. 지정되면 fill/고정값보다 우선한다.
+  embeddedHeight?: number;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   // 확대 상태를 부모가 제어할 수 있게 한다. embedded일 때는 부모가 본문 칸을 숨기고 튜터를 꽉 채운다.
@@ -170,6 +172,7 @@ export const AITutorDrawer = ({
   resetHistory = false,
   layout = "drawer",
   fill = false,
+  embeddedHeight,
   open,
   onOpenChange,
   expanded,
@@ -510,8 +513,8 @@ export const AITutorDrawer = ({
         left: layout === "embedded" ? undefined : isExpanded ? "50%" : undefined,
         right: layout === "embedded" ? "auto" : isExpanded ? "auto" : 0,
         width: layout === "embedded" ? "100%" : isExpanded ? "min(1080px, calc(100vw - 48px))" : "min(420px, 100vw)",
-        height: layout === "embedded" ? (fill ? "100%" : 1100) : isExpanded ? "calc(100vh - 48px)" : "100vh",
-        minHeight: layout === "embedded" ? (fill ? 0 : 1100) : undefined,
+        height: layout === "embedded" ? (embeddedHeight ?? (fill ? "100%" : 1100)) : isExpanded ? "calc(100vh - 48px)" : "100vh",
+        minHeight: layout === "embedded" ? (embeddedHeight ?? (fill ? 0 : 1100)) : undefined,
         zIndex: layout === "embedded" ? "auto" : isExpanded ? 260 : 190,
         border: "1px solid var(--color-border-soft)",
         borderRight: layout === "embedded" ? "1px solid var(--color-border-soft)" : isExpanded ? "1px solid var(--color-border-soft)" : "none",
