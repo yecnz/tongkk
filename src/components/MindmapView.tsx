@@ -547,13 +547,6 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
           </span>
         )}
         <button
-          onClick={exportPng}
-          disabled={exporting}
-          style={{ ...toolBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? "default" : "pointer" }}
-        >
-          {exporting ? "PNG 생성 중…" : "PNG 저장"}
-        </button>
-        <button
           onClick={toggleStudyMode}
           aria-pressed={studyMode}
           title="켜면 노드를 클릭해 AI 튜터에게 질문할 수 있어요"
@@ -565,6 +558,13 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
           }}
         >
           {studyMode ? "학습 모드 켜짐" : "학습 모드"}
+        </button>
+        <button
+          onClick={exportPng}
+          disabled={exporting}
+          style={{ ...toolBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? "default" : "pointer" }}
+        >
+          {exporting ? "PNG 생성 중…" : "PNG 저장"}
         </button>
       </div>
 
