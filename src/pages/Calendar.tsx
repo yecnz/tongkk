@@ -202,9 +202,8 @@ export default function Calendar() {
   };
 
   return (
-    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active={page} onNav={(item) => { navigate(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
-      {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />}
       {showAddDday && <AddDdayModal initialDate={selectedDate} onClose={() => setShowAddDday(false)} onAdd={addDday} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={addPlanForSelected} />}
       {showAddPace && <AddPaceModal courses={courses} ddays={ddays} onClose={() => setShowAddPace(false)} onAdd={addPacePlan} />}

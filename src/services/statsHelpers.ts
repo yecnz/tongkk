@@ -112,6 +112,12 @@ export function studyStreak(attempts: SavedQuizAttempt[]): number {
   const dateKeys = new Set(attempts.map(attempt => toLocalDateKey(attempt.createdAt)));
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
+  // 오늘 아직 학습 기록이 없으면 어제부터 센다. 그래야 자정이 지나도(오늘 풀기 전)
+  // 어제까지 쌓인 연속 기록이 0으로 초기화되지 않는다. 어제도 없으면 연속이 끊긴 것이라 0.
+  if (!dateKeys.has(toLocalDateKey(cursor.getTime()))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!dateKeys.has(toLocalDateKey(cursor.getTime()))) return 0;
+  }
   let streak = 0;
   while (dateKeys.has(toLocalDateKey(cursor.getTime()))) {
     streak += 1;

@@ -50,7 +50,12 @@ const getCourseId = async (course: string) => {
 // 퀴즈 세트 목록은 화면 이동마다 다시 받지만 생성 때만 바뀐다 → 짧게 캐싱.
 // variant로 문제 본문(questions) 포함 여부를 구분한다.
 const quizSetsCache = createTtlCache<SavedQuizSet[]>(30_000);
-export const invalidateQuizSetsCache = (course?: string) => quizSetsCache.invalidate(course);
+// 대시보드 통계용 개수 캐시 — 목록 본문을 받지 않고 count(개수)만 보관한다.
+const quizSetsCountCache = createTtlCache<number>(30_000);
+export const invalidateQuizSetsCache = (course?: string) => {
+  quizSetsCache.invalidate(course);
+  quizSetsCountCache.invalidate(course);
+};
 
 // questions(문제 본문 JSONB)는 세트당 수십 KB~수백 KB라 목록/개수 조회에 함께 받으면 Egress가 커진다.
 // 문제 본문이 실제로 필요한 화면(퀴즈 풀기/재풀기, 복습노트 원문 대조, 요약 내 퀴즈 미리보기)만
@@ -82,6 +87,34 @@ export async function loadQuizSetsFromServer(
   const quizSets = (data || []).map(toSavedQuizSet);
   quizSetsCache.set(cacheKey, quizSets);
   return quizSets;
+}
+
+// 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
+// 이미 받아둔 목록 캐시가 있으면 추가 조회 없이 그 길이를 쓴다.
+export async function countQuizSetsFromServer(course: string): Promise<number> {
+  const cacheKey = `${course}::count`;
+  const cachedCount = quizSetsCountCache.get(cacheKey);
+  if (cachedCount !== undefined) return cachedCount;
+
+  const cachedList = quizSetsCache.get(`${course}::light`) ?? quizSetsCache.get(`${course}::full`);
+  if (cachedList) {
+    quizSetsCountCache.set(cacheKey, cachedList.length);
+    return cachedList.length;
+  }
+
+  const courseId = await getCourseId(course);
+  if (!courseId) return 0;
+
+  const { count, error } = await supabase
+    .from('quiz_sets')
+    .select('*', { count: 'exact', head: true })
+    .eq('course_id', courseId);
+
+  if (error) throw new Error(formatSupabaseError(error));
+
+  const total = count ?? 0;
+  quizSetsCountCache.set(cacheKey, total);
+  return total;
 }
 
 export async function saveQuizSetToServer(

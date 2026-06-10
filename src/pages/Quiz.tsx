@@ -901,7 +901,6 @@ export default function Quiz() {
   const sidebarEl = (
     <>
       {sidebar && <Sidebar active="퀴즈 생성" onNav={handleNav} onClose={() => setSidebar(false)} />}
-      {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
     </>
   );
 
@@ -914,7 +913,7 @@ export default function Quiz() {
   if (view === "courseDetail") {
     const canGenerate = !isExtracting;
     return (
-      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
@@ -1114,9 +1113,9 @@ export default function Quiz() {
               {[5, 10, 15, 20].map(n => (
                 <button key={n} onClick={() => setCount(n)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
-                  border: count === n ? "1px solid #d9d9d9" : "1px solid #eaeaea",
-                  background: count === n ? "#efefef" : "#fafafa",
-                  color: count === n ? "#666" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                  border: count === n ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: count === n ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: count === n ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: count === n ? 800 : 600, cursor: "pointer"
                 }}>{n}문제</button>
               ))}
             </div>
@@ -1126,9 +1125,9 @@ export default function Quiz() {
               {(["쉬움", "보통", "어려움"] as QuizDifficulty[]).map(d => (
                 <button key={d} onClick={() => setDifficulty(d)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
-                  border: difficulty === d ? "1px solid #d9d9d9" : "1px solid #eaeaea",
-                  background: difficulty === d ? "#efefef" : "#fafafa",
-                  color: difficulty === d ? "#666" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                  border: difficulty === d ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: difficulty === d ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: difficulty === d ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: difficulty === d ? 800 : 600, cursor: "pointer"
                 }}>{d}</button>
               ))}
             </div>
@@ -1138,9 +1137,9 @@ export default function Quiz() {
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
                 <button key={t} onClick={() => setQuestionType(t)} style={{
                   padding: "10px 0", borderRadius: 10,
-                  border: questionType === t ? "1px solid #d9d9d9" : "1px solid #eaeaea",
-                  background: questionType === t ? "#efefef" : "#fafafa",
-                  color: questionType === t ? "#666" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer"
+                  border: questionType === t ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                  background: questionType === t ? "var(--color-tint-pink)" : "var(--color-card)",
+                  color: questionType === t ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: questionType === t ? 800 : 600, cursor: "pointer"
                 }}>{t}</button>
               ))}
             </div>
@@ -1199,7 +1198,7 @@ export default function Quiz() {
   if (view === "generating") {
     const sourceName = selectedMaterials.length > 0 ? `자료별 소스 ${selectedMaterials.length}개` : null;
     return (
-      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ width: 48, height: 48, border: "3px solid var(--color-border-soft)", borderTop: `3px solid ${PINK}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 20px" }}/>
           <p style={{ fontSize: 16, fontWeight: 600, color: "var(--color-text-strong)" }}>AI가 퀴즈를 생성하고 있습니다...</p>
@@ -1361,7 +1360,7 @@ export default function Quiz() {
       }
     };
     return (
-      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
@@ -1566,7 +1565,7 @@ export default function Quiz() {
   const subjectiveGrade = subjectiveGrades[current];
   if (!q) {
     return (
-      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 600, margin: "40px auto" }}>
@@ -1584,7 +1583,7 @@ export default function Quiz() {
   // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
   const currentCorrect = isQuestionCorrect(q, current, selected);
   return (
-    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
       <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={
@@ -1785,6 +1784,11 @@ export default function Quiz() {
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
             }}>결과로 돌아가기</button>
+          ) : current < quizzes.length - 1 ? (
+            <button onClick={goNextActive} style={{
+              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
+            }}>다음</button>
           ) : (
             <button onClick={submitQuiz} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",

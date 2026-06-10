@@ -1,4 +1,8 @@
+import { useEffect } from "react";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+
+// 피드백을 받을 팀 메일 (사이드바 하단·문의 메일 공통)
+export const FEEDBACK_EMAIL = "tongkk.team@gmail.com";
 
 // 색상은 모두 CSS 변수를 가리켜 라이트/다크 토큰을 자동으로 따른다(정의: src/index.css).
 // 브랜드색 PINK·CYAN도 다크에서 채도를 낮춘 값으로 전환되며, 투명도를 섞을 때는
@@ -52,28 +56,64 @@ export const SidebarIcon = () => (
   </svg>
 );
 
-export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => (
-  <div className="tongkk-sidebar" style={{
-    position: "fixed", top: 0, left: 0, width: 240, height: "100vh",
-    background: CARD_BACKGROUND, borderRight: `1px solid ${BORDER_COLOR}`, zIndex: 100,
-    display: "flex", flexDirection: "column", padding: "24px 0",
-    boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
-  }}>
-    <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <button onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
-    </div>
-    {(Object.keys(pageRoutes) as PageRouteLabel[])
-      .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
-      .map(item => (
-      <button key={item} onClick={() => { onNav(item); onClose(); }} style={{
-        padding: "14px 24px", border: "none", background: active === item ? "rgba(240,112,174,0.11)" : "transparent",
-        textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
-        color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
-      }}>{item}</button>
-    ))}
-  </div>
+// 피드백 보내기 버튼의 종이비행기 아이콘
+const PaperPlaneIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 2 11 13" />
+    <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
+  </svg>
 );
+
+export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
+  // 사이드바가 열려 있는 동안 body에 클래스를 붙여, 본문(#root)을 오른쪽으로 밀어
+  // 가리지 않고 폭이 줄어들게 한다(스타일 정의: src/index.css). 언마운트 시 원복.
+  useEffect(() => {
+    document.body.classList.add("tongkk-sidebar-open");
+    return () => document.body.classList.remove("tongkk-sidebar-open");
+  }, []);
+
+  return (
+    <div className="tongkk-sidebar" style={{
+      position: "fixed", top: 0, left: 0, width: 240, height: "100vh",
+      background: CARD_BACKGROUND, borderRight: `1px solid ${BORDER_COLOR}`, zIndex: 100,
+      display: "flex", flexDirection: "column", padding: "24px 0",
+      boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
+    }}>
+      <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <button onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
+      </div>
+      {(Object.keys(pageRoutes) as PageRouteLabel[])
+        .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
+        .map(item => (
+        <button key={item} onClick={() => { onNav(item); onClose(); }} style={{
+          padding: "14px 24px", border: "none", background: active === item ? "rgba(240,112,174,0.11)" : "transparent",
+          textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
+          color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
+        }}>{item}</button>
+      ))}
+
+      {/* 하단 피드백 — mailto로 메일 작성을 띄우고, 메일 클라이언트가 없는 사용자를 위해 주소도 노출 */}
+      <div style={{ marginTop: "auto", padding: "16px 20px 4px", borderTop: `1px solid ${BORDER_COLOR}` }}>
+        <a
+          href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Tongkk 피드백")}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "11px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+            background: MUTED_SURFACE, color: "var(--color-text-secondary)",
+            fontSize: 14, fontWeight: 700, textDecoration: "none", cursor: "pointer",
+          }}
+        >
+          <PaperPlaneIcon />
+          피드백 보내기
+        </a>
+        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--color-muted)", textAlign: "center", wordBreak: "break-all" }}>
+          {FEEDBACK_EMAIL}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export const Card = ({ children, style, className, ...props }: CardProps) => (
   <div className={["tongkk-card", className].filter(Boolean).join(" ")} style={{

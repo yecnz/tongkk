@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
-import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
-import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
-import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
+import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
+import { loadQuizSetsFromServer, countQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
 import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 import {
@@ -251,7 +251,16 @@ const CourseDetailModal = ({
 
         <div style={{ border: "1px solid var(--color-border-soft)", borderRadius: 14, background: "var(--color-card)", minHeight: 320, padding: 18 }}>
           {materials.length === 0 ? (
-            <p style={{ margin: 0, minHeight: 280, display: "grid", placeItems: "center", fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
+            <div style={{ minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
+              {!loading && (
+                <button onClick={onGoSummary} style={{
+                  padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
+                  color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
+                  boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+                }}>+ 자료 추가하기</button>
+              )}
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {materials.map((material, index) => {
@@ -322,10 +331,90 @@ const CourseDetailModal = ({
   );
 };
 
+// 공지사항 — 백엔드 공지 테이블이 아직 없어 정적으로 관리한다. 새 공지는 이 배열에 추가하면 된다.
+// link/linkLabel이 있으면 카드 하단에 바로가기 버튼이 표시된다(예: 설문 구글폼).
+const NOTICES: { date: string; tag: string; title: string; body: string; link?: string; linkLabel?: string }[] = [
+  {
+    date: "2026.06.11",
+    tag: "설문",
+    title: "사용자 설문에 참여해 주세요",
+    body: "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했어요. 잠깐이면 끝나니 아래 버튼으로 참여해 주시면 큰 도움이 됩니다.",
+    link: "https://forms.gle/cDguG46mLHqSUmu7A",
+    linkLabel: "설문 참여하기",
+  },
+  {
+    date: "2026.06.11",
+    tag: "안내",
+    title: "Tongkk 베타 오픈",
+    body: "현재 캡스톤 시연용 MVP 단계예요. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.",
+  },
+  {
+    date: "2026.06.11",
+    tag: "개발 중",
+    title: "아직 준비 중인 기능이 있어요",
+    body: "다음 기능은 아직 완성되지 않았어요: 다크모드(완벽 적용 전), AI 학습 계획 자동 생성, 학습 통계 탭, 로그인 기능. 순차적으로 업데이트할 예정이니 양해 부탁드려요.",
+  },
+  {
+    date: "2026.06.11",
+    tag: "피드백",
+    title: "여러분의 의견을 기다립니다",
+    body: `사이드바 하단의 '피드백 보내기' 또는 ${FEEDBACK_EMAIL}로 의견을 보내주시면 큰 힘이 됩니다.`,
+  },
+];
+
+const NoticeModal = ({ onClose }: { onClose: () => void }) => (
+  <div onClick={onClose} style={{
+    position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.24)",
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+  }}>
+    <Card onClick={e => e.stopPropagation()} style={{ width: "min(460px, 100%)", maxHeight: "calc(100vh - 56px)", overflowY: "auto", padding: 26 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>공지사항</h3>
+        <button onClick={onClose} aria-label="공지사항 닫기" style={{
+          width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
+          color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
+        }}>×</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {NOTICES.map((notice, i) => (
+          <div key={i} style={{ padding: 16, borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-surface)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+              <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>{notice.tag}</span>
+              <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>{notice.date}</span>
+            </div>
+            <p style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>{notice.title}</p>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>{notice.body}</p>
+            {notice.link && (
+              <a
+                href={notice.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12,
+                  padding: "9px 16px", borderRadius: 10, border: "none",
+                  background: CYAN, color: "var(--color-on-brand)",
+                  fontSize: 13, fontWeight: 800, textDecoration: "none", cursor: "pointer",
+                }}
+              >
+                {notice.linkLabel || "바로가기"}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 17 17 7" />
+                  <path d="M8 7h9v9" />
+                </svg>
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+);
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [ddays, setDdays] = useState<Dday[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -369,13 +458,14 @@ export default function Dashboard() {
     const loadStats = async () => {
       await Promise.all(courses.map(async course => {
         try {
-          const [materials, summaries, quizSets] = await Promise.all([
-            loadCourseMaterialsFromServer(course),
-            loadSummariesFromServer(course),
-            loadQuizSetsFromServer(course),
+          // 자료/요약/퀴즈는 개수만 필요하므로 행 본문을 받지 않고 Supabase count(head)만 조회한다.
+          const [materials, summaries, quizzes] = await Promise.all([
+            countCourseMaterialsFromServer(course),
+            countSummariesFromServer(course),
+            countQuizSetsFromServer(course),
           ]);
           if (ignore) return;
-          setCourseStats(prev => ({ ...prev, [course]: { materials: materials.length, summaries: summaries.length, quizzes: quizSets.length, loading: false, error: "" } }));
+          setCourseStats(prev => ({ ...prev, [course]: { materials, summaries, quizzes, loading: false, error: "" } }));
         } catch (err) {
           if (ignore) return;
           setCourseStats(prev => ({ ...prev, [course]: { ...(prev[course] || defaultStats), loading: false, error: err instanceof Error ? err.message : "오류" } }));
@@ -674,9 +764,8 @@ export default function Dashboard() {
         : `오늘 추천: ${stepView.plan.course}`;
 
   return (
-    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active={page} onNav={(item) => { navigate(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
-      {sidebar && <div onClick={() => setSidebar(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }}/>}
       {showAddCourse && <AddCourseModal onClose={() => setShowAddCourse(false)} onAdd={addCourse} />}
       {renamingCourse && <RenameCourseModal course={renamingCourse} courses={courses} onClose={() => setRenamingCourse(null)} onRename={renameCourse} />}
       {deletingCourse && <DeleteCourseModal course={deletingCourse} onClose={() => setDeletingCourse(null)} onDelete={deleteCourse} />}
@@ -703,12 +792,29 @@ export default function Dashboard() {
       )}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
+      {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button
+          onClick={() => setShowNotice(true)}
+          aria-label="공지사항"
+          style={{
+            marginLeft: "auto", display: "flex", alignItems: "center", gap: 7,
+            padding: "8px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+            background: "var(--color-card)", color: "var(--color-text-secondary)",
+            fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          공지사항
+        </button>
       </div>
 
       <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", zoom: 0.85 }}>

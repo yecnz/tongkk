@@ -39,7 +39,12 @@ const getCourseId = async (course: string) => {
 // 요약 목록은 화면 이동마다 다시 받지만 생성/수정/삭제 때만 바뀐다 → 짧게 캐싱.
 // variant로 본문(content) 포함 여부를 구분한다.
 const summariesCache = createTtlCache<SavedSummary[]>(30_000);
-export const invalidateSummariesCache = (course?: string) => summariesCache.invalidate(course);
+// 대시보드 통계용 개수 캐시 — 목록 본문을 받지 않고 count(개수)만 보관한다.
+const summariesCountCache = createTtlCache<number>(30_000);
+export const invalidateSummariesCache = (course?: string) => {
+  summariesCache.invalidate(course);
+  summariesCountCache.invalidate(course);
+};
 
 // content(요약 전문)는 항목당 수 KB~수십 KB라 목록/개수 조회에 함께 받으면 Egress가 커진다.
 // 본문이 실제로 필요한 화면(요약 표시·AI 튜터, 요약 기반 퀴즈 출제)만 includeContent로 받고,
@@ -72,6 +77,34 @@ export async function loadSummariesFromServer(
   const summaries = (data || []).map(toSavedSummary);
   summariesCache.set(cacheKey, summaries);
   return summaries;
+}
+
+// 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
+// 이미 받아둔 목록 캐시가 있으면 추가 조회 없이 그 길이를 쓴다.
+export async function countSummariesFromServer(course: string): Promise<number> {
+  const cacheKey = `${course}::count`;
+  const cachedCount = summariesCountCache.get(cacheKey);
+  if (cachedCount !== undefined) return cachedCount;
+
+  const cachedList = summariesCache.get(`${course}::light`) ?? summariesCache.get(`${course}::full`);
+  if (cachedList) {
+    summariesCountCache.set(cacheKey, cachedList.length);
+    return cachedList.length;
+  }
+
+  const courseId = await getCourseId(course);
+  if (!courseId) return 0;
+
+  const { count, error } = await supabase
+    .from('summaries')
+    .select('*', { count: 'exact', head: true })
+    .eq('course_id', courseId);
+
+  if (error) throw new Error(formatSupabaseError(error));
+
+  const total = count ?? 0;
+  summariesCountCache.set(cacheKey, total);
+  return total;
 }
 
 export async function deleteSummariesByMaterialId(course: string, materialId: string): Promise<void> {

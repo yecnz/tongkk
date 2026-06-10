@@ -80,7 +80,7 @@ export default function Auth() {
   return (
     <div style={{
       minHeight: "100vh",
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
