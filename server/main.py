@@ -53,6 +53,9 @@ SUPABASE_PLACEHOLDER_VALUES = {
     "https://your-project.supabase.co",
     "your-supabase-url",
 }
+# 인증 비활성화는 명시적으로 켤 때만 허용한다(개발용). 운영에서 Supabase 설정이 빠지면
+# 조용히 무인증으로 열리는 대신 503으로 막아(fail-closed) 배포 사고를 즉시 드러낸다.
+ALLOW_NO_AUTH = os.getenv("ALLOW_NO_AUTH", "").strip().lower() in {"1", "true", "yes", "on"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,7 +95,12 @@ MAX_CHAT_MESSAGES = _env_int("MAX_CHAT_MESSAGES", 100)
 
 async def require_api_user(authorization: str | None = Header(default=None)):
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        return None
+        if ALLOW_NO_AUTH:
+            return None
+        raise HTTPException(
+            status_code=503,
+            detail="서버 인증 설정(SUPABASE_URL/SUPABASE_ANON_KEY)이 누락되었습니다.",
+        )
     if SUPABASE_URL in SUPABASE_PLACEHOLDER_VALUES:
         raise HTTPException(status_code=503, detail="백엔드 Supabase URL이 실제 프로젝트 주소로 설정되지 않았습니다.")
 
