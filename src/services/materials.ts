@@ -23,7 +23,12 @@ const MATERIAL_STORAGE_BUCKET = 'course-materials';
 // 자료 목록은 화면 이동마다 다시 받지만 업로드/삭제 때만 바뀐다 → 짧게 캐싱.
 // variant로 본문(markdown) 포함 여부를 구분해, 가벼운 캐시를 본문 필요한 화면에 잘못 주지 않게 한다.
 const materialsCache = createTtlCache<CourseMaterial[]>(30_000);
-export const invalidateMaterialsCache = (course?: string) => materialsCache.invalidate(course);
+// 대시보드 통계용 개수 캐시 — 목록 본문을 받지 않고 count(개수)만 보관한다.
+const materialsCountCache = createTtlCache<number>(30_000);
+export const invalidateMaterialsCache = (course?: string) => {
+  materialsCache.invalidate(course);
+  materialsCountCache.invalidate(course);
+};
 
 // 원본 파일 서명 URL은 자료 상세를 열 때마다 새로 발급된다. URL이 매번 바뀌면 브라우저가
 // 같은 파일을 매번 다시 받아(Egress) → 30분간 같은 URL을 재사용해 브라우저 HTTP 캐시
@@ -188,6 +193,34 @@ export const loadCourseMaterialsFromServer = async (
 
   materialsCache.set(cacheKey, materials);
   return materials;
+};
+
+// 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
+// 이미 받아둔 목록 캐시가 있으면 추가 조회 없이 그 길이를 쓴다.
+export const countCourseMaterialsFromServer = async (course: string): Promise<number> => {
+  const cacheKey = `${course}::count`;
+  const cachedCount = materialsCountCache.get(cacheKey);
+  if (cachedCount !== undefined) return cachedCount;
+
+  const cachedList = materialsCache.get(`${course}::light`) ?? materialsCache.get(`${course}::full`);
+  if (cachedList) {
+    materialsCountCache.set(cacheKey, cachedList.length);
+    return cachedList.length;
+  }
+
+  const courseId = (await findCourseRecord(course))?.id;
+  if (!courseId) return 0;
+
+  const { count, error } = await supabase
+    .from('materials')
+    .select('*', { count: 'exact', head: true })
+    .eq('course_id', courseId);
+
+  if (error) throw new Error(formatSupabaseError(error));
+
+  const total = count ?? 0;
+  materialsCountCache.set(cacheKey, total);
+  return total;
 };
 
 export const deleteCourseMaterialFromServer = async (course: string, materialId: string) => {

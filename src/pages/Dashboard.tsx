@@ -4,9 +4,9 @@ import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, 
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
-import { loadCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
-import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
-import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
+import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
+import { loadQuizSetsFromServer, countQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
 import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
 import {
@@ -449,13 +449,14 @@ export default function Dashboard() {
     const loadStats = async () => {
       await Promise.all(courses.map(async course => {
         try {
-          const [materials, summaries, quizSets] = await Promise.all([
-            loadCourseMaterialsFromServer(course),
-            loadSummariesFromServer(course),
-            loadQuizSetsFromServer(course),
+          // 자료/요약/퀴즈는 개수만 필요하므로 행 본문을 받지 않고 Supabase count(head)만 조회한다.
+          const [materials, summaries, quizzes] = await Promise.all([
+            countCourseMaterialsFromServer(course),
+            countSummariesFromServer(course),
+            countQuizSetsFromServer(course),
           ]);
           if (ignore) return;
-          setCourseStats(prev => ({ ...prev, [course]: { materials: materials.length, summaries: summaries.length, quizzes: quizSets.length, loading: false, error: "" } }));
+          setCourseStats(prev => ({ ...prev, [course]: { materials, summaries, quizzes, loading: false, error: "" } }));
         } catch (err) {
           if (ignore) return;
           setCourseStats(prev => ({ ...prev, [course]: { ...(prev[course] || defaultStats), loading: false, error: err instanceof Error ? err.message : "오류" } }));
