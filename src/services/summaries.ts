@@ -1,3 +1,4 @@
+import { createTtlCache } from './cache';
 import { fetchCourses } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { SummaryTemplate } from './gpt';
@@ -14,7 +15,7 @@ export type SavedSummary = {
 type SummaryRow = {
   id: string;
   template: SummaryTemplate;
-  content: string;
+  content?: string | null;
   material_ids: string[] | null;
   created_at: string;
 };
@@ -22,7 +23,7 @@ type SummaryRow = {
 const toSavedSummary = (row: SummaryRow): SavedSummary => ({
   id: row.id,
   template: row.template,
-  content: row.content,
+  content: row.content || '',
   createdAt: new Date(row.created_at).getTime(),
   materialIds: row.material_ids || [],
 });
@@ -35,19 +36,41 @@ const getCourseId = async (course: string) => {
   return found.id;
 };
 
-export async function loadSummariesFromServer(course: string): Promise<SavedSummary[]> {
+// 요약 목록은 화면 이동마다 다시 받지만 생성/수정/삭제 때만 바뀐다 → 짧게 캐싱.
+// variant로 본문(content) 포함 여부를 구분한다.
+const summariesCache = createTtlCache<SavedSummary[]>(30_000);
+export const invalidateSummariesCache = (course?: string) => summariesCache.invalidate(course);
+
+// content(요약 전문)는 항목당 수 KB~수십 KB라 목록/개수 조회에 함께 받으면 Egress가 커진다.
+// 본문이 실제로 필요한 화면(요약 표시·AI 튜터, 요약 기반 퀴즈 출제)만 includeContent로 받고,
+// 개수·목록 용도는 기본값(제외)으로 호출한다.
+export async function loadSummariesFromServer(
+  course: string,
+  options?: { includeContent?: boolean },
+): Promise<SavedSummary[]> {
+  const cacheKey = `${course}::${options?.includeContent ? 'full' : 'light'}`;
+  const cached = summariesCache.get(cacheKey);
+  if (cached) return cached;
+
   const courseId = await getCourseId(course);
   if (!courseId) return [];
 
-  const { data, error } = await supabase
-    .from('summaries')
-    .select('id, template, content, material_ids, created_at')
-    .eq('course_id', courseId)
-    .order('created_at', { ascending: false });
+  const { data, error } = options?.includeContent
+    ? await supabase
+        .from('summaries')
+        .select('id, template, content, material_ids, created_at')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false })
+    : await supabase
+        .from('summaries')
+        .select('id, template, material_ids, created_at')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
 
   const summaries = (data || []).map(toSavedSummary);
+  summariesCache.set(cacheKey, summaries);
   return summaries;
 }
 
@@ -74,6 +97,7 @@ export async function deleteSummariesByMaterialId(course: string, materialId: st
     .in('id', toDelete);
 
   if (deleteError) throw new Error(formatSupabaseError(deleteError));
+  invalidateSummariesCache(course);
 }
 
 const sortedIds = (ids: string[]) => [...ids].sort();
@@ -108,6 +132,7 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
       .select('id, template, content, material_ids, created_at')
       .single();
     if (error) throw new Error(formatSupabaseError(error));
+    invalidateSummariesCache(course);
     return { ...toSavedSummary(data), materialNames: summary.materialNames || [] };
   }
 
@@ -124,5 +149,6 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateSummariesCache(course);
   return { ...toSavedSummary(data), materialNames: summary.materialNames || [] };
 }

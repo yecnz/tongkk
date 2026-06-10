@@ -1,3 +1,4 @@
+import { createTtlCache } from './cache';
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import { deleteSummariesByMaterialId } from './summaries';
@@ -18,6 +19,11 @@ export type CourseMaterial = {
 };
 
 const MATERIAL_STORAGE_BUCKET = 'course-materials';
+
+// 자료 목록은 화면 이동마다 다시 받지만 업로드/삭제 때만 바뀐다 → 짧게 캐싱.
+// variant로 본문(markdown) 포함 여부를 구분해, 가벼운 캐시를 본문 필요한 화면에 잘못 주지 않게 한다.
+const materialsCache = createTtlCache<CourseMaterial[]>(30_000);
+export const invalidateMaterialsCache = (course?: string) => materialsCache.invalidate(course);
 
 // 원본 파일 저장 한도(Supabase Free 플랜 업로드 한도 ≈ 50MB). Pro로 글로벌 한도를 올리면 이 값도 함께 조정.
 export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
@@ -143,6 +149,10 @@ export const loadCourseMaterialsFromServer = async (
   course: string,
   options?: { includeMarkdown?: boolean },
 ): Promise<CourseMaterial[]> => {
+  const cacheKey = `${course}::${options?.includeMarkdown ? 'full' : 'light'}`;
+  const cached = materialsCache.get(cacheKey);
+  if (cached) return cached;
+
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return [];
 
@@ -163,6 +173,7 @@ export const loadCourseMaterialsFromServer = async (
   const materials = (data || [])
     .map(toCourseMaterial);
 
+  materialsCache.set(cacheKey, materials);
   return materials;
 };
 
@@ -193,6 +204,7 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
 
   if (error) throw new Error(formatSupabaseError(error));
 
+  invalidateMaterialsCache(course);
   await deleteSummariesByMaterialId(course, materialId);
 };
 
@@ -200,6 +212,8 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return;
 
+  // 아래 diff는 서버 실제 상태와 비교해야 하므로 캐시를 먼저 비워 최신을 읽는다.
+  invalidateMaterialsCache(course);
   const serverMaterials = await loadCourseMaterialsFromServer(course);
   const localNames = new Set(materials.map(material => material.name.trim().toLowerCase()));
 
@@ -221,6 +235,7 @@ export const syncCourseMaterials = async (course: string, materials: CourseMater
     );
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateMaterialsCache(course);
 };
 
 export const saveCourseMaterials = syncCourseMaterials;

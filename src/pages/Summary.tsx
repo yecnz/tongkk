@@ -1785,7 +1785,7 @@ const MaterialDetailView = ({
     setActiveSummaryId("");
 
     Promise.all([
-      loadSummariesFromServer(selectedCourse),
+      loadSummariesFromServer(selectedCourse, { includeContent: true }),
       loadQuizSetsFromServer(selectedCourse, { includeQuestions: true }),
       loadQuizAttemptsFromServer(selectedCourse, { includeAnswers: true }),
     ])
@@ -2718,7 +2718,7 @@ export default function Summary() {
 
     Promise.all([
       loadCourseMaterialsFromServer(selectedCourse, { includeMarkdown: true }),
-      loadSummariesFromServer(selectedCourse),
+      loadSummariesFromServer(selectedCourse, { includeContent: true }),
     ])
       .then(([nextMaterials, summaries]) => {
         if (ignore) return;

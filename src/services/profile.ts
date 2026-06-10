@@ -1,4 +1,8 @@
 import type { User } from '@supabase/supabase-js';
+import { invalidateCoursesCache } from './courses';
+import { invalidateMaterialsCache } from './materials';
+import { invalidateQuizSetsCache } from './quizSets';
+import { invalidateSummariesCache } from './summaries';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 
 export type UserProfile = {
@@ -157,4 +161,10 @@ export async function deleteOwnAppData(): Promise<void> {
     const result = await request();
     if (result.error) throw new Error(formatSupabaseError(result.error));
   }
+
+  // 계정 데이터 전체 삭제 후 낡은 캐시가 남지 않도록 모두 비운다.
+  invalidateCoursesCache();
+  invalidateMaterialsCache();
+  invalidateSummariesCache();
+  invalidateQuizSetsCache();
 }

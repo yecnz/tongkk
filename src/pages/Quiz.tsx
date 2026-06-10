@@ -383,7 +383,7 @@ export default function Quiz() {
 
     Promise.all([
       loadCourseMaterialsFromServer(selectedCourse, { includeMarkdown: true }),
-      loadSummariesFromServer(selectedCourse),
+      loadSummariesFromServer(selectedCourse, { includeContent: true }),
       loadQuizSetsFromServer(selectedCourse, { includeQuestions: true }),
       loadQuizAttemptsFromServer(selectedCourse, { includeAnswers: true }),
     ])

@@ -1,3 +1,4 @@
+import { createTtlCache } from './cache';
 import { fetchCourses } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { QuizDifficulty, QuizQuestion, QuizQuestionType } from './gpt';
@@ -46,6 +47,11 @@ const getCourseId = async (course: string) => {
   return found.id;
 };
 
+// 퀴즈 세트 목록은 화면 이동마다 다시 받지만 생성 때만 바뀐다 → 짧게 캐싱.
+// variant로 문제 본문(questions) 포함 여부를 구분한다.
+const quizSetsCache = createTtlCache<SavedQuizSet[]>(30_000);
+export const invalidateQuizSetsCache = (course?: string) => quizSetsCache.invalidate(course);
+
 // questions(문제 본문 JSONB)는 세트당 수십 KB~수백 KB라 목록/개수 조회에 함께 받으면 Egress가 커진다.
 // 문제 본문이 실제로 필요한 화면(퀴즈 풀기/재풀기, 복습노트 원문 대조, 요약 내 퀴즈 미리보기)만
 // includeQuestions로 받고, 개수·메트릭 용도는 기본값(제외)으로 호출한다.
@@ -53,6 +59,10 @@ export async function loadQuizSetsFromServer(
   course: string,
   options?: { includeQuestions?: boolean },
 ): Promise<SavedQuizSet[]> {
+  const cacheKey = `${course}::${options?.includeQuestions ? 'full' : 'light'}`;
+  const cached = quizSetsCache.get(cacheKey);
+  if (cached) return cached;
+
   const courseId = await getCourseId(course);
   if (!courseId) return [];
 
@@ -69,7 +79,9 @@ export async function loadQuizSetsFromServer(
         .order('created_at', { ascending: false });
 
   if (error) throw new Error(formatSupabaseError(error));
-  return (data || []).map(toSavedQuizSet);
+  const quizSets = (data || []).map(toSavedQuizSet);
+  quizSetsCache.set(cacheKey, quizSets);
+  return quizSets;
 }
 
 export async function saveQuizSetToServer(
@@ -98,5 +110,6 @@ export async function saveQuizSetToServer(
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
+  invalidateQuizSetsCache(course);
   return toSavedQuizSet(data);
 }
