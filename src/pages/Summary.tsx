@@ -1212,7 +1212,13 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
         ) : (
           <div style={{
             display: "grid",
-            gridTemplateColumns: isResultExpanded ? "minmax(0, 1fr)" : isTutorOpen ? "minmax(0, 1fr) 400px" : "minmax(0, 1fr)",
+            // 마인드맵일 때는 AI 튜터가 마인드맵과 같은 화면 비율(50:50)을 차지하도록 두 칸을 동일하게,
+            // 텍스트 요약일 때는 읽기 폭 유지를 위해 기존처럼 튜터를 고정 400px로 둔다.
+            gridTemplateColumns: isResultExpanded
+              ? "minmax(0, 1fr)"
+              : isTutorOpen
+                ? (mindmapData ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr) 400px")
+                : "minmax(0, 1fr)",
             gap: isTutorOpen && !isResultExpanded ? 12 : 0,
             alignItems: "stretch",
           }}>
