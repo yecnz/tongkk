@@ -11,7 +11,6 @@ import {
   studyStreak,
   totalQuestionCount,
   totalStudyMinutes,
-  weakTopicTop5,
 } from "../services/statsHelpers";
 
 const formatStudyTime = (minutes: number) => {
@@ -56,6 +55,8 @@ const SummaryCard = ({ label, value, accent, note }: { label: string; value: Rea
 const CHART_WIDTH = 600;
 const CHART_HEIGHT = 160;
 const BAR_GAP = 10;
+// 점수 100%일 때 막대 위 점수 라벨(y-8)·꼭짓점이 viewBox(y=0) 위로 넘어가 잘리므로 위쪽 여백을 둔다.
+const CHART_TOP_PAD = 22;
 
 export default function Stats() {
   const navigate = useNavigate();
@@ -76,14 +77,12 @@ export default function Stats() {
   }, [showToast]);
 
   const trend = useMemo(() => scoreTrend(attempts), [attempts]);
-  const weak = useMemo(() => weakTopicTop5(attempts), [attempts]);
   const courses = useMemo(() => coursePerformance(attempts), [attempts]);
   const latest = useMemo(() => recentAttempts(attempts, 5), [attempts]);
   const streak = studyStreak(attempts);
   const minutes = totalStudyMinutes(attempts);
   const average = averageScore(attempts);
   const totalQuestions = totalQuestionCount(attempts);
-  const maxWeakCount = Math.max(1, ...weak.map(item => item.count));
   const bestCourse = courses.length > 0 ? [...courses].sort((a, b) => b.progressPercent - a.progressPercent)[0] : null;
   const latestScore = latest[0]?.scorePercent ?? 0;
   const previousScore = latest[1]?.scorePercent ?? null;
@@ -130,13 +129,13 @@ export default function Stats() {
         </div>
 
         <div className="stats-summary-grid">
-          <SummaryCard label="연속 학습일" value={`${streak}일`} accent={PINK} note={streak > 0 ? "오늘 풀이 기록 포함" : "오늘 기록 없음"} />
+          <SummaryCard label="연속 학습일" value={`${streak}일`} accent={PINK} note={streak > 0 ? "연속 학습 중이에요" : "오늘 기록 없음"} />
           <SummaryCard label="총 학습시간" value={formatStudyTime(minutes)} accent={CYAN} note={`${attempts.length}회 풀이 기준`} />
           <SummaryCard label="평균 점수" value={`${average}%`} accent={scoreColor(average)} note={scoreDelta === null ? "이전 기록 없음" : `${scoreDelta >= 0 ? "+" : ""}${scoreDelta}%p 변화`} />
           <SummaryCard label="최근 집중 과목" value={bestCourse ? bestCourse.courseName : "-"} accent="#6574F7" note={bestCourse ? `진척도 ${bestCourse.progressPercent}% · ${bestCourse.attempts}회` : "과목 기록 없음"} />
         </div>
 
-        <div className="stats-main-grid">
+        <div style={{ marginBottom: 18 }}>
           <Card style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
               <div>
@@ -149,7 +148,7 @@ export default function Stats() {
               <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>아직 풀이 기록이 없습니다.</p>
             ) : (
               <svg
-                viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT + 42}`}
+                viewBox={`0 ${-CHART_TOP_PAD} ${CHART_WIDTH} ${CHART_HEIGHT + 42 + CHART_TOP_PAD}`}
                 width="100%"
                 preserveAspectRatio="xMidYMid meet"
                 style={{ display: "block" }}
@@ -180,29 +179,6 @@ export default function Stats() {
               </svg>
             )}
           </Card>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Card style={{ padding: 22 }}>
-              <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 900, color: "var(--color-text-strong)" }}>약점 Top 5</h3>
-              {weak.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>아직 약점으로 잡힌 항목이 없습니다.</p>
-              ) : (
-                weak.map(item => (
-                  <div key={item.topic} style={{ marginBottom: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 7 }}>
-                      <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text-strong)", fontWeight: 850, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.topic}
-                      </span>
-                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 900, color: PINK }}>{item.count}회</span>
-                    </div>
-                    <div style={{ height: 9, background: MUTED_SURFACE, borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${(item.count / maxWeakCount) * 100}%`, height: "100%", background: PINK, borderRadius: 999 }} />
-                    </div>
-                  </div>
-                ))
-              )}
-            </Card>
-          </div>
         </div>
 
         <div className="stats-bottom-grid">
