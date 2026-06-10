@@ -17,6 +17,8 @@ type AITutorDrawerProps = {
   contextMarkdown: string;
   // 원본 강의자료 본문. 있으면 요약과 함께 보내 사실·근거의 우선 기준이 된다.
   sourceMarkdown?: string;
+  // 요약에 쓰인 페이지 범위(예: "1-5, 8"). 있으면 원본을 같은 범위로 좁혀 보낸다.
+  sourcePages?: string;
   summaryId?: string | null;
   materialId?: string | null;
   threadId?: string;
@@ -164,6 +166,7 @@ const formatSessionDate = (timestamp: number) =>
 export const AITutorDrawer = ({
   contextMarkdown,
   sourceMarkdown,
+  sourcePages,
   summaryId,
   materialId,
   threadId = "",
@@ -432,6 +435,7 @@ export const AITutorDrawer = ({
         localThreadId ? [userMessage] : nextMessages,
         localThreadId ? undefined : contextMarkdown,
         localThreadId ? undefined : sourceMarkdown,
+        localThreadId ? undefined : sourcePages,
       );
       const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
       setLocalThreadId(response.threadId);

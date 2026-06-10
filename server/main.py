@@ -238,6 +238,7 @@ class AgentRequest(BaseModel):
     thread_id: str | None = None
     markdown: str | None = None
     source_markdown: str | None = None
+    pages: str | None = None
 
 
 class QuizRequest(BaseModel):
@@ -1081,9 +1082,12 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
 @app.post("/agent")
 async def agent(req: AgentRequest, _user=Depends(require_api_user)):
     messages = [message.model_dump() for message in req.messages]
-    if req.source_markdown:
-        # 원본 본문과 요약을 구분해 제공하고, 사실·근거는 원본을 우선하도록 안내한다.
-        parts = [f"[원본 강의자료 본문]\n{req.source_markdown}"]
+    # 요약에 쓰인 페이지 범위(pages)가 있으면 원본도 같은 범위로 좁힌다(마커 기준; 없으면 전체).
+    source = _filter_markdown_by_pages(req.source_markdown, req.pages) if req.source_markdown else ""
+    # 원본이 너무 길면 컨텍스트엔 요약만 넣고, 원본은 inspect_original_source 도구로 on-demand 조회하게 한다.
+    source_inline_limit = 12000  # 자(char) 기준
+    if source and len(source) <= source_inline_limit:
+        parts = [f"[원본 강의자료 본문]\n{source}"]
         if req.markdown:
             parts.append(f"[정리된 요약]\n{req.markdown}")
         messages.insert(
@@ -1099,16 +1103,22 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
             },
         )
     elif req.markdown:
+        note = (
+            " 원본 본문은 길어서 기본 컨텍스트에는 요약만 넣었어. "
+            "요약이 의심스럽거나 원본 확인이 필요하면 inspect_original_source 도구로 원본을 확인해."
+            if source
+            else ""
+        )
         messages.insert(
             0,
             {
                 "role": "user",
-                "content": f"다음 강의자료를 현재 대화의 참고 자료로 사용해.\n\n[강의자료]\n{req.markdown}",
+                "content": f"다음 강의자료를 현재 대화의 참고 자료로 사용해.{note}\n\n[정리된 요약]\n{req.markdown}",
             },
         )
 
     try:
-        return await run_in_threadpool(run_study_agent, req.model, messages, req.thread_id)
+        return await run_in_threadpool(run_study_agent, req.model, messages, req.thread_id, source)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
