@@ -1581,6 +1581,8 @@ export default function Quiz() {
       </div>
     );
   }
+  // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
+  const currentCorrect = isQuestionCorrect(q, current, selected);
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
@@ -1616,13 +1618,55 @@ export default function Quiz() {
         </button>
         <Card style={{ flex: 1, minWidth: 0, padding: 28 }}>
           {reviewMode && (
-            <div style={{ marginBottom: 16, padding: "8px 12px", borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>
-              오답 복습 · 정답과 내 답을 확인하세요
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <span style={{
+                flexShrink: 0, padding: "3px 10px", borderRadius: 999,
+                background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
+                color: currentCorrect ? CYAN : PINK, fontSize: 11, fontWeight: 850,
+              }}>{currentCorrect ? "정답" : "오답"}</span>
+              <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인하세요</span>
             </div>
           )}
           <span style={{ fontSize: 12, fontWeight: 600, color: CYAN, marginBottom: 10, display: "block" }}>Q{current + 1}</span>
           <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}>{q.question}</h3>
-          {isShortAnswer || isSubjective ? (
+          {reviewMode ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {isShortAnswer || isSubjective ? (
+                <div style={{ display: "grid", gap: 8, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                  <span>내 답: <span style={{ padding: "3px 10px", borderRadius: 8, background: "var(--color-muted-surface)", color: "var(--color-text)", fontWeight: 700 }}>{typeof selected === "string" && selected.trim() ? selected : "미응답"}</span></span>
+                  {!currentCorrect && (
+                    <span>정답: <strong style={{ color: PINK }}>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</strong></span>
+                  )}
+                  {isSubjective && subjectiveGrade && (
+                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · {subjectiveGrade.feedback}</span>
+                  )}
+                </div>
+              ) : (
+                (q.options || []).map((opt, i) => {
+                  const isMyChoice = selected === i;
+                  const showCorrect = q.answer === i && !currentCorrect;
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                      padding: "12px 16px", borderRadius: 12,
+                      background: showCorrect ? "var(--color-tint-pink)" : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
+                      border: `1.5px solid ${showCorrect ? PINK : "var(--color-border-soft)"}`,
+                    }}>
+                      <span style={{ minWidth: 0, fontSize: 14, color: showCorrect ? PINK : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word" }}>
+                        <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        {opt}
+                      </span>
+                      {(isMyChoice || showCorrect) && (
+                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? PINK : "var(--color-text-secondary)" }}>
+                          {showCorrect ? "정답" : "내 답"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : isShortAnswer || isSubjective ? (
             <div>
               <div style={{ display: "flex", gap: 10, alignItems: isSubjective ? "flex-end" : "stretch" }}>
                 {isSubjective ? (
@@ -1705,8 +1749,7 @@ export default function Quiz() {
                 const isSelected = selected === i;
                 const isCorrect = q.answer === i;
                 const answered = selected !== undefined;
-                // 복습 모드는 시험 모드라도 정답·오답을 항상 공개한다.
-                const revealAnswer = reviewMode || (answered && !examMode);
+                const revealAnswer = answered && !examMode;
                 let bg = "var(--color-surface)", border = "var(--color-border-soft)", color = "var(--color-text)";
                 if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = CYAN; }
                 else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
@@ -1714,7 +1757,7 @@ export default function Quiz() {
                 return (
                   <button key={i} onClick={() => selectAnswer(i)} style={{
                     padding: "14px 18px", borderRadius: 12, border: `1.5px solid ${border}`,
-                    background: bg, textAlign: "left", fontSize: 14, color, cursor: reviewMode || answered ? "default" : "pointer",
+                    background: bg, textAlign: "left", fontSize: 14, color, cursor: answered ? "default" : "pointer",
                     fontWeight: isSelected || (revealAnswer && isCorrect) ? 600 : 400, transition: "all 0.2s"
                   }}>
                     <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
@@ -1727,9 +1770,15 @@ export default function Quiz() {
             </div>
           )}
           {showExplanation && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
-              <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
-            </div>
+            reviewMode ? (
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                <strong style={{ color: "var(--color-text)" }}>해설</strong> {q.explanation}
+              </div>
+            ) : (
+              <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
+                <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
+              </div>
+            )
           )}
           {reviewMode ? (
             <button onClick={exitReviewToResult} style={{
