@@ -223,6 +223,8 @@ export default function Quiz() {
   );
   const [activeQuizSetId, setActiveQuizSetId] = useState<string | null>(null);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
+  // 이 과목에서 이미 출제된 퀴즈 세트들(중복 출제 방지용 제외 목록 구성에 사용).
+  const [priorQuizSets, setPriorQuizSets] = useState<SavedQuizSet[]>([]);
 
   // 퀴즈
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>(() => hasReviewQuestions && reviewQuestions ? shuffleQuizOptions(reviewQuestions) : []);
@@ -241,6 +243,8 @@ export default function Quiz() {
   const [attemptSavedKey, setAttemptSavedKey] = useState("");
   const [attemptSaveNotice, setAttemptSaveNotice] = useState("");
   const [reviewAttempt, setReviewAttempt] = useState<SavedQuizAttempt | null>(null);
+  // 결과 화면의 '오답 복습'에서 특정 문항을 눌러 정답·오답이 표시된 풀이 화면을 다시 보는 읽기 전용 모드.
+  const [reviewMode, setReviewMode] = useState(false);
   // 과목 오답 분석(오답 다시 풀기 결과 화면)
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
@@ -278,6 +282,7 @@ export default function Quiz() {
       setOpenedQuizTitle("");
       setActiveQuizSetId(null);
       setQuizAttempts([]);
+      setPriorQuizSets([]);
       return;
     }
 
@@ -290,6 +295,7 @@ export default function Quiz() {
       if (ignore) return;
       setMaterials(courseMaterials);
       setQuizAttempts(attempts);
+      setPriorQuizSets(quizSets);
 
       // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
       const usable = summaries.filter(s => s.template !== "MINDMAP");
@@ -412,11 +418,12 @@ export default function Quiz() {
 
   // 퀴즈 풀이/생성 중 브라우저 이탈 방지
   useEffect(() => {
-    if (view !== "quiz" && view !== "generating") return;
+    // 복습(읽기 전용) 화면은 잃을 진행 상태가 없으므로 이탈 경고에서 제외한다.
+    if ((view !== "quiz" && view !== "generating") || reviewMode) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [view]);
+  }, [view, reviewMode]);
 
   const handleCourseBack = () => {
     // 자료 목록(materialList)을 거쳐 들어온 경우 이전 화면인 자료 목록으로 돌아간다.
@@ -608,14 +615,45 @@ export default function Quiz() {
     setView("generating");
     setError(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
-    // 이미 풀었던/출제된 문제를 모아 중복 출제를 막는다(풀이 기록의 문항 + 직전 퀴즈 문항).
-    const excludeQuestions = Array.from(new Set([
+    // 이미 풀었거나 출제된 문제(풀이 기록 + 저장된 퀴즈 세트 + 직전 퀴즈)를 모아 중복 출제를 막는다.
+    const priorQuestions = Array.from(new Set([
       ...quizAttempts.flatMap(attempt => attempt.answers.map(answer => answer.question)),
+      ...priorQuizSets.flatMap(set => set.questions.map(question => question.question)),
       ...quizzes.map(quiz => quiz.question),
-    ].filter(Boolean))).slice(0, 80);
+    ].filter(Boolean)));
+    // 정규화 키 집합. 백엔드가 제외 지시를 어겨도 생성 결과에서 과거 문제와 같은(거의 같은) 문항을 프런트에서 한 번 더 걸러낸다.
+    const seenKeys = new Set(priorQuestions.map(normalizeAnswer));
     try {
-      const generated = await generateQuiz(selectedCourse, count, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
-      const questions = shuffleQuizOptions(generated, questionType);
+      const collected: QuizQuestion[] = [];
+      let lastGenerated: QuizQuestion[] = [];
+      // 중복으로 문항이 모자라면 모자란 만큼 더 생성해 채운다(최대 3회). 같은 문제가 반복되지 않게 한다.
+      for (let round = 0; round < 3 && collected.length < count; round++) {
+        const excludeQuestions = Array.from(new Set([
+          ...priorQuestions,
+          ...collected.map(quiz => quiz.question),
+        ])).slice(0, 80);
+        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
+        lastGenerated = generated;
+        for (const question of generated) {
+          const key = normalizeAnswer(question.question || "");
+          if (!key || seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          collected.push(question);
+          if (collected.length >= count) break;
+        }
+      }
+      // 극단적으로 모두 걸러진 경우엔 빈 퀴즈를 피하려 마지막 생성분의 자체 중복만 제거해 사용한다.
+      let deduped = collected;
+      if (deduped.length === 0) {
+        const selfSeen = new Set<string>();
+        deduped = lastGenerated.filter(question => {
+          const key = normalizeAnswer(question.question || "");
+          if (!key || selfSeen.has(key)) return false;
+          selfSeen.add(key);
+          return true;
+        });
+      }
+      const questions = shuffleQuizOptions(deduped, questionType);
       setQuizzes(questions);
       const savedQuizSet = await saveQuizSetToServer(selectedCourse, {
         title: `${selectedCourse} ${questionType} 퀴즈`,
@@ -625,6 +663,7 @@ export default function Quiz() {
         materialIds: selectedMaterialIds,
         questions,
       });
+      setPriorQuizSets(prev => [savedQuizSet, ...prev]);
       setOpenedQuizTitle(savedQuizSet.title);
       setActiveQuizSetId(savedQuizSet.id);
       setCurrent(0);
@@ -638,6 +677,7 @@ export default function Quiz() {
       setAttemptSavedKey("");
       setAttemptSaveNotice("");
       setReviewAttempt(null);
+      setReviewMode(false);
       setView("quiz");
     } catch (err) {
       if (controller.signal.aborted) {
@@ -654,6 +694,7 @@ export default function Quiz() {
   };
 
   const selectAnswer = (idx: number) => {
+    if (reviewMode) return; // 복습 모드는 읽기 전용이라 답을 바꾸지 않는다.
     if (!examMode && answers[current] !== undefined) return;
     setAnswers(prev => ({ ...prev, [current]: idx }));
     setShowExplanation(!examMode);
@@ -689,13 +730,47 @@ export default function Quiz() {
     }
   };
 
-  const next = () => {
-    if (current < quizzes.length - 1) {
-      setCurrent(current + 1);
-      setShowExplanation(false);
-      setShortAnswerInput("");
+  // 활성 풀이: 미응답 상태로 다음으로 넘어가면 한 번 경고하고, 확인하면 이동한다.
+  const goNextActive = () => {
+    if (current >= quizzes.length - 1) return;
+    if (answers[current] === undefined && !window.confirm("정답을 선택하지 않았습니다.\n그래도 다음 문제로 이동할까요?")) return;
+    goToQuestion(current + 1);
+  };
+
+  // 퀴즈 제출: 아직 풀지 않은 문항이 있으면 번호를 알려주고, 해당 문항으로 이동할지 선택하게 한다(취소 시 그대로 제출).
+  const submitQuiz = () => {
+    const unanswered = quizzes.map((_, index) => index).filter(index => answers[index] === undefined);
+    if (unanswered.length > 0) {
+      const numbers = unanswered.map(index => index + 1).join(", ");
+      if (window.confirm(`아직 풀지 않은 문제가 있습니다: ${numbers}번\n해당 문제로 이동할까요?\n(취소를 누르면 그대로 제출합니다.)`)) {
+        goToQuestion(unanswered[0]);
+        return;
+      }
     }
-    else setView("result");
+    setView("result");
+  };
+
+  // 특정 문항으로 이동(복습/탐색용). 해설 표시는 모드와 응답 여부에 맞춰 갱신한다.
+  const goToQuestion = (index: number) => {
+    if (index < 0 || index >= quizzes.length) return;
+    setCurrent(index);
+    setShortAnswerInput("");
+    setShowExplanation(reviewMode || (answers[index] !== undefined && !examMode));
+  };
+
+  // 결과 화면의 '오답 복습'에서 해당 문항의 풀이 화면(정답·오답 표시)으로 진입한다.
+  const goToQuestionReview = (index: number) => {
+    setReviewMode(true);
+    setCurrent(index);
+    setShortAnswerInput("");
+    setShowExplanation(true);
+    setView("quiz");
+  };
+
+  // 복습 화면에서 결과 화면으로 되돌아간다.
+  const exitReviewToResult = () => {
+    setReviewMode(false);
+    setView("result");
   };
 
   const isQuestionCorrect = useCallback((quiz: QuizQuestion, index: number, answerValue: number | string | undefined) => {
@@ -814,7 +889,7 @@ export default function Quiz() {
   ]);
 
   const handleNav = (item: PageRouteLabel) => {
-    if (view === "quiz") {
+    if (view === "quiz" && !reviewMode) {
       if (!window.confirm("퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다.\n페이지를 떠나시겠습니까?")) {
         setSidebar(false);
         return;
@@ -1200,8 +1275,9 @@ export default function Quiz() {
           ]),
         ].filter(Boolean).join("\n")
       : "";
-    const makeTutorQuestion = (topic: string) => [
-      `${topic} 부분을 중심으로 이번 퀴즈에서 틀린 문제들을 한 문제씩 다시 설명해줘. 설명 뒤에는 내가 다시 풀어볼 수 있는 확인 질문을 이어서 내줘.`,
+    // '오답 복습' 헤더의 'AI 튜터로 복습' 버튼이 보낼 질문. 이번 회차 오답 전체를 한 문제씩 다시 설명하도록 요청한다.
+    const reviewTutorQuestion = [
+      "이번 퀴즈에서 틀린 문제들을 한 문제씩 다시 설명해줘. 각 설명 뒤에는 내가 다시 풀어볼 수 있는 확인 질문을 이어서 내줘.",
       quizReviewContext,
     ].filter(Boolean).join("\n\n");
     const goToMaterialReview = (options?: { materialId?: string; tutorQuestion?: string }) => {
@@ -1239,6 +1315,7 @@ export default function Quiz() {
       setAttemptSavedKey("");
       setAttemptSaveNotice("");
       setReviewAttempt(null);
+      setReviewMode(false);
       setDifficulty(nextDifficulty);
       setView("quiz");
     };
@@ -1336,63 +1413,6 @@ export default function Quiz() {
               </div>
             )}
 
-            <div style={{
-              margin: "0 0 24px",
-              padding: 18,
-              borderRadius: 14,
-              background: "#F7FDFF",
-              border: "1px solid var(--color-tint-cyan)",
-              textAlign: "left",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>개인 맞춤 복습</h3>
-                <span style={{ fontSize: 12, fontWeight: 800, color: CYAN }}>다음 추천: {nextDifficulty}</span>
-              </div>
-              {resultWeakTopics.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {resultWeakTopics.map(topic => (
-                    <button
-                      key={topic}
-                      type="button"
-                      onClick={() => goToMaterialReview({ tutorQuestion: makeTutorQuestion(topic) })}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 10,
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1px solid var(--color-tint-cyan)",
-                        background: "var(--color-card)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>
-                        약점 후보: <strong>{topic}</strong>
-                      </span>
-                      <span style={{
-                        flexShrink: 0,
-                        padding: "7px 10px",
-                        borderRadius: 9,
-                        background: "var(--color-tint-pink)",
-                        color: PINK,
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}>
-                        요약과 튜터로 보기
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                  이번 회차에서는 뚜렷한 약점 문항이 없습니다. 다음에는 {nextDifficulty} 난이도로 실전 감각을 이어가세요.
-                </p>
-              )}
-            </div>
-
             {reviewMaterials.length > 1 && (
               <div style={{
                 margin: "0 0 24px",
@@ -1445,9 +1465,28 @@ export default function Quiz() {
                 border: `1px solid ${BORDER_COLOR}`,
                 textAlign: "left",
               }}>
-                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>
-                  오답 복습
-                </h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>
+                    오답 복습
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => goToMaterialReview({ tutorQuestion: reviewTutorQuestion })}
+                    style={{
+                      flexShrink: 0,
+                      padding: "7px 12px",
+                      borderRadius: 999,
+                      border: "none",
+                      background: PINK,
+                      color: "var(--color-on-brand)",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    AI 튜터로 복습
+                  </button>
+                </div>
                 <div style={{ display: "grid", gap: 10 }}>
                   {wrongQuestions.map((quiz, wrongIndex) => {
                     const questionIndex = quizzes.indexOf(quiz);
@@ -1462,16 +1501,28 @@ export default function Quiz() {
                         ? typeof quiz.answer === "number" ? quiz.options?.[quiz.answer] : null
                         : quiz.answerText);
                     return (
-                      <div key={`${quiz.question}-${wrongIndex}`} style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
-                        <div style={{ marginBottom: 8, fontSize: 13, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
-                          Q{questionIndex + 1}. {quiz.question}
+                      <button
+                        key={`${quiz.question}-${wrongIndex}`}
+                        type="button"
+                        onClick={() => goToQuestionReview(questionIndex)}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left",
+                          padding: 14, borderRadius: 12, background: "var(--color-surface)",
+                          border: "1px solid var(--color-border-soft)", cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                          <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
+                            Q{questionIndex + 1}. {quiz.question}
+                          </span>
+                          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: CYAN }}>문제 보기 →</span>
                         </div>
                         <div style={{ display: "grid", gap: 5, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                           <span>내 답: <strong style={{ color: PINK }}>{userAnswer ?? "미응답"}</strong></span>
                           <span>정답: <strong style={{ color: CYAN }}>{correctAnswer ?? "정답 정보 없음"}</strong></span>
                           <span>틀린 이유: {attemptAnswer?.feedback || quiz.explanation}</span>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1530,13 +1581,15 @@ export default function Quiz() {
       </div>
     );
   }
+  // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
+  const currentCorrect = isQuestionCorrect(q, current, selected);
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
       <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {examMode && remainingSeconds !== null && (
+            {examMode && !reviewMode && remainingSeconds !== null && (
               <span style={{ fontSize: 14, fontWeight: 800, color: remainingSeconds <= 60 ? PINK : CYAN }}>
                 {formatSeconds(remainingSeconds)}
               </span>
@@ -1547,18 +1600,80 @@ export default function Quiz() {
       <div style={{ height: 3, background: "var(--color-border-soft)" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
       </div>
-      <div style={{ padding: 24, maxWidth: 600, margin: "30px auto" }}>
-        <Card style={{ padding: 28 }}>
+      <div style={{ padding: 24, maxWidth: 700, margin: "30px auto", display: "flex", alignItems: "center", gap: 4 }}>
+        <button
+          type="button"
+          onClick={() => goToQuestion(current - 1)}
+          disabled={current === 0}
+          aria-label="이전 문제"
+          style={{
+            flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            background: "none", border: "none", padding: "10px 6px",
+            color: current === 0 ? "var(--color-border-soft)" : "var(--color-muted)",
+            cursor: current === 0 ? "default" : "pointer",
+          }}
+        >
+          <span style={{ fontSize: 26, lineHeight: 1 }}>‹</span>
+          <span style={{ fontSize: 11, fontWeight: 800 }}>이전</span>
+        </button>
+        <Card style={{ flex: 1, minWidth: 0, padding: 28 }}>
+          {reviewMode && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <span style={{
+                flexShrink: 0, padding: "3px 10px", borderRadius: 999,
+                background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
+                color: currentCorrect ? CYAN : PINK, fontSize: 11, fontWeight: 850,
+              }}>{currentCorrect ? "정답" : "오답"}</span>
+              <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인하세요</span>
+            </div>
+          )}
           <span style={{ fontSize: 12, fontWeight: 600, color: CYAN, marginBottom: 10, display: "block" }}>Q{current + 1}</span>
           <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}>{q.question}</h3>
-          {isShortAnswer || isSubjective ? (
+          {reviewMode ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {isShortAnswer || isSubjective ? (
+                <div style={{ display: "grid", gap: 8, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                  <span>내 답: <span style={{ padding: "3px 10px", borderRadius: 8, background: "var(--color-muted-surface)", color: "var(--color-text)", fontWeight: 700 }}>{typeof selected === "string" && selected.trim() ? selected : "미응답"}</span></span>
+                  {!currentCorrect && (
+                    <span>정답: <strong style={{ color: PINK }}>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</strong></span>
+                  )}
+                  {isSubjective && subjectiveGrade && (
+                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · {subjectiveGrade.feedback}</span>
+                  )}
+                </div>
+              ) : (
+                (q.options || []).map((opt, i) => {
+                  const isMyChoice = selected === i;
+                  const showCorrect = q.answer === i && !currentCorrect;
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                      padding: "12px 16px", borderRadius: 12,
+                      background: showCorrect ? "var(--color-tint-pink)" : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
+                      border: `1.5px solid ${showCorrect ? PINK : "var(--color-border-soft)"}`,
+                    }}>
+                      <span style={{ minWidth: 0, fontSize: 14, color: showCorrect ? PINK : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word" }}>
+                        <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        {opt}
+                      </span>
+                      {(isMyChoice || showCorrect) && (
+                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? PINK : "var(--color-text-secondary)" }}>
+                          {showCorrect ? "정답" : "내 답"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : isShortAnswer || isSubjective ? (
             <div>
               <div style={{ display: "flex", gap: 10, alignItems: isSubjective ? "flex-end" : "stretch" }}>
                 {isSubjective ? (
                   <textarea
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
-                    disabled={selected !== undefined || grading}
+                    disabled={reviewMode || selected !== undefined || grading}
                     placeholder="근거와 함께 답안을 작성하세요"
                     rows={5}
                     style={{
@@ -1580,7 +1695,7 @@ export default function Quiz() {
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") submitShortAnswer(); }}
-                    disabled={selected !== undefined}
+                    disabled={reviewMode || selected !== undefined}
                     placeholder="정답을 입력하세요"
                     style={{
                       flex: 1, padding: "14px 16px", borderRadius: 12, border: "1.5px solid var(--color-border-soft)",
@@ -1588,18 +1703,20 @@ export default function Quiz() {
                     }}
                   />
                 )}
-                <button
-                  onClick={isSubjective ? submitSubjectiveAnswer : submitShortAnswer}
-                  disabled={!shortAnswerInput.trim() || selected !== undefined || grading}
-                  style={{
-                    padding: isSubjective ? "14px 20px" : "0 20px", borderRadius: 12, border: "none",
-                    background: shortAnswerInput.trim() && selected === undefined && !grading ? PINK : "var(--color-border-soft)",
-                    color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700,
-                    cursor: shortAnswerInput.trim() && selected === undefined && !grading ? "pointer" : "default"
-                  }}
-                >{grading ? "채점 중..." : "제출"}</button>
+                {!reviewMode && (
+                  <button
+                    onClick={isSubjective ? submitSubjectiveAnswer : submitShortAnswer}
+                    disabled={!shortAnswerInput.trim() || selected !== undefined || grading}
+                    style={{
+                      padding: isSubjective ? "14px 20px" : "0 20px", borderRadius: 12, border: "none",
+                      background: shortAnswerInput.trim() && selected === undefined && !grading ? PINK : "var(--color-border-soft)",
+                      color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700,
+                      cursor: shortAnswerInput.trim() && selected === undefined && !grading ? "pointer" : "default"
+                    }}
+                  >{grading ? "채점 중..." : "제출"}</button>
+                )}
               </div>
-              {selected !== undefined && isShortAnswer && !examMode && (
+              {isShortAnswer && (reviewMode || (selected !== undefined && !examMode)) && (
                 <div style={{
                   marginTop: 12, padding: "12px 16px", borderRadius: 12,
                   background: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
@@ -1609,7 +1726,7 @@ export default function Quiz() {
                   정답: {q.answerText}
                 </div>
               )}
-              {selected !== undefined && isSubjective && subjectiveGrade && !examMode && (
+              {isSubjective && subjectiveGrade && (reviewMode || (selected !== undefined && !examMode)) && (
                 <div style={{
                   marginTop: 12,
                   padding: "12px 16px",
@@ -1634,11 +1751,9 @@ export default function Quiz() {
                 const answered = selected !== undefined;
                 const revealAnswer = answered && !examMode;
                 let bg = "var(--color-surface)", border = "var(--color-border-soft)", color = "var(--color-text)";
-                if (answered) {
-                  if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = CYAN; }
-                  else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
-                  else if (isSelected) { bg = "#f3f3f3"; border = "#d8d8d8"; color = "#333"; }
-                }
+                if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = CYAN; }
+                else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
+                else if (isSelected) { bg = "#f3f3f3"; border = "#d8d8d8"; color = "#333"; }
                 return (
                   <button key={i} onClick={() => selectAnswer(i)} style={{
                     padding: "14px 18px", borderRadius: 12, border: `1.5px solid ${border}`,
@@ -1655,17 +1770,43 @@ export default function Quiz() {
             </div>
           )}
           {showExplanation && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
-              <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
-            </div>
+            reviewMode ? (
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                <strong style={{ color: "var(--color-text)" }}>해설</strong> {q.explanation}
+              </div>
+            ) : (
+              <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
+                <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
+              </div>
+            )
           )}
-          {selected !== undefined && (
-            <button onClick={next} style={{
+          {reviewMode ? (
+            <button onClick={exitReviewToResult} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
-            }}>{current < quizzes.length - 1 ? "다음 문제" : "결과 보기"}</button>
+            }}>결과로 돌아가기</button>
+          ) : (
+            <button onClick={submitQuiz} style={{
+              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
+            }}>결과 보기</button>
           )}
         </Card>
+        <button
+          type="button"
+          onClick={reviewMode ? () => goToQuestion(current + 1) : goNextActive}
+          disabled={current >= quizzes.length - 1}
+          aria-label="다음 문제"
+          style={{
+            flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            background: "none", border: "none", padding: "10px 6px",
+            color: current >= quizzes.length - 1 ? "var(--color-border-soft)" : "var(--color-muted)",
+            cursor: current >= quizzes.length - 1 ? "default" : "pointer",
+          }}
+        >
+          <span style={{ fontSize: 26, lineHeight: 1 }}>›</span>
+          <span style={{ fontSize: 11, fontWeight: 800 }}>다음</span>
+        </button>
       </div>
     </div>
   );
