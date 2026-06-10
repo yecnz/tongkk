@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
@@ -322,10 +322,62 @@ const CourseDetailModal = ({
   );
 };
 
+// 공지사항 — 백엔드 공지 테이블이 아직 없어 정적으로 관리한다. 새 공지는 이 배열에 추가하면 된다.
+const NOTICES: { date: string; tag: string; title: string; body: string }[] = [
+  {
+    date: "2026.06.11",
+    tag: "안내",
+    title: "Tongkk 베타 오픈",
+    body: "현재 캡스톤 시연용 MVP 단계예요. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.",
+  },
+  {
+    date: "2026.06.11",
+    tag: "기능",
+    title: "AI 요약 · 퀴즈 · 학습 계획 제공",
+    body: "강의자료를 올리면 요약과 퀴즈를 만들고, D-day에 맞춰 오늘 할 일을 자동으로 쪼개드려요.",
+  },
+  {
+    date: "2026.06.11",
+    tag: "피드백",
+    title: "여러분의 의견을 기다립니다",
+    body: `사이드바 하단의 '피드백 보내기' 또는 ${FEEDBACK_EMAIL}로 의견을 보내주시면 큰 힘이 됩니다.`,
+  },
+];
+
+const NoticeModal = ({ onClose }: { onClose: () => void }) => (
+  <div onClick={onClose} style={{
+    position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.24)",
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+  }}>
+    <Card onClick={e => e.stopPropagation()} style={{ width: "min(460px, 100%)", maxHeight: "calc(100vh - 56px)", overflowY: "auto", padding: 26 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>공지사항</h3>
+        <button onClick={onClose} aria-label="공지사항 닫기" style={{
+          width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
+          color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
+        }}>×</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {NOTICES.map((notice, i) => (
+          <div key={i} style={{ padding: 16, borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-surface)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+              <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>{notice.tag}</span>
+              <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>{notice.date}</span>
+            </div>
+            <p style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>{notice.title}</p>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>{notice.body}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+);
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [ddays, setDdays] = useState<Dday[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -702,12 +754,29 @@ export default function Dashboard() {
       )}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
+      {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button
+          onClick={() => setShowNotice(true)}
+          aria-label="공지사항"
+          style={{
+            marginLeft: "auto", display: "flex", alignItems: "center", gap: 7,
+            padding: "8px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+            background: "var(--color-card)", color: "var(--color-text-secondary)",
+            fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          공지사항
+        </button>
       </div>
 
       <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", zoom: 0.85 }}>
