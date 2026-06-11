@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
@@ -410,11 +410,70 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
+// 피드백 보내기 — 메일 주소를 보여주고, mailto로 바로 메일을 보낼 수 있게 한다.
+// 메일 클라이언트가 없는 사용자를 위해 주소 복사 버튼도 함께 둔다.
+const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.24)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <Card onClick={e => e.stopPropagation()} style={{ width: "min(400px, 100%)", padding: 26 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>피드백 보내기</h3>
+          <button onClick={onClose} aria-label="피드백 창 닫기" style={{
+            width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
+            color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
+          }}>×</button>
+        </div>
+        <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
+          버그 제보, 기능 제안 등 어떤 의견이든 환영해요. 아래 주소로 메일을 보내주시면 큰 힘이 됩니다.
+        </p>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          padding: "12px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+          background: "var(--color-surface)", marginBottom: 14,
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", wordBreak: "break-all" }}>{FEEDBACK_EMAIL}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(FEEDBACK_EMAIL).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            style={{
+              flexShrink: 0, padding: "6px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
+              background: "var(--color-card)", color: copied ? CYAN : "var(--color-text-secondary)",
+              fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+            }}
+          >{copied ? "복사됨!" : "복사"}</button>
+        </div>
+        <a
+          href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Tongkk 피드백")}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "12px 16px", borderRadius: 10, border: "none",
+            background: PINK, color: "var(--color-on-brand)",
+            fontSize: 14, fontWeight: 800, textDecoration: "none", cursor: "pointer",
+            boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+          }}
+        >
+          <PaperPlaneIcon />
+          메일 보내기
+        </a>
+      </Card>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [ddays, setDdays] = useState<Dday[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -793,6 +852,7 @@ export default function Dashboard() {
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
       {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -815,9 +875,22 @@ export default function Dashboard() {
           </svg>
           공지사항
         </button>
+        <button
+          onClick={() => setShowFeedback(true)}
+          aria-label="피드백 보내기"
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "8px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+            background: "var(--color-card)", color: "var(--color-text-secondary)",
+            fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+          }}
+        >
+          <PaperPlaneIcon />
+          피드백 보내기
+        </button>
       </div>
 
-      <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", zoom: 0.85 }}>
+      <div className="app-container">
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
           <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
             공부 시작하기
@@ -847,7 +920,7 @@ export default function Dashboard() {
             </button>
           </div>
         </Card>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
+        <div className="dash-main-grid">
           {/* 강의 목록 카드 그리드 */}
           <div>
             {courses.length === 0 ? (
