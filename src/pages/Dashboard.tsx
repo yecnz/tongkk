@@ -95,8 +95,8 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: "min(400px, calc(100vw - 32px))" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <Card style={{ padding: 28, width: "min(400px, 100%)" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
         <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAddAndUpload(); }} placeholder="과목명 입력" autoFocus style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
@@ -133,8 +133,8 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <Card style={{ padding: 28, width: "min(340px, 100%)" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 이름 변경</h3>
         <input
           value={name}
@@ -165,7 +165,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
 
 const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-    <Card style={{ padding: 28, width: "min(360px, calc(100vw - 32px))" }}>
+    <Card style={{ padding: 28, width: "min(360px, 100%)" }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>강의를 삭제할까요?</h3>
       <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
         {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.

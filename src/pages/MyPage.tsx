@@ -66,8 +66,8 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: "min(360px, calc(100vw - 32px))" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <Card style={{ padding: 28, width: "min(360px, 100%)" }}>
         <h3 style={{ margin: "0 0 24px", fontSize: 17, fontWeight: 700 }}>프로필 편집</h3>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
           <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}>
