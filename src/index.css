@@ -36,7 +36,9 @@
 
   /* 비색상 토큰 */
   --radius-card: 18px;
-  --shadow-card: light-dark(0 10px 28px rgba(15, 23, 42, .045), 0 1px 8px rgba(0, 0, 0, .28));
+  /* light-dark()는 <color> 전용이라 그림자 목록 전체를 감싸면 무효(그림자 사라짐).
+     라이트 값을 기본으로 두고 다크는 아래 [data-theme="dark"] 블록에서 통째로 덮어쓴다. */
+  --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
   --glass-bg: light-dark(rgba(255, 255, 255, 0.75), rgba(26, 30, 38, 0.72));
   --glass-border: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.10));
 }
@@ -54,17 +56,21 @@
 
 /* ── 전역 스케일 ──
    앱이 고정 px 기반이라 루트 zoom으로 전체를 균일하게 키우/줄인다.
-   기준은 기존 대시보드(zoom 0.85)의 약 105% = 0.90. 윈도우는 OS 기본 배율 125%를
-   상쇄하기 위해 0.90 × 100/125 = 0.72를 쓴다(플랫폼 감지: index.html 인라인 스크립트).
+   기준은 기존 대시보드(zoom 0.85)의 약 105% = 0.90. 윈도우도 동일 — OS 배율(125%)을
+   상쇄하는 0.72를 써봤으나 실기기에서 너무 작다는 피드백으로 폐기(OS 배율은 따라간다).
+   사용자별 조절은 마이페이지 '화면 크기' 설정(localStorage tongkk-ui-scale)이 이 값을
+   인라인 스타일로 덮어쓴다(첫 페인트 적용: index.html 인라인 스크립트).
    주의: zoom 하에서 100vh는 축소되므로 전체 높이 고정 요소는 top/bottom 0을 쓴다(예: 사이드바). */
 :root {
   --app-scale: 0.90;
 }
 html[data-platform="windows"] {
-  --app-scale: 0.72;
+  --app-scale: 0.90;
 }
 [data-theme="dark"] {
   color-scheme: dark;
+  /* 다크 그림자는 색뿐 아니라 퍼짐도 달라(은은하게 좁게) 토큰을 통째로 교체한다. */
+  --shadow-card: 0 1px 8px rgba(0, 0, 0, .28);
 }
 [data-theme="light"] {
   color-scheme: light;
@@ -142,6 +148,94 @@ body.tongkk-sidebar-open #root {
   .tongkk-plan-edit-hint {
     opacity: 0.45;
   }
+}
+
+/* ── hover·포커스 피드백 유틸 ──
+   본문이 인라인 스타일 위주라(인라인 > 클래스) hover/focus 시점 값에만 !important로 덮는다.
+   sticky hover를 피하려 hover 효과는 (hover: hover)에서만 적용하고,
+   키보드 사용자를 위해 :focus-visible에 같은 표면 피드백을 준다.
+   - hover-lift: 카드형 클릭 요소(과목 카드, 템플릿 카드)
+   - hover-row: 목록 행(사이드바 항목, 자료 행, 최근 풀이)
+   - hover-dim: 보조 버튼(헤더, 모달 닫기, 토스트 액션) — 배경 한 단계 진하게
+   - hover-fade: 텍스트 로고처럼 배경 없이 명도만
+   - icon-btn(.danger/.accent): 24px대 ×·✎·↗ 버튼. danger는 삭제 의도를 색으로 예고
+   - quiz-option / dropzone: 절반만 구현돼 있던 transition에 hover 상태를 보강 */
+.tongkk-hover-lift,
+.tongkk-hover-row,
+.tongkk-hover-dim,
+.tongkk-hover-fade,
+.tongkk-icon-btn,
+.tongkk-quiz-option,
+.tongkk-dropzone {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease,
+    color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+/* 행 안의 보조 힌트(예: "복습 열기 →")는 평소 옅게, 행 hover 시 또렷하게 */
+.tongkk-row-hint {
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+@media (hover: hover) {
+  .tongkk-hover-lift:hover {
+    transform: translateY(-2px) !important;
+    /* light-dark()는 색상 자리에서만 유효 — 그림자 목록을 감싸면 선언이 무효가 된다 */
+    box-shadow: 0 14px 32px light-dark(rgba(15, 23, 42, 0.1), rgba(0, 0, 0, 0.45)) !important;
+  }
+  .tongkk-hover-row:hover {
+    background: var(--color-surface) !important;
+  }
+  .tongkk-hover-dim:hover {
+    background: var(--color-muted-surface) !important;
+  }
+  .tongkk-hover-fade:hover {
+    opacity: 0.72;
+  }
+  .tongkk-icon-btn:hover {
+    background: var(--color-muted-surface) !important;
+    color: var(--color-text) !important;
+  }
+  .tongkk-icon-btn.danger:hover {
+    background: var(--color-tint-pink) !important;
+    color: var(--color-danger) !important;
+    border-color: color-mix(in srgb, var(--color-danger) 35%, transparent) !important;
+  }
+  .tongkk-icon-btn.accent:hover {
+    background: var(--color-tint-cyan) !important;
+  }
+  .tongkk-quiz-option:hover {
+    background: var(--color-muted-surface) !important;
+    border-color: var(--color-border) !important;
+  }
+  /* 드롭존 기본 배경이 muted-surface라, hover는 dragOver 강조와 같은 계열(옅은 시안 틴트)로 */
+  .tongkk-dropzone:hover {
+    background: color-mix(in srgb, var(--color-cyan) 6%, var(--color-card)) !important;
+    border-color: color-mix(in srgb, var(--color-cyan) 40%, var(--color-border)) !important;
+  }
+  .stats-course-row:hover {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+  }
+  :is(.tongkk-hover-row, .tongkk-hover-dim, .stats-course-row):hover .tongkk-row-hint {
+    opacity: 1;
+  }
+}
+
+/* 키보드 포커스에도 hover와 같은 표면 피드백 */
+.tongkk-hover-row:focus-visible,
+.stats-course-row:focus-visible {
+  background: var(--color-surface) !important;
+}
+.tongkk-hover-dim:focus-visible,
+.tongkk-icon-btn:focus-visible {
+  background: var(--color-muted-surface) !important;
+}
+
+/* 전역 키보드 포커스 링 — 마우스 클릭에는 나타나지 않는다(:focus-visible).
+   인라인 outline:none이 걸린 입력류는 인라인이 우선이라 영향받지 않는다. */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-pink) 55%, transparent);
+  outline-offset: 2px;
 }
 
 /* ── 공통 페이지 컨테이너 ──

@@ -145,7 +145,7 @@ const SettingsModal = ({
       <Card style={{ width: "min(430px, 100%)", padding: 26 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>{title}</h3>
-          <button onClick={onClose} style={{
+          <button className="tongkk-hover-dim" onClick={onClose} style={{
             width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
             color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px"
           }}>×</button>
@@ -225,6 +225,18 @@ export default function MyPage() {
   });
   const [error, setError] = useState("");
 
+  // 화면 크기(전역 스케일 --app-scale) — 기기·OS 배율이 제각각이라 사용자가 직접 고른다.
+  // localStorage에 저장하며, 첫 페인트 적용은 index.html 인라인 스크립트가 담당한다.
+  const [uiScale, setUiScale] = useState(() => {
+    const saved = parseFloat(localStorage.getItem("tongkk-ui-scale") ?? "");
+    return saved >= 0.7 && saved <= 1.2 ? saved : 0.9;
+  });
+  const changeUiScale = (value: number) => {
+    setUiScale(value);
+    localStorage.setItem("tongkk-ui-scale", String(value));
+    document.documentElement.style.setProperty("--app-scale", String(value));
+  };
+
   const reload = async () => {
     try {
       const nextProfile = await loadUserProfile();
@@ -286,10 +298,10 @@ export default function MyPage() {
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
@@ -340,6 +352,23 @@ export default function MyPage() {
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>다크모드</span>
                 <Toggle on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
               </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "14px 0", borderBottom: "1px solid var(--color-border-soft)" }}>
+                <span style={{ fontSize: 14, color: "var(--color-text)" }}>화면 크기</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[{ label: "작게", value: 0.8 }, { label: "보통", value: 0.9 }, { label: "크게", value: 1 }].map(opt => {
+                    const selected = uiScale === opt.value;
+                    return (
+                      <button key={opt.label} onClick={() => changeUiScale(opt.value)} style={{
+                        padding: "6px 12px", borderRadius: 8,
+                        border: selected ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                        background: selected ? "var(--color-tint-pink)" : "var(--color-card)",
+                        color: selected ? PINK : "var(--color-muted)",
+                        fontSize: 13, fontWeight: selected ? 800 : 600, cursor: "pointer",
+                      }}>{opt.label}</button>
+                    );
+                  })}
+                </div>
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>알림 설정</span>
                 <Toggle on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
@@ -373,7 +402,7 @@ export default function MyPage() {
                 { label: "공지사항", type: "notice" as const },
                 { label: "문의하기", type: "contact" as const },
               ].map((item, index) => (
-                <button key={item.label} onClick={() => setSettingsDialog(item.type)} style={{
+                <button key={item.label} className="tongkk-hover-row" onClick={() => setSettingsDialog(item.type)} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "14px 0", border: "none", background: "none", cursor: "pointer",
                   borderBottom: index === 0 ? "1px solid var(--color-border-soft)" : "none", width: "100%", textAlign: "left"

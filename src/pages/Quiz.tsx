@@ -219,10 +219,10 @@ type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => voi
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-      <button onClick={onOpenSidebar} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+      <button className="tongkk-hover-dim" onClick={onOpenSidebar} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
-      <button onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+      <button className="tongkk-hover-fade" onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ {label}</span>
     </div>
     {extra}
@@ -1241,6 +1241,7 @@ export default function Quiz() {
             )}
 
             <div
+              className="tongkk-dropzone"
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
@@ -1603,6 +1604,7 @@ export default function Quiz() {
                     <button
                       key={material.id}
                       type="button"
+                      className="tongkk-hover-dim"
                       onClick={() => goToMaterialReview({ materialId: material.id })}
                       style={{
                         display: "flex",
@@ -1620,7 +1622,7 @@ export default function Quiz() {
                       <span style={{ minWidth: 0, color: "var(--color-text)", fontSize: 13, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {material.name}
                       </span>
-                      <span style={{ flexShrink: 0, color: CYAN, fontSize: 12, fontWeight: 850 }}>
+                      <span className="tongkk-row-hint" style={{ flexShrink: 0, color: CYAN, fontSize: 12, fontWeight: 850 }}>
                         요약 탭 열기
                       </span>
                     </button>
@@ -1677,6 +1679,7 @@ export default function Quiz() {
                       <button
                         key={`${quiz.question}-${wrongIndex}`}
                         type="button"
+                        className="tongkk-hover-dim"
                         onClick={() => goToQuestionReview(questionIndex)}
                         style={{
                           display: "block", width: "100%", textAlign: "left",
@@ -1688,7 +1691,7 @@ export default function Quiz() {
                           <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
                             Q{questionIndex + 1}. {quiz.question}
                           </span>
-                          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: CYAN }}>문제 보기 →</span>
+                          <span className="tongkk-row-hint" style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: CYAN }}>문제 보기 →</span>
                         </div>
                         <div style={{ display: "grid", gap: 5, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                           <span>내 답: <strong style={{ color: PINK }}>{userAnswer ?? "미응답"}</strong></span>
@@ -1933,7 +1936,7 @@ export default function Quiz() {
                 else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
                 else if (isSelected) { bg = "#f3f3f3"; border = "#d8d8d8"; color = "#333"; }
                 return (
-                  <button key={i} onClick={() => selectAnswer(i)} style={{
+                  <button key={i} className={answered ? undefined : "tongkk-quiz-option"} onClick={() => selectAnswer(i)} style={{
                     padding: "14px 18px", borderRadius: 12, border: `1.5px solid ${border}`,
                     background: bg, textAlign: "left", fontSize: 14, color, cursor: answered ? "default" : "pointer",
                     fontWeight: isSelected || (revealAnswer && isCorrect) ? 600 : 400, transition: "all 0.2s"

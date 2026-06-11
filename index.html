@@ -11,6 +11,12 @@
       (function () {
         var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
         document.documentElement.dataset.platform = /windows|win32|win64/i.test(p) ? "windows" : "mac";
+        // 사용자가 마이페이지에서 고른 화면 크기(작게 0.8 / 보통 0.9 / 크게 1)를
+        // 첫 페인트 전에 적용해 깜빡임을 막는다. 값이 없거나 이상하면 CSS 기본값을 쓴다.
+        try {
+          var s = parseFloat(localStorage.getItem("tongkk-ui-scale"));
+          if (s >= 0.7 && s <= 1.2) document.documentElement.style.setProperty("--app-scale", String(s));
+        } catch (e) { /* localStorage 접근 불가 환경은 기본값 유지 */ }
       })();
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />

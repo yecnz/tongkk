@@ -229,10 +229,10 @@ export default function Calendar() {
       )}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-surface)" }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       </div>
 
       <div className="app-container">
@@ -333,8 +333,8 @@ export default function Calendar() {
                         </div>
                         {plan && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                            <button type="button" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
-                            <button type="button" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                            <button type="button" className="tongkk-icon-btn" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
+                            <button type="button" className="tongkk-icon-btn danger" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                           </div>
                         )}
                       </div>
@@ -361,7 +361,7 @@ export default function Calendar() {
                         flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
                         color: p.done ? "var(--color-muted)" : "var(--color-text)", textDecoration: p.done ? "line-through" : "none",
                       }}>{p.text}</span>
-                      <button type="button" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                      <button type="button" className="tongkk-icon-btn danger" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                     </div>
                   ))}
                 </>
@@ -395,8 +395,8 @@ export default function Calendar() {
                         <span style={{ fontSize: 13, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
                           {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                         </span>
-                        <button type="button" onClick={() => setEditingDday(d)} aria-label={`${d.subj} 수정`} title="수정" style={editBtnStyle}>✎</button>
-                        <button type="button" onClick={() => deleteDday(d)} aria-label={`${d.subj} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                        <button type="button" className="tongkk-icon-btn" onClick={() => setEditingDday(d)} aria-label={`${d.subj} 수정`} title="수정" style={editBtnStyle}>✎</button>
+                        <button type="button" className="tongkk-icon-btn danger" onClick={() => deleteDday(d)} aria-label={`${d.subj} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                       </div>
                     </div>
                   );

@@ -122,10 +122,10 @@ export default function Stats() {
       {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 학습 통계</span>
       </div>
 
@@ -219,7 +219,7 @@ export default function Stats() {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ marginBottom: 5, fontSize: 14, fontWeight: 900, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {course.courseName}
-                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 850, color: CYAN }}>복습 열기 →</span>
+                        <span className="tongkk-row-hint" style={{ marginLeft: 8, fontSize: 11, fontWeight: 850, color: CYAN }}>복습 열기 →</span>
                       </div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-muted)" }}>{course.attempts}회 · {course.totalQuestions}문제 · {formatStudyTime(course.totalMinutes)} · 정답률 {course.averageScore}%</div>
                     </div>
@@ -254,6 +254,7 @@ export default function Stats() {
                   <button
                     key={attempt.id}
                     type="button"
+                    className="tongkk-hover-row"
                     onClick={() => goToAttempt(attempt)}
                     title={attempt.quizSetId ? "저장된 풀이 결과 열기" : `${attempt.courseName} 자료 복습 열기`}
                     style={{

@@ -244,7 +244,7 @@ const CourseDetailModal = ({
             <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
           </div>
-          <button onClick={onClose} aria-label="강의 상세 닫기" style={{
+          <button className="tongkk-hover-dim" onClick={onClose} aria-label="강의 상세 닫기" style={{
             width: 32,
             height: 32,
             borderRadius: 9,
@@ -286,6 +286,7 @@ const CourseDetailModal = ({
                   <button
                     key={material.id}
                     type="button"
+                    className="tongkk-hover-row"
                     onClick={() => onOpenMaterial(material)}
                     style={{
                       width: "100%",
@@ -386,7 +387,7 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
     <Card onClick={e => e.stopPropagation()} style={{ width: "min(460px, 100%)", maxHeight: "calc(100vh - 56px)", overflowY: "auto", padding: 26 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>공지사항</h3>
-        <button onClick={onClose} aria-label="공지사항 닫기" style={{
+        <button className="tongkk-hover-dim" onClick={onClose} aria-label="공지사항 닫기" style={{
           width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
           color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
         }}>×</button>
@@ -438,7 +439,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
       <Card onClick={e => e.stopPropagation()} style={{ width: "min(400px, 100%)", padding: 26 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>피드백 보내기</h3>
-          <button onClick={onClose} aria-label="피드백 창 닫기" style={{
+          <button className="tongkk-hover-dim" onClick={onClose} aria-label="피드백 창 닫기" style={{
             width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
             color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
           }}>×</button>
@@ -1013,11 +1014,12 @@ export default function Dashboard() {
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <button
+          className="tongkk-hover-dim"
           onClick={() => setShowNotice(true)}
           aria-label="공지사항"
           style={{
@@ -1034,6 +1036,7 @@ export default function Dashboard() {
           <span className="header-btn-label">공지사항</span>
         </button>
         <button
+          className="tongkk-hover-dim"
           onClick={() => setShowFeedback(true)}
           aria-label="피드백 보내기"
           style={{
@@ -1106,6 +1109,7 @@ export default function Dashboard() {
                   return (
                     <Card
                       key={course}
+                      className="tongkk-hover-lift"
                       role="button"
                       tabIndex={0}
                       onClick={() => openCourseDetail(course)}
@@ -1126,6 +1130,7 @@ export default function Dashboard() {
                       </div>
                       <button
                         type="button"
+                        className="tongkk-hover-dim"
                         aria-label={`${course} 관리 메뉴`}
                         onClick={e => { e.stopPropagation(); setOpenCourseMenu(prev => prev === course ? null : course); }}
                         style={{
@@ -1142,8 +1147,8 @@ export default function Dashboard() {
                           borderRadius: 12, border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
                           boxShadow: "0 12px 28px rgba(0,0,0,0.12)", zIndex: 20,
                         }}>
-                          <button type="button" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
-                          <button type="button" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-danger)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
+                          <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
+                          <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-danger)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
                         </div>
                       )}
                     </Card>
@@ -1193,6 +1198,7 @@ export default function Dashboard() {
                             {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                           </span>
                           <button
+                            className="tongkk-icon-btn danger"
                             onClick={() => deleteDday(d)}
                             aria-label={`${d.subj} D-day 삭제`}
                             title="삭제"
@@ -1222,6 +1228,7 @@ export default function Dashboard() {
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>오늘의 학습계획</h3>
                 <button
                   type="button"
+                  className="tongkk-hover-dim"
                   onClick={() => navigate(pageRoutes["학습 캘린더"])}
                   aria-label="학습 캘린더 열기"
                   title="학습 캘린더"
@@ -1576,6 +1583,7 @@ export default function Dashboard() {
                         {p.action && !isEditing && (p.action === "review_wrong" || resolvePlanCourse(p.course)) && (
                           <button
                             type="button"
+                            className="tongkk-icon-btn accent"
                             onClick={() => openPlanAction(p)}
                             aria-label={`${planActionLabels[p.action]}로 이동`}
                             title={planActionLabels[p.action]}
@@ -1587,6 +1595,7 @@ export default function Dashboard() {
                           >↗</button>
                         )}
                         <button
+                          className="tongkk-icon-btn danger"
                           onClick={() => deletePlan(p, i)}
                           aria-label={`${p.text} 학습 계획 삭제`}
                           title="삭제"

@@ -773,7 +773,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
 
       <div className="summary-template-grid">
         {templates.map(t => (
-          <Card key={t.key} style={{ padding: 0, overflow: "hidden" }}>
+          <Card key={t.key} className="tongkk-hover-lift" style={{ padding: 0, overflow: "hidden" }}>
             <button onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
               width: "100%",
               minHeight: 190,
@@ -3605,6 +3605,7 @@ export default function Summary() {
               </div>
             </div>
             <button
+              className="tongkk-hover-dim"
               onClick={() => setDuplicateNotice(null)}
               aria-label="중복 파일 안내 닫기"
               style={{
@@ -3628,10 +3629,10 @@ export default function Summary() {
       )}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
@@ -3724,6 +3725,7 @@ export default function Summary() {
                 </div>
                 {inputMode === "file" ? (
                   <div
+                    className="tongkk-dropzone"
                     onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}

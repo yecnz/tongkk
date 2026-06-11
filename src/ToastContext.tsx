@@ -71,6 +71,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             {toast.action && (
               <button
                 type="button"
+                className="tongkk-hover-dim"
                 onClick={() => {
                   toast.action?.onAction();
                   setToasts(prev => prev.filter(item => item.id !== toast.id));
