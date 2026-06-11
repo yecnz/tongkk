@@ -4,8 +4,11 @@ import type { SummaryTemplate } from './gpt';
 // 서버 _PAGE_MARKER_RE와 동일: PDF는 `<!-- p.N -->`, PPT/PPTX는 `<!-- Slide number: N -->`.
 const PAGE_MARKER_RE = /<!--\s*(?:p\.|Slide number:\s*)(\d+)\s*-->/g;
 
-// 구간당 입력 글자 예산. 출력도 이에 비례해 짧아져 한 요청이 터널 제한(~100초) 안에 끝난다.
+// 구간당 입력 글자 예산(목표치). 출력도 이에 비례해 짧아져 한 요청이 터널 제한(~100초) 안에 끝난다.
 const CHUNK_TARGET_CHARS = 16_000;
+// 섹션 하나는 이 상한까지 통째로 유지한다(목표치를 넘어도 안 쪼갬). 이 상한마저 넘는 초대형
+// 섹션만 페이지 단위로 분할하고, 둘째 조각부터 '이어짐'으로 표시해 제목 재생성을 막는다.
+const CHUNK_HARD_CHARS = 28_000;
 // 직전 구간 요약 끝부분을 다음 구간에 넘겨 제목 수준·흐름을 잇는다(서버 previous_tail 한도 6000자).
 const PREVIOUS_TAIL_CHARS = 1_500;
 // 구간 하나의 스트림이 이 시간 안에 못 끝나면 중단한다.
@@ -67,30 +70,49 @@ function parsePageSelection(spec: string): Set<number> {
   return pages;
 }
 
-/** 페이지 마커 기준으로 자료를 구간 입력 목록으로 나눈다. 마커가 없으면 문단 기준 폴백. */
-export function splitMarkdownIntoChunks(markdown: string, pagesSpec?: string): string[] {
+// 슬라이드 머리글·절 제목 줄("6.2 주기억장치", "6.2.1 …"). 페이지 블록 앞부분에서만 찾는다.
+const SECTION_LABEL_RE = /^(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+(\S.{0,38})$/;
+
+export type SummaryChunk = { markdown: string; isContinuation: boolean };
+
+/** 페이지 블록 앞부분(마커·페이지번호 줄은 건너뜀)에서 '6.2 주기억장치' 같은 절 제목을 찾는다. */
+function detectSectionLabel(blockText: string): string | null {
+  const lines = blockText.split('\n').map(line => line.trim()).filter(Boolean);
+  for (const line of lines.slice(0, 8)) {
+    const match = SECTION_LABEL_RE.exec(line);
+    if (match) return `${match[1]} ${match[2].trim()}`;
+  }
+  return null;
+}
+
+/**
+ * 페이지 마커로 블록을 만든 뒤, 절 제목이 바뀌는 지점(섹션)으로 묶어 구간을 만든다.
+ * - 섹션 경계에서만 잘라 한 섹션이 두 구간에 걸쳐 제목이 중복되는 것을 막는다.
+ * - 한 섹션이 CHUNK_HARD_CHARS를 넘으면 그 섹션만 페이지 단위로 쪼개고 둘째 조각부터 isContinuation.
+ * - 절 제목이 안 잡히는 자료는 섹션이 하나로 묶여, 페이지를 목표 글자수로 채우는 기존 동작과 같아진다.
+ * - 마커가 없으면 문단 기준 폴백.
+ */
+export function splitMarkdownIntoChunks(markdown: string, pagesSpec?: string): SummaryChunk[] {
   const matches = [...markdown.matchAll(PAGE_MARKER_RE)];
 
   if (matches.length === 0) {
-    return splitByParagraphs(markdown);
+    return splitByParagraphs(markdown).map(text => ({ markdown: text, isContinuation: false }));
   }
 
   // 페이지 블록 추출 (마커 앞 서문은 첫 구간에 붙인다)
   const preamble = markdown.slice(0, matches[0].index).trim();
   const selected = pagesSpec?.trim() ? parsePageSelection(pagesSpec) : null;
 
-  type Block = { text: string; start: number };
+  type Block = { text: string; start: number; pageNo: number };
   const collectBlocks = (filterPages: boolean): Block[] => {
     const result: Block[] = [];
     for (let i = 0; i < matches.length; i++) {
-      if (filterPages && selected && selected.size > 0) {
-        const pageNo = Number.parseInt(matches[i][1], 10);
-        if (!selected.has(pageNo)) continue;
-      }
+      const pageNo = Number.parseInt(matches[i][1], 10);
+      if (filterPages && selected && selected.size > 0 && !selected.has(pageNo)) continue;
       const start = matches[i].index;
       const end = i + 1 < matches.length ? matches[i + 1].index : markdown.length;
       const text = markdown.slice(start, end).trim();
-      if (text) result.push({ text, start });
+      if (text) result.push({ text, start, pageNo });
     }
     return result;
   };
@@ -98,23 +120,88 @@ export function splitMarkdownIntoChunks(markdown: string, pagesSpec?: string): s
   let blocks = collectBlocks(true);
   // 서버 필터와 동일: 선택한 페이지가 자료에 하나도 없으면 전체를 쓴다.
   if (blocks.length === 0) blocks = collectBlocks(false);
+  if (blocks.length === 0) return [{ markdown, isContinuation: false }];
 
-  const chunks: Block[] = [];
-  let current = preamble;
-  let currentStart = 0;
+  // 절 제목이 명시된 페이지 = 섹션 시작점(페이지 번호 오름차순). 반복되는 머리글은 한 번만 등록.
+  const sectionStarts: { pageNo: number; label: string }[] = [];
   for (const block of blocks) {
-    if (current && current.length + block.text.length > CHUNK_TARGET_CHARS) {
-      chunks.push({ text: current, start: currentStart });
-      current = block.text;
-      currentStart = block.start;
-    } else {
-      if (!current) currentStart = block.start;
-      current = current ? `${current}\n\n${block.text}` : block.text;
+    const label = detectSectionLabel(block.text);
+    if (label && (sectionStarts.length === 0 || sectionStarts[sectionStarts.length - 1].label !== label)) {
+      sectionStarts.push({ pageNo: block.pageNo, label });
     }
   }
-  if (current) chunks.push({ text: current, start: currentStart });
-  if (chunks.length === 0) return [markdown];
-  return chunks.map(chunk => prependMaterialContext(markdown, chunk.text, chunk.start));
+  // 페이지 번호로 섹션을 찾는다. 시각 분석 레이어('## PDF N페이지' 블록)도 같은 페이지 번호라 자동 귀속.
+  const sectionFor = (pageNo: number): string | null => {
+    let label: string | null = null;
+    for (const start of sectionStarts) {
+      if (start.pageNo <= pageNo) label = start.label;
+      else break;
+    }
+    return label;
+  };
+
+  // 연속된 같은 섹션 블록을 한 그룹으로 묶는다.
+  type Group = { blocks: Block[]; length: number; label: string | null };
+  const groups: Group[] = [];
+  for (const block of blocks) {
+    const label = sectionFor(block.pageNo);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.blocks.push(block);
+      last.length += block.text.length;
+    } else {
+      groups.push({ blocks: [block], length: block.text.length, label });
+    }
+  }
+
+  const assemble = (parts: Block[]): string =>
+    prependMaterialContext(markdown, parts.map(part => part.text).join('\n\n'), parts[0].start);
+
+  const chunks: SummaryChunk[] = [];
+  let current: Block[] = [];
+  let currentLength = 0;
+  const flush = () => {
+    if (current.length > 0) {
+      chunks.push({ markdown: assemble(current), isContinuation: false });
+      current = [];
+      currentLength = 0;
+    }
+  };
+
+  for (const group of groups) {
+    // 섹션 하나가 상한을 넘으면 통째로 못 넣는다 → 페이지 단위로 쪼개고 둘째 조각부터 '이어짐'.
+    if (group.length > CHUNK_HARD_CHARS) {
+      flush();
+      let piece: Block[] = [];
+      let pieceLength = 0;
+      let firstPiece = true;
+      const flushPiece = () => {
+        if (piece.length > 0) {
+          chunks.push({ markdown: assemble(piece), isContinuation: !firstPiece });
+          firstPiece = false;
+          piece = [];
+          pieceLength = 0;
+        }
+      };
+      for (const block of group.blocks) {
+        if (pieceLength > 0 && pieceLength + block.text.length > CHUNK_HARD_CHARS) flushPiece();
+        piece.push(block);
+        pieceLength += block.text.length;
+      }
+      flushPiece();
+      continue;
+    }
+    // 목표치를 넘으면 새 구간에서 시작한다(자르는 지점은 항상 섹션 경계).
+    if (currentLength > 0 && currentLength + group.length > CHUNK_TARGET_CHARS) flush();
+    current.push(...group.blocks);
+    currentLength += group.length;
+  }
+  flush();
+
+  if (chunks.length === 0) return [{ markdown, isContinuation: false }];
+  // 마커 앞 서문은 첫 구간 머리에 붙인다.
+  if (preamble) chunks[0] = { ...chunks[0], markdown: `${preamble}\n\n${chunks[0].markdown}` };
+  return chunks;
 }
 
 function splitByParagraphs(markdown: string): string[] {
@@ -154,6 +241,7 @@ type ChunkRequestBody = {
   chunk_index?: number;
   chunk_total?: number;
   previous_tail?: string;
+  is_continuation?: boolean;
 };
 
 type ChunkResult = { text: string; finishReason: string };
@@ -239,7 +327,7 @@ export async function summarizeWithTemplateStream(
   template: SummaryTemplate,
   options: SummaryStreamOptions = {},
 ): Promise<string> {
-  const chunks = template === 'CHEAT_SHEET'
+  const chunks: (SummaryChunk | null)[] = template === 'CHEAT_SHEET'
     ? [null] // 서버가 pages로 필터링한 전체 입력을 한 번에 처리
     : splitMarkdownIntoChunks(markdown, options.pages);
 
@@ -247,9 +335,9 @@ export async function summarizeWithTemplateStream(
   for (let i = 0; i < chunks.length; i++) {
     options.onProgress?.(i + 1, chunks.length);
 
-    const chunkMarkdown = chunks[i];
+    const chunk = chunks[i];
     const sourceNames = options.sourceNames?.length ? options.sourceNames : undefined;
-    const body: ChunkRequestBody = chunkMarkdown === null
+    const body: ChunkRequestBody = chunk === null
       ? {
         markdown,
         template,
@@ -258,7 +346,7 @@ export async function summarizeWithTemplateStream(
         source_names: sourceNames,
       }
       : {
-        markdown: chunkMarkdown,
+        markdown: chunk.markdown,
         template,
         focus_prompt: options.focusPrompt?.trim() || undefined,
         source_names: sourceNames,
@@ -266,6 +354,7 @@ export async function summarizeWithTemplateStream(
           chunk_index: i + 1,
           chunk_total: chunks.length,
           previous_tail: completed ? completed.slice(-PREVIOUS_TAIL_CHARS) : undefined,
+          ...(chunk.isContinuation ? { is_continuation: true } : {}),
         } : {}),
       };
 
