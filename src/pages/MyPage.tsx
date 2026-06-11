@@ -118,11 +118,15 @@ const SettingsModal = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // 전체 데이터 파기는 되돌릴 수 없어, "삭제"를 직접 입력해야 버튼이 활성화된다.
+  const [confirmText, setConfirmText] = useState("");
+  const deleteReady = confirmText.trim() === "삭제";
   if (!type) return null;
 
   const title = type === "notice" ? "공지사항" : type === "contact" ? "문의하기" : "회원 데이터 삭제";
 
   const handleDelete = async () => {
+    if (!deleteReady) return;
     setLoading(true);
     setError("");
     try {
@@ -141,7 +145,7 @@ const SettingsModal = ({
       <Card style={{ width: "min(430px, 100%)", padding: 26 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>{title}</h3>
-          <button onClick={onClose} style={{
+          <button className="tongkk-hover-dim" onClick={onClose} style={{
             width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
             color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px"
           }}>×</button>
@@ -176,13 +180,25 @@ const SettingsModal = ({
               Supabase Auth 계정 자체 삭제는 관리자 권한이 필요한 별도 서버 기능입니다.
             </p>
             {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
+            <label style={{ display: "block", marginBottom: 6, fontSize: 12.5, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              계속하려면 <strong style={{ color: "var(--color-danger)" }}>삭제</strong>를 입력하세요
+            </label>
+            <input
+              value={confirmText}
+              onChange={event => setConfirmText(event.target.value)}
+              placeholder="삭제"
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12,
+              }}
+            />
             <button
               onClick={handleDelete}
-              disabled={loading}
+              disabled={loading || !deleteReady}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                background: loading ? "var(--color-muted)" : "var(--color-danger)", color: "var(--color-on-brand)",
-                fontWeight: 800, cursor: loading ? "default" : "pointer"
+                background: loading || !deleteReady ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
+                fontWeight: 800, cursor: loading || !deleteReady ? "default" : "pointer"
               }}
             >
               {loading ? "삭제 중" : "내 앱 데이터 삭제"}
@@ -208,6 +224,18 @@ export default function MyPage() {
     hideSummaryNotice: false,
   });
   const [error, setError] = useState("");
+
+  // 화면 크기(전역 스케일 --app-scale) — 기기·OS 배율이 제각각이라 사용자가 직접 고른다.
+  // localStorage에 저장하며, 첫 페인트 적용은 index.html 인라인 스크립트가 담당한다.
+  const [uiScale, setUiScale] = useState(() => {
+    const saved = parseFloat(localStorage.getItem("tongkk-ui-scale") ?? "");
+    return saved >= 0.7 && saved <= 1.2 ? saved : 0.9;
+  });
+  const changeUiScale = (value: number) => {
+    setUiScale(value);
+    localStorage.setItem("tongkk-ui-scale", String(value));
+    document.documentElement.style.setProperty("--app-scale", String(value));
+  };
 
   const reload = async () => {
     try {
@@ -270,10 +298,10 @@ export default function MyPage() {
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
@@ -324,6 +352,23 @@ export default function MyPage() {
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>다크모드</span>
                 <Toggle on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
               </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "14px 0", borderBottom: "1px solid var(--color-border-soft)" }}>
+                <span style={{ fontSize: 14, color: "var(--color-text)" }}>화면 크기</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[{ label: "작게", value: 0.8 }, { label: "보통", value: 0.9 }, { label: "크게", value: 1 }].map(opt => {
+                    const selected = uiScale === opt.value;
+                    return (
+                      <button key={opt.label} onClick={() => changeUiScale(opt.value)} style={{
+                        padding: "6px 12px", borderRadius: 8,
+                        border: selected ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
+                        background: selected ? "var(--color-tint-pink)" : "var(--color-card)",
+                        color: selected ? PINK : "var(--color-muted)",
+                        fontSize: 13, fontWeight: selected ? 800 : 600, cursor: "pointer",
+                      }}>{opt.label}</button>
+                    );
+                  })}
+                </div>
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>알림 설정</span>
                 <Toggle on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
@@ -357,7 +402,7 @@ export default function MyPage() {
                 { label: "공지사항", type: "notice" as const },
                 { label: "문의하기", type: "contact" as const },
               ].map((item, index) => (
-                <button key={item.label} onClick={() => setSettingsDialog(item.type)} style={{
+                <button key={item.label} className="tongkk-hover-row" onClick={() => setSettingsDialog(item.type)} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "14px 0", border: "none", background: "none", cursor: "pointer",
                   borderBottom: index === 0 ? "1px solid var(--color-border-soft)" : "none", width: "100%", textAlign: "left"

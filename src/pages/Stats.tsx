@@ -65,6 +65,8 @@ export default function Stats() {
   const [sidebar, setSidebar] = useState(false);
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllCourses, setShowAllCourses] = useState(false);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -78,7 +80,24 @@ export default function Stats() {
 
   const trend = useMemo(() => scoreTrend(attempts), [attempts]);
   const courses = useMemo(() => coursePerformance(attempts), [attempts]);
-  const latest = useMemo(() => recentAttempts(attempts, 5), [attempts]);
+  const latest = useMemo(
+    () => recentAttempts(attempts, showAllRecent ? attempts.length : 5),
+    [attempts, showAllRecent],
+  );
+  const visibleCourses = showAllCourses ? courses : courses.slice(0, 6);
+
+  // 통계가 막다른 화면이 되지 않도록 과목 행에서 해당 과목 복습(자료 요약)으로 바로 잇는다.
+  const goToCourseReview = (courseName: string) => {
+    navigate(pageRoutes["자료 요약"], { state: { selectedCourse: courseName } });
+  };
+  // 최근 풀이는 세트가 남아 있으면 저장된 결과 화면으로 바로 연다.
+  const goToAttempt = (attempt: SavedQuizAttemptWithCourse) => {
+    if (attempt.quizSetId) {
+      navigate(pageRoutes["퀴즈 생성"], { state: { course: attempt.courseName, quizSetId: attempt.quizSetId, openQuiz: true } });
+      return;
+    }
+    goToCourseReview(attempt.courseName);
+  };
   const streak = studyStreak(attempts);
   const minutes = totalStudyMinutes(attempts);
   const average = averageScore(attempts);
@@ -103,10 +122,10 @@ export default function Stats() {
       {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 학습 통계</span>
       </div>
 
@@ -188,10 +207,20 @@ export default function Stats() {
               <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>아직 과목별 기록이 없습니다.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {courses.slice(0, 6).map(course => (
-                  <div key={course.courseName} className="stats-course-row">
+                {visibleCourses.map(course => (
+                  <button
+                    key={course.courseName}
+                    type="button"
+                    className="stats-course-row"
+                    onClick={() => goToCourseReview(course.courseName)}
+                    title={`${course.courseName} 자료 복습 열기`}
+                    style={{ textAlign: "left", cursor: "pointer", width: "100%" }}
+                  >
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ marginBottom: 5, fontSize: 14, fontWeight: 900, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{course.courseName}</div>
+                      <div style={{ marginBottom: 5, fontSize: 14, fontWeight: 900, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {course.courseName}
+                        <span className="tongkk-row-hint" style={{ marginLeft: 8, fontSize: 11, fontWeight: 850, color: CYAN }}>복습 열기 →</span>
+                      </div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-muted)" }}>{course.attempts}회 · {course.totalQuestions}문제 · {formatStudyTime(course.totalMinutes)} · 정답률 {course.averageScore}%</div>
                     </div>
                     <div style={{ minWidth: 130 }}>
@@ -203,8 +232,14 @@ export default function Stats() {
                         <div style={{ width: `${course.progressPercent}%`, height: "100%", background: progressColor(course.progressPercent), borderRadius: 999 }} />
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
+                {courses.length > 6 && (
+                  <button type="button" onClick={() => setShowAllCourses(prev => !prev)} style={{
+                    padding: "8px 0", width: "100%", background: "none", border: "none",
+                    color: PINK, fontSize: 13, cursor: "pointer", fontWeight: 700,
+                  }}>{showAllCourses ? "접기" : `더보기 (${courses.length - 6}개)`}</button>
+                )}
               </div>
             )}
           </Card>
@@ -216,14 +251,37 @@ export default function Stats() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {latest.map(attempt => (
-                  <div key={attempt.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${BORDER_COLOR}` }}>
+                  <button
+                    key={attempt.id}
+                    type="button"
+                    className="tongkk-hover-row"
+                    onClick={() => goToAttempt(attempt)}
+                    title={attempt.quizSetId ? "저장된 풀이 결과 열기" : `${attempt.courseName} 자료 복습 열기`}
+                    style={{
+                      display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center",
+                      padding: "12px 0", border: "none", borderBottom: `1px solid ${BORDER_COLOR}`,
+                      background: "none", textAlign: "left", cursor: "pointer", width: "100%",
+                    }}
+                  >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ marginBottom: 5, fontSize: 13.5, fontWeight: 900, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{attempt.courseName}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-muted)" }}>{formatDate(attempt.createdAt)} · {attempt.questionType} · {attempt.difficulty} · {attempt.correctCount}/{attempt.count}</div>
                     </div>
                     <span style={{ color: scoreColor(attempt.scorePercent), fontSize: 16, fontWeight: 950 }}>{attempt.scorePercent}%</span>
-                  </div>
+                  </button>
                 ))}
+                {!showAllRecent && attempts.length > 5 && (
+                  <button type="button" onClick={() => setShowAllRecent(true)} style={{
+                    padding: "8px 0", width: "100%", background: "none", border: "none",
+                    color: PINK, fontSize: 13, cursor: "pointer", fontWeight: 700,
+                  }}>더보기 ({attempts.length - 5}개)</button>
+                )}
+                {showAllRecent && attempts.length > 5 && (
+                  <button type="button" onClick={() => setShowAllRecent(false)} style={{
+                    padding: "8px 0", width: "100%", background: "none", border: "none",
+                    color: PINK, fontSize: 13, cursor: "pointer", fontWeight: 700,
+                  }}>접기</button>
+                )}
               </div>
             )}
           </Card>
