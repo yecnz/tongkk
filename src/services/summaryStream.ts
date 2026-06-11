@@ -21,8 +21,31 @@ export type SummaryStreamCallbacks = {
 export type SummaryStreamOptions = SummaryStreamCallbacks & {
   pages?: string;
   focusPrompt?: string;
+  /** 요약에 포함된 자료 이름 목록. 2개 이상이면 서버가 출처에 자료명을 함께 적게 한다. */
+  sourceNames?: string[];
   signal?: AbortSignal;
 };
+
+// combineMaterialsMarkdown이 합본에 넣는 자료 경계 표식. 구간 분할 시 자료명 문맥을 잇는 데 쓴다.
+const MATERIAL_MARKER_RE = /<!--\s*자료:\s*([^>]+?)\s*-->/g;
+
+/** start 위치 앞에서 마지막으로 등장한 자료 표식의 이름. 없으면 null. */
+function lastMaterialNameBefore(markdown: string, start: number): string | null {
+  let name: string | null = null;
+  for (const match of markdown.matchAll(MATERIAL_MARKER_RE)) {
+    if (match.index === undefined || match.index >= start) break;
+    name = match[1].trim();
+  }
+  return name;
+}
+
+// 합본 분할 시 둘째 이후 구간은 `<!-- 자료: ... -->` 표식을 잃어 모델이 어느 자료의
+// 구간인지 알 수 없다. 구간 시작 위치 앞의 마지막 표식을 찾아 머리에 이어 붙인다.
+function prependMaterialContext(markdown: string, chunkText: string, chunkStart: number): string {
+  if (chunkStart === 0 || /^<!--\s*자료:/.test(chunkText)) return chunkText;
+  const name = lastMaterialNameBefore(markdown, chunkStart);
+  return name ? `<!-- 자료: ${name} (이어짐) -->\n\n${chunkText}` : chunkText;
+}
 
 /** 서버 _parse_page_selection과 동일: "1-5, 8" → 페이지 번호 집합 */
 function parsePageSelection(spec: string): Set<number> {
@@ -55,49 +78,61 @@ export function splitMarkdownIntoChunks(markdown: string, pagesSpec?: string): s
   // 페이지 블록 추출 (마커 앞 서문은 첫 구간에 붙인다)
   const preamble = markdown.slice(0, matches[0].index).trim();
   const selected = pagesSpec?.trim() ? parsePageSelection(pagesSpec) : null;
-  let blocks: string[] = [];
-  for (let i = 0; i < matches.length; i++) {
-    const pageNo = Number.parseInt(matches[i][1], 10);
-    if (selected && selected.size > 0 && !selected.has(pageNo)) continue;
-    const end = i + 1 < matches.length ? matches[i + 1].index : markdown.length;
-    const block = markdown.slice(matches[i].index, end).trim();
-    if (block) blocks.push(block);
-  }
-  // 서버 필터와 동일: 선택한 페이지가 자료에 하나도 없으면 전체를 쓴다.
-  if (blocks.length === 0) {
-    blocks = [];
-    for (let i = 0; i < matches.length; i++) {
-      const end = i + 1 < matches.length ? matches[i + 1].index : markdown.length;
-      const block = markdown.slice(matches[i].index, end).trim();
-      if (block) blocks.push(block);
-    }
-  }
 
-  const chunks: string[] = [];
+  type Block = { text: string; start: number };
+  const collectBlocks = (filterPages: boolean): Block[] => {
+    const result: Block[] = [];
+    for (let i = 0; i < matches.length; i++) {
+      if (filterPages && selected && selected.size > 0) {
+        const pageNo = Number.parseInt(matches[i][1], 10);
+        if (!selected.has(pageNo)) continue;
+      }
+      const start = matches[i].index;
+      const end = i + 1 < matches.length ? matches[i + 1].index : markdown.length;
+      const text = markdown.slice(start, end).trim();
+      if (text) result.push({ text, start });
+    }
+    return result;
+  };
+
+  let blocks = collectBlocks(true);
+  // 서버 필터와 동일: 선택한 페이지가 자료에 하나도 없으면 전체를 쓴다.
+  if (blocks.length === 0) blocks = collectBlocks(false);
+
+  const chunks: Block[] = [];
   let current = preamble;
+  let currentStart = 0;
   for (const block of blocks) {
-    if (current && current.length + block.length > CHUNK_TARGET_CHARS) {
-      chunks.push(current);
-      current = block;
+    if (current && current.length + block.text.length > CHUNK_TARGET_CHARS) {
+      chunks.push({ text: current, start: currentStart });
+      current = block.text;
+      currentStart = block.start;
     } else {
-      current = current ? `${current}\n\n${block}` : block;
+      if (!current) currentStart = block.start;
+      current = current ? `${current}\n\n${block.text}` : block.text;
     }
   }
-  if (current) chunks.push(current);
-  return chunks.length > 0 ? chunks : [markdown];
+  if (current) chunks.push({ text: current, start: currentStart });
+  if (chunks.length === 0) return [markdown];
+  return chunks.map(chunk => prependMaterialContext(markdown, chunk.text, chunk.start));
 }
 
 function splitByParagraphs(markdown: string): string[] {
   if (markdown.length <= CHUNK_TARGET_CHARS) return [markdown];
   const chunks: string[] = [];
   let current = '';
+  // 직전까지 본 자료 표식 이름. 새 구간이 표식 없이 시작하면 머리에 이어 붙인다.
+  let lastName: string | null = null;
   for (const paragraph of markdown.split(/\n{2,}/)) {
     if (current && current.length + paragraph.length > CHUNK_TARGET_CHARS) {
       chunks.push(current);
-      current = paragraph;
+      current = lastName && !/^<!--\s*자료:/.test(paragraph)
+        ? `<!-- 자료: ${lastName} (이어짐) -->\n\n${paragraph}`
+        : paragraph;
     } else {
       current = current ? `${current}\n\n${paragraph}` : paragraph;
     }
+    for (const match of paragraph.matchAll(MATERIAL_MARKER_RE)) lastName = match[1].trim();
   }
   if (current) chunks.push(current);
   return chunks.length > 0 ? chunks : [markdown];
@@ -115,6 +150,7 @@ type ChunkRequestBody = {
   template: SummaryTemplate;
   pages?: string;
   focus_prompt?: string;
+  source_names?: string[];
   chunk_index?: number;
   chunk_total?: number;
   previous_tail?: string;
@@ -212,17 +248,20 @@ export async function summarizeWithTemplateStream(
     options.onProgress?.(i + 1, chunks.length);
 
     const chunkMarkdown = chunks[i];
+    const sourceNames = options.sourceNames?.length ? options.sourceNames : undefined;
     const body: ChunkRequestBody = chunkMarkdown === null
       ? {
         markdown,
         template,
         pages: options.pages?.trim() || undefined,
         focus_prompt: options.focusPrompt?.trim() || undefined,
+        source_names: sourceNames,
       }
       : {
         markdown: chunkMarkdown,
         template,
         focus_prompt: options.focusPrompt?.trim() || undefined,
+        source_names: sourceNames,
         ...(chunks.length > 1 ? {
           chunk_index: i + 1,
           chunk_total: chunks.length,

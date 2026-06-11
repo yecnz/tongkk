@@ -255,7 +255,7 @@ type SummaryApiResponse = {
 export async function summarizeWithTemplate(
   markdown: string,
   template: SummaryTemplate,
-  opts?: { pages?: string; focusPrompt?: string },
+  opts?: { pages?: string; focusPrompt?: string; sourceNames?: string[] },
 ): Promise<SummaryResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 150_000);
@@ -269,6 +269,7 @@ export async function summarizeWithTemplate(
         template,
         pages: opts?.pages?.trim() || undefined,
         focus_prompt: opts?.focusPrompt?.trim() || undefined,
+        source_names: opts?.sourceNames?.length ? opts.sourceNames : undefined,
       }),
       signal: controller.signal,
     });

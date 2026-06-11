@@ -43,9 +43,13 @@ export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
 
 export const getFileMaterialId = (file: Pick<File, "name" | "size">) => `${file.name}:${file.size}`;
 
+// 여러 자료 합본에는 `<!-- 자료: 이름 -->` 표식을 함께 넣는다. 본문에 흔한 `# 제목` 헤딩과 달리
+// 자료 경계를 기계적으로 구분할 수 있어, 구간 분할 시 둘째 이후 구간에 자료명을 이어 붙이는 데 쓴다.
 export const combineMaterialsMarkdown = (materials: CourseMaterial[]) =>
   materials
-    .map(material => `# ${material.name}\n\n${material.markdown}`)
+    .map(material => materials.length > 1
+      ? `<!-- 자료: ${material.name} -->\n\n# ${material.name}\n\n${material.markdown}`
+      : `# ${material.name}\n\n${material.markdown}`)
     .join("\n\n---\n\n");
 
 const toServerMaterial = (courseId: string, material: CourseMaterial) => ({

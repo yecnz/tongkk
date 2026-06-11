@@ -168,7 +168,7 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - '핵심 개념'에서는 개념을 하나씩 '### 개념명' 소제목으로 나눠 설명해. 각 소제목 아래에 정의, 의미, 중요한 이유, 예시/적용 맥락을 bullet로 적어. 여러 개념을 '6.1 …', '6.2 …'처럼 절 번호 제목 하나에 몰아넣거나 '**개념명**' 굵은 글머리로 묶지 말고, 소제목에는 번호 없이 개념 이름만 써. 각 개념의 출처는 그 개념 소제목 아래 내용에만 붙여.
 - '방법/절차'에서는 실험법, 계산법, 분석법처럼 순서가 있는 내용을 번호 목록으로 정리하고, 단계별 목적과 결과를 함께 적어.
 - '주요 용어'는 별도 섹션에서 '용어 | 설명 | 헷갈리는 점' 표로 정리해.
-- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 '문제 → 답' 형식으로 정리해. 각 항목은 반드시 '>' 인용문 박스 하나로 감싸서 항목끼리 카드처럼 분리하고, 박스 안에는 질문을 한 줄로 쓰고 그 질문 줄 끝에 '(출처: 파일명, p.X)'로 해당 문제의 출처를 붙인 다음, 줄을 바꿔 '- 답:'을 한 줄로만 적고, 바로 아래 줄부터 답 내용을 요점별로 하위 bullet('  - ')로 나눠 적어라. 한 bullet에는 한 가지 요점만 담고, 한 문장에 사실이 여러 개면 쪼개서 각각 별도 bullet로 만들어라(답이 정말 한 가지뿐일 때만 bullet 하나). '답:' 옆에 답 내용을 같은 줄로 붙이지 말고, 답의 각 요점은 반드시 '- '로 시작하는 별도 줄에 둬라. 질문과 답은 반드시 서로 다른 줄에 둬라. 시험 포인트 출처는 헤딩이 아니라 각 질문 옆에만 둔다. 질문 앞에 '시험 포인트:' 같은 라벨은 붙이지 마.
+- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 '문제 → 답' 형식으로 정리해. 각 항목은 반드시 '>' 인용문 박스 하나로 감싸서 항목끼리 카드처럼 분리하고, 박스 안에는 질문을 한 줄로 쓰고 그 질문 줄 끝에 공통 기준의 출처 표기 규칙에 맞는 '(출처: ...)'로 해당 문제의 출처를 붙인 다음, 줄을 바꿔 '- 답:'을 한 줄로만 적고, 바로 아래 줄부터 답 내용을 요점별로 하위 bullet('  - ')로 나눠 적어라. 한 bullet에는 한 가지 요점만 담고, 한 문장에 사실이 여러 개면 쪼개서 각각 별도 bullet로 만들어라(답이 정말 한 가지뿐일 때만 bullet 하나). '답:' 옆에 답 내용을 같은 줄로 붙이지 말고, 답의 각 요점은 반드시 '- '로 시작하는 별도 줄에 둬라. 질문과 답은 반드시 서로 다른 줄에 둬라. 시험 포인트 출처는 헤딩이 아니라 각 질문 옆에만 둔다. 질문 앞에 '시험 포인트:' 같은 라벨은 붙이지 마.
 - '핵심 암기 사항'은 마지막 복습용으로 반드시 외울 정의, 공식, 절차, 비교 개념만 압축해서, 전체를 '>' 인용문 박스 하나로 묶어 bullet 목록으로 정리해(핵심 키워드는 굵게).
 - '참고/주의 사항'에는 실험 주의점, 예외, 단위, 조건, 흔한 실수를 '>' 인용문 박스 하나로 묶어 bullet로 정리해(핵심 암기 사항과 같은 박스 형태). 각 항목 앞에 '헷갈림 주의:' 같은 라벨은 붙이지 마.
 - 비교가 필요한 개념은 Markdown 표로 정리해.
@@ -220,7 +220,7 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 11. '>' 인용문은 텍스트 상자가 필요한 경우에만 사용해. 화면에서는 왼쪽 색 선 없이 둥근 박스로 렌더링된다.
 12. 제목별로 카드나 박스를 나누는 형식은 사용하지 마.
 13. 템플릿별 목적을 최우선으로 따르고, 세 템플릿의 출력 스타일이 서로 비슷해지지 않게 해.
-14. 일반 요약과 강의 노트에서는 핵심 bullet이나 중요한 문장 끝에 가능한 경우 `(출처: 파일명, p.3/slide 7/OCR 이미지 2/섹션명)`처럼 짧은 근거 표기를 붙여라. 자료에 위치 단서가 없으면 파일명이나 섹션명만 써도 된다. 단, 치트시트에는 `(출처: ...)` 같은 출처 표기를 절대 붙이지 마라.
+{citation_rule}
 
 [강의자료]
 {markdown}
@@ -270,6 +270,8 @@ class SummarizeRequest(BaseModel):
     pages: str | None = None
     # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
     focus_prompt: str | None = None
+    # 요약에 포함된 자료 이름 목록. 2개 이상이면 출처에 자료명을 함께 적게 한다.
+    source_names: list[str] | None = Field(default=None, max_length=50)
 
 
 class SummarizeStreamRequest(SummarizeRequest):
@@ -1378,6 +1380,37 @@ async def extract_text_with_google_vision(
     return {"text": text}
 
 
+def _citation_rule(source_names: list[str] | None) -> str:
+    """공통 기준 14(출처 표기)를 자료 구성에 맞게 생성한다.
+
+    - 페이지/슬라이드 번호는 본문에 변환 시점 마커(`<!-- p.N -->` 등)가 있을 때만 허용해
+      텍스트 붙여넣기 자료에서 존재하지 않는 페이지를 지어내는 것을 막는다.
+    - 자료명은 여러 자료를 합쳐 요약할 때만 붙여 어느 자료인지 구분하고,
+      단일 자료 요약에서는 위치만 남긴다(프론트 표시 규칙과 일치).
+    """
+    names = [name.strip() for name in (source_names or []) if name and name.strip()]
+    base = (
+        "14. 일반 요약과 강의 노트에서는 핵심 bullet이나 중요한 문장 끝에 가능한 경우 짧은 출처 표기를 붙여라. "
+        "위치는 본문에 `<!-- p.N -->` 또는 `<!-- Slide number: N -->` 마커가 있는 부분만 `p.3`/`slide 7`처럼 쓸 수 있다. "
+        "마커가 없는 자료에는 페이지·슬라이드 번호를 절대 만들어내지 마라. "
+        "마커가 없는 자료는 원문에 실제로 존재하는 제목(헤딩)이 있을 때만 그 섹션명을 `'섹션명'`처럼 작은따옴표로 감싸 위치로 쓰고, "
+        "원문에 없는 섹션명을 지어내지 마라. "
+    )
+    if len(names) > 1:
+        listed = ", ".join(names)
+        scope = (
+            f"여러 자료를 합쳐 요약하므로 출처는 `(출처: 자료명, p.3)`/`(출처: 자료명, '섹션명')`처럼 자료명을 반드시 함께 써라. "
+            f"자료명은 다음 목록에 있는 이름만 그대로 사용해라: {listed}. "
+            "위치 단서가 없으면 `(출처: 자료명)`처럼 자료명만 써라. "
+        )
+    else:
+        scope = (
+            "자료가 하나뿐이므로 출처에 자료명·파일명을 쓰지 말고 위치만 `(출처: p.3)`/`(출처: '섹션명')`처럼 표기해라. "
+            "위치 단서가 전혀 없으면 출처 표기를 생략해라. "
+        )
+    return base + scope + "단, 치트시트에는 `(출처: ...)` 같은 출처 표기를 절대 붙이지 마라."
+
+
 def _summary_system_content(focus_prompt: str | None) -> str:
     if focus_prompt and focus_prompt.strip():
         return (
@@ -1396,6 +1429,7 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
+        citation_rule=_citation_rule(req.source_names),
         markdown=markdown,
     )
 
@@ -1455,6 +1489,7 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
+        citation_rule=_citation_rule(req.source_names),
         markdown=markdown,
     )
 

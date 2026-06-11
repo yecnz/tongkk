@@ -313,6 +313,15 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
   },
 };
 
+// 출처 배지 표시용 정리: '출처:' 라벨 제거, 섹션명의 작은따옴표 제거,
+// 텍스트 붙여넣기 자료 이름 뒤의 .txt 확장자 숨김(파일을 올린 적 없는 자료라 어색하다).
+const formatCitationLabel = (citation: string): string =>
+  citation
+    .slice(1, -1)
+    .replace(/^출처:\s*/, "")
+    .replace(/\.txt(?=\s*[,;]|\s*$)/gi, "")
+    .replace(/'([^']+)'/g, "$1");
+
 const renderHighlightSyntax = (children: ReactNode): ReactNode => {
   if (typeof children === "string") {
     return children.split(/(§EXAM§[\s\S]*?§\/EXAM§|==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)|\*\*[^*]+\*\*)/g).map((part, index) => {
@@ -327,7 +336,7 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
       if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
-        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
+        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{formatCitationLabel(part)}</span>;
       }
       // CommonMark 경계 규칙(닫는 ** 앞이 ')' 등 문장부호 + 뒤가 한글)으로 굵게 처리에
       // 실패해 그대로 남은 **...**를 폴백으로 굵게 렌더링한다.
@@ -463,34 +472,54 @@ const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
 const sanitizeCitationTildes = (markdown: string): string =>
   markdown.replace(/\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g, (m) => m.replace(/~/g, "-"));
 
+// 자료명 없이 위치만 적은 출처(단일 자료 요약 형식)인지 판별한다.
+// 페이지·슬라이드 번호이거나, 작은따옴표로 감싼 섹션명이면 위치로 본다.
+// "3쪽 정리.txt"처럼 숫자로 시작하는 자료명을 오인하지 않게, 숫자형은 그 자체로 끝나는 경우만 위치로 본다.
+const isCitationLocation = (part: string): boolean =>
+  /^['"]/.test(part) ||
+  /^pp?\.\s*\d/i.test(part) ||
+  /^(?:slide|슬라이드|페이지)\s*\d/i.test(part) ||
+  /^OCR\s*이미지/i.test(part) ||
+  /^\d+(?:\s*[-–~]\s*\d+)?\s*(?:p|페이지|쪽)?$/i.test(part);
+
 // 한 섹션에 흩어진 여러 (출처: ...)를 파일별로 묶어 하나로 합친다. (페이지/슬라이드 중복 제거)
 const mergeSourceCitations = (sources: string[]): string => {
   const byFile = new Map<string, string[]>();
   for (const src of sources) {
     const inner = src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
     const commaIdx = inner.indexOf(",");
-    const file = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
-    const locText = commaIdx === -1 ? "" : inner.slice(commaIdx + 1);
+    let file = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+    let locText = commaIdx === -1 ? "" : inner.slice(commaIdx + 1);
+    // 위치-only 출처는 파일명 없이 위치 묶음("")으로 모은다.
+    if (isCitationLocation(file)) {
+      locText = inner;
+      file = "";
+    }
     if (!byFile.has(file)) byFile.set(file, []);
     const locs = byFile.get(file)!;
     locText.split(",").map(s => s.trim()).filter(Boolean).forEach(loc => {
       if (!locs.includes(loc)) locs.push(loc);
     });
   }
-  const parts = [...byFile.entries()].map(([file, locs]) => (locs.length ? `${file}, ${locs.join(", ")}` : file));
+  const parts = [...byFile.entries()]
+    .map(([file, locs]) => (file ? (locs.length ? `${file}, ${locs.join(", ")}` : file) : locs.join(", ")))
+    .filter(Boolean);
   return parts.length ? `(출처: ${parts.join("; ")})` : "";
 };
 
 // 출처 표기에서 파일명 부분만 떼어낸다. (예: "(출처: a.pdf, p.3)" -> "a.pdf")
+// 위치-only 출처(예: "(출처: p.3)", "(출처: '동기화')")는 파일명이 없으므로 빈 문자열.
 const citationFileName = (src: string): string => {
   const inner = src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
   const commaIdx = inner.indexOf(",");
-  return (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+  const head = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+  return isCitationLocation(head) ? "" : head;
 };
 
 // 요약 전체가 단일 자료(파일명이 한 종류)일 때는 출처에서 파일명을 떼고
 // 위치(p.3 등)만 남긴다. 위치 단서 없이 파일명만 있는 출처는 통째로 제거한다.
-// 여러 파일명이 섞여 있으면 어느 자료인지 구분이 필요하므로 그대로 둔다.
+// 여러 파일명이 섞여 있으면 어느 자료인지 구분이 필요하므로 그대로 두고,
+// 파일명 없는 위치-only 출처도 그대로 둔다.
 const simplifySoleFileSources = (markdown: string): string => {
   const matches = markdown.match(SOURCE_PATTERN) || [];
   if (!matches.length) return markdown;
@@ -500,6 +529,8 @@ const simplifySoleFileSources = (markdown: string): string => {
   return markdown.replace(SOURCE_PATTERN, (m) => {
     const inner = m.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
     const commaIdx = inner.indexOf(",");
+    const head = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+    if (isCitationLocation(head)) return m;
     const loc = commaIdx === -1 ? "" : inner.slice(commaIdx + 1).trim();
     return loc ? `(출처: ${loc})` : "";
   });
@@ -3557,6 +3588,7 @@ export default function Summary() {
           response = await summarizeWithTemplate(selectedMarkdown, template, {
             pages: opts?.pageRange,
             focusPrompt: opts?.focusPrompt,
+            sourceNames: selectedMaterials.map(material => material.name),
           });
         } else {
           // 스트리밍 경로: 결과 화면으로 먼저 이동해 생성 중인 텍스트를 타자기처럼 보여준다.
@@ -3564,6 +3596,7 @@ export default function Summary() {
           const result = await summarizeWithTemplateStream(selectedMarkdown, template, {
             pages: opts?.pageRange,
             focusPrompt: opts?.focusPrompt,
+            sourceNames: selectedMaterials.map(material => material.name),
             onDelta: text => setSummaryText(text),
             onProgress: (chunkIndex, chunkTotal) => setLoadingStep(
               chunkTotal > 1
