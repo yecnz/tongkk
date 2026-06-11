@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
@@ -8,7 +8,7 @@ import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, type Cou
 import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, countQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
-import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
+import { generateStudyPlan, type StudyPlanMode, type StudyPlanGoal, type StudyPlanFamiliarity } from "../services/studyPlan";
 import {
   isPaceSprint,
   paceCatchUpTarget,
@@ -32,6 +32,7 @@ import {
   type Dday,
   type DdayType,
   type Plan,
+  type PlanAction,
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 
@@ -51,10 +52,11 @@ type PlanSource = {
   key: string;
   label: string;
   meta: string;
-  kind: DdayType | "carryover";
+  kind: DdayType | "review";
   daysLeft?: number;
   dday?: Dday;
-  plan?: Plan;
+  // kind가 review일 때: 간격 반복 복습 후보 정보.
+  review?: { course: string; daysSince: number; scorePercent: number };
 };
 
 type CourseStats = {
@@ -84,7 +86,7 @@ const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
+      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
         <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="과목명 입력" style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
@@ -115,7 +117,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
+      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 이름 변경</h3>
         <input
           value={name}
@@ -146,7 +148,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
 
 const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-    <Card style={{ padding: 28, width: 360 }}>
+    <Card style={{ padding: 28, width: "min(360px, calc(100vw - 32px))" }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>강의를 삭제할까요?</h3>
       <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
         {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
@@ -410,11 +412,70 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
+// 피드백 보내기 — 메일 주소를 보여주고, mailto로 바로 메일을 보낼 수 있게 한다.
+// 메일 클라이언트가 없는 사용자를 위해 주소 복사 버튼도 함께 둔다.
+const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.24)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <Card onClick={e => e.stopPropagation()} style={{ width: "min(400px, 100%)", padding: 26 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>피드백 보내기</h3>
+          <button onClick={onClose} aria-label="피드백 창 닫기" style={{
+            width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
+            color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
+          }}>×</button>
+        </div>
+        <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
+          버그 제보, 기능 제안 등 어떤 의견이든 환영해요. 아래 주소로 메일을 보내주시면 큰 힘이 됩니다.
+        </p>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          padding: "12px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+          background: "var(--color-surface)", marginBottom: 14,
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", wordBreak: "break-all" }}>{FEEDBACK_EMAIL}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(FEEDBACK_EMAIL).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            style={{
+              flexShrink: 0, padding: "6px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
+              background: "var(--color-card)", color: copied ? CYAN : "var(--color-text-secondary)",
+              fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+            }}
+          >{copied ? "복사됨!" : "복사"}</button>
+        </div>
+        <a
+          href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Tongkk 피드백")}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "12px 16px", borderRadius: 10, border: "none",
+            background: PINK, color: "var(--color-on-brand)",
+            fontSize: 14, fontWeight: 800, textDecoration: "none", cursor: "pointer",
+            boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+          }}
+        >
+          <PaperPlaneIcon />
+          메일 보내기
+        </a>
+      </Card>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
   const [sidebar, setSidebar] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const page: PageRouteLabel = "대시보드";
   const [ddays, setDdays] = useState<Dday[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -431,6 +492,14 @@ export default function Dashboard() {
   const [studyPlanMessage, setStudyPlanMessage] = useState("");
   const [studyPlanLoading, setStudyPlanLoading] = useState(false);
   const [studyPlanError, setStudyPlanError] = useState("");
+  // AI 생성 직전의 계획 스냅샷. 있으면 "되돌리기" 버튼을 노출한다.
+  const [planUndoSnapshot, setPlanUndoSnapshot] = useState<{ plans: Plan[]; message: string } | null>(null);
+  // 콜드 스타트 대응: 학습 기록이 없어도 좋은 계획이 나오도록 사용자가 알려주는 학습 상태.
+  const [studyPlanGoal, setStudyPlanGoal] = useState<StudyPlanGoal>("exam");
+  const [studyPlanFamiliarity, setStudyPlanFamiliarity] = useState<StudyPlanFamiliarity>("attended");
+  const [studyPlanDailyMinutes, setStudyPlanDailyMinutes] = useState(60);
+  // 미완료 이월: 항목을 일일이 고르게 하지 않고 토글 하나로 전부 반영/제외한다.
+  const [includeCarryover, setIncludeCarryover] = useState(true);
   const [editingPlanKey, setEditingPlanKey] = useState<string | null>(null);
   const [editingPlanText, setEditingPlanText] = useState("");
   const [openCourseMenu, setOpenCourseMenu] = useState<string | null>(null);
@@ -522,10 +591,10 @@ export default function Dashboard() {
     return () => { ignore = true; };
   }, []);
 
-  // 페이스 플랜 과목의 응시 기록을 불러와 자동 진행도(퀴즈 기준)와 시험 준비도(최근 점수) 계산에 사용.
+  // 응시 기록 로드: 페이스 플랜 진행도·준비도 계산 + 간격 반복 복습 추천 + AI 계획 컨텍스트에 사용.
   // 과목 집합이 바뀔 때만 재조회하도록 안정 키에 의존(수동 플랜 변경 시 불필요한 재조회 방지).
   const paceCoursesKey = JSON.stringify(
-    Array.from(new Set(pacePlans.map(plan => plan.course))).sort()
+    Array.from(new Set([...pacePlans.map(plan => plan.course), ...courses])).sort()
   );
   useEffect(() => {
     const paceCourses: string[] = JSON.parse(paceCoursesKey);
@@ -553,9 +622,18 @@ export default function Dashboard() {
 
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
-  const incompletePlans = plans.filter(plan => !plan.done);
+  // 이월 후보: 오늘까지의 미완료 항목만(시험 대비로 미래 날짜에 배치된 항목은 밀린 게 아니므로 제외).
+  const todayKey = paceDateKey(new Date());
+  const incompletePlans = plans.filter(plan => !plan.done && (!plan.date || plan.date <= todayKey));
   const makeDdaySourceKey = (dday: Dday, index: number) => `dday-${dday.id || `${dday.subj}-${dday.date}-${index}`}`;
-  const makePlanSourceKey = (plan: Plan, index: number) => `plan-${plan.id || `${plan.text}-${index}`}`;
+  // 간격 반복 복습 후보: 과목별 최근 응시가 1~7일 전이면 다시 꺼내 인출 연습을 제안한다.
+  const reviewCandidates = Object.entries(courseQuizAttempts).flatMap(([course, attempts]) => {
+    const latest = attempts[0];
+    if (!latest) return [];
+    const daysSince = Math.floor((Date.now() - latest.createdAt) / 86400000);
+    if (daysSince < 1 || daysSince > 7) return [];
+    return [{ course, daysSince, scorePercent: Math.round(latest.scorePercent) }];
+  });
   const planSources: PlanSource[] = [
     ...sortedDdays.map((dday, index) => {
       const daysLeft = getDaysLeft(dday.date);
@@ -569,29 +647,32 @@ export default function Dashboard() {
         dday,
       };
     }),
-    ...incompletePlans.map((plan, index) => ({
-      key: makePlanSourceKey(plan, index),
-      label: plan.text,
-      meta: "미완료",
-      kind: "carryover" as const,
-      plan,
+    ...reviewCandidates.map(candidate => ({
+      key: `review-${candidate.course}`,
+      label: candidate.course,
+      meta: `${candidate.daysSince}일 전 퀴즈 ${candidate.scorePercent}점`,
+      kind: "review" as const,
+      review: candidate,
     })),
   ];
-  const canGenerateStudyPlan = planSources.length > 0;
+  const canGenerateStudyPlan = planSources.length > 0 || incompletePlans.length > 0;
   const selectedPlanSources = planSources.filter(source => selectedPlanSourceKeys.includes(source.key));
-  const carryoverPlanSources = planSources.filter(source => source.kind === "carryover");
-  const ddayPlanSources = planSources.filter(source => source.kind !== "carryover");
+  const reviewPlanSources = planSources.filter(source => source.kind === "review");
+  const ddayPlanSources = planSources.filter(source => source.kind !== "review");
+  // 소스 칩을 하나도 안 골라도 이월 토글만 켜져 있으면 생성 가능.
+  const canSubmitPlan = selectedPlanSources.length > 0 || (includeCarryover && incompletePlans.length > 0);
 
-  const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode) => {
-    const carryoverCount = sources.filter(source => source.kind === "carryover").length;
+  const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode, carryoverCount: number) => {
     const assignmentCount = sources.filter(source => source.kind === "assignment").length;
     const examCount = sources.filter(source => source.kind === "exam").length;
     const eventCount = sources.filter(source => source.kind === "event").length;
+    const reviewCount = sources.filter(source => source.kind === "review").length;
     const parts = [
       carryoverCount ? `미완료 계획 ${carryoverCount}개` : "",
       assignmentCount ? `가까운 과제 ${assignmentCount}개` : "",
       examCount ? `가까운 시험 ${examCount}개` : "",
       eventCount ? `가까운 일정 ${eventCount}개` : "",
+      reviewCount ? `복습 추천 ${reviewCount}개` : "",
     ].filter(Boolean);
     if (parts.length === 0) return "자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.";
     if (mode === "lighter") return `${parts.join("와 ")}만 가볍게 반영할게요.`;
@@ -602,11 +683,7 @@ export default function Dashboard() {
   };
 
   const getRecommendedPlanSourceKeys = (mode: StudyPlanMode) => {
-    const carryoverLimit = mode === "harder" ? 5 : mode === "lighter" ? 1 : mode === "event" ? 1 : 2;
     const ddayLimit = mode === "harder" ? 5 : mode === "lighter" ? 1 : 3;
-    const carryoverSources = planSources
-      .filter(source => source.kind === "carryover")
-      .slice(0, carryoverLimit);
     // 과제·시험은 마감 전 미리 준비하는 "마감형"으로 함께 보고, 일정(event)은 당일 위주로 본다.
     const isDeadlineKind = (kind: PlanSource["kind"]) => kind === "assignment" || kind === "exam";
     const ddaySources = planSources
@@ -620,8 +697,23 @@ export default function Dashboard() {
       })
       .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0))
       .slice(0, ddayLimit);
-    return [...carryoverSources, ...ddaySources].map(source => source.key);
+    // 간격 반복 복습은 기본 1~2개만 추천(부하를 키우지 않는 선에서).
+    const reviewLimit = mode === "harder" ? 3 : mode === "lighter" ? 1 : 2;
+    const reviewSources = planSources
+      .filter(source => source.kind === "review")
+      .sort((a, b) => (b.review?.daysSince ?? 0) - (a.review?.daysSince ?? 0))
+      .slice(0, reviewLimit);
+    return [...ddaySources, ...reviewSources].map(source => source.key);
   };
+
+  // 진단 퀴즈 대상 과목: 선택한 시험 D-day와 이름이 닿는 과목 → 자료 있는 과목 → 첫 과목 순.
+  const diagnosticCourse = (() => {
+    const examDday = selectedPlanSources.find(source => source.kind === "exam")?.dday;
+    const fromExam = examDday
+      ? courses.find(course => examDday.subj.includes(course) || course.includes(examDday.subj))
+      : undefined;
+    return fromExam ?? courses.find(course => (courseStats[course]?.materials ?? 0) > 0) ?? courses[0];
+  })();
 
   const openPlanSourcePicker = (mode: StudyPlanMode) => {
     if (!canGenerateStudyPlan) return;
@@ -629,39 +721,124 @@ export default function Dashboard() {
     const recommendedSources = planSources.filter(source => recommendedKeys.includes(source.key));
     setPendingStudyPlanMode(mode);
     setSelectedPlanSourceKeys(recommendedKeys);
-    setPlanSourceMessage(summarizePlanSources(recommendedSources, mode));
+    setIncludeCarryover(incompletePlans.length > 0);
+    setPlanSourceMessage(summarizePlanSources(recommendedSources, mode, incompletePlans.length));
     setStudyPlanError("");
     setShowPlanSourcePicker(true);
   };
 
   const requestStudyPlan = async () => {
-    if (selectedPlanSources.length === 0 || studyPlanLoading) return;
+    if (!canSubmitPlan || studyPlanLoading) return;
     setStudyPlanLoading(true);
     setStudyPlanError("");
     try {
       const selectedDdays = selectedPlanSources
         .map(source => source.dday)
-        .filter((dday): dday is Dday => Boolean(dday))
-        // study-plan API는 assignment/event만 알아서, 시험은 마감형 과제로 매핑해 보낸다.
-        .map(dday => ({ ...dday, type: dday.type === "exam" ? ("assignment" as const) : dday.type }));
-      const selectedIncompletePlans = selectedPlanSources
-        .map(source => source.plan)
-        .filter((plan): plan is Plan => Boolean(plan));
-      const result = await generateStudyPlan(selectedDdays, selectedIncompletePlans, pendingStudyPlanMode);
+        .filter((dday): dday is Dday => Boolean(dday));
+      // 이월은 토글 하나로 전부 반영(너무 많으면 최근 8개까지만).
+      const carryoverToSend = includeCarryover ? incompletePlans.slice(0, 8) : [];
+      const selectedReviews = selectedPlanSources
+        .map(source => source.review)
+        .filter((review): review is NonNullable<PlanSource["review"]> => Boolean(review));
+      // 데이터 기반 처방 근거: 과목별 자료·요약·퀴즈 현황과 최근 응시 기록 요약.
+      const courseContexts = courses.map(course => {
+        const stats = courseStats[course];
+        const attempts = courseQuizAttempts[course] ?? [];
+        const latest = attempts[0];
+        return {
+          name: course,
+          materials: stats?.materials ?? 0,
+          summaries: stats?.summaries ?? 0,
+          quizSets: stats?.quizzes ?? 0,
+          attempts: attempts.length,
+          lastScorePercent: latest ? Math.round(latest.scorePercent) : null,
+          // 최근 3회 응시의 추정 오답 수(문항수 × 오답률 합).
+          recentWrongCount: attempts.slice(0, 3).reduce(
+            (sum, attempt) => sum + Math.round(attempt.count * (100 - attempt.scorePercent) / 100), 0,
+          ),
+          daysSinceLastAttempt: latest ? Math.floor((Date.now() - latest.createdAt) / 86400000) : null,
+        };
+      });
+      const result = await generateStudyPlan(selectedDdays, carryoverToSend, pendingStudyPlanMode, {
+        goal: studyPlanGoal,
+        familiarity: studyPlanFamiliarity,
+        dailyMinutes: studyPlanDailyMinutes,
+        courses: courseContexts,
+        reviewCandidates: selectedReviews.map(review => ({
+          course: review.course,
+          daysSince: review.daysSince,
+          scorePercent: review.scorePercent,
+        })),
+      });
+      // 되돌리기용 스냅샷(생성 직전 상태). 다음 생성 전까지 유지된다.
+      setPlanUndoSnapshot({ plans, message: studyPlanMessage });
       setStudyPlanMessage(result.message);
-      setPlans(result.items.map(item => ({
-        id: createClientId(),
-        text: `${item.text} ${item.minutes}분`,
-        done: false,
-        minutes: item.minutes,
-        sourceType: item.sourceType,
-      })));
+      // 직접 작성한 계획과 완료된 항목은 유지하고,
+      // 이전 AI 생성 미완료 항목과 이번에 이월로 넘긴 미완료 항목만 새 AI 계획으로 교체한다.
+      const replacedIds = new Set(carryoverToSend.map(plan => plan.id).filter(Boolean));
+      const replacedRefs = new Set<Plan>(carryoverToSend);
+      setPlans(prev => [
+        ...prev.filter(item => {
+          if (replacedRefs.has(item) || (item.id && replacedIds.has(item.id))) return false;
+          if (item.origin === "ai" && !item.done) return false;
+          return true;
+        }),
+        ...result.items.map(item => ({
+          id: createClientId(),
+          text: `${item.text} ${item.minutes}분`,
+          done: false,
+          minutes: item.minutes,
+          sourceType: item.sourceType,
+          origin: "ai" as const,
+          action: item.action ?? undefined,
+          course: item.course ?? undefined,
+          // 시험 분산 배치: 오늘(0)은 date 없이(레거시 호환), 이후 날짜는 캘린더에 깔린다.
+          date: item.dayOffset > 0 ? paceDateKey(new Date(Date.now() + item.dayOffset * 86400000)) : undefined,
+        })),
+      ]);
       setShowPlanSourcePicker(false);
     } catch (err) {
       setStudyPlanError(err instanceof Error ? err.message : "학습 계획 생성 실패");
     } finally {
       setStudyPlanLoading(false);
     }
+  };
+
+  // AI 계획 항목의 딥링크: 클릭 한 번으로 해당 학습 화면에 진입시켜 실행 마찰을 줄인다.
+  const planActionLabels: Record<PlanAction, string> = {
+    retry_quiz: "퀴즈 다시 풀기",
+    review_wrong: "오답 확인하기",
+    review_summary: "요약 복습하기",
+    read_material: "자료 보기",
+    make_quiz: "퀴즈 만들기",
+  };
+  // LLM이 적은 과목명을 실제 과목으로 정규화(정확 일치 → 부분 일치).
+  const resolvePlanCourse = (name?: string) => {
+    if (!name) return undefined;
+    return courses.find(course => course === name)
+      ?? courses.find(course => course.includes(name) || name.includes(course));
+  };
+  const openPlanAction = (plan: Plan) => {
+    if (!plan.action) return;
+    if (plan.action === "review_wrong") {
+      navigate(pageRoutes["오답 노트"]);
+      return;
+    }
+    // 퀴즈/요약 페이지는 과목 핸드오프 없이 진입하면 대시보드로 돌아오므로 과목이 풀릴 때만 이동.
+    const course = resolvePlanCourse(plan.course);
+    if (!course) return;
+    if (plan.action === "retry_quiz" || plan.action === "make_quiz") {
+      navigate(pageRoutes["퀴즈 생성"], { state: { course, fromDashboard: true } });
+      return;
+    }
+    navigate(pageRoutes["자료 요약"], { state: { selectedCourse: course, fromDashboard: true } });
+  };
+
+  const undoStudyPlan = () => {
+    if (!planUndoSnapshot) return;
+    setPlans(planUndoSnapshot.plans);
+    setStudyPlanMessage(planUndoSnapshot.message);
+    setPlanUndoSnapshot(null);
   };
 
   const deleteDday = (target: Dday) => {
@@ -793,6 +970,7 @@ export default function Dashboard() {
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
       {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={t => setPlans(prev => [...prev, { id: createClientId(), text: t, done: false }])} />}
       {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
         <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -813,11 +991,24 @@ export default function Dashboard() {
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
-          공지사항
+          <span className="header-btn-label">공지사항</span>
+        </button>
+        <button
+          onClick={() => setShowFeedback(true)}
+          aria-label="피드백 보내기"
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "8px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
+            background: "var(--color-card)", color: "var(--color-text-secondary)",
+            fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+          }}
+        >
+          <PaperPlaneIcon />
+          <span className="header-btn-label">피드백 보내기</span>
         </button>
       </div>
 
-      <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", zoom: 0.85 }}>
+      <div className="app-container">
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
           <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
             공부 시작하기
@@ -847,7 +1038,7 @@ export default function Dashboard() {
             </button>
           </div>
         </Card>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
+        <div className="dash-main-grid">
           {/* 강의 목록 카드 그리드 */}
           <div>
             {courses.length === 0 ? (
@@ -1006,7 +1197,22 @@ export default function Dashboard() {
                 </button>
               </div>
               {studyPlanMessage ? (
-                <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>{studyPlanMessage}</p>
+                <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
+                  {studyPlanMessage}
+                  {planUndoSnapshot && (
+                    <button
+                      type="button"
+                      onClick={undoStudyPlan}
+                      style={{
+                        marginLeft: 8, padding: "2px 8px", borderRadius: 999,
+                        border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
+                        color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 11, fontWeight: 750,
+                      }}
+                    >
+                      되돌리기
+                    </button>
+                  )}
+                </p>
               ) : (
                 <p style={{ margin: "0 0 12px", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                   D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
@@ -1086,12 +1292,15 @@ export default function Dashboard() {
                   marginBottom: 14, padding: 12, borderRadius: 12,
                   border: "1px solid #eef7f9", background: "#fbfeff",
                 }}>
-                  <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "var(--color-text)" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 13, lineHeight: 1.55, color: "var(--color-text)" }}>
                     {planSourceMessage}
                   </p>
+                  <p style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
+                    직접 작성한 계획은 그대로 유지돼요. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
+                  </p>
                   {([
-                    { title: "남아있는 학습계획", sources: carryoverPlanSources },
                     { title: "D-day", sources: ddayPlanSources },
+                    { title: "복습 추천", sources: reviewPlanSources },
                   ] as const).map(group => (
                     group.sources.length > 0 && (
                       <div key={group.title} style={{ marginBottom: 12 }}>
@@ -1099,7 +1308,8 @@ export default function Dashboard() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                           {group.sources.map(source => {
                             const selected = selectedPlanSourceKeys.includes(source.key);
-                            const accent = source.kind === "carryover" ? "var(--color-text-secondary)" : ddayTypeColors[source.kind].solid;
+                            const accent = source.kind === "review" ? CYAN : ddayTypeColors[source.kind].solid;
+                            const selectedBackground = source.kind === "review" ? "var(--color-tint-cyan)" : ddayTypeColors[source.kind].soft;
                             return (
                               <button
                                 key={source.key}
@@ -1108,7 +1318,7 @@ export default function Dashboard() {
                                 style={{
                                   maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
                                   border: `1px solid ${selected ? accent : "var(--color-border-soft)"}`,
-                                  background: selected ? (source.kind === "carryover" ? "var(--color-surface)" : ddayTypeColors[source.kind].soft) : "var(--color-card)",
+                                  background: selected ? selectedBackground : "var(--color-card)",
                                   color: selected ? accent : "var(--color-text-secondary)",
                                   cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                                   textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -1122,6 +1332,102 @@ export default function Dashboard() {
                       </div>
                     )
                   ))}
+                  {incompletePlans.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "var(--color-muted)" }}>남아있는 학습계획</p>
+                      <button
+                        type="button"
+                        onClick={() => setIncludeCarryover(prev => !prev)}
+                        style={{
+                          padding: "6px 9px", borderRadius: 999,
+                          border: `1px solid ${includeCarryover ? "var(--color-text-secondary)" : "var(--color-border-soft)"}`,
+                          background: includeCarryover ? "var(--color-surface)" : "var(--color-card)",
+                          color: includeCarryover ? "var(--color-text-secondary)" : "var(--color-muted)",
+                          cursor: "pointer", fontSize: 12, fontWeight: includeCarryover ? 800 : 650,
+                        }}
+                      >
+                        {includeCarryover ? "✓ " : ""}남은 계획 {incompletePlans.length}개 함께 반영
+                      </button>
+                    </div>
+                  )}
+                  {([
+                    {
+                      title: "공부 목표",
+                      value: studyPlanGoal,
+                      set: (v: string) => setStudyPlanGoal(v as StudyPlanGoal),
+                      options: [
+                        { label: "시험 대비", value: "exam" },
+                        { label: "과제", value: "assignment" },
+                        { label: "평소 복습", value: "review" },
+                      ],
+                    },
+                    {
+                      title: "지금 상태",
+                      value: studyPlanFamiliarity,
+                      set: (v: string) => setStudyPlanFamiliarity(v as StudyPlanFamiliarity),
+                      options: [
+                        { label: "처음 봐요", value: "new" },
+                        { label: "수업은 들었어요", value: "attended" },
+                        { label: "복습해 봤어요", value: "reviewed" },
+                      ],
+                    },
+                    {
+                      title: "하루 공부 시간",
+                      value: String(studyPlanDailyMinutes),
+                      set: (v: string) => setStudyPlanDailyMinutes(Number(v)),
+                      options: [
+                        { label: "30분", value: "30" },
+                        { label: "1시간", value: "60" },
+                        { label: "2시간+", value: "120" },
+                      ],
+                    },
+                  ] as const).map(question => (
+                    <div key={question.title} style={{ marginBottom: 12 }}>
+                      <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "var(--color-muted)" }}>{question.title}</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                        {question.options.map(option => {
+                          const selected = question.value === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => question.set(option.value)}
+                              style={{
+                                padding: "6px 9px", borderRadius: 999,
+                                border: `1px solid ${selected ? CYAN : "var(--color-border-soft)"}`,
+                                background: selected ? "var(--color-tint-cyan)" : "var(--color-card)",
+                                color: selected ? CYAN : "var(--color-text-secondary)",
+                                cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
+                              }}
+                            >
+                              {selected ? "✓ " : ""}{option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {studyPlanFamiliarity === "new" && diagnosticCourse && (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      marginBottom: 12, padding: "8px 10px", borderRadius: 9,
+                      background: "var(--color-card)", border: "1px solid var(--color-border-soft)",
+                    }}>
+                      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--color-text-secondary)" }}>
+                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인해보세요.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate(pageRoutes["퀴즈 생성"], { state: { course: diagnosticCourse, diagnostic: true, fromDashboard: true } })}
+                        style={{
+                          flexShrink: 0, padding: "6px 9px", borderRadius: 8, border: `1px solid ${CYAN}`,
+                          background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 12, fontWeight: 800,
+                        }}
+                      >
+                        진단 퀴즈 풀기
+                      </button>
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button
                       type="button"
@@ -1134,12 +1440,12 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={requestStudyPlan}
-                      disabled={selectedPlanSources.length === 0 || studyPlanLoading}
+                      disabled={!canSubmitPlan || studyPlanLoading}
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "none",
-                        background: selectedPlanSources.length === 0 || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
+                        background: !canSubmitPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
                         color: "var(--color-on-brand)",
-                        cursor: selectedPlanSources.length === 0 || studyPlanLoading ? "default" : "pointer",
+                        cursor: !canSubmitPlan || studyPlanLoading ? "default" : "pointer",
                         fontSize: 12, fontWeight: 800,
                       }}
                     >
@@ -1212,8 +1518,28 @@ export default function Dashboard() {
                               lineHeight: 1.45, wordBreak: "break-word",
                             }}
                           >
+                            {p.origin === "ai" && (
+                              <span style={{
+                                display: "inline-block", marginRight: 6, padding: "1px 6px", borderRadius: 999,
+                                background: "var(--color-tint-cyan)", color: CYAN, fontSize: 10, fontWeight: 850,
+                                verticalAlign: "1px", textDecoration: "none",
+                              }}>AI</span>
+                            )}
                             {p.text}
                           </button>
+                        )}
+                        {p.action && !isEditing && (p.action === "review_wrong" || resolvePlanCourse(p.course)) && (
+                          <button
+                            type="button"
+                            onClick={() => openPlanAction(p)}
+                            aria-label={`${planActionLabels[p.action]}로 이동`}
+                            title={planActionLabels[p.action]}
+                            style={{
+                              width: 24, height: 24, borderRadius: 8, border: `1px solid ${CYAN}`,
+                              background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 13,
+                              lineHeight: "22px", padding: 0, flexShrink: 0, fontWeight: 800,
+                            }}
+                          >↗</button>
                         )}
                         <button
                           onClick={() => deletePlan(p, i)}

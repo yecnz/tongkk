@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // 첫 페인트 전에 OS를 감지해 전역 스케일을 분기한다(값 정의: src/index.css의 --app-scale).
+      // 윈도우는 OS 기본 배율(125%)을 상쇄하도록 더 작은 스케일을 써서 맥과 비슷한 크기로 보이게 한다.
+      // "darwin"에 "win"이 포함되므로 /win/i 단독 매칭은 금지.
+      (function () {
+        var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
+        document.documentElement.dataset.platform = /windows|win32|win64/i.test(p) ? "windows" : "mac";
+      })();
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <!-- Pretendard: 윈도우 사용자도 가독성 좋게 (동적 서브셋으로 필요한 글자만 로드) -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" />

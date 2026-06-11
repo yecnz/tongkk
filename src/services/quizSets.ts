@@ -146,3 +146,11 @@ export async function saveQuizSetToServer(
   invalidateQuizSetsCache(course);
   return toSavedQuizSet(data);
 }
+
+// 퀴즈 세트 한 건을 id로 삭제한다. RLS로 본인 행만 지워지며, quiz_attempts.quiz_set_id는
+// schema의 on delete set null로 처리돼 풀이 기록 자체는 보존된다.
+export async function deleteQuizSetById(course: string, id: string): Promise<void> {
+  const { error } = await supabase.from('quiz_sets').delete().eq('id', id);
+  if (error) throw new Error(formatSupabaseError(error));
+  invalidateQuizSetsCache(course);
+}

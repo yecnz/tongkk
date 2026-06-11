@@ -11,11 +11,12 @@ import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import {
   deleteSummariesByMaterialId,
+  deleteSummaryById,
   loadSummariesFromServer,
   saveSummaryToServer,
   type SavedSummary,
 } from "../services/summaries";
-import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { deleteQuizSetById, loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
@@ -764,7 +765,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      <div className="summary-template-grid">
         {templates.map(t => (
           <Card key={t.key} style={{ padding: 0, overflow: "hidden" }}>
             <button onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
@@ -1221,10 +1222,11 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             <strong>요약 실패:</strong> {error}
           </div>
         ) : (
-          <div style={{
+          <div className="summary-result-grid" style={{
             display: "grid",
             // 마인드맵일 때는 AI 튜터가 마인드맵과 같은 화면 비율(50:50)을 차지하도록 두 칸을 동일하게,
             // 텍스트 요약일 때는 읽기 폭 유지를 위해 기존처럼 튜터를 고정 400px로 둔다.
+            // ~768px에선 .summary-result-grid(src/index.css)가 1열로 강제한다.
             gridTemplateColumns: isResultExpanded
               ? "minmax(0, 1fr)"
               : isTutorOpen
@@ -1644,6 +1646,12 @@ const TutorSplitDivider = ({ onPointerDown }: { onPointerDown: (event: ReactPoin
 // revoke하지 않고 재사용한다(자료 id = 파일명+크기라 내용이 바뀌면 키도 달라진다).
 const pptPreviewUrlCache = new Map<string, string>();
 
+// 자료 상세에서 삭제 확인 모달이 다루는 대상(요약 또는 퀴즈 세트).
+type DeleteTarget =
+  | { kind: "summary"; summary: SavedSummary }
+  | { kind: "quiz"; quizSet: SavedQuizSet }
+  | null;
+
 const MaterialDetailView = ({
   material,
   selectedCourse,
@@ -1682,6 +1690,10 @@ const MaterialDetailView = ({
   const [showSummaryList, setShowSummaryList] = useState(false);
   // 퀴즈 탭에서 카드를 눌러 펼친 퀴즈 세트(최신 풀이 채점 이력 표시)
   const [expandedQuizSetId, setExpandedQuizSetId] = useState<string | null>(null);
+  // 삭제 확인 모달 대상(요약/퀴즈)과 진행·오류 상태. 네이티브 confirm 대신 클릭형 모달로 처리한다.
+  const [pendingDelete, setPendingDelete] = useState<DeleteTarget>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
@@ -1856,6 +1868,47 @@ const MaterialDetailView = ({
     if (attempt.quizSetId && !map.has(attempt.quizSetId)) map.set(attempt.quizSetId, attempt);
     return map;
   }, new Map());
+
+  // × 버튼은 바로 지우지 않고 확인 모달을 연다.
+  const requestDelete = (target: NonNullable<DeleteTarget>) => {
+    setDeleteError("");
+    setPendingDelete(target);
+  };
+  const closeDelete = () => {
+    if (deleteBusy) return; // 삭제 진행 중에는 닫지 않는다.
+    setPendingDelete(null);
+    setDeleteError("");
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      if (pendingDelete.kind === "summary") {
+        const { summary } = pendingDelete;
+        if (summary.id) {
+          await deleteSummaryById(selectedCourse, summary.id);
+          const next = summaries.filter(item => item.id !== summary.id);
+          setSummaries(next);
+          if (activeSummaryId === summary.id) {
+            const fallback = next.find(item => item.template === "GENERAL") || next[0];
+            setActiveSummaryId(fallback?.id || "");
+          }
+        }
+      } else {
+        const { quizSet } = pendingDelete;
+        await deleteQuizSetById(selectedCourse, quizSet.id);
+        setQuizSets(prev => prev.filter(item => item.id !== quizSet.id));
+        setExpandedQuizSetId(prev => (prev === quizSet.id ? null : prev));
+      }
+      setPendingDelete(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
   const hasSummaries = summaries.length > 0;
   const hasQuizSets = quizSets.length > 0;
   const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
@@ -2250,24 +2303,48 @@ const MaterialDetailView = ({
                 {showSummaryList && !isSummaryTutorExpanded && (
                   <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (
-                      <button
-                        key={summary.id || `${summary.template}-${summary.createdAt}`}
-                        type="button"
-                        onClick={() => setActiveSummaryId(summary.id || "")}
-                        style={{
-                          padding: "12px 13px",
-                          borderRadius: 10,
-                          border: activeSummary?.id === summary.id ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
-                          background: activeSummary?.id === summary.id ? "var(--color-tint-pink)" : "var(--color-card)",
-                          color: activeSummary?.id === summary.id ? PINK : "var(--color-text)",
-                          textAlign: "left",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
-                        <span style={{ display: "block", fontSize: 11, color: "var(--color-muted)" }}>{formatHubDate(summary.createdAt)}</span>
-                      </button>
+                      <div key={summary.id || `${summary.template}-${summary.createdAt}`} style={{ position: "relative", flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveSummaryId(summary.id || "")}
+                          style={{
+                            width: "100%",
+                            padding: "12px 34px 12px 13px",
+                            borderRadius: 10,
+                            border: activeSummary?.id === summary.id ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                            background: activeSummary?.id === summary.id ? "var(--color-tint-pink)" : "var(--color-card)",
+                            color: activeSummary?.id === summary.id ? PINK : "var(--color-text)",
+                            textAlign: "left",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
+                          <span style={{ display: "block", fontSize: 11, color: "var(--color-muted)" }}>{formatHubDate(summary.createdAt)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); requestDelete({ kind: "summary", summary }); }}
+                          aria-label={`${templateLabels[summary.template]} 요약 삭제`}
+                          title="삭제"
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            right: 8,
+                            width: 22,
+                            height: 22,
+                            borderRadius: 6,
+                            border: `1px solid ${BORDER_COLOR}`,
+                            background: "var(--color-card)",
+                            color: "var(--color-muted)",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            lineHeight: "20px",
+                            padding: 0,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                     <button
                       type="button"
@@ -2387,9 +2464,20 @@ const MaterialDetailView = ({
                             {latestAttempt && <span style={{ color: CYAN }}>{isExpanded ? "풀이 이력 접기 ▴" : "풀이 이력 보기 ▾"}</span>}
                           </div>
                         </div>
-                        <button onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
-                          {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
-                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <button onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                            {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); requestDelete({ kind: "quiz", quizSet }); }}
+                            aria-label={`${quizSet.title} 퀴즈 삭제`}
+                            title="삭제"
+                            style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 16, lineHeight: "32px", padding: 0 }}
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                       {isExpanded && latestAttempt && (
                         <div style={{ marginTop: 14, borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: 14, display: "grid", gap: 12 }}>
@@ -2472,6 +2560,41 @@ const MaterialDetailView = ({
         )}
         </div>
       </Card>
+      {pendingDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Card style={{ padding: 28, width: "min(380px, 100%)" }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>
+              {pendingDelete.kind === "summary" ? "요약을 삭제할까요?" : "퀴즈를 삭제할까요?"}
+            </h3>
+            <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
+              {pendingDelete.kind === "summary"
+                ? `'${templateLabels[pendingDelete.summary.template]}' 요약과 연결된 AI 튜터 대화가 함께 삭제됩니다. 삭제 후에는 되돌릴 수 없습니다.`
+                : `'${pendingDelete.quizSet.title}' 퀴즈가 삭제됩니다. 풀이 기록은 통계에 남습니다. 삭제 후에는 되돌릴 수 없습니다.`}
+            </p>
+            {deleteError && (
+              <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--color-danger)", fontWeight: 700, lineHeight: 1.5 }}>{deleteError}</p>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={closeDelete}
+                disabled={deleteBusy}
+                style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleteBusy}
+                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "light-dark(#4b5563, #5b6473)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
+              >
+                {deleteBusy ? "삭제 중" : "삭제"}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
@@ -2492,7 +2615,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
       }}>← 돌아가기</button>
       <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>퀴즈 생성</h2>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+      <div className="summary-quizcreate-grid">
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border-soft)" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)" }}>요약된 파일 미리보기</span>
@@ -3496,11 +3619,11 @@ export default function Summary() {
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
-      <div style={{
-        padding: view === "summaryResult" || view === "materialDetail" ? "18px 20px" : 24,
-        maxWidth: view === "summaryResult" || view === "materialDetail" ? 1480 : 1100,
-        margin: "0 auto",
-      }}>
+      <div
+        className={view === "summaryResult" || view === "materialDetail" ? "app-container wide" : "app-container"}
+        // 넓은 뷰(요약 결과·자료 상세)는 기존의 더 촘촘한 여백을 유지한다(인라인이 클래스보다 우선).
+        style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
+      >
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}
@@ -3859,7 +3982,7 @@ export default function Summary() {
                   <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>요약 설정</h3>
 
                   <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>요약 종류</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+                  <div className="option-grid-4" style={{ marginBottom: 20 }}>
                     {([
                       { key: "GENERAL", name: "일반 요약" },
                       { key: "LECTURE_NOTE", name: "강의 노트" },

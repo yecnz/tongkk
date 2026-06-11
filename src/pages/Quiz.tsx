@@ -44,6 +44,7 @@ type QuizLocationState = {
   openQuiz?: boolean;
   reviewQuestions?: QuizQuestion[];
   reviewTitle?: string;
+  diagnostic?: boolean;
 } | null;
 
 const sourceLabels: Record<string, string> = {
@@ -218,6 +219,8 @@ export default function Quiz() {
   // courseDetail(과목 세부)에 외부 라우트(자료 요약/대시보드)에서 직접 진입했는지 여부.
   // materialList(자료 목록)를 거쳐 들어왔다면 false로 두어 "돌아가기"가 자료 목록으로 가게 한다.
   const courseDetailFromRouteRef = useRef(false);
+  // 대시보드 온보딩에서 넘어온 진단 퀴즈 모드. 다음 생성 1회에만 적용한다.
+  const diagnosticPendingRef = useRef(false);
   const [openedQuizTitle, setOpenedQuizTitle] = useState(
     hasReviewQuestions ? (reviewState?.reviewTitle || "오답 다시 풀기") : "",
   );
@@ -253,6 +256,12 @@ export default function Quiz() {
   useEffect(() => {
     if (reviewActiveRef.current) return; // 오답 다시 풀기: 초기 상태에서 이미 풀이 화면 구성
     const state = location.state as QuizLocationState;
+    // 진단 퀴즈: 전 범위 기초 문제로 현재 수준을 확인하는 모드. 쉬움·5문항을 기본값으로 둔다.
+    if (state?.diagnostic) {
+      diagnosticPendingRef.current = true;
+      setCount(5);
+      setDifficulty("쉬움");
+    }
     const course = state?.course || state?.selectedCourse;
     if (course) {
       fromDashboardRef.current = Boolean(state.fromDashboard);
@@ -615,6 +624,9 @@ export default function Quiz() {
     setView("generating");
     setError(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
+    // 진단 모드는 대시보드에서 넘어온 첫 생성 1회에만 적용.
+    const diagnostic = diagnosticPendingRef.current;
+    diagnosticPendingRef.current = false;
     // 이미 풀었거나 출제된 문제(풀이 기록 + 저장된 퀴즈 세트 + 직전 퀴즈)를 모아 중복 출제를 막는다.
     const priorQuestions = Array.from(new Set([
       ...quizAttempts.flatMap(attempt => attempt.answers.map(answer => answer.question)),
@@ -632,7 +644,7 @@ export default function Quiz() {
           ...priorQuestions,
           ...collected.map(quiz => quiz.question),
         ])).slice(0, 80);
-        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
+        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions, diagnostic);
         lastGenerated = generated;
         for (const question of generated) {
           const key = normalizeAnswer(question.question || "");
@@ -916,7 +928,7 @@ export default function Quiz() {
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
-        <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
+        <div className="app-container narrow">
           <button onClick={handleCourseBack} style={{
             background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
           }}>← 돌아가기</button>
@@ -1133,7 +1145,7 @@ export default function Quiz() {
             </div>
 
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 유형</label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+            <div className="option-grid-4" style={{ marginBottom: 20 }}>
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
                 <button key={t} onClick={() => setQuestionType(t)} style={{
                   padding: "10px 0", borderRadius: 10,
@@ -1144,7 +1156,7 @@ export default function Quiz() {
               ))}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", cursor: "pointer" }}>
                 <input
                   type="checkbox"

@@ -220,7 +220,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const placeholder = `${ddayTypeLabels[type]}명`;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 380, background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
+      <div style={{ width: "min(380px, calc(100vw - 32px))", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
           {(["assignment", "event", "exam"] as const).map(item => {
@@ -282,7 +282,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
+      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
         <input
           value={txt}
@@ -583,7 +583,7 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 380, background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
+      <div style={{ width: "min(380px, calc(100vw - 32px))", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
         <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>페이스 플랜 수정</h3>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)" }}>{plan.course}</p>
 

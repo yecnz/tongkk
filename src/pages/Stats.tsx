@@ -151,7 +151,7 @@ export default function Stats() {
                 viewBox={`0 ${-CHART_TOP_PAD} ${CHART_WIDTH} ${CHART_HEIGHT + 42 + CHART_TOP_PAD}`}
                 width="100%"
                 preserveAspectRatio="xMidYMid meet"
-                style={{ display: "block" }}
+                style={{ display: "block", width: "100%", maxWidth: CHART_WIDTH, margin: "0 auto" }}
               >
                 <line x1="0" y1={CHART_HEIGHT * 0.3} x2={CHART_WIDTH} y2={CHART_HEIGHT * 0.3} stroke="var(--color-border)" strokeWidth="1" />
                 <line x1="0" y1={CHART_HEIGHT * 0.6} x2={CHART_WIDTH} y2={CHART_HEIGHT * 0.6} stroke="var(--color-border)" strokeWidth="1" />

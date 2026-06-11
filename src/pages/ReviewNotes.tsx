@@ -184,7 +184,7 @@ export default function ReviewNotes() {
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
+      <div className="app-container narrow">
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>오답 노트</h2>
           <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.</p>

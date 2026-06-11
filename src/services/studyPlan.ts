@@ -1,10 +1,42 @@
 import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
+import type { PlanAction } from './studyPlanner';
 
 export type StudyPlanMode = 'balanced' | 'lighter' | 'harder' | 'assignment' | 'event' | 'reroll';
 
+// 콜드 스타트 대응: 학습 기록이 없어도 좋은 계획을 짜도록 사용자가 알려주는 학습 상태.
+export type StudyPlanGoal = 'exam' | 'assignment' | 'review';
+export type StudyPlanFamiliarity = 'new' | 'attended' | 'reviewed';
+
+// 데이터 기반 처방의 근거가 되는 과목별 학습 상태 요약.
+export type StudyPlanCourseContext = {
+  name: string;
+  materials: number;
+  summaries: number;
+  quizSets: number;
+  attempts: number;
+  lastScorePercent: number | null;
+  recentWrongCount: number;
+  daysSinceLastAttempt: number | null;
+};
+
+// 간격 반복 복습 후보(며칠 전 학습한 내용).
+export type StudyPlanReviewCandidate = {
+  course: string;
+  daysSince: number;
+  scorePercent: number | null;
+};
+
+export type StudyPlanContext = {
+  goal: StudyPlanGoal;
+  familiarity: StudyPlanFamiliarity;
+  dailyMinutes: number;
+  courses?: StudyPlanCourseContext[];
+  reviewCandidates?: StudyPlanReviewCandidate[];
+};
+
 export type StudyPlanDday = {
   id?: string;
-  type?: 'assignment' | 'event';
+  type?: 'assignment' | 'event' | 'exam';
   subj: string;
   date: string;
 };
@@ -19,7 +51,10 @@ export type GeneratedStudyPlanItem = {
   text: string;
   minutes: number;
   sourceId?: string | null;
-  sourceType?: 'assignment' | 'event' | 'carryover';
+  sourceType?: 'assignment' | 'event' | 'exam' | 'carryover' | 'review';
+  action?: PlanAction | null;
+  course?: string | null;
+  dayOffset: number;
 };
 
 export type GeneratedStudyPlan = {
@@ -32,6 +67,7 @@ export async function generateStudyPlan(
   ddays: StudyPlanDday[],
   incompletePlans: StudyPlanCarryover[],
   mode: StudyPlanMode,
+  context?: StudyPlanContext,
 ): Promise<GeneratedStudyPlan> {
   const response = await fetch(`${BACKEND_URL}/study-plan`, {
     method: 'POST',
@@ -45,6 +81,24 @@ export async function generateStudyPlan(
       })),
       incomplete_plans: incompletePlans,
       mode,
+      goal: context?.goal,
+      familiarity: context?.familiarity,
+      daily_minutes: context?.dailyMinutes,
+      courses: (context?.courses ?? []).map(course => ({
+        name: course.name,
+        materials: course.materials,
+        summaries: course.summaries,
+        quiz_sets: course.quizSets,
+        attempts: course.attempts,
+        last_score_percent: course.lastScorePercent,
+        recent_wrong_count: course.recentWrongCount,
+        days_since_last_attempt: course.daysSinceLastAttempt,
+      })),
+      review_candidates: (context?.reviewCandidates ?? []).map(candidate => ({
+        course: candidate.course,
+        days_since: candidate.daysSince,
+        score_percent: candidate.scorePercent,
+      })),
     }),
   });
 
@@ -70,15 +124,23 @@ export async function generateStudyPlan(
         minutes?: unknown;
         source_id?: unknown;
         source_type?: unknown;
+        action?: unknown;
+        course?: unknown;
+        day_offset?: unknown;
       };
       if (typeof candidate.text !== 'string' || !candidate.text.trim()) return [];
+      const sourceTypes = ['assignment', 'event', 'exam', 'carryover', 'review'] as const;
+      const actions = ['retry_quiz', 'review_wrong', 'review_summary', 'read_material', 'make_quiz'] as const;
       const normalized: GeneratedStudyPlanItem = {
         text: candidate.text.trim(),
         minutes: typeof candidate.minutes === 'number' ? candidate.minutes : 30,
         sourceId: typeof candidate.source_id === 'string' ? candidate.source_id : null,
-        sourceType: candidate.source_type === 'event' || candidate.source_type === 'carryover'
-          ? candidate.source_type
-          : 'assignment',
+        sourceType: sourceTypes.find(type => type === candidate.source_type) ?? 'assignment',
+        action: actions.find(action => action === candidate.action) ?? null,
+        course: typeof candidate.course === 'string' && candidate.course.trim() ? candidate.course.trim() : null,
+        dayOffset: typeof candidate.day_offset === 'number' && Number.isFinite(candidate.day_offset)
+          ? Math.max(0, Math.min(30, Math.round(candidate.day_offset)))
+          : 0,
       };
       return [normalized];
     });

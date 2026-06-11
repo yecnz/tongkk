@@ -67,7 +67,7 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 360 }}>
+      <Card style={{ padding: 28, width: "min(360px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 24px", fontSize: 17, fontWeight: 700 }}>프로필 편집</h3>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
           <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}>
@@ -277,9 +277,9 @@ export default function MyPage() {
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 860, margin: "0 auto" }}>
+      <div className="app-container narrow">
         {/* 상단: 프로필 (왼) + 앱 설정 (오) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20, alignItems: "start" }}>
+        <div className="mypage-grid" style={{ marginBottom: 20 }}>
           {/* 프로필 */}
           <Card style={{ padding: 28 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -333,7 +333,7 @@ export default function MyPage() {
         </div>
 
         {/* 하단: 데이터 관리 (왼) + 지원 및 정보 (오) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+        <div className="mypage-grid">
           {/* 데이터 관리 */}
           <Card style={{ padding: 24 }}>
             <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>데이터 관리</h3>

@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from agent import run_study_agent, build_llm, build_openai_llm
 
@@ -75,9 +75,15 @@ def _env_int(name: str, default: int) -> int:
 
 
 VISUAL_ANALYSIS_MODE = os.getenv("VISUAL_ANALYSIS_MODE", "auto").lower()
+# 시각 분석에 쓸 모델. 기본은 그래프·도표 해석 가성비가 좋은 Gemini 2.5 Flash.
+VISUAL_ANALYSIS_MODEL = os.getenv("VISUAL_ANALYSIS_MODEL", "Gemini")
+VISUAL_ANALYSIS_GEMINI_MODEL = os.getenv("VISUAL_ANALYSIS_GEMINI_MODEL", "gemini-2.5-flash")
+VISUAL_ANALYSIS_OPENAI_MODEL = os.getenv("VISUAL_ANALYSIS_OPENAI_MODEL", "gpt-5.4-mini")
 VISUAL_ANALYSIS_MAX_ITEMS = _env_int("VISUAL_ANALYSIS_MAX_ITEMS", 12)
 VISUAL_ANALYSIS_BATCH_SIZE = max(1, _env_int("VISUAL_ANALYSIS_BATCH_SIZE", 4))
 VISUAL_ANALYSIS_MIN_TEXT_CHARS = _env_int("VISUAL_ANALYSIS_MIN_TEXT_CHARS", 1200)
+# 이미지 해석 시 함께 보내는 본문 텍스트(맥락)의 길이 상한.
+VISUAL_CONTEXT_MAX_CHARS = _env_int("VISUAL_CONTEXT_MAX_CHARS", 1500)
 PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 90)
 PDF_VISUAL_TEXT_PAGE_CHARS = _env_int("PDF_VISUAL_TEXT_PAGE_CHARS", 180)
 PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -90,6 +96,9 @@ SUMMARY_MAX_TOKENS = _env_int("SUMMARY_MAX_TOKENS", 32768)
 MAX_MARKDOWN_CHARS = _env_int("MAX_MARKDOWN_CHARS", 2_000_000)
 MAX_CHAT_CONTENT_CHARS = _env_int("MAX_CHAT_CONTENT_CHARS", 100_000)
 MAX_CHAT_MESSAGES = _env_int("MAX_CHAT_MESSAGES", 100)
+# AI 튜터에 첨부할 수 있는 이미지 수와 1장당 data URL 길이 상한(base64 약 6MB 상당).
+MAX_CHAT_IMAGES = _env_int("MAX_CHAT_IMAGES", 3)
+MAX_CHAT_IMAGE_CHARS = _env_int("MAX_CHAT_IMAGE_CHARS", 8_000_000)
 
 
 async def require_api_user(authorization: str | None = Header(default=None)):
@@ -233,7 +242,20 @@ SUMMARY_SYSTEM_PROMPT = """너는 대학 강의자료를 템플릿별 목적에 
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=MAX_CHAT_CONTENT_CHARS)
+    content: str = Field(default="", max_length=MAX_CHAT_CONTENT_CHARS)
+    # 사용자가 첨부한 이미지(data:image/...;base64,...). 비어 있으면 일반 텍스트 메시지.
+    images: list[str] = Field(default_factory=list, max_length=MAX_CHAT_IMAGES)
+
+    @model_validator(mode="after")
+    def _validate_content_or_images(self) -> "ChatMessage":
+        if not self.content.strip() and not self.images:
+            raise ValueError("메시지에는 내용이나 이미지가 하나 이상 있어야 합니다.")
+        for image in self.images:
+            if not image.startswith("data:image/"):
+                raise ValueError("이미지는 data:image/... 형식의 data URL이어야 합니다.")
+            if len(image) > MAX_CHAT_IMAGE_CHARS:
+                raise ValueError("첨부 이미지 크기가 너무 큽니다.")
+        return self
 
 
 class SummarizeRequest(BaseModel):
@@ -265,6 +287,8 @@ class QuizRequest(BaseModel):
     markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
     # 이전에 출제된 문제 텍스트. 이 문제들과 중복/유사하게 내지 않도록 프롬프트에 반영한다.
     exclude_questions: list[str] = Field(default_factory=list)
+    # 학습 전 수준 진단용 퀴즈: 전 범위에서 단원별로 골고루, 기초 개념 위주로 출제.
+    diagnostic: bool = False
 
 
 class WrongAnswerItem(BaseModel):
@@ -292,7 +316,7 @@ class SubjectiveGradeRequest(BaseModel):
 
 class StudyPlanDday(BaseModel):
     id: str | None = None
-    type: Literal["assignment", "event"] = "assignment"
+    type: Literal["assignment", "event", "exam"] = "assignment"
     subj: str = Field(min_length=1)
     date: str = Field(min_length=1)
 
@@ -303,10 +327,36 @@ class StudyPlanItem(BaseModel):
     done: bool = False
 
 
+class StudyPlanCourse(BaseModel):
+    """학습계획 처방 근거가 되는 과목별 학습 상태 요약."""
+    name: str = Field(min_length=1)
+    materials: int = Field(default=0, ge=0)
+    summaries: int = Field(default=0, ge=0)
+    quiz_sets: int = Field(default=0, ge=0)
+    attempts: int = Field(default=0, ge=0)
+    last_score_percent: int | None = Field(default=None, ge=0, le=100)
+    recent_wrong_count: int = Field(default=0, ge=0)
+    days_since_last_attempt: int | None = Field(default=None, ge=0)
+
+
+class StudyPlanReviewCandidate(BaseModel):
+    """간격 반복 복습 후보(며칠 전 학습한 내용)."""
+    course: str = Field(min_length=1)
+    days_since: int = Field(default=1, ge=0)
+    score_percent: int | None = Field(default=None, ge=0, le=100)
+
+
 class StudyPlanRequest(BaseModel):
     ddays: list[StudyPlanDday] = Field(default_factory=list)
     incomplete_plans: list[StudyPlanItem] = Field(default_factory=list)
     mode: Literal["balanced", "lighter", "harder", "assignment", "event", "reroll"] = "balanced"
+    # 콜드 스타트 대응 학습자 정보(선택). 없으면 기존과 동일하게 동작한다.
+    goal: Literal["exam", "assignment", "review"] | None = None
+    familiarity: Literal["new", "attended", "reviewed"] | None = None
+    daily_minutes: int | None = Field(default=None, ge=30, le=480)
+    # 데이터 기반 처방(선택): 과목별 학습 상태와 간격 반복 복습 후보.
+    courses: list[StudyPlanCourse] = Field(default_factory=list)
+    review_candidates: list[StudyPlanReviewCandidate] = Field(default_factory=list)
 
 
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
@@ -337,8 +387,14 @@ STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항
 판단 기준:
 - assignment는 과제다. 요구사항 확인, 자료 정리, 목차 잡기, 초안 작성, 제출 전 검토처럼 실행 가능한 작업으로 쪼갠다.
 - event는 일정이다. 오늘 준비가 필요한 경우에만 준비물 확인, 장소/시간 확인, 연락, 이동 계획 같은 리마인드 작업으로 만든다.
+- exam은 시험이다. 다시 읽기보다 스스로 떠올려 확인하는 인출 연습을 우선한다: ① 오답 다시 확인 → ② 점수 낮은 퀴즈 다시 풀기 → ③ 퀴즈를 안 만든 자료는 요약 훑기→정독→퀴즈 만들기 순서로 준비 작업을 만든다.
 - 미완료 항목은 우선 반영하되, 너무 무거우면 더 작게 쪼갠다.
-- 오늘 할 일은 1~5개로 제한한다.
+- day_offset이 0(오늘)인 항목은 1~5개로 제한한다.
+- 시험(exam)이 3일 이상 남았으면 오늘에 다 몰지 말고 day_offset(0=오늘, 1=내일, ...)으로 시험 전날까지 나눠 배치한다. 시험 직전 1~2일은 총복습과 오답 점검으로 남겨둔다. 전체 항목은 12개를 넘기지 않는다.
+- 시험이 없거나 임박했으면 모든 항목을 day_offset 0으로 둔다.
+- [과목 학습 상태]가 있으면 수치(최근 점수, 최근 오답 수, 퀴즈 미응시)에 근거해 어떤 과목의 무엇을 할지 구체적으로 처방한다.
+- [복습 추천 후보]는 며칠 전 학습한 내용의 간격 반복이다. 퀴즈 다시 풀기나 오답 확인 항목으로 1~2개 반영하고 source_type을 review로 둔다.
+- 항목에 이어서 할 행동이 분명하면 action을 넣는다: retry_quiz(퀴즈 다시 풀기), review_wrong(오답 확인), review_summary(요약 복습), read_material(자료 정독), make_quiz(퀴즈 만들기). 해당 없으면 null. action이 있으면 course에 과목명을 넣는다.
 - 각 항목은 사용자가 바로 실행할 수 있게 8~22자 정도의 한국어 동사형 문장으로 쓴다.
 - 시간은 5분 단위, 10~90분 사이로 제안한다.
 - mode가 lighter면 총량을 줄이고 쉬운 작업 위주로 둔다.
@@ -346,18 +402,25 @@ STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항
 - mode가 assignment면 과제 작업을 우선한다.
 - mode가 event면 일정 준비 작업을 우선한다.
 
+학습자 정보가 주어지면 다음을 반영한다:
+- goal이 exam이면 단순 읽기보다 스스로 떠올려 확인하는 작업(퀴즈 풀기, 오답 다시 보기, 핵심 개념 말로 설명해보기)을 우선한다.
+- familiarity가 new(처음 공부)면 초심자 루틴으로 쪼갠다: 요약이나 목차로 전체 훑어보기(10~15분) → 자료 정독(30~40분) → 퀴즈로 확인(15분) 순서를 지키고, 쉬운 단원부터 배치한다.
+- familiarity가 attended(수업은 들음)면 훑어보기는 짧게 줄이고 정독과 확인 위주로 짠다.
+- familiarity가 reviewed(한 번 복습함)면 다시 읽기보다 퀴즈·오답 같은 확인 작업 위주로 짠다.
+- daily_minutes가 주어지면 모든 항목의 minutes 합계가 그 값을 넘지 않게 한다.
+
 출력 형식:
-{"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment 또는 event 또는 carryover"}]}"""
+{"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment|event|exam|carryover|review","action":"retry_quiz|review_wrong|review_summary|read_material|make_quiz 또는 null","course":"과목명 또는 null","day_offset":0}]}"""
 
 STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
 조정 모드: {mode}
-
+{learner_section}
 [D-day 목록]
 {ddays_json}
 
 [미완료 항목]
 {incomplete_json}
-
+{courses_section}{review_section}
 위 정보를 보고 오늘의 학습계획을 JSON으로만 생성해."""
 
 
@@ -526,7 +589,7 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
         raise ValueError("학습 계획 items가 배열 형식이 아닙니다.")
 
     items: list[dict[str, object]] = []
-    for raw_item in raw_items[:5]:
+    for raw_item in raw_items[:12]:
         if not isinstance(raw_item, dict):
             continue
         text = raw_item.get("text")
@@ -537,11 +600,18 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
         minutes = max(10, min(90, int(round(minutes / 5) * 5)))
         source_type = raw_item.get("source_type")
         source_id = raw_item.get("source_id")
+        action = raw_item.get("action")
+        course = raw_item.get("course")
+        raw_offset = raw_item.get("day_offset", 0)
+        day_offset = raw_offset if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool) else 0
         items.append({
             "text": text.strip()[:80],
             "minutes": minutes,
             "source_id": source_id if isinstance(source_id, str) and source_id else None,
-            "source_type": source_type if source_type in {"assignment", "event", "carryover"} else "assignment",
+            "source_type": source_type if source_type in {"assignment", "event", "exam", "carryover", "review"} else "assignment",
+            "action": action if action in {"retry_quiz", "review_wrong", "review_summary", "read_material", "make_quiz"} else None,
+            "course": course.strip()[:60] if isinstance(course, str) and course.strip() else None,
+            "day_offset": max(0, min(30, int(day_offset))),
         })
 
     if not items:
@@ -774,9 +844,13 @@ def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -
         for index in selected_indexes:
             page = doc.load_page(index)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            # 같은 페이지의 텍스트 레이어를 맥락으로 함께 전달해, 작은 글씨 오독을 줄이고
+            # 이미지가 본문 어느 개념과 연결되는지 모델이 해석할 수 있게 한다.
+            page_text = (page.get_text("text") or "").strip()
             pages.append({
                 "label": f"PDF {index + 1}페이지",
                 "data_url": _image_data_url(pixmap.tobytes("png")),
+                "context": page_text[:VISUAL_CONTEXT_MAX_CHARS],
             })
 
     return pages
@@ -811,11 +885,9 @@ def _should_analyze_visuals(base_markdown: str, suffix: str) -> bool:
         return False
     if VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}:
         return True
-    if suffix not in {".pdf", ".pptx"}:
-        return False
-    if suffix == ".pdf":
-        return True
-    return _text_length(base_markdown) < VISUAL_ANALYSIS_MIN_TEXT_CHARS
+    # PDF·PPTX는 본문 텍스트 양과 무관하게 삽입 이미지를 해석한다.
+    # (이미지가 없으면 _collect_visual_inputs가 빈 목록을 돌려 분석을 건너뛴다.)
+    return suffix in {".pdf", ".pptx"}
 
 
 def _collect_visual_inputs(file_path: str, suffix: str, force: bool = False) -> list[dict[str, str]]:
@@ -846,6 +918,72 @@ def _tag_visual_pdf_pages(visual_markdown: str) -> str:
     )
 
 
+_VISUAL_SYSTEM_PROMPT = """너는 대학 강의자료의 이미지(슬라이드, 그래프, 도표, 그림, 손글씨)를 읽고 학습에 쓸 수 있게 해석하는 분석기다.
+규칙:
+- 이미지 안의 인쇄 텍스트·표·수식·손글씨를 정확히 읽어 Markdown으로 정리한다. 확실하지 않은 글자는 추측하지 말고 '[불확실]'로 표시한다.
+- 그래프·도표·그림은 글자 전사에 그치지 말고 의미를 해석한다: 축·범례·단위·추세를 먼저 읽고, 무엇을 나타내는지, 어떤 값·관계·패턴이 핵심인지 설명한다.
+- 함께 제공된 본문 텍스트가 있으면 그것과 연결해, 이 이미지가 본문의 어떤 개념을 시각화·예시·근거로 보여주는지, 왜 이 자리에 삽입됐는지를 1~2문장으로 판단해 적는다.
+- 텍스트가 거의 없는 사진·도식이라도 학습에 의미가 있으면 반드시 해석한다.
+- 로고, 배경 장식, 표지처럼 학습 내용이 전혀 없을 때만 '유의미한 학습 내용 없음'이라고만 답한다.
+- 여러 이미지가 들어오면 이미지별로 반드시 별도 섹션을 만든다.
+- 한국어로 답한다."""
+
+
+def _build_visual_llm():
+    """시각 분석용 LLM을 만든다. 키가 없으면 None을 돌려 호출부가 분석을 건너뛰게 한다."""
+    if VISUAL_ANALYSIS_MODEL == "GPT":
+        if not os.getenv("OPENAI_API_KEY"):
+            return None
+        return build_llm("GPT", model_name=VISUAL_ANALYSIS_OPENAI_MODEL)
+    if not os.getenv("GEMINI_API_KEY"):
+        return None
+    return build_llm("Gemini", model_name=VISUAL_ANALYSIS_GEMINI_MODEL)
+
+
+def _run_visual_llm(visual_inputs: list[dict[str, str]], shared_context: str = "") -> str:
+    """이미지 목록을 시각 분석 모델에 보내 해석 결과(섹션들)를 합쳐 돌려준다."""
+    llm = _build_visual_llm()
+    if llm is None:
+        return ""
+
+    sections: list[str] = []
+    for batch in _visual_batches(visual_inputs):
+        content: list[dict[str, object]] = [{
+            "type": "text",
+            "text": (
+                "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
+                "반드시 각 항목을 제공된 라벨을 그대로 쓴 '## 라벨' 제목(예: '## PDF 3페이지')으로 시작하고, "
+                "이미지 순서대로 작성해. "
+                "전사뿐 아니라 그래프·도표의 의미와, 본문 텍스트가 주어졌다면 본문과의 연관성(왜 삽입됐는지)을 함께 설명해. "
+                "분석 대상: " + ", ".join(item["label"] for item in batch)
+            ),
+        }]
+        if shared_context:
+            content.append({
+                "type": "text",
+                "text": f"[강의자료 본문 텍스트(참고용)]\n{shared_context}",
+            })
+        for item in batch:
+            content.append({"type": "text", "text": f"[{item['label']}]"})
+            item_context = (item.get("context") or "").strip()
+            if item_context:
+                content.append({
+                    "type": "text",
+                    "text": f"[{item['label']} 본문 텍스트]\n{item_context}",
+                })
+            content.append({"type": "image_url", "image_url": {"url": item["data_url"]}})
+
+        response = llm.invoke([
+            SystemMessage(content=_VISUAL_SYSTEM_PROMPT),
+            HumanMessage(content=content),
+        ])
+        text = _message_content_to_text(response.content).strip()
+        if text and text != "유의미한 학습 내용 없음":
+            sections.append(text)
+
+    return "\n\n".join(sections)
+
+
 def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = "") -> str:
     force_visual_scan = VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}
     if not force_visual_scan and not _should_analyze_visuals(base_markdown, suffix):
@@ -855,63 +993,41 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
     if not visual_inputs:
         return ""
 
-    model = os.getenv("VISUAL_ANALYSIS_MODEL", "GPT")
-
-    if model == "GPT" and not os.getenv("OPENAI_API_KEY"):
-        return ""
-    if model == "Gemini" and not os.getenv("GEMINI_API_KEY"):
-        return ""
-
-    llm = build_llm(model)
-    sections: list[str] = []
-
-    for batch in _visual_batches(visual_inputs):
-        content: list[dict[str, object]] = [{
-            "type": "text",
-            "text": (
-                "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
-                "반드시 각 항목을 제공된 라벨을 그대로 쓴 '## 라벨' 제목(예: '## PDF 3페이지')으로 시작하고, "
-                "이미지 순서대로 작성해. "
-                "분석 대상: " + ", ".join(item["label"] for item in batch)
-            ),
-        }]
-        for item in batch:
-            content.extend([
-                {
-                    "type": "text",
-                    "text": f"[{item['label']}]",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {"url": item["data_url"]},
-                },
-            ])
-
-        response = llm.invoke([
-            SystemMessage(content="""너는 강의자료 이미지와 손글씨를 Markdown으로 전사하는 OCR 보조 분석기다.
-규칙:
-- 이미지 안의 인쇄 텍스트, 도표 텍스트, 손글씨를 최대한 읽어 Markdown bullet로 정리한다.
-- 수식, 표, 화살표 관계, 도식의 의미도 강의 요약/퀴즈 생성에 쓸 수 있게 설명한다.
-- 확실하지 않은 글자는 추측하지 말고 '[불확실]'로 표시한다.
-- 이미지에 유의미한 학습 내용이 없으면 '유의미한 학습 내용 없음'이라고만 답한다.
-- 여러 이미지가 들어오면 이미지별로 반드시 별도 섹션을 만든다.
-- 한국어로 답한다."""),
-            HumanMessage(content=content),
-        ])
-        text = _message_content_to_text(response.content).strip()
-        if text and text != "유의미한 학습 내용 없음":
-            sections.append(text)
-
-    if not sections:
+    # PPTX 삽입 이미지는 슬라이드 번호와 1:1로 매칭되지 않으므로 본문 전체를 공통 맥락으로 준다.
+    shared_context = base_markdown[:VISUAL_CONTEXT_MAX_CHARS] if (suffix == ".pptx" and base_markdown) else ""
+    body_text = _run_visual_llm(visual_inputs, shared_context)
+    if not body_text:
         return ""
 
-    body = "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
+    body = "# 이미지/손글씨 분석 결과\n\n" + body_text
     # PDF는 페이지별로 렌더링·분석하므로 'PDF N페이지' 섹션마다 페이지 마커를 심어,
     # 페이지 선택 요약이 이미지 슬라이드에도 적용되게 한다. (PPTX 삽입 이미지는 슬라이드 번호와
     # 1:1로 매칭되지 않아, 본문 markitdown의 'Slide number' 마커에만 의존한다.)
     if suffix == ".pdf":
         body = _tag_visual_pdf_pages(body)
     return body
+
+
+def _image_to_png_bytes(path: str) -> bytes:
+    """업로드 이미지를 시각 분석 모델 호환성이 높은 PNG로 변환한다(투명 배경은 흰색으로)."""
+    import io
+
+    from PIL import Image
+
+    with Image.open(path) as image:
+        rgba = image.convert("RGBA")
+        background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        background.alpha_composite(rgba)
+        buffer = io.BytesIO()
+        background.convert("RGB").save(buffer, format="PNG")
+        return buffer.getvalue()
+
+
+def _analyze_uploaded_image(path: str) -> str:
+    """단독 업로드 이미지를 시각 분석 모델로 해석한다. 키가 없으면 빈 문자열."""
+    png_bytes = _image_to_png_bytes(path)
+    item = {"label": "업로드 이미지", "data_url": _image_data_url(png_bytes, "image/png")}
+    return _run_visual_llm([item])
 
 
 @app.post("/convert")
@@ -939,6 +1055,15 @@ async def convert_document_to_markdown(
 
     try:
         if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+            # 1순위: 시각 분석 모델로 이미지를 읽고 해석한다(텍스트가 없는 그래프·도식도 처리).
+            analysis = ""
+            try:
+                analysis = await run_in_threadpool(_analyze_uploaded_image, tmp_path)
+            except Exception:
+                logger.exception("업로드 이미지 시각 분석 실패")
+            if analysis:
+                return {"markdown": f"# 이미지 분석 결과\n\n{analysis}"}
+            # 폴백: 시각 분석 키가 없거나 결과가 비면 기존 Tesseract OCR로 글자만 추출한다.
             text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
             return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
 
@@ -1187,6 +1312,11 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         markdown_section=markdown_section,
         exclude_section=exclude_section,
     )
+    if req.diagnostic:
+        prompt = (
+            "[진단 퀴즈] 학습 전 수준 진단용이다. 자료의 전체 범위에서 단원·주제별로 골고루 1문제씩, "
+            "핵심 개념을 확인하는 기초 문제로 출제해라.\n\n" + prompt
+        )
 
     def _call_llm():
         llm = build_llm(req.model)
@@ -1310,15 +1440,35 @@ async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_u
     if not req.ddays and not req.incomplete_plans:
         raise HTTPException(status_code=400, detail="D-day나 미완료 학습 계획이 필요합니다.")
 
+    learner_info = {
+        key: value
+        for key, value in (("goal", req.goal), ("familiarity", req.familiarity), ("daily_minutes", req.daily_minutes))
+        if value is not None
+    }
+    learner_section = (
+        f"\n[학습자 정보]\n{json.dumps(learner_info, ensure_ascii=False)}\n\n" if learner_info else "\n"
+    )
+    courses_section = (
+        f"\n[과목 학습 상태]\n{json.dumps([item.model_dump() for item in req.courses], ensure_ascii=False)}\n"
+        if req.courses else ""
+    )
+    review_section = (
+        f"\n[복습 추천 후보]\n{json.dumps([item.model_dump() for item in req.review_candidates], ensure_ascii=False)}\n"
+        if req.review_candidates else ""
+    )
     prompt = STUDY_PLAN_USER_PROMPT.format(
         today=date.today().isoformat(),
         mode=req.mode,
+        learner_section=learner_section,
         ddays_json=json.dumps([item.model_dump() for item in req.ddays], ensure_ascii=False),
         incomplete_json=json.dumps([item.model_dump() for item in req.incomplete_plans], ensure_ascii=False),
+        courses_section=courses_section,
+        review_section=review_section,
     )
 
     def _call_llm():
-        llm = build_openai_llm(STUDY_PLAN_MODEL, max_tokens=900)
+        # 시험 분산 배치 시 항목이 최대 12개까지 늘어 토큰 여유를 둔다.
+        llm = build_openai_llm(STUDY_PLAN_MODEL, max_tokens=1400)
         response = llm.invoke([
             SystemMessage(content=STUDY_PLAN_SYSTEM_PROMPT),
             HumanMessage(content=prompt),

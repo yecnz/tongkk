@@ -234,7 +234,7 @@ export default function Calendar() {
         <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+      <div className="app-container">
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>학습 캘린더</h2>
           <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>날짜별 페이스 학습 · D-day · 할 일을 한 화면에서 관리하세요.</p>
