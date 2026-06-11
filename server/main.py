@@ -280,6 +280,9 @@ class SummarizeStreamRequest(SummarizeRequest):
     chunk_total: int | None = Field(default=None, ge=1)
     # 직전 구간 요약의 끝부분. 제목 수준·흐름을 이어가되 내용 반복을 막는 용도.
     previous_tail: str | None = Field(default=None, max_length=6000)
+    # 직전 구간과 같은 원본 섹션이 글자수 한도 때문에 쪼개진 '이어지는' 구간인지 여부.
+    # True면 새 제목을 만들지 말고 직전 요약 끝에 곧바로 이어 쓰게 한다.
+    is_continuation: bool = False
 
 
 class AgentRequest(BaseModel):
@@ -1465,6 +1468,13 @@ def _summary_chunk_instructions(req: SummarizeStreamRequest) -> str:
     ]
     if req.chunk_index == 1:
         lines.append("- 첫 구간이므로 문서 제목(# 수준)을 한 번만 만들고 시작해.")
+    elif req.is_continuation:
+        # 같은 원본 섹션이 길어서 쪼개진 '이어지는' 구간 → 직전에 만든 제목을 다시 만들면 안 된다.
+        lines.append(
+            "- 이 구간은 직전 구간에서 다루던 같은 원본 섹션의 뒷부분이다. "
+            "문서 제목(#)이나 직전 구간에서 이미 만든 단원·소단원 제목(##/###)을 다시 만들지 말고, "
+            "직전 요약이 끊긴 지점에서 곧바로 이어서 내용만 작성해. 같은 제목을 새로 달면 안 된다."
+        )
     else:
         lines.append("- 첫 구간이 아니므로 문서 제목(# 수준)을 다시 만들지 말고, 이어지는 단원 제목(## 수준)부터 바로 시작해.")
     if req.previous_tail and req.previous_tail.strip():
