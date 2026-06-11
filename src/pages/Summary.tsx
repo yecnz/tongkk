@@ -74,7 +74,7 @@ type FileIconProps = { type: FileKind };
 // range: 같은 본문이 살아 있을 때 구절 위치 보정용 / scrollY: 확대 등으로 본문이 언마운트돼
 // range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
 type DragAnchor = { range: Range; top: number; scrollY: number };
-type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string; isLoading?: boolean; loadingStep?: string };
+type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void; onRetry?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
@@ -730,7 +730,49 @@ const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { co
     : <FormattedAiText content={content} template={template} />;
 };
 
-const TemplateSelectView = ({ onSelect, onBack, pageHint, isLoading = false, loadingStep = "" }: TemplateSelectViewProps) => {
+// 요약 평균 소요 시간(초, 고정). 로딩 멘트 전환 속도의 기준이다. 실측이 달라지면 이 값만 고치면 된다.
+const SUMMARY_AVG_SECONDS = 50;
+
+// 요약 생성 로딩 오버레이에서 순환 표시할 멘트. 자유롭게 추가/수정 가능.
+const SUMMARY_LOADING_MESSAGES = [
+  "강의자료를 꼼꼼히 읽고 있어요",
+  "핵심 개념을 골라내는 중...",
+  "시험에 나올 내용을 정리하고 있어요",
+  "거의 다 됐어요, 조금만 기다려 주세요",
+];
+
+// 요약 생성 로딩 오버레이(전체 화면). 멘트를 고정 평균 소요 시간에 맞춰 순환시키고(마지막은 완료까지 유지),
+// templates·upload 어느 화면에서 요약을 시작하든 공통으로 화면 위에 띄운다.
+const SummaryLoadingOverlay = ({ loadingStep }: { loadingStep?: string }) => {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const stepMs = (SUMMARY_AVG_SECONDS * 1000) / SUMMARY_LOADING_MESSAGES.length;
+    const id = setInterval(() => setIdx(i => Math.min(i + 1, SUMMARY_LOADING_MESSAGES.length - 1)), stepMs);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200,
+      background: "color-mix(in srgb, var(--color-page) 82%, transparent)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
+    }}>
+      <div style={{
+        width: 40, height: 40,
+        border: `3px solid ${PINK}`, borderTop: "3px solid transparent",
+        borderRadius: "50%", animation: "spin 0.8s linear infinite"
+      }}/>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); }} @keyframes tk-msg-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); }}`}</style>
+      <p key={idx} style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)", textAlign: "center", animation: "tk-msg-fade 0.5s ease" }}>
+        {SUMMARY_LOADING_MESSAGES[idx]}
+      </p>
+      {loadingStep && (
+        <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>{loadingStep}</p>
+      )}
+    </div>
+  );
+};
+
+const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewProps) => {
   const [pageRange, setPageRange] = useState("");
   const [focusPrompt, setFocusPrompt] = useState("");
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
@@ -741,27 +783,9 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint, isLoading = false, loa
   ];
 
   return (
-    <div style={{ position: "relative" }}>
-      {/* 요약 생성 중에는 결과 전용 화면으로 넘어가지 않고 이 템플릿 화면 위에 오버레이로 로딩을 보여준다. */}
-      {isLoading && (
-        <div style={{
-          position: "absolute", inset: -8, zIndex: 10, borderRadius: 14,
-          background: "color-mix(in srgb, var(--color-page) 78%, transparent)",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
-        }}>
-          <div style={{
-            width: 36, height: 36,
-            border: `3px solid ${PINK}`, borderTop: "3px solid transparent",
-            borderRadius: "50%", animation: "spin 0.8s linear infinite"
-          }}/>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>
-            {loadingStep || "요약 중..."}
-          </p>
-        </div>
-      )}
-      <button onClick={onBack} disabled={isLoading} style={{
-        background: "none", border: "none", color: "var(--color-muted)", cursor: isLoading ? "default" : "pointer", fontSize: 14, marginBottom: 20, padding: 0
+    <div>
+      <button onClick={onBack} style={{
+        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
 
       <div style={{ marginBottom: 24 }}>
@@ -3678,8 +3702,10 @@ export default function Summary() {
         // 넓은 뷰(요약 결과·자료 상세)는 기존의 더 촘촘한 여백을 유지한다(인라인이 클래스보다 우선).
         style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
       >
+        {/* 요약 생성 중에는 어느 화면(templates·upload)에서 시작했든 전체 화면 로딩 오버레이를 띄운다. */}
+        {isSummarizing && <SummaryLoadingOverlay loadingStep={loadingStep} />}
         {view === "templates" && (
-          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} isLoading={isSummarizing} loadingStep={loadingStep} />
+          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}
 
         {view === "summaryResult" && selectedTemplate && (
