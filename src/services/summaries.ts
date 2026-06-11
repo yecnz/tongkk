@@ -1,4 +1,4 @@
-import { createTtlCache } from './cache';
+import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
 import { fetchCourses } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { SummaryTemplate } from './gpt';
@@ -36,11 +36,11 @@ const getCourseId = async (course: string) => {
   return found.id;
 };
 
-// 요약 목록은 화면 이동마다 다시 받지만 생성/수정/삭제 때만 바뀐다 → 짧게 캐싱.
+// 요약 목록은 화면 이동마다 다시 받지만 생성/수정/삭제 때만 바뀐다 → fresh 30초 + stale 30분(SWR).
 // variant로 본문(content) 포함 여부를 구분한다.
-const summariesCache = createTtlCache<SavedSummary[]>(30_000);
+const summariesCache = createTtlCache<SavedSummary[]>(30_000, SWR_STALE_TTL_MS);
 // 대시보드 통계용 개수 캐시 — 목록 본문을 받지 않고 count(개수)만 보관한다.
-const summariesCountCache = createTtlCache<number>(30_000);
+const summariesCountCache = createTtlCache<number>(30_000, SWR_STALE_TTL_MS);
 export const invalidateSummariesCache = (course?: string) => {
   summariesCache.invalidate(course);
   summariesCountCache.invalidate(course);
@@ -57,26 +57,37 @@ export async function loadSummariesFromServer(
   const cached = summariesCache.get(cacheKey);
   if (cached) return cached;
 
-  const courseId = await getCourseId(course);
-  if (!courseId) return [];
+  const fetchList = async (): Promise<SavedSummary[]> => {
+    const courseId = await getCourseId(course);
+    if (!courseId) return [];
 
-  const { data, error } = options?.includeContent
-    ? await supabase
-        .from('summaries')
-        .select('id, template, content, material_ids, created_at')
-        .eq('course_id', courseId)
-        .order('created_at', { ascending: false })
-    : await supabase
-        .from('summaries')
-        .select('id, template, material_ids, created_at')
-        .eq('course_id', courseId)
-        .order('created_at', { ascending: false });
+    const { data, error } = options?.includeContent
+      ? await supabase
+          .from('summaries')
+          .select('id, template, content, material_ids, created_at')
+          .eq('course_id', courseId)
+          .order('created_at', { ascending: false })
+      : await supabase
+          .from('summaries')
+          .select('id, template, material_ids, created_at')
+          .eq('course_id', courseId)
+          .order('created_at', { ascending: false });
 
-  if (error) throw new Error(formatSupabaseError(error));
+    if (error) throw new Error(formatSupabaseError(error));
 
-  const summaries = (data || []).map(toSavedSummary);
-  summariesCache.set(cacheKey, summaries);
-  return summaries;
+    const summaries = (data || []).map(toSavedSummary);
+    summariesCache.set(cacheKey, summaries);
+    return summaries;
+  };
+
+  // 만료됐지만 stale 윈도우 안이면 일단 보여주고 백그라운드로 갱신한다(SWR).
+  const stale = summariesCache.getStale(cacheKey);
+  if (stale) {
+    summariesCache.revalidate(cacheKey, fetchList);
+    return stale;
+  }
+
+  return fetchList();
 }
 
 // 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
@@ -86,25 +97,37 @@ export async function countSummariesFromServer(course: string): Promise<number> 
   const cachedCount = summariesCountCache.get(cacheKey);
   if (cachedCount !== undefined) return cachedCount;
 
+  // 목록 캐시 파생은 fresh만 사용한다 — stale 목록에서 count를 만들어 set하면
+  // stale 데이터가 fresh로 승격되는 경로가 생긴다.
   const cachedList = summariesCache.get(`${course}::light`) ?? summariesCache.get(`${course}::full`);
   if (cachedList) {
     summariesCountCache.set(cacheKey, cachedList.length);
     return cachedList.length;
   }
 
-  const courseId = await getCourseId(course);
-  if (!courseId) return 0;
+  const fetchCount = async (): Promise<number> => {
+    const courseId = await getCourseId(course);
+    if (!courseId) return 0;
 
-  const { count, error } = await supabase
-    .from('summaries')
-    .select('*', { count: 'exact', head: true })
-    .eq('course_id', courseId);
+    const { count, error } = await supabase
+      .from('summaries')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', courseId);
 
-  if (error) throw new Error(formatSupabaseError(error));
+    if (error) throw new Error(formatSupabaseError(error));
 
-  const total = count ?? 0;
-  summariesCountCache.set(cacheKey, total);
-  return total;
+    const total = count ?? 0;
+    summariesCountCache.set(cacheKey, total);
+    return total;
+  };
+
+  const staleCount = summariesCountCache.getStale(cacheKey);
+  if (staleCount !== undefined) {
+    summariesCountCache.revalidate(cacheKey, fetchCount);
+    return staleCount;
+  }
+
+  return fetchCount();
 }
 
 export async function deleteSummariesByMaterialId(course: string, materialId: string): Promise<void> {
