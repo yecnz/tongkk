@@ -2901,7 +2901,9 @@ export default function Summary() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const filesRef = useRef<UploadedFile[]>([]);
 
-  const [view, setView] = useState<SummaryView>("upload");
+  // 초기 view를 URL의 view와 일치시킨다. upload로 시작하면 복원되기 전에 URL 동기화가
+  // 새로고침 URL(view=material 등)을 upload로 덮어써, 복원에 쓸 material id가 날아간다.
+  const [view, setView] = useState<SummaryView>(restoreFromUrl && urlView ? urlView : "upload");
   // 요약 안내 팝업 '다시 보지 않기' 설정은 계정별(Supabase 프로필)로 저장한다.
   // 로드 전에는 true(숨김)로 두어, 불러오기 전에 팝업이 깜빡이지 않게 한다.
   const [hideSummaryNoticePref, setHideSummaryNoticePref] = useState(true);
@@ -3008,12 +3010,15 @@ export default function Summary() {
   }, []);
 
   useEffect(() => {
+    // 새로고침/직접 URL 진입(initial route entry)이면 handoff 소비를 건너뛰고 URL 기반 복원에 맡긴다.
+    // 이때 보존된 location.state를 handoff로 오인해 navigate로 URL을 초기화하면, 요약/자료 상세가
+    // 잠깐 떴다가 material 정보를 잃고 upload로 떨어진다. 다른 페이지에서 막 넘어온 경우에만 소비한다.
+    if (isInitialRouteEntryRef.current) return;
     if (!locationState?.openSummary && !locationState?.viewMaterial && !locationState?.createSummary) return;
     navigate(pageRoutes["자료 요약"], {
       replace: true,
       state: initialCourse ? { selectedCourse: initialCourse, fromDashboard: locationState.fromDashboard } : null,
     });
-    // The location handoff should be consumed once on mount so refreshes do not reopen nested views.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -3032,7 +3037,11 @@ export default function Summary() {
         const pendingMaterialId = pendingMaterialIdRef.current;
         if (pendingMaterialId) {
           pendingMaterialIdRef.current = "";
-          const material = nextMaterials.find(item => item.id === pendingMaterialId);
+          // macOS 업로드 파일명은 NFD(자모 분리)라, URL을 거치며 자료 목록의 id와 유니코드 정규화가
+          // 어긋날 수 있다(NFC vs NFD). NFC로 통일해 비교해야 새로고침 시 자료 상세가 복원된다
+          // (아니면 자료를 못 찾아 upload로 폴백됨).
+          const normalizedPendingId = pendingMaterialId.normalize("NFC");
+          const material = nextMaterials.find(item => item.id.normalize("NFC") === normalizedPendingId);
           if (material) {
             const validMaterialIds = pendingMaterialIdsRef.current.filter(id => nextMaterials.some(item => item.id === id));
             pendingMaterialIdsRef.current = [];
