@@ -68,6 +68,38 @@ const AGENT_INPUT_LINE_HEIGHT = 20;
 const AGENT_INPUT_BORDER = 2;
 const AGENT_INPUT_MAX_HEIGHT = AGENT_INPUT_LINE_HEIGHT * 5 + 22 + AGENT_INPUT_BORDER;
 
+// AI 튜터에 첨부할 수 있는 이미지 수와 전송 전 리사이즈 기준(긴 변 px).
+const MAX_TUTOR_IMAGES = 3;
+const TUTOR_IMAGE_MAX_DIM = 1500;
+
+// 첨부 이미지를 긴 변 기준으로 줄이고 JPEG data URL로 변환한다(전송 용량·서버 부담 절감).
+const fileToResizedDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
+      img.onload = () => {
+        const scale = Math.min(1, TUTOR_IMAGE_MAX_DIM / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("이미지 변환에 실패했습니다."));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+
 const markdownComponents: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
   h2: ({ children }) => <h2 style={{ margin: "16px 0 10px", fontSize: 16, lineHeight: 1.4, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
@@ -220,6 +252,8 @@ export const AITutorDrawer = ({
   const initialQuestionRef = useRef("");
   const pendingNonceRef = useRef<number | null>(null);
   const agentInputRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const canUseAgent = Boolean(contextMarkdown.trim());
   const canPersistChat = Boolean(summaryId || materialId);
   const chatTarget = { summaryId, materialId };
@@ -239,6 +273,30 @@ export const AITutorDrawer = ({
     const el = chatContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   };
+
+  const addImageFiles = useCallback(async (files: File[]) => {
+    const imageFiles = files.filter(file => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    setAgentError("");
+    const remaining = MAX_TUTOR_IMAGES - attachedImages.length;
+    if (remaining <= 0) {
+      setAgentError(`이미지는 최대 ${MAX_TUTOR_IMAGES}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+    try {
+      const picked = imageFiles.slice(0, remaining);
+      const dataUrls = await Promise.all(picked.map(fileToResizedDataUrl));
+      setAttachedImages(prev => [...prev, ...dataUrls].slice(0, MAX_TUTOR_IMAGES));
+      if (imageFiles.length > remaining) {
+        setAgentError(`이미지는 최대 ${MAX_TUTOR_IMAGES}장까지 첨부할 수 있습니다.`);
+      }
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : "이미지 첨부에 실패했습니다.");
+    }
+  }, [attachedImages.length]);
+
+  const removeAttachedImage = (index: number) =>
+    setAttachedImages(prev => prev.filter((_, i) => i !== index));
 
   // 입력 길이에 따라 textarea 높이를 1~5줄 범위에서 자동 조절한다.
   useEffect(() => {
@@ -264,6 +322,7 @@ export const AITutorDrawer = ({
     let ignore = false;
     setLocalThreadId(threadId);
     setAgentInput("");
+    setAttachedImages([]);
     setAgentError("");
     setActiveSessionId(null);
     setAgentMessages([]);
@@ -375,6 +434,7 @@ export const AITutorDrawer = ({
     setAgentError("");
     setShowScrollBtn(false);
     setSessionMenuOpen(false);
+    setAttachedImages([]);
 
     if (!canPersistChat) return;
     setChatLoading(true);
@@ -396,6 +456,7 @@ export const AITutorDrawer = ({
     setAgentInput("");
     setAgentError("");
     setShowScrollBtn(false);
+    setAttachedImages([]);
     setChatLoading(true);
 
     try {
@@ -409,15 +470,16 @@ export const AITutorDrawer = ({
     }
   };
 
-  const sendAgentQuestion = async (question: string) => {
+  const sendAgentQuestion = async (question: string, images: string[] = []) => {
     const content = question.trim();
-    if (!content || !canUseAgent || chatLoading || agentLoading) return;
+    if ((!content && images.length === 0) || !canUseAgent || chatLoading || agentLoading) return;
 
     setOpen(true);
-    const userMessage: AgentMessage = { role: "user", content };
+    const userMessage: AgentMessage = images.length ? { role: "user", content, images } : { role: "user", content };
     const nextMessages = [...agentMessages, userMessage];
     setAgentMessages(nextMessages);
     setAgentInput("");
+    setAttachedImages([]);
     setAgentError("");
     setAgentLoading(true);
 
@@ -484,7 +546,7 @@ export const AITutorDrawer = ({
   }, [autoSendQuestion, canUseAgent, chatLoading, agentLoading]);
 
   const handleSubmit = async () => {
-    await sendAgentQuestion(agentInput);
+    await sendAgentQuestion(agentInput, attachedImages);
   };
 
   const toggleButtonStyle: CSSProperties = {
@@ -812,6 +874,18 @@ export const AITutorDrawer = ({
                   return (
                     <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 8 }}>
                       <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
+                        {msg.images && msg.images.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: mainContent ? 8 : 0 }}>
+                            {msg.images.map((src, imgIdx) => (
+                              <img
+                                key={imgIdx}
+                                src={src}
+                                alt={`첨부 이미지 ${imgIdx + 1}`}
+                                style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8, border: "1px solid var(--color-border-soft)", objectFit: "cover" }}
+                              />
+                            ))}
+                          </div>
+                        )}
                         <FormattedTutorText content={mainContent} />
                       </div>
                       {isLastAssistant && suggestions.length > 0 && (
@@ -856,11 +930,61 @@ export const AITutorDrawer = ({
         </div>
 
         {agentError && <div style={{ marginBottom: 10, fontSize: 12, color: "var(--color-danger)" }}>{agentError}</div>}
+        {attachedImages.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            {attachedImages.map((src, index) => (
+              <div key={index} style={{ position: "relative" }}>
+                <img
+                  src={src}
+                  alt={`첨부 미리보기 ${index + 1}`}
+                  style={{ width: 56, height: 56, borderRadius: 8, border: "1px solid var(--color-border-soft)", objectFit: "cover", display: "block" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeAttachedImage(index)}
+                  aria-label={`첨부 이미지 ${index + 1} 삭제`}
+                  style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 11, lineHeight: "18px", textAlign: "center", cursor: "pointer", padding: 0 }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={e => {
+            void addImageFiles(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={!canUseAgent || chatLoading || agentLoading || attachedImages.length >= MAX_TUTOR_IMAGES}
+            aria-label="이미지 첨부"
+            title={attachedImages.length >= MAX_TUTOR_IMAGES ? `이미지는 최대 ${MAX_TUTOR_IMAGES}장까지 첨부할 수 있습니다` : "이미지 첨부"}
+            style={{ width: 42, height: 42, borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 16, cursor: !canUseAgent || chatLoading || agentLoading || attachedImages.length >= MAX_TUTOR_IMAGES ? "default" : "pointer", flexShrink: 0, opacity: !canUseAgent || chatLoading || agentLoading || attachedImages.length >= MAX_TUTOR_IMAGES ? 0.5 : 1 }}
+          >
+            <i className="fa-solid fa-paperclip" />
+          </button>
           <textarea
             ref={agentInputRef}
             value={agentInput}
             onChange={e => setAgentInput(e.target.value)}
+            onPaste={e => {
+              // 클립보드에 이미지가 있으면 첨부로 처리하고 기본 붙여넣기를 막는다.
+              const files = Array.from(e.clipboardData.files);
+              if (files.some(file => file.type.startsWith("image/"))) {
+                e.preventDefault();
+                void addImageFiles(files);
+              }
+            }}
             onKeyDown={e => {
               // Enter는 전송, Shift+Enter는 줄바꿈. 한글 IME 조합 중 Enter는 전송하지 않는다.
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -869,14 +993,14 @@ export const AITutorDrawer = ({
               }
             }}
             disabled={!canUseAgent || chatLoading || agentLoading}
-            placeholder="요약본에 대해 질문하기"
+            placeholder="요약본에 대해 질문하기 (이미지 첨부·붙여넣기 가능)"
             rows={1}
             style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
           />
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={!canUseAgent || chatLoading || !agentInput.trim() || agentLoading}
+            disabled={!canUseAgent || chatLoading || agentLoading || (!agentInput.trim() && attachedImages.length === 0)}
             style={{ padding: "11px 14px", borderRadius: 10, border: "none", background: !canUseAgent || chatLoading || agentLoading ? "var(--color-border-soft)" : PINK, color: "var(--color-on-brand)", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, fontWeight: 800, cursor: !canUseAgent || chatLoading || agentLoading ? "default" : "pointer", flexShrink: 0 }}
           >
             {agentLoading ? "응답 중" : "전송"}

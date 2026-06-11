@@ -34,7 +34,8 @@ SYSTEM_PROMPT = """너는 Tongkk의 대학 강의자료 학습 에이전트다.
 7. 화면 가독성을 위해 중요한 용어는 **굵게** 표시하고, 세부 내용은 bullet point로 정리한다. 프론트엔드가 이를 시각적으로 렌더링한다. 굵게는 `**텍스트**`처럼 별표와 텍스트 사이에 공백 없이 붙여 쓰고, `** 텍스트 **`처럼 별표 안쪽에 공백을 넣지 않는다.
 8. 템플릿이 지정되면 그 템플릿 구조를 최우선으로 따른다.
 9. 핵심 설명 뒤에는 후속 질문 전에 `근거로 본 자료: ...` 한 줄을 붙인다. 자료 제목, 섹션명, 페이지/슬라이드/OCR 라벨처럼 확인 가능한 단서를 우선 사용하고, 없으면 `업로드한 강의자료`라고 쓴다.
-10. 모든 답변의 맨 마지막에는 반드시 아래 형식으로 후속 질문 2~3개를 제안한다. 이 형식을 절대 생략하거나 바꾸지 않는다.
+10. 사용자가 메시지에 이미지를 첨부하면(그래프, 손글씨 필기, 문제 풀이, 화면 캡처 등) 그 이미지를 직접 읽어 해석한다. 그래프·도표는 축·범례·추세를 읽고 무엇을 뜻하는지 설명하고, 업로드된 강의자료 본문과 연관 지어 답한다. 이미지에서 읽은 내용을 근거로 쓸 때는 `근거로 본 자료`에 `첨부 이미지`라고 표기한다.
+11. 모든 답변의 맨 마지막에는 반드시 아래 형식으로 후속 질문 2~3개를 제안한다. 이 형식을 절대 생략하거나 바꾸지 않는다.
 
 다음으로 알려드릴게요:
 - (후속 질문 1)
@@ -155,8 +156,9 @@ class StudyAgentState(TypedDict):
     source_markdown: NotRequired[str]
 
 
-def build_llm(model: AgentModel, max_tokens: int | None = None):
-    return _build_model(model, max_tokens=max_tokens)
+def build_llm(model: AgentModel, max_tokens: int | None = None, model_name: str | None = None):
+    # model_name을 주면 기본 모델 대신 그 모델을 쓴다(예: 시각 분석 전용 모델 지정).
+    return _build_model(model, max_tokens=max_tokens, model_name=model_name)
 
 
 def build_openai_llm(model_name: str, max_tokens: int | None = None):
@@ -171,15 +173,15 @@ def build_openai_llm(model_name: str, max_tokens: int | None = None):
     )
 
 
-def _build_model(model: AgentModel, max_tokens: int | None = None):
+def _build_model(model: AgentModel, max_tokens: int | None = None, model_name: str | None = None):
     if model == "GPT":
-        return build_openai_llm(os.getenv("OPENAI_MODEL", "gpt-5.4-mini"), max_tokens=max_tokens)
+        return build_openai_llm(model_name or os.getenv("OPENAI_MODEL", "gpt-5.4-mini"), max_tokens=max_tokens)
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("서버에 GEMINI_API_KEY가 설정되지 않았습니다.")
     return ChatGoogleGenerativeAI(
-        model=os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
+        model=model_name or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"),
         temperature=0.3,
         max_output_tokens=max_tokens or _env_int("GEMINI_MAX_OUTPUT_TOKENS", 8192),
         google_api_key=api_key,
@@ -207,11 +209,23 @@ def _build_graph():
 GRAPH = _build_graph()
 
 
-def _to_langchain_message(message: dict[str, str]) -> BaseMessage:
+def _to_langchain_message(message: dict[str, object]) -> BaseMessage:
     role = message.get("role")
-    content = message.get("content", "")
+    content = message.get("content") or ""
     if role == "assistant":
         return AIMessage(content=content)
+
+    # 사용자가 이미지를 첨부하면 텍스트+이미지 멀티모달 콘텐츠로 보낸다.
+    images = message.get("images") or []
+    if isinstance(images, list) and images:
+        blocks: list[dict[str, object]] = []
+        text = content.strip() if isinstance(content, str) else ""
+        if text:
+            blocks.append({"type": "text", "text": text})
+        for url in images:
+            if isinstance(url, str) and url:
+                blocks.append({"type": "image_url", "image_url": {"url": url}})
+        return HumanMessage(content=blocks)
     return HumanMessage(content=content)
 
 

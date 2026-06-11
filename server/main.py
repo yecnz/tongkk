@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from agent import run_study_agent, build_llm, build_openai_llm
 
@@ -75,9 +75,15 @@ def _env_int(name: str, default: int) -> int:
 
 
 VISUAL_ANALYSIS_MODE = os.getenv("VISUAL_ANALYSIS_MODE", "auto").lower()
+# 시각 분석에 쓸 모델. 기본은 그래프·도표 해석 가성비가 좋은 Gemini 2.5 Flash.
+VISUAL_ANALYSIS_MODEL = os.getenv("VISUAL_ANALYSIS_MODEL", "Gemini")
+VISUAL_ANALYSIS_GEMINI_MODEL = os.getenv("VISUAL_ANALYSIS_GEMINI_MODEL", "gemini-2.5-flash")
+VISUAL_ANALYSIS_OPENAI_MODEL = os.getenv("VISUAL_ANALYSIS_OPENAI_MODEL", "gpt-5.4-mini")
 VISUAL_ANALYSIS_MAX_ITEMS = _env_int("VISUAL_ANALYSIS_MAX_ITEMS", 12)
 VISUAL_ANALYSIS_BATCH_SIZE = max(1, _env_int("VISUAL_ANALYSIS_BATCH_SIZE", 4))
 VISUAL_ANALYSIS_MIN_TEXT_CHARS = _env_int("VISUAL_ANALYSIS_MIN_TEXT_CHARS", 1200)
+# 이미지 해석 시 함께 보내는 본문 텍스트(맥락)의 길이 상한.
+VISUAL_CONTEXT_MAX_CHARS = _env_int("VISUAL_CONTEXT_MAX_CHARS", 1500)
 PDF_VISUAL_RENDER_DPI = _env_int("PDF_VISUAL_RENDER_DPI", 90)
 PDF_VISUAL_TEXT_PAGE_CHARS = _env_int("PDF_VISUAL_TEXT_PAGE_CHARS", 180)
 PPTX_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -90,6 +96,9 @@ SUMMARY_MAX_TOKENS = _env_int("SUMMARY_MAX_TOKENS", 32768)
 MAX_MARKDOWN_CHARS = _env_int("MAX_MARKDOWN_CHARS", 2_000_000)
 MAX_CHAT_CONTENT_CHARS = _env_int("MAX_CHAT_CONTENT_CHARS", 100_000)
 MAX_CHAT_MESSAGES = _env_int("MAX_CHAT_MESSAGES", 100)
+# AI 튜터에 첨부할 수 있는 이미지 수와 1장당 data URL 길이 상한(base64 약 6MB 상당).
+MAX_CHAT_IMAGES = _env_int("MAX_CHAT_IMAGES", 3)
+MAX_CHAT_IMAGE_CHARS = _env_int("MAX_CHAT_IMAGE_CHARS", 8_000_000)
 
 
 async def require_api_user(authorization: str | None = Header(default=None)):
@@ -233,7 +242,20 @@ SUMMARY_SYSTEM_PROMPT = """너는 대학 강의자료를 템플릿별 목적에 
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=MAX_CHAT_CONTENT_CHARS)
+    content: str = Field(default="", max_length=MAX_CHAT_CONTENT_CHARS)
+    # 사용자가 첨부한 이미지(data:image/...;base64,...). 비어 있으면 일반 텍스트 메시지.
+    images: list[str] = Field(default_factory=list, max_length=MAX_CHAT_IMAGES)
+
+    @model_validator(mode="after")
+    def _validate_content_or_images(self) -> "ChatMessage":
+        if not self.content.strip() and not self.images:
+            raise ValueError("메시지에는 내용이나 이미지가 하나 이상 있어야 합니다.")
+        for image in self.images:
+            if not image.startswith("data:image/"):
+                raise ValueError("이미지는 data:image/... 형식의 data URL이어야 합니다.")
+            if len(image) > MAX_CHAT_IMAGE_CHARS:
+                raise ValueError("첨부 이미지 크기가 너무 큽니다.")
+        return self
 
 
 class SummarizeRequest(BaseModel):
@@ -822,9 +844,13 @@ def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -
         for index in selected_indexes:
             page = doc.load_page(index)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            # 같은 페이지의 텍스트 레이어를 맥락으로 함께 전달해, 작은 글씨 오독을 줄이고
+            # 이미지가 본문 어느 개념과 연결되는지 모델이 해석할 수 있게 한다.
+            page_text = (page.get_text("text") or "").strip()
             pages.append({
                 "label": f"PDF {index + 1}페이지",
                 "data_url": _image_data_url(pixmap.tobytes("png")),
+                "context": page_text[:VISUAL_CONTEXT_MAX_CHARS],
             })
 
     return pages
@@ -859,11 +885,9 @@ def _should_analyze_visuals(base_markdown: str, suffix: str) -> bool:
         return False
     if VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}:
         return True
-    if suffix not in {".pdf", ".pptx"}:
-        return False
-    if suffix == ".pdf":
-        return True
-    return _text_length(base_markdown) < VISUAL_ANALYSIS_MIN_TEXT_CHARS
+    # PDF·PPTX는 본문 텍스트 양과 무관하게 삽입 이미지를 해석한다.
+    # (이미지가 없으면 _collect_visual_inputs가 빈 목록을 돌려 분석을 건너뛴다.)
+    return suffix in {".pdf", ".pptx"}
 
 
 def _collect_visual_inputs(file_path: str, suffix: str, force: bool = False) -> list[dict[str, str]]:
@@ -894,6 +918,72 @@ def _tag_visual_pdf_pages(visual_markdown: str) -> str:
     )
 
 
+_VISUAL_SYSTEM_PROMPT = """너는 대학 강의자료의 이미지(슬라이드, 그래프, 도표, 그림, 손글씨)를 읽고 학습에 쓸 수 있게 해석하는 분석기다.
+규칙:
+- 이미지 안의 인쇄 텍스트·표·수식·손글씨를 정확히 읽어 Markdown으로 정리한다. 확실하지 않은 글자는 추측하지 말고 '[불확실]'로 표시한다.
+- 그래프·도표·그림은 글자 전사에 그치지 말고 의미를 해석한다: 축·범례·단위·추세를 먼저 읽고, 무엇을 나타내는지, 어떤 값·관계·패턴이 핵심인지 설명한다.
+- 함께 제공된 본문 텍스트가 있으면 그것과 연결해, 이 이미지가 본문의 어떤 개념을 시각화·예시·근거로 보여주는지, 왜 이 자리에 삽입됐는지를 1~2문장으로 판단해 적는다.
+- 텍스트가 거의 없는 사진·도식이라도 학습에 의미가 있으면 반드시 해석한다.
+- 로고, 배경 장식, 표지처럼 학습 내용이 전혀 없을 때만 '유의미한 학습 내용 없음'이라고만 답한다.
+- 여러 이미지가 들어오면 이미지별로 반드시 별도 섹션을 만든다.
+- 한국어로 답한다."""
+
+
+def _build_visual_llm():
+    """시각 분석용 LLM을 만든다. 키가 없으면 None을 돌려 호출부가 분석을 건너뛰게 한다."""
+    if VISUAL_ANALYSIS_MODEL == "GPT":
+        if not os.getenv("OPENAI_API_KEY"):
+            return None
+        return build_llm("GPT", model_name=VISUAL_ANALYSIS_OPENAI_MODEL)
+    if not os.getenv("GEMINI_API_KEY"):
+        return None
+    return build_llm("Gemini", model_name=VISUAL_ANALYSIS_GEMINI_MODEL)
+
+
+def _run_visual_llm(visual_inputs: list[dict[str, str]], shared_context: str = "") -> str:
+    """이미지 목록을 시각 분석 모델에 보내 해석 결과(섹션들)를 합쳐 돌려준다."""
+    llm = _build_visual_llm()
+    if llm is None:
+        return ""
+
+    sections: list[str] = []
+    for batch in _visual_batches(visual_inputs):
+        content: list[dict[str, object]] = [{
+            "type": "text",
+            "text": (
+                "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
+                "반드시 각 항목을 제공된 라벨을 그대로 쓴 '## 라벨' 제목(예: '## PDF 3페이지')으로 시작하고, "
+                "이미지 순서대로 작성해. "
+                "전사뿐 아니라 그래프·도표의 의미와, 본문 텍스트가 주어졌다면 본문과의 연관성(왜 삽입됐는지)을 함께 설명해. "
+                "분석 대상: " + ", ".join(item["label"] for item in batch)
+            ),
+        }]
+        if shared_context:
+            content.append({
+                "type": "text",
+                "text": f"[강의자료 본문 텍스트(참고용)]\n{shared_context}",
+            })
+        for item in batch:
+            content.append({"type": "text", "text": f"[{item['label']}]"})
+            item_context = (item.get("context") or "").strip()
+            if item_context:
+                content.append({
+                    "type": "text",
+                    "text": f"[{item['label']} 본문 텍스트]\n{item_context}",
+                })
+            content.append({"type": "image_url", "image_url": {"url": item["data_url"]}})
+
+        response = llm.invoke([
+            SystemMessage(content=_VISUAL_SYSTEM_PROMPT),
+            HumanMessage(content=content),
+        ])
+        text = _message_content_to_text(response.content).strip()
+        if text and text != "유의미한 학습 내용 없음":
+            sections.append(text)
+
+    return "\n\n".join(sections)
+
+
 def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = "") -> str:
     force_visual_scan = VISUAL_ANALYSIS_MODE in {"on", "always", "true", "1"}
     if not force_visual_scan and not _should_analyze_visuals(base_markdown, suffix):
@@ -903,63 +993,41 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
     if not visual_inputs:
         return ""
 
-    model = os.getenv("VISUAL_ANALYSIS_MODEL", "GPT")
-
-    if model == "GPT" and not os.getenv("OPENAI_API_KEY"):
-        return ""
-    if model == "Gemini" and not os.getenv("GEMINI_API_KEY"):
-        return ""
-
-    llm = build_llm(model)
-    sections: list[str] = []
-
-    for batch in _visual_batches(visual_inputs):
-        content: list[dict[str, object]] = [{
-            "type": "text",
-            "text": (
-                "아래 강의자료 이미지들을 각각 구분해서 분석해줘. "
-                "반드시 각 항목을 제공된 라벨을 그대로 쓴 '## 라벨' 제목(예: '## PDF 3페이지')으로 시작하고, "
-                "이미지 순서대로 작성해. "
-                "분석 대상: " + ", ".join(item["label"] for item in batch)
-            ),
-        }]
-        for item in batch:
-            content.extend([
-                {
-                    "type": "text",
-                    "text": f"[{item['label']}]",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {"url": item["data_url"]},
-                },
-            ])
-
-        response = llm.invoke([
-            SystemMessage(content="""너는 강의자료 이미지와 손글씨를 Markdown으로 전사하는 OCR 보조 분석기다.
-규칙:
-- 이미지 안의 인쇄 텍스트, 도표 텍스트, 손글씨를 최대한 읽어 Markdown bullet로 정리한다.
-- 수식, 표, 화살표 관계, 도식의 의미도 강의 요약/퀴즈 생성에 쓸 수 있게 설명한다.
-- 확실하지 않은 글자는 추측하지 말고 '[불확실]'로 표시한다.
-- 이미지에 유의미한 학습 내용이 없으면 '유의미한 학습 내용 없음'이라고만 답한다.
-- 여러 이미지가 들어오면 이미지별로 반드시 별도 섹션을 만든다.
-- 한국어로 답한다."""),
-            HumanMessage(content=content),
-        ])
-        text = _message_content_to_text(response.content).strip()
-        if text and text != "유의미한 학습 내용 없음":
-            sections.append(text)
-
-    if not sections:
+    # PPTX 삽입 이미지는 슬라이드 번호와 1:1로 매칭되지 않으므로 본문 전체를 공통 맥락으로 준다.
+    shared_context = base_markdown[:VISUAL_CONTEXT_MAX_CHARS] if (suffix == ".pptx" and base_markdown) else ""
+    body_text = _run_visual_llm(visual_inputs, shared_context)
+    if not body_text:
         return ""
 
-    body = "# 이미지/손글씨 분석 결과\n\n" + "\n\n".join(sections)
+    body = "# 이미지/손글씨 분석 결과\n\n" + body_text
     # PDF는 페이지별로 렌더링·분석하므로 'PDF N페이지' 섹션마다 페이지 마커를 심어,
     # 페이지 선택 요약이 이미지 슬라이드에도 적용되게 한다. (PPTX 삽입 이미지는 슬라이드 번호와
     # 1:1로 매칭되지 않아, 본문 markitdown의 'Slide number' 마커에만 의존한다.)
     if suffix == ".pdf":
         body = _tag_visual_pdf_pages(body)
     return body
+
+
+def _image_to_png_bytes(path: str) -> bytes:
+    """업로드 이미지를 시각 분석 모델 호환성이 높은 PNG로 변환한다(투명 배경은 흰색으로)."""
+    import io
+
+    from PIL import Image
+
+    with Image.open(path) as image:
+        rgba = image.convert("RGBA")
+        background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        background.alpha_composite(rgba)
+        buffer = io.BytesIO()
+        background.convert("RGB").save(buffer, format="PNG")
+        return buffer.getvalue()
+
+
+def _analyze_uploaded_image(path: str) -> str:
+    """단독 업로드 이미지를 시각 분석 모델로 해석한다. 키가 없으면 빈 문자열."""
+    png_bytes = _image_to_png_bytes(path)
+    item = {"label": "업로드 이미지", "data_url": _image_data_url(png_bytes, "image/png")}
+    return _run_visual_llm([item])
 
 
 @app.post("/convert")
@@ -987,6 +1055,15 @@ async def convert_document_to_markdown(
 
     try:
         if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+            # 1순위: 시각 분석 모델로 이미지를 읽고 해석한다(텍스트가 없는 그래프·도식도 처리).
+            analysis = ""
+            try:
+                analysis = await run_in_threadpool(_analyze_uploaded_image, tmp_path)
+            except Exception:
+                logger.exception("업로드 이미지 시각 분석 실패")
+            if analysis:
+                return {"markdown": f"# 이미지 분석 결과\n\n{analysis}"}
+            # 폴백: 시각 분석 키가 없거나 결과가 비면 기존 Tesseract OCR로 글자만 추출한다.
             text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
             return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
 

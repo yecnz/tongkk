@@ -5,6 +5,8 @@ export type AgentRole = 'user' | 'assistant';
 export type AgentMessage = {
   role: AgentRole;
   content: string;
+  // 사용자가 첨부한 이미지(data:image/...;base64,...). 화면 표시 및 백엔드 전송용.
+  images?: string[];
 };
 
 export type AgentResponse = {
