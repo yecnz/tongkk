@@ -16,13 +16,17 @@ export const ddayTypeColors: Record<DdayType, { solid: string; soft: string }> =
 };
 
 export type Dday = { id?: string; type?: DdayType; subj: string; date: string };
+// AI 계획 항목을 누르면 바로 이동할 학습 행동(딥링크).
+export type PlanAction = "retry_quiz" | "review_wrong" | "review_summary" | "read_material" | "make_quiz";
 export type Plan = {
   id?: string;
   text: string;
   done: boolean;
   minutes?: number;
-  sourceType?: DdayType | "carryover";
+  sourceType?: DdayType | "carryover" | "review";
   origin?: "manual" | "ai"; // 없으면 manual로 간주(하위호환).
+  action?: PlanAction;
+  course?: string; // action 이동 대상 과목.
   date?: string; // "YYYY-MM-DD". 없으면 "오늘"로 간주(하위호환).
 };
 

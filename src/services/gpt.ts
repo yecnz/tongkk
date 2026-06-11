@@ -27,6 +27,7 @@ export async function generateQuiz(
   signal?: AbortSignal,
   questionType: QuizQuestionType = '객관식',
   excludeQuestions: string[] = [],
+  diagnostic = false,
 ): Promise<QuizQuestion[]> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90_000);
@@ -38,7 +39,7 @@ export async function generateQuiz(
     const response = await fetch(`${BACKEND_URL}/quiz`, {
       method: 'POST',
       headers: await getJsonRequestHeaders(),
-      body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType, exclude_questions: excludeQuestions }),
+      body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType, exclude_questions: excludeQuestions, diagnostic }),
       signal: controller.signal,
     });
 

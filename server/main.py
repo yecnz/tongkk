@@ -265,6 +265,8 @@ class QuizRequest(BaseModel):
     markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
     # 이전에 출제된 문제 텍스트. 이 문제들과 중복/유사하게 내지 않도록 프롬프트에 반영한다.
     exclude_questions: list[str] = Field(default_factory=list)
+    # 학습 전 수준 진단용 퀴즈: 전 범위에서 단원별로 골고루, 기초 개념 위주로 출제.
+    diagnostic: bool = False
 
 
 class WrongAnswerItem(BaseModel):
@@ -292,7 +294,7 @@ class SubjectiveGradeRequest(BaseModel):
 
 class StudyPlanDday(BaseModel):
     id: str | None = None
-    type: Literal["assignment", "event"] = "assignment"
+    type: Literal["assignment", "event", "exam"] = "assignment"
     subj: str = Field(min_length=1)
     date: str = Field(min_length=1)
 
@@ -303,6 +305,25 @@ class StudyPlanItem(BaseModel):
     done: bool = False
 
 
+class StudyPlanCourse(BaseModel):
+    """학습계획 처방 근거가 되는 과목별 학습 상태 요약."""
+    name: str = Field(min_length=1)
+    materials: int = Field(default=0, ge=0)
+    summaries: int = Field(default=0, ge=0)
+    quiz_sets: int = Field(default=0, ge=0)
+    attempts: int = Field(default=0, ge=0)
+    last_score_percent: int | None = Field(default=None, ge=0, le=100)
+    recent_wrong_count: int = Field(default=0, ge=0)
+    days_since_last_attempt: int | None = Field(default=None, ge=0)
+
+
+class StudyPlanReviewCandidate(BaseModel):
+    """간격 반복 복습 후보(며칠 전 학습한 내용)."""
+    course: str = Field(min_length=1)
+    days_since: int = Field(default=1, ge=0)
+    score_percent: int | None = Field(default=None, ge=0, le=100)
+
+
 class StudyPlanRequest(BaseModel):
     ddays: list[StudyPlanDday] = Field(default_factory=list)
     incomplete_plans: list[StudyPlanItem] = Field(default_factory=list)
@@ -311,6 +332,9 @@ class StudyPlanRequest(BaseModel):
     goal: Literal["exam", "assignment", "review"] | None = None
     familiarity: Literal["new", "attended", "reviewed"] | None = None
     daily_minutes: int | None = Field(default=None, ge=30, le=480)
+    # 데이터 기반 처방(선택): 과목별 학습 상태와 간격 반복 복습 후보.
+    courses: list[StudyPlanCourse] = Field(default_factory=list)
+    review_candidates: list[StudyPlanReviewCandidate] = Field(default_factory=list)
 
 
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
@@ -341,8 +365,14 @@ STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항
 판단 기준:
 - assignment는 과제다. 요구사항 확인, 자료 정리, 목차 잡기, 초안 작성, 제출 전 검토처럼 실행 가능한 작업으로 쪼갠다.
 - event는 일정이다. 오늘 준비가 필요한 경우에만 준비물 확인, 장소/시간 확인, 연락, 이동 계획 같은 리마인드 작업으로 만든다.
+- exam은 시험이다. 다시 읽기보다 스스로 떠올려 확인하는 인출 연습을 우선한다: ① 오답 다시 확인 → ② 점수 낮은 퀴즈 다시 풀기 → ③ 퀴즈를 안 만든 자료는 요약 훑기→정독→퀴즈 만들기 순서로 준비 작업을 만든다.
 - 미완료 항목은 우선 반영하되, 너무 무거우면 더 작게 쪼갠다.
-- 오늘 할 일은 1~5개로 제한한다.
+- day_offset이 0(오늘)인 항목은 1~5개로 제한한다.
+- 시험(exam)이 3일 이상 남았으면 오늘에 다 몰지 말고 day_offset(0=오늘, 1=내일, ...)으로 시험 전날까지 나눠 배치한다. 시험 직전 1~2일은 총복습과 오답 점검으로 남겨둔다. 전체 항목은 12개를 넘기지 않는다.
+- 시험이 없거나 임박했으면 모든 항목을 day_offset 0으로 둔다.
+- [과목 학습 상태]가 있으면 수치(최근 점수, 최근 오답 수, 퀴즈 미응시)에 근거해 어떤 과목의 무엇을 할지 구체적으로 처방한다.
+- [복습 추천 후보]는 며칠 전 학습한 내용의 간격 반복이다. 퀴즈 다시 풀기나 오답 확인 항목으로 1~2개 반영하고 source_type을 review로 둔다.
+- 항목에 이어서 할 행동이 분명하면 action을 넣는다: retry_quiz(퀴즈 다시 풀기), review_wrong(오답 확인), review_summary(요약 복습), read_material(자료 정독), make_quiz(퀴즈 만들기). 해당 없으면 null. action이 있으면 course에 과목명을 넣는다.
 - 각 항목은 사용자가 바로 실행할 수 있게 8~22자 정도의 한국어 동사형 문장으로 쓴다.
 - 시간은 5분 단위, 10~90분 사이로 제안한다.
 - mode가 lighter면 총량을 줄이고 쉬운 작업 위주로 둔다.
@@ -358,7 +388,7 @@ STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항
 - daily_minutes가 주어지면 모든 항목의 minutes 합계가 그 값을 넘지 않게 한다.
 
 출력 형식:
-{"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment 또는 event 또는 carryover"}]}"""
+{"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment|event|exam|carryover|review","action":"retry_quiz|review_wrong|review_summary|read_material|make_quiz 또는 null","course":"과목명 또는 null","day_offset":0}]}"""
 
 STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
 조정 모드: {mode}
@@ -368,7 +398,7 @@ STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
 
 [미완료 항목]
 {incomplete_json}
-
+{courses_section}{review_section}
 위 정보를 보고 오늘의 학습계획을 JSON으로만 생성해."""
 
 
@@ -537,7 +567,7 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
         raise ValueError("학습 계획 items가 배열 형식이 아닙니다.")
 
     items: list[dict[str, object]] = []
-    for raw_item in raw_items[:5]:
+    for raw_item in raw_items[:12]:
         if not isinstance(raw_item, dict):
             continue
         text = raw_item.get("text")
@@ -548,11 +578,18 @@ def _validate_study_plan(parsed: dict[str, object]) -> dict[str, object]:
         minutes = max(10, min(90, int(round(minutes / 5) * 5)))
         source_type = raw_item.get("source_type")
         source_id = raw_item.get("source_id")
+        action = raw_item.get("action")
+        course = raw_item.get("course")
+        raw_offset = raw_item.get("day_offset", 0)
+        day_offset = raw_offset if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool) else 0
         items.append({
             "text": text.strip()[:80],
             "minutes": minutes,
             "source_id": source_id if isinstance(source_id, str) and source_id else None,
-            "source_type": source_type if source_type in {"assignment", "event", "carryover"} else "assignment",
+            "source_type": source_type if source_type in {"assignment", "event", "exam", "carryover", "review"} else "assignment",
+            "action": action if action in {"retry_quiz", "review_wrong", "review_summary", "read_material", "make_quiz"} else None,
+            "course": course.strip()[:60] if isinstance(course, str) and course.strip() else None,
+            "day_offset": max(0, min(30, int(day_offset))),
         })
 
     if not items:
@@ -1198,6 +1235,11 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         markdown_section=markdown_section,
         exclude_section=exclude_section,
     )
+    if req.diagnostic:
+        prompt = (
+            "[진단 퀴즈] 학습 전 수준 진단용이다. 자료의 전체 범위에서 단원·주제별로 골고루 1문제씩, "
+            "핵심 개념을 확인하는 기초 문제로 출제해라.\n\n" + prompt
+        )
 
     def _call_llm():
         llm = build_llm(req.model)
@@ -1329,16 +1371,27 @@ async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_u
     learner_section = (
         f"\n[학습자 정보]\n{json.dumps(learner_info, ensure_ascii=False)}\n\n" if learner_info else "\n"
     )
+    courses_section = (
+        f"\n[과목 학습 상태]\n{json.dumps([item.model_dump() for item in req.courses], ensure_ascii=False)}\n"
+        if req.courses else ""
+    )
+    review_section = (
+        f"\n[복습 추천 후보]\n{json.dumps([item.model_dump() for item in req.review_candidates], ensure_ascii=False)}\n"
+        if req.review_candidates else ""
+    )
     prompt = STUDY_PLAN_USER_PROMPT.format(
         today=date.today().isoformat(),
         mode=req.mode,
         learner_section=learner_section,
         ddays_json=json.dumps([item.model_dump() for item in req.ddays], ensure_ascii=False),
         incomplete_json=json.dumps([item.model_dump() for item in req.incomplete_plans], ensure_ascii=False),
+        courses_section=courses_section,
+        review_section=review_section,
     )
 
     def _call_llm():
-        llm = build_openai_llm(STUDY_PLAN_MODEL, max_tokens=900)
+        # 시험 분산 배치 시 항목이 최대 12개까지 늘어 토큰 여유를 둔다.
+        llm = build_openai_llm(STUDY_PLAN_MODEL, max_tokens=1400)
         response = llm.invoke([
             SystemMessage(content=STUDY_PLAN_SYSTEM_PROMPT),
             HumanMessage(content=prompt),

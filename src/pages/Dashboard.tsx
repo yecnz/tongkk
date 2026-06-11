@@ -32,6 +32,7 @@ import {
   type Dday,
   type DdayType,
   type Plan,
+  type PlanAction,
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 
@@ -51,10 +52,12 @@ type PlanSource = {
   key: string;
   label: string;
   meta: string;
-  kind: DdayType | "carryover";
+  kind: DdayType | "carryover" | "review";
   daysLeft?: number;
   dday?: Dday;
   plan?: Plan;
+  // kind가 review일 때: 간격 반복 복습 후보 정보.
+  review?: { course: string; daysSince: number; scorePercent: number };
 };
 
 type CourseStats = {
@@ -587,10 +590,10 @@ export default function Dashboard() {
     return () => { ignore = true; };
   }, []);
 
-  // 페이스 플랜 과목의 응시 기록을 불러와 자동 진행도(퀴즈 기준)와 시험 준비도(최근 점수) 계산에 사용.
+  // 응시 기록 로드: 페이스 플랜 진행도·준비도 계산 + 간격 반복 복습 추천 + AI 계획 컨텍스트에 사용.
   // 과목 집합이 바뀔 때만 재조회하도록 안정 키에 의존(수동 플랜 변경 시 불필요한 재조회 방지).
   const paceCoursesKey = JSON.stringify(
-    Array.from(new Set(pacePlans.map(plan => plan.course))).sort()
+    Array.from(new Set([...pacePlans.map(plan => plan.course), ...courses])).sort()
   );
   useEffect(() => {
     const paceCourses: string[] = JSON.parse(paceCoursesKey);
@@ -621,6 +624,14 @@ export default function Dashboard() {
   const incompletePlans = plans.filter(plan => !plan.done);
   const makeDdaySourceKey = (dday: Dday, index: number) => `dday-${dday.id || `${dday.subj}-${dday.date}-${index}`}`;
   const makePlanSourceKey = (plan: Plan, index: number) => `plan-${plan.id || `${plan.text}-${index}`}`;
+  // 간격 반복 복습 후보: 과목별 최근 응시가 1~7일 전이면 다시 꺼내 인출 연습을 제안한다.
+  const reviewCandidates = Object.entries(courseQuizAttempts).flatMap(([course, attempts]) => {
+    const latest = attempts[0];
+    if (!latest) return [];
+    const daysSince = Math.floor((Date.now() - latest.createdAt) / 86400000);
+    if (daysSince < 1 || daysSince > 7) return [];
+    return [{ course, daysSince, scorePercent: Math.round(latest.scorePercent) }];
+  });
   const planSources: PlanSource[] = [
     ...sortedDdays.map((dday, index) => {
       const daysLeft = getDaysLeft(dday.date);
@@ -641,22 +652,32 @@ export default function Dashboard() {
       kind: "carryover" as const,
       plan,
     })),
+    ...reviewCandidates.map(candidate => ({
+      key: `review-${candidate.course}`,
+      label: candidate.course,
+      meta: `${candidate.daysSince}일 전 퀴즈 ${candidate.scorePercent}점`,
+      kind: "review" as const,
+      review: candidate,
+    })),
   ];
   const canGenerateStudyPlan = planSources.length > 0;
   const selectedPlanSources = planSources.filter(source => selectedPlanSourceKeys.includes(source.key));
   const carryoverPlanSources = planSources.filter(source => source.kind === "carryover");
-  const ddayPlanSources = planSources.filter(source => source.kind !== "carryover");
+  const reviewPlanSources = planSources.filter(source => source.kind === "review");
+  const ddayPlanSources = planSources.filter(source => source.kind !== "carryover" && source.kind !== "review");
 
   const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode) => {
     const carryoverCount = sources.filter(source => source.kind === "carryover").length;
     const assignmentCount = sources.filter(source => source.kind === "assignment").length;
     const examCount = sources.filter(source => source.kind === "exam").length;
     const eventCount = sources.filter(source => source.kind === "event").length;
+    const reviewCount = sources.filter(source => source.kind === "review").length;
     const parts = [
       carryoverCount ? `미완료 계획 ${carryoverCount}개` : "",
       assignmentCount ? `가까운 과제 ${assignmentCount}개` : "",
       examCount ? `가까운 시험 ${examCount}개` : "",
       eventCount ? `가까운 일정 ${eventCount}개` : "",
+      reviewCount ? `복습 추천 ${reviewCount}개` : "",
     ].filter(Boolean);
     if (parts.length === 0) return "자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.";
     if (mode === "lighter") return `${parts.join("와 ")}만 가볍게 반영할게요.`;
@@ -685,8 +706,23 @@ export default function Dashboard() {
       })
       .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0))
       .slice(0, ddayLimit);
-    return [...carryoverSources, ...ddaySources].map(source => source.key);
+    // 간격 반복 복습은 기본 1~2개만 추천(부하를 키우지 않는 선에서).
+    const reviewLimit = mode === "harder" ? 3 : mode === "lighter" ? 1 : 2;
+    const reviewSources = planSources
+      .filter(source => source.kind === "review")
+      .sort((a, b) => (b.review?.daysSince ?? 0) - (a.review?.daysSince ?? 0))
+      .slice(0, reviewLimit);
+    return [...carryoverSources, ...ddaySources, ...reviewSources].map(source => source.key);
   };
+
+  // 진단 퀴즈 대상 과목: 선택한 시험 D-day와 이름이 닿는 과목 → 자료 있는 과목 → 첫 과목 순.
+  const diagnosticCourse = (() => {
+    const examDday = selectedPlanSources.find(source => source.kind === "exam")?.dday;
+    const fromExam = examDday
+      ? courses.find(course => examDday.subj.includes(course) || course.includes(examDday.subj))
+      : undefined;
+    return fromExam ?? courses.find(course => (courseStats[course]?.materials ?? 0) > 0) ?? courses[0];
+  })();
 
   const openPlanSourcePicker = (mode: StudyPlanMode) => {
     if (!canGenerateStudyPlan) return;
@@ -706,16 +742,42 @@ export default function Dashboard() {
     try {
       const selectedDdays = selectedPlanSources
         .map(source => source.dday)
-        .filter((dday): dday is Dday => Boolean(dday))
-        // study-plan API는 assignment/event만 알아서, 시험은 마감형 과제로 매핑해 보낸다.
-        .map(dday => ({ ...dday, type: dday.type === "exam" ? ("assignment" as const) : dday.type }));
+        .filter((dday): dday is Dday => Boolean(dday));
       const selectedIncompletePlans = selectedPlanSources
         .map(source => source.plan)
         .filter((plan): plan is Plan => Boolean(plan));
+      const selectedReviews = selectedPlanSources
+        .map(source => source.review)
+        .filter((review): review is NonNullable<PlanSource["review"]> => Boolean(review));
+      // 데이터 기반 처방 근거: 과목별 자료·요약·퀴즈 현황과 최근 응시 기록 요약.
+      const courseContexts = courses.map(course => {
+        const stats = courseStats[course];
+        const attempts = courseQuizAttempts[course] ?? [];
+        const latest = attempts[0];
+        return {
+          name: course,
+          materials: stats?.materials ?? 0,
+          summaries: stats?.summaries ?? 0,
+          quizSets: stats?.quizzes ?? 0,
+          attempts: attempts.length,
+          lastScorePercent: latest ? Math.round(latest.scorePercent) : null,
+          // 최근 3회 응시의 추정 오답 수(문항수 × 오답률 합).
+          recentWrongCount: attempts.slice(0, 3).reduce(
+            (sum, attempt) => sum + Math.round(attempt.count * (100 - attempt.scorePercent) / 100), 0,
+          ),
+          daysSinceLastAttempt: latest ? Math.floor((Date.now() - latest.createdAt) / 86400000) : null,
+        };
+      });
       const result = await generateStudyPlan(selectedDdays, selectedIncompletePlans, pendingStudyPlanMode, {
         goal: studyPlanGoal,
         familiarity: studyPlanFamiliarity,
         dailyMinutes: studyPlanDailyMinutes,
+        courses: courseContexts,
+        reviewCandidates: selectedReviews.map(review => ({
+          course: review.course,
+          daysSince: review.daysSince,
+          scorePercent: review.scorePercent,
+        })),
       });
       // 되돌리기용 스냅샷(생성 직전 상태). 다음 생성 전까지 유지된다.
       setPlanUndoSnapshot({ plans, message: studyPlanMessage });
@@ -737,6 +799,10 @@ export default function Dashboard() {
           minutes: item.minutes,
           sourceType: item.sourceType,
           origin: "ai" as const,
+          action: item.action ?? undefined,
+          course: item.course ?? undefined,
+          // 시험 분산 배치: 오늘(0)은 date 없이(레거시 호환), 이후 날짜는 캘린더에 깔린다.
+          date: item.dayOffset > 0 ? paceDateKey(new Date(Date.now() + item.dayOffset * 86400000)) : undefined,
         })),
       ]);
       setShowPlanSourcePicker(false);
@@ -745,6 +811,36 @@ export default function Dashboard() {
     } finally {
       setStudyPlanLoading(false);
     }
+  };
+
+  // AI 계획 항목의 딥링크: 클릭 한 번으로 해당 학습 화면에 진입시켜 실행 마찰을 줄인다.
+  const planActionLabels: Record<PlanAction, string> = {
+    retry_quiz: "퀴즈 다시 풀기",
+    review_wrong: "오답 확인하기",
+    review_summary: "요약 복습하기",
+    read_material: "자료 보기",
+    make_quiz: "퀴즈 만들기",
+  };
+  // LLM이 적은 과목명을 실제 과목으로 정규화(정확 일치 → 부분 일치).
+  const resolvePlanCourse = (name?: string) => {
+    if (!name) return undefined;
+    return courses.find(course => course === name)
+      ?? courses.find(course => course.includes(name) || name.includes(course));
+  };
+  const openPlanAction = (plan: Plan) => {
+    if (!plan.action) return;
+    if (plan.action === "review_wrong") {
+      navigate(pageRoutes["오답 노트"]);
+      return;
+    }
+    // 퀴즈/요약 페이지는 과목 핸드오프 없이 진입하면 대시보드로 돌아오므로 과목이 풀릴 때만 이동.
+    const course = resolvePlanCourse(plan.course);
+    if (!course) return;
+    if (plan.action === "retry_quiz" || plan.action === "make_quiz") {
+      navigate(pageRoutes["퀴즈 생성"], { state: { course, fromDashboard: true } });
+      return;
+    }
+    navigate(pageRoutes["자료 요약"], { state: { selectedCourse: course, fromDashboard: true } });
   };
 
   const undoStudyPlan = () => {
@@ -1214,6 +1310,7 @@ export default function Dashboard() {
                   {([
                     { title: "남아있는 학습계획", sources: carryoverPlanSources },
                     { title: "D-day", sources: ddayPlanSources },
+                    { title: "복습 추천", sources: reviewPlanSources },
                   ] as const).map(group => (
                     group.sources.length > 0 && (
                       <div key={group.title} style={{ marginBottom: 12 }}>
@@ -1221,7 +1318,12 @@ export default function Dashboard() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                           {group.sources.map(source => {
                             const selected = selectedPlanSourceKeys.includes(source.key);
-                            const accent = source.kind === "carryover" ? "var(--color-text-secondary)" : ddayTypeColors[source.kind].solid;
+                            const accent = source.kind === "carryover" ? "var(--color-text-secondary)"
+                              : source.kind === "review" ? CYAN
+                              : ddayTypeColors[source.kind].solid;
+                            const selectedBackground = source.kind === "carryover" ? "var(--color-surface)"
+                              : source.kind === "review" ? "var(--color-tint-cyan)"
+                              : ddayTypeColors[source.kind].soft;
                             return (
                               <button
                                 key={source.key}
@@ -1230,7 +1332,7 @@ export default function Dashboard() {
                                 style={{
                                   maxWidth: "100%", padding: "6px 9px", borderRadius: 999,
                                   border: `1px solid ${selected ? accent : "var(--color-border-soft)"}`,
-                                  background: selected ? (source.kind === "carryover" ? "var(--color-surface)" : ddayTypeColors[source.kind].soft) : "var(--color-card)",
+                                  background: selected ? selectedBackground : "var(--color-card)",
                                   color: selected ? accent : "var(--color-text-secondary)",
                                   cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                                   textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -1301,6 +1403,27 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+                  {studyPlanFamiliarity === "new" && diagnosticCourse && (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      marginBottom: 12, padding: "8px 10px", borderRadius: 9,
+                      background: "var(--color-card)", border: "1px solid var(--color-border-soft)",
+                    }}>
+                      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--color-text-secondary)" }}>
+                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인해보세요.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate(pageRoutes["퀴즈 생성"], { state: { course: diagnosticCourse, diagnostic: true, fromDashboard: true } })}
+                        style={{
+                          flexShrink: 0, padding: "6px 9px", borderRadius: 8, border: `1px solid ${CYAN}`,
+                          background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 12, fontWeight: 800,
+                        }}
+                      >
+                        진단 퀴즈 풀기
+                      </button>
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button
                       type="button"
@@ -1400,6 +1523,19 @@ export default function Dashboard() {
                             )}
                             {p.text}
                           </button>
+                        )}
+                        {p.action && !isEditing && (p.action === "review_wrong" || resolvePlanCourse(p.course)) && (
+                          <button
+                            type="button"
+                            onClick={() => openPlanAction(p)}
+                            aria-label={`${planActionLabels[p.action]}로 이동`}
+                            title={planActionLabels[p.action]}
+                            style={{
+                              width: 24, height: 24, borderRadius: 8, border: `1px solid ${CYAN}`,
+                              background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 13,
+                              lineHeight: "22px", padding: 0, flexShrink: 0, fontWeight: 800,
+                            }}
+                          >↗</button>
                         )}
                         <button
                           onClick={() => deletePlan(p, i)}

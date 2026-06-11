@@ -44,6 +44,7 @@ type QuizLocationState = {
   openQuiz?: boolean;
   reviewQuestions?: QuizQuestion[];
   reviewTitle?: string;
+  diagnostic?: boolean;
 } | null;
 
 const sourceLabels: Record<string, string> = {
@@ -218,6 +219,8 @@ export default function Quiz() {
   // courseDetail(과목 세부)에 외부 라우트(자료 요약/대시보드)에서 직접 진입했는지 여부.
   // materialList(자료 목록)를 거쳐 들어왔다면 false로 두어 "돌아가기"가 자료 목록으로 가게 한다.
   const courseDetailFromRouteRef = useRef(false);
+  // 대시보드 온보딩에서 넘어온 진단 퀴즈 모드. 다음 생성 1회에만 적용한다.
+  const diagnosticPendingRef = useRef(false);
   const [openedQuizTitle, setOpenedQuizTitle] = useState(
     hasReviewQuestions ? (reviewState?.reviewTitle || "오답 다시 풀기") : "",
   );
@@ -253,6 +256,12 @@ export default function Quiz() {
   useEffect(() => {
     if (reviewActiveRef.current) return; // 오답 다시 풀기: 초기 상태에서 이미 풀이 화면 구성
     const state = location.state as QuizLocationState;
+    // 진단 퀴즈: 전 범위 기초 문제로 현재 수준을 확인하는 모드. 쉬움·5문항을 기본값으로 둔다.
+    if (state?.diagnostic) {
+      diagnosticPendingRef.current = true;
+      setCount(5);
+      setDifficulty("쉬움");
+    }
     const course = state?.course || state?.selectedCourse;
     if (course) {
       fromDashboardRef.current = Boolean(state.fromDashboard);
@@ -615,6 +624,9 @@ export default function Quiz() {
     setView("generating");
     setError(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
+    // 진단 모드는 대시보드에서 넘어온 첫 생성 1회에만 적용.
+    const diagnostic = diagnosticPendingRef.current;
+    diagnosticPendingRef.current = false;
     // 이미 풀었거나 출제된 문제(풀이 기록 + 저장된 퀴즈 세트 + 직전 퀴즈)를 모아 중복 출제를 막는다.
     const priorQuestions = Array.from(new Set([
       ...quizAttempts.flatMap(attempt => attempt.answers.map(answer => answer.question)),
@@ -632,7 +644,7 @@ export default function Quiz() {
           ...priorQuestions,
           ...collected.map(quiz => quiz.question),
         ])).slice(0, 80);
-        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions);
+        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions, diagnostic);
         lastGenerated = generated;
         for (const question of generated) {
           const key = normalizeAnswer(question.question || "");
