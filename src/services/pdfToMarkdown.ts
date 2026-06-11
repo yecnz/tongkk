@@ -1,4 +1,4 @@
-import { BACKEND_URL, getAuthRequestHeaders, parseApiError } from './backend';
+import { BACKEND_URL, fetchWithTunnelRetry, getAuthRequestHeaders, parseApiError } from './backend';
 
 type ConvertApiResponse = {
   markdown: string;
@@ -16,12 +16,13 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
   const timeoutId = setTimeout(() => controller.abort(), 600_000);
 
   try {
-    const response = await fetch(`${BACKEND_URL}/convert`, {
+    // 터널 타임아웃 시 페이지 단위 분석 캐시가 쌓인 뒤 재시도되도록 점점 길게 대기
+    const response = await fetchWithTunnelRetry(`${BACKEND_URL}/convert`, {
       method: 'POST',
       headers: await getAuthRequestHeaders(),
       body: formData,
       signal: controller.signal,
-    });
+    }, [3_000, 10_000, 20_000, 30_000]);
 
     if (!response.ok) {
       throw new Error(await parseApiError(response));

@@ -24,7 +24,7 @@ load_dotenv(SERVER_DIR / ".env")
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field, model_validator
@@ -168,7 +168,7 @@ TEMPLATE_INSTRUCTIONS: dict[str, str] = {
 - '핵심 개념'에서는 개념을 하나씩 '### 개념명' 소제목으로 나눠 설명해. 각 소제목 아래에 정의, 의미, 중요한 이유, 예시/적용 맥락을 bullet로 적어. 여러 개념을 '6.1 …', '6.2 …'처럼 절 번호 제목 하나에 몰아넣거나 '**개념명**' 굵은 글머리로 묶지 말고, 소제목에는 번호 없이 개념 이름만 써. 각 개념의 출처는 그 개념 소제목 아래 내용에만 붙여.
 - '방법/절차'에서는 실험법, 계산법, 분석법처럼 순서가 있는 내용을 번호 목록으로 정리하고, 단계별 목적과 결과를 함께 적어.
 - '주요 용어'는 별도 섹션에서 '용어 | 설명 | 헷갈리는 점' 표로 정리해.
-- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 '문제 → 답' 형식으로 정리해. 각 항목은 반드시 '>' 인용문 박스 하나로 감싸서 항목끼리 카드처럼 분리하고, 박스 안에는 질문을 한 줄로 쓰고 그 질문 줄 끝에 '(출처: 파일명, p.X)'로 해당 문제의 출처를 붙인 다음, 줄을 바꿔 '- 답:'을 한 줄로만 적고, 바로 아래 줄부터 답 내용을 요점별로 하위 bullet('  - ')로 나눠 적어라. 한 bullet에는 한 가지 요점만 담고, 한 문장에 사실이 여러 개면 쪼개서 각각 별도 bullet로 만들어라(답이 정말 한 가지뿐일 때만 bullet 하나). '답:' 옆에 답 내용을 같은 줄로 붙이지 말고, 답의 각 요점은 반드시 '- '로 시작하는 별도 줄에 둬라. 질문과 답은 반드시 서로 다른 줄에 둬라. 시험 포인트 출처는 헤딩이 아니라 각 질문 옆에만 둔다. 질문 앞에 '시험 포인트:' 같은 라벨은 붙이지 마.
+- '시험 포인트'는 출제될 만한 정의, 비교, 조건, 절차, 계산식을 '문제 → 답' 형식으로 정리해. 각 항목은 반드시 '>' 인용문 박스 하나로 감싸서 항목끼리 카드처럼 분리하고, 박스 안에는 질문을 한 줄로 쓰고 그 질문 줄 끝에 공통 기준의 출처 표기 규칙에 맞는 '(출처: ...)'로 해당 문제의 출처를 붙인 다음, 줄을 바꿔 '- 답:'을 한 줄로만 적고, 바로 아래 줄부터 답 내용을 요점별로 하위 bullet('  - ')로 나눠 적어라. 한 bullet에는 한 가지 요점만 담고, 한 문장에 사실이 여러 개면 쪼개서 각각 별도 bullet로 만들어라(답이 정말 한 가지뿐일 때만 bullet 하나). '답:' 옆에 답 내용을 같은 줄로 붙이지 말고, 답의 각 요점은 반드시 '- '로 시작하는 별도 줄에 둬라. 질문과 답은 반드시 서로 다른 줄에 둬라. 시험 포인트 출처는 헤딩이 아니라 각 질문 옆에만 둔다. 질문 앞에 '시험 포인트:' 같은 라벨은 붙이지 마.
 - '핵심 암기 사항'은 마지막 복습용으로 반드시 외울 정의, 공식, 절차, 비교 개념만 압축해서, 전체를 '>' 인용문 박스 하나로 묶어 bullet 목록으로 정리해(핵심 키워드는 굵게).
 - '참고/주의 사항'에는 실험 주의점, 예외, 단위, 조건, 흔한 실수를 '>' 인용문 박스 하나로 묶어 bullet로 정리해(핵심 암기 사항과 같은 박스 형태). 각 항목 앞에 '헷갈림 주의:' 같은 라벨은 붙이지 마.
 - 비교가 필요한 개념은 Markdown 표로 정리해.
@@ -220,7 +220,7 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 11. '>' 인용문은 텍스트 상자가 필요한 경우에만 사용해. 화면에서는 왼쪽 색 선 없이 둥근 박스로 렌더링된다.
 12. 제목별로 카드나 박스를 나누는 형식은 사용하지 마.
 13. 템플릿별 목적을 최우선으로 따르고, 세 템플릿의 출력 스타일이 서로 비슷해지지 않게 해.
-14. 일반 요약과 강의 노트에서는 핵심 bullet이나 중요한 문장 끝에 가능한 경우 `(출처: 파일명, p.3/slide 7/OCR 이미지 2/섹션명)`처럼 짧은 근거 표기를 붙여라. 자료에 위치 단서가 없으면 파일명이나 섹션명만 써도 된다. 단, 치트시트에는 `(출처: ...)` 같은 출처 표기를 절대 붙이지 마라.
+{citation_rule}
 
 [강의자료]
 {markdown}
@@ -270,6 +270,16 @@ class SummarizeRequest(BaseModel):
     pages: str | None = None
     # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
     focus_prompt: str | None = None
+    # 요약에 포함된 자료 이름 목록. 2개 이상이면 출처에 자료명을 함께 적게 한다.
+    source_names: list[str] | None = Field(default=None, max_length=50)
+
+
+class SummarizeStreamRequest(SummarizeRequest):
+    # 구간 분할 생성: 전체 chunk_total개 중 chunk_index(1-base)번째 구간 요청임을 알린다.
+    chunk_index: int | None = Field(default=None, ge=1)
+    chunk_total: int | None = Field(default=None, ge=1)
+    # 직전 구간 요약의 끝부분. 제목 수준·흐름을 이어가되 내용 반복을 막는 용도.
+    previous_tail: str | None = Field(default=None, max_length=6000)
 
 
 class AgentRequest(BaseModel):
@@ -652,8 +662,8 @@ def _validate_wrong_analysis(parsed: dict[str, object]) -> dict[str, object]:
 
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
-SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENSIONS}
-SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
+SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", ".docx", *SUPPORTED_IMAGE_EXTENSIONS}
+SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx", ".docx"}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
 # PDF/PPT 등 비이미지 문서 업로드 크기 상한(메모리·디스크 보호). 이미지(OCR)는 MAX_OCR_IMAGE_BYTES를 따른다.
@@ -686,7 +696,7 @@ def _find_office_binary() -> str | None:
 def _convert_presentation_to_pdf(file_path: str) -> bytes:
     office_binary = _find_office_binary()
     if not office_binary:
-        raise RuntimeError("PPT/PPTX 미리보기를 사용하려면 서버에 LibreOffice가 설치되어 있어야 합니다.")
+        raise RuntimeError("PPT/PPTX·DOCX 미리보기를 사용하려면 서버에 LibreOffice가 설치되어 있어야 합니다.")
 
     with tempfile.TemporaryDirectory() as output_dir:
         command = [
@@ -706,15 +716,15 @@ def _convert_presentation_to_pdf(file_path: str) -> bytes:
                 timeout=_env_int("PPT_PREVIEW_TIMEOUT_SECONDS", 120),
             )
         except subprocess.TimeoutExpired as e:
-            raise RuntimeError("PPT/PPTX PDF 변환 시간이 초과되었습니다.") from e
+            raise RuntimeError("문서 PDF 변환 시간이 초과되었습니다.") from e
 
         if completed.returncode != 0:
             detail = (completed.stderr or completed.stdout or "").strip()
-            raise RuntimeError(f"PPT/PPTX PDF 변환 실패: {detail or 'LibreOffice 변환 오류'}")
+            raise RuntimeError(f"문서 PDF 변환 실패: {detail or 'LibreOffice 변환 오류'}")
 
         pdf_files = sorted(Path(output_dir).glob("*.pdf"))
         if not pdf_files:
-            raise RuntimeError("PPT/PPTX 변환 결과 PDF를 찾지 못했습니다.")
+            raise RuntimeError("문서 변환 결과 PDF를 찾지 못했습니다.")
 
         return pdf_files[0].read_bytes()
 
@@ -1162,7 +1172,7 @@ async def convert_document_to_markdown(
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX, 이미지 파일만 지원합니다.")
+        raise HTTPException(status_code=400, detail="PDF, PPT/PPTX, DOCX, 이미지 파일만 지원합니다.")
 
     file_bytes = await file.read()
     if suffix in SUPPORTED_IMAGE_EXTENSIONS:
@@ -1251,7 +1261,7 @@ async def convert_document_to_pdf_preview(
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_PREVIEW_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 미리보기를 지원합니다.")
+        raise HTTPException(status_code=400, detail="PDF, PPT/PPTX, DOCX 파일만 미리보기를 지원합니다.")
 
     file_bytes = await file.read()
     if not file_bytes:
@@ -1370,24 +1380,60 @@ async def extract_text_with_google_vision(
     return {"text": text}
 
 
+def _citation_rule(source_names: list[str] | None) -> str:
+    """공통 기준 14(출처 표기)를 자료 구성에 맞게 생성한다.
+
+    - 페이지/슬라이드 번호는 본문에 변환 시점 마커(`<!-- p.N -->` 등)가 있을 때만 허용해
+      텍스트 붙여넣기 자료에서 존재하지 않는 페이지를 지어내는 것을 막는다.
+    - 자료명은 여러 자료를 합쳐 요약할 때만 붙여 어느 자료인지 구분하고,
+      단일 자료 요약에서는 위치만 남긴다(프론트 표시 규칙과 일치).
+    """
+    names = [name.strip() for name in (source_names or []) if name and name.strip()]
+    base = (
+        "14. 일반 요약과 강의 노트에서는 핵심 bullet이나 중요한 문장 끝에 가능한 경우 짧은 출처 표기를 붙여라. "
+        "위치는 본문에 `<!-- p.N -->` 또는 `<!-- Slide number: N -->` 마커가 있는 부분만 `p.3`/`slide 7`처럼 쓸 수 있다. "
+        "마커가 없는 자료에는 페이지·슬라이드 번호를 절대 만들어내지 마라. "
+        "마커가 없는 자료는 원문에 실제로 존재하는 제목(헤딩)이 있을 때만 그 섹션명을 `'섹션명'`처럼 작은따옴표로 감싸 위치로 쓰고, "
+        "원문에 없는 섹션명을 지어내지 마라. "
+    )
+    if len(names) > 1:
+        listed = ", ".join(names)
+        scope = (
+            f"여러 자료를 합쳐 요약하므로 출처는 `(출처: 자료명, p.3)`/`(출처: 자료명, '섹션명')`처럼 자료명을 반드시 함께 써라. "
+            f"자료명은 다음 목록에 있는 이름만 그대로 사용해라: {listed}. "
+            "위치 단서가 없으면 `(출처: 자료명)`처럼 자료명만 써라. "
+        )
+    else:
+        scope = (
+            "자료가 하나뿐이므로 출처에 자료명·파일명을 쓰지 말고 위치만 `(출처: p.3)`/`(출처: '섹션명')`처럼 표기해라. "
+            "위치 단서가 전혀 없으면 출처 표기를 생략해라. "
+        )
+    return base + scope + "단, 치트시트에는 `(출처: ...)` 같은 출처 표기를 절대 붙이지 마라."
+
+
+def _summary_system_content(focus_prompt: str | None) -> str:
+    if focus_prompt and focus_prompt.strip():
+        return (
+            f"{SUMMARY_SYSTEM_PROMPT}\n\n"
+            "[사용자 집중 요청]\n"
+            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {focus_prompt.strip()}\n"
+            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
+            "원문에 없는 내용을 지어내지 마."
+        )
+    return SUMMARY_SYSTEM_PROMPT
+
+
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
+        citation_rule=_citation_rule(req.source_names),
         markdown=markdown,
     )
 
-    system_content = SUMMARY_SYSTEM_PROMPT
-    if req.focus_prompt and req.focus_prompt.strip():
-        system_content = (
-            f"{SUMMARY_SYSTEM_PROMPT}\n\n"
-            "[사용자 집중 요청]\n"
-            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {req.focus_prompt.strip()}\n"
-            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
-            "원문에 없는 내용을 지어내지 마."
-        )
+    system_content = _summary_system_content(req.focus_prompt)
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -1405,6 +1451,79 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     except Exception as e:
         logger.exception("/summarize 실패")
         raise HTTPException(status_code=502, detail="요약 생성 중 오류가 발생했습니다.") from e
+
+
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _summary_chunk_instructions(req: SummarizeStreamRequest) -> str:
+    """구간 분할 생성 시, 구간임을 알리고 직전 구간과 자연스럽게 이어지게 하는 지시."""
+    lines = [
+        "\n\n[구간 분할 요약]",
+        f"지금 주어진 강의자료는 전체 자료를 나눈 {req.chunk_total}개 구간 중 {req.chunk_index}번째 구간이다.",
+        "- 이 구간의 내용만 정리하고, 전체 자료에 대한 서론·총정리·마무리 멘트를 만들지 마.",
+    ]
+    if req.chunk_index == 1:
+        lines.append("- 첫 구간이므로 문서 제목(# 수준)을 한 번만 만들고 시작해.")
+    else:
+        lines.append("- 첫 구간이 아니므로 문서 제목(# 수준)을 다시 만들지 말고, 이어지는 단원 제목(## 수준)부터 바로 시작해.")
+    if req.previous_tail and req.previous_tail.strip():
+        lines.append(
+            "- 아래는 직전 구간 요약의 끝부분이다. 제목 수준과 흐름이 자연스럽게 이어지게 하되, 같은 내용을 반복하지 마.\n"
+            "[직전 구간 요약 끝부분]\n"
+            f"{req.previous_tail.strip()}"
+        )
+    return "\n".join(lines)
+
+
+@app.post("/summarize/stream")
+async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_api_user)):
+    """요약을 SSE로 토큰 단위 스트리밍한다.
+
+    한 요청의 출력이 짧게 유지되도록 클라이언트가 자료를 구간으로 나눠 호출하고,
+    응답이 계속 흐르는 동안은 Cloudflare 터널 응답 대기 제한(~100초)에 걸리지 않는다.
+    이벤트: {"delta": str} 반복 → {"done": true, "finish_reason": str}. 오류 시 {"error": str}.
+    """
+    markdown = _filter_markdown_by_pages(req.markdown, req.pages)
+    prompt = SUMMARY_USER_PROMPT.format(
+        template_label=TEMPLATE_LABELS[req.template],
+        template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
+        citation_rule=_citation_rule(req.source_names),
+        markdown=markdown,
+    )
+
+    system_content = _summary_system_content(req.focus_prompt)
+    if req.chunk_index and req.chunk_total and req.chunk_total > 1:
+        system_content += _summary_chunk_instructions(req)
+
+    async def event_stream():
+        finish_reason = ""
+        try:
+            llm = build_llm(req.model, max_tokens=SUMMARY_MAX_TOKENS)
+            async for chunk in llm.astream([
+                SystemMessage(content=system_content),
+                HumanMessage(content=prompt),
+            ]):
+                text = _message_content_to_text(chunk.content)
+                if text:
+                    yield _sse_event({"delta": text})
+                metadata = getattr(chunk, "response_metadata", None) or {}
+                reason = metadata.get("finish_reason") or metadata.get("stop_reason")
+                if reason:
+                    finish_reason = str(reason)
+        except Exception:
+            logger.exception("/summarize/stream 실패")
+            yield _sse_event({"error": "요약 생성 중 오류가 발생했습니다."})
+            return
+        yield _sse_event({"done": True, "finish_reason": finish_reason})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        # 프록시(Vite·Cloudflare)가 스트림을 버퍼링하지 않도록 명시한다.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/agent")

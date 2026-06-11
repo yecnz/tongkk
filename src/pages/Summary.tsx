@@ -4,8 +4,11 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
+import { summarizeWithTemplateStream } from "../services/summaryStream";
 import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
@@ -151,9 +154,13 @@ const getFileType = (name: string): FileKind => {
 };
 
 const isSupportedDocumentFile = (file: File) =>
-  ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
+  ["pdf", "ppt", "pptx", "docx", "txt", "md", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
-const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
+// txt/md는 파일 내용이 곧 본문이므로 서버 변환 없이 그대로 읽는다.
+const isPlainTextFile = (name: string) => ["txt", "md"].includes((name.split(".").pop() || "").toLowerCase());
+
+const extractMarkdownFromMaterialFile = (file: File) =>
+  isPlainTextFile(file.name) ? file.text() : extractMarkdownFromPDF(file);
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const getUploadStatusId = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
@@ -168,7 +175,7 @@ const classifyUploadFailure = (message: string): { kind: UploadFailureKind; labe
     return {
       kind: "unsupported",
       label: "지원하지 않는 파일",
-      guide: "PDF, PPT/PPTX, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
+      guide: "PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
     };
   }
   if (
@@ -312,6 +319,15 @@ const summaryData: Record<SummaryTemplate, SummarySample> = {
   },
 };
 
+// 출처 배지 표시용 정리: '출처:' 라벨 제거, 섹션명의 작은따옴표 제거,
+// 텍스트 붙여넣기 자료 이름 뒤의 .txt 확장자 숨김(파일을 올린 적 없는 자료라 어색하다).
+const formatCitationLabel = (citation: string): string =>
+  citation
+    .slice(1, -1)
+    .replace(/^출처:\s*/, "")
+    .replace(/\.txt(?=\s*[,;]|\s*$)/gi, "")
+    .replace(/'([^']+)'/g, "$1");
+
 const renderHighlightSyntax = (children: ReactNode): ReactNode => {
   if (typeof children === "string") {
     return children.split(/(§EXAM§[\s\S]*?§\/EXAM§|==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)|\*\*[^*]+\*\*)/g).map((part, index) => {
@@ -326,7 +342,7 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
         return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
       if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
-        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
+        return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{formatCitationLabel(part)}</span>;
       }
       // CommonMark 경계 규칙(닫는 ** 앞이 ')' 등 문장부호 + 뒤가 한글)으로 굵게 처리에
       // 실패해 그대로 남은 **...**를 폴백으로 굵게 렌더링한다.
@@ -462,34 +478,54 @@ const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
 const sanitizeCitationTildes = (markdown: string): string =>
   markdown.replace(/\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g, (m) => m.replace(/~/g, "-"));
 
+// 자료명 없이 위치만 적은 출처(단일 자료 요약 형식)인지 판별한다.
+// 페이지·슬라이드 번호이거나, 작은따옴표로 감싼 섹션명이면 위치로 본다.
+// "3쪽 정리.txt"처럼 숫자로 시작하는 자료명을 오인하지 않게, 숫자형은 그 자체로 끝나는 경우만 위치로 본다.
+const isCitationLocation = (part: string): boolean =>
+  /^['"]/.test(part) ||
+  /^pp?\.\s*\d/i.test(part) ||
+  /^(?:slide|슬라이드|페이지)\s*\d/i.test(part) ||
+  /^OCR\s*이미지/i.test(part) ||
+  /^\d+(?:\s*[-–~]\s*\d+)?\s*(?:p|페이지|쪽)?$/i.test(part);
+
 // 한 섹션에 흩어진 여러 (출처: ...)를 파일별로 묶어 하나로 합친다. (페이지/슬라이드 중복 제거)
 const mergeSourceCitations = (sources: string[]): string => {
   const byFile = new Map<string, string[]>();
   for (const src of sources) {
     const inner = src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
     const commaIdx = inner.indexOf(",");
-    const file = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
-    const locText = commaIdx === -1 ? "" : inner.slice(commaIdx + 1);
+    let file = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+    let locText = commaIdx === -1 ? "" : inner.slice(commaIdx + 1);
+    // 위치-only 출처는 파일명 없이 위치 묶음("")으로 모은다.
+    if (isCitationLocation(file)) {
+      locText = inner;
+      file = "";
+    }
     if (!byFile.has(file)) byFile.set(file, []);
     const locs = byFile.get(file)!;
     locText.split(",").map(s => s.trim()).filter(Boolean).forEach(loc => {
       if (!locs.includes(loc)) locs.push(loc);
     });
   }
-  const parts = [...byFile.entries()].map(([file, locs]) => (locs.length ? `${file}, ${locs.join(", ")}` : file));
+  const parts = [...byFile.entries()]
+    .map(([file, locs]) => (file ? (locs.length ? `${file}, ${locs.join(", ")}` : file) : locs.join(", ")))
+    .filter(Boolean);
   return parts.length ? `(출처: ${parts.join("; ")})` : "";
 };
 
 // 출처 표기에서 파일명 부분만 떼어낸다. (예: "(출처: a.pdf, p.3)" -> "a.pdf")
+// 위치-only 출처(예: "(출처: p.3)", "(출처: '동기화')")는 파일명이 없으므로 빈 문자열.
 const citationFileName = (src: string): string => {
   const inner = src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
   const commaIdx = inner.indexOf(",");
-  return (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+  const head = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+  return isCitationLocation(head) ? "" : head;
 };
 
 // 요약 전체가 단일 자료(파일명이 한 종류)일 때는 출처에서 파일명을 떼고
 // 위치(p.3 등)만 남긴다. 위치 단서 없이 파일명만 있는 출처는 통째로 제거한다.
-// 여러 파일명이 섞여 있으면 어느 자료인지 구분이 필요하므로 그대로 둔다.
+// 여러 파일명이 섞여 있으면 어느 자료인지 구분이 필요하므로 그대로 두고,
+// 파일명 없는 위치-only 출처도 그대로 둔다.
 const simplifySoleFileSources = (markdown: string): string => {
   const matches = markdown.match(SOURCE_PATTERN) || [];
   if (!matches.length) return markdown;
@@ -499,6 +535,8 @@ const simplifySoleFileSources = (markdown: string): string => {
   return markdown.replace(SOURCE_PATTERN, (m) => {
     const inner = m.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "").trim();
     const commaIdx = inner.indexOf(",");
+    const head = (commaIdx === -1 ? inner : inner.slice(0, commaIdx)).trim();
+    if (isCitationLocation(head)) return m;
     const loc = commaIdx === -1 ? "" : inner.slice(commaIdx + 1).trim();
     return loc ? `(출처: ${loc})` : "";
   });
@@ -733,7 +771,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
         columnGap: 34,
         columnRule: "1px solid var(--color-border-soft)",
       }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={cheatSheetMarkdownComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={cheatSheetMarkdownComponents}>
           {cleaned}
         </ReactMarkdown>
       </div>
@@ -741,7 +779,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
       {cleaned}
     </ReactMarkdown>
   );
@@ -895,6 +933,14 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const mindmapPaneRef = useRef<HTMLDivElement | null>(null);
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
+  // 스트리밍 생성 중 텍스트 끝 지점. 사용자가 하단 근처에 있을 때만 따라 내려간다.
+  const streamEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isLoading || !realContent) return;
+    const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 240;
+    if (nearBottom) streamEndRef.current?.scrollIntoView({ block: "end" });
+  }, [isLoading, realContent]);
 
   // 완성된 질문을 그대로 튜터 입력창에 채운다(마인드맵 노드 질문 등).
   const askTutorWithQuestion = (question: string, anchor: DragAnchor | null) => {
@@ -1284,7 +1330,27 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           </div>
         )}
 
-        {isLoading ? (
+        {isLoading && realContent ? (
+          // 스트리밍 생성 중: 지금까지 생성된 텍스트를 그대로 렌더링해 타자기 효과를 낸다.
+          <div style={{
+            background: "var(--color-card)", borderRadius: 12, padding: 28,
+            border: "1px solid var(--color-border-soft)",
+            fontSize: 15, color: "var(--color-text)", lineHeight: 1.85,
+            overflowX: "auto",
+          }}>
+            <FormattedAiText content={realContent} template={template} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 18, fontSize: 13, color: "var(--color-muted)" }}>
+              <div style={{
+                width: 14, height: 14, flexShrink: 0,
+                border: `2px solid ${PINK}`, borderTop: "2px solid transparent",
+                borderRadius: "50%", animation: "spin 0.8s linear infinite"
+              }}/>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+              {loadingStep || "요약 생성 중..."}
+            </div>
+            <div ref={streamEndRef} />
+          </div>
+        ) : isLoading ? (
           <div style={{
             background: "var(--color-surface)", borderRadius: 12, padding: 48,
             display: "flex", flexDirection: "column", alignItems: "center", gap: 16
@@ -1826,9 +1892,19 @@ const MaterialDetailView = ({
   const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
   const isLegacyPpt = lowerMaterialName.endsWith(".ppt");
   const isPresentation = material.type === "ppt" || isPptx || isLegacyPpt;
+  const isImage = material.type === "img" || (material.mimeType || "").startsWith("image/");
+  const isDocx = material.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || lowerMaterialName.endsWith(".docx");
+  // 텍스트 자료: 붙여넣기(원본 파일 없음)와 txt/md 업로드 모두 저장된 markdown이 곧 본문이라 같은 방식으로 렌더링한다.
+  // mimeType이 비어 있는 옛 붙여넣기 자료는 id 접두사로 판별한다.
+  const isTextMaterial = (material.mimeType || "").startsWith("text/") || material.id.startsWith("text:")
+    || lowerMaterialName.endsWith(".txt") || lowerMaterialName.endsWith(".md");
   const hasReviewContext = Boolean(reviewContext.trim());
-  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
-  const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
+  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : isDocx ? "DOCX" : isTextMaterial ? "텍스트" : "자료";
+  const pageInfo = material.pages ? `${material.pages}페이지`
+    : material.slides ? `${material.slides}슬라이드`
+    : isTextMaterial && !material.filePath && material.size ? `${material.size.toLocaleString()}자`
+    : material.size ? `${(material.size / (1024 * 1024)).toFixed(1)}MB`
+    : "페이지 정보 없음";
   const previewFailure = previewError ? classifyUploadFailure(previewError) : null;
 
   useEffect(() => {
@@ -1866,7 +1942,7 @@ const MaterialDetailView = ({
     setPreviewPdfUrl(null);
     setPreviewError("");
 
-    if (!fileUrl || !isPresentation) {
+    if (!fileUrl || !(isPresentation || isDocx)) {
       setPreviewLoading(false);
       return () => {
         ignore = true;
@@ -1891,7 +1967,7 @@ const MaterialDetailView = ({
         if (!ignore) setPreviewPdfUrl(url);
       })
       .catch(err => {
-        if (!ignore) setPreviewError(err instanceof Error ? err.message : "PPT/PPTX 미리보기 변환에 실패했습니다.");
+        if (!ignore) setPreviewError(err instanceof Error ? err.message : "원본 미리보기 변환에 실패했습니다.");
       })
       .finally(() => {
         if (!ignore) setPreviewLoading(false);
@@ -1900,7 +1976,7 @@ const MaterialDetailView = ({
     return () => {
       ignore = true;
     };
-  }, [fileUrl, isPresentation, material.id, material.name]);
+  }, [fileUrl, isPresentation, isDocx, material.id, material.name]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -2061,10 +2137,54 @@ const MaterialDetailView = ({
   );
 
   const renderOriginalTab = () => {
+    // 텍스트 붙여넣기 자료: 원본 파일이 없으므로 저장된 마크다운 본문을 바로 렌더링한다.
+    // FormattedAiText는 AI 출력 전용 후처리(출처 헤딩 합치기 등)를 거치므로, 사용자가 쓴 원문에는 적용하지 않는다.
+    if (isTextMaterial) {
+      return (
+        <div style={{
+          background: "var(--color-surface)",
+          padding: 24,
+          fontSize: 14,
+          color: "var(--color-text)",
+          lineHeight: 1.8,
+          height: "100%",
+          overflowY: "auto",
+          boxSizing: "border-box",
+        }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {material.markdown || "표시할 내용이 없습니다."}
+          </ReactMarkdown>
+        </div>
+      );
+    }
+
     if (fileLoading || previewLoading) {
       return (
         <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
-          {previewLoading ? "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다." : "원본 파일을 불러오는 중입니다."}
+          {previewLoading
+            ? (isDocx ? "DOCX 미리보기를 PDF로 변환하는 중입니다." : "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다.")
+            : (isImage ? "원본 이미지를 불러오는 중입니다." : "원본 파일을 불러오는 중입니다.")}
+        </div>
+      );
+    }
+
+    if (fileUrl && isImage) {
+      return (
+        <div style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "auto",
+          background: "var(--color-surface)",
+          display: "grid",
+          placeItems: "center",
+          padding: 24,
+          boxSizing: "border-box",
+        }}>
+          <img
+            src={fileUrl}
+            alt={material.name}
+            style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
+          />
         </div>
       );
     }
@@ -2108,7 +2228,7 @@ const MaterialDetailView = ({
     const noOriginalMessage =
       !material.filePath && originalSize != null && originalSize > MAX_ORIGINAL_FILE_BYTES
         ? `이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.`
-        : "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다.";
+        : "이 자료는 원본 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 파일을 다시 업로드하면 다음부터 원본 보기로 열립니다.";
 
     return (
       <div style={{
@@ -2131,23 +2251,26 @@ const MaterialDetailView = ({
           fontWeight: 700,
           lineHeight: 1.55,
         }}>
-          {previewFailure ? `${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.` : fileError || (isPresentation
-            ? (isLegacyPpt
-              ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
-              : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
+          {previewFailure ? `${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.` : fileError || (isPresentation || isDocx
+            ? (isDocx
+              ? "DOCX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
+              : isLegacyPpt
+                ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
+                : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
             : noOriginalMessage)}
         </div>
-        {fileUrl && isPresentation && (
+        {fileUrl && (isPresentation || isDocx) && (
           <a
             href={fileUrl}
             target="_blank"
             rel="noreferrer"
             style={{ display: "inline-flex", marginBottom: 16, color: CYAN, fontSize: 13, fontWeight: 800, textDecoration: "none" }}
           >
-            원본 PPT/PPTX 열기
+            {isDocx ? "원본 DOCX 열기" : "원본 PPT/PPTX 열기"}
           </a>
         )}
-        {material.filePath && (
+        {/* 원본 파일이 없어도(50MB 초과 등) 변환 텍스트는 저장돼 있으므로 본문을 보여준다. */}
+        {(material.filePath || material.markdown) && (
           <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
         )}
       </div>
@@ -2174,9 +2297,11 @@ const MaterialDetailView = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          // 진행 단계·삭제 버튼은 축소되지 않으므로, 좁은 화면에서는 다음 줄로 내려 제목이 0px로 찌그러지지 않게 한다.
+          flexWrap: "wrap",
           gap: 16,
         }}>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ flex: "1 1 auto", minWidth: 160 }}>
             <h2 style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", wordBreak: "break-word" }}>
               {material.name}
             </h2>
@@ -3531,10 +3656,30 @@ export default function Summary() {
         // 요약 성공 시 자료 상세로 이동했는지 표시. 이동하지 못하면 결과 화면으로 폴백한다.
         let movedToDetail = false;
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 작성 중...`);
-        const response = await summarizeWithTemplate(selectedMarkdown, template, {
-          pages: opts?.pageRange,
-          focusPrompt: opts?.focusPrompt,
-        });
+        let response: { result: string; threadId: string };
+        if (template === "MINDMAP") {
+          // 마인드맵은 JSON 출력이라 부분 렌더링이 불가능해 기존 단일 호출을 유지한다.
+          response = await summarizeWithTemplate(selectedMarkdown, template, {
+            pages: opts?.pageRange,
+            focusPrompt: opts?.focusPrompt,
+            sourceNames: selectedMaterials.map(material => material.name),
+          });
+        } else {
+          // 스트리밍 경로: 결과 화면으로 먼저 이동해 생성 중인 텍스트를 타자기처럼 보여준다.
+          setView("summaryResult");
+          const result = await summarizeWithTemplateStream(selectedMarkdown, template, {
+            pages: opts?.pageRange,
+            focusPrompt: opts?.focusPrompt,
+            sourceNames: selectedMaterials.map(material => material.name),
+            onDelta: text => setSummaryText(text),
+            onProgress: (chunkIndex, chunkTotal) => setLoadingStep(
+              chunkTotal > 1
+                ? `${templateLabels[template]} 작성 중... (${chunkIndex}/${chunkTotal} 구간)`
+                : `${templateLabels[template]} 형식으로 요약 작성 중...`,
+            ),
+          });
+          response = { result, threadId: "" };
+        }
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
         let persistedId: string | undefined;
@@ -3946,8 +4091,9 @@ export default function Summary() {
         // 넓은 뷰(요약 결과·자료 상세)는 기존의 더 촘촘한 여백을 유지한다(인라인이 클래스보다 우선).
         style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
       >
-        {/* 요약 생성 중에는 어느 화면(templates·upload)에서 시작했든 전체 화면 로딩 오버레이를 띄운다. */}
-        {isSummarizing && <SummaryLoadingOverlay loadingStep={loadingStep} />}
+        {/* 요약 생성 중에는 전체 화면 로딩 오버레이를 띄운다.
+            단, 스트리밍 텍스트가 결과 화면에 흐르기 시작하면 오버레이를 걷어 타자기 효과를 보여준다. */}
+        {isSummarizing && !(view === "summaryResult" && summaryText) && <SummaryLoadingOverlay loadingStep={loadingStep} />}
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}
@@ -4046,7 +4192,7 @@ export default function Summary() {
                       transition: "all 0.2s", marginBottom: 20
                     }}
                   >
-                    <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
+                    <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.docx,.txt,.md,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
                       onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
                     <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--color-muted)" }}>강의자료 파일을 드래그하거나</p>
                     <button style={{

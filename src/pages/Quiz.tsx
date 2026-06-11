@@ -107,16 +107,21 @@ const clearQuizDraft = () => {
 };
 
 const isSupportedDocumentFile = (file: File) =>
-  ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
+  ["pdf", "ppt", "pptx", "docx", "txt", "md", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
-const getDocumentMaterialType = (file: File): CourseMaterial["type"] =>
-  file.name.toLowerCase().endsWith(".pdf")
-    ? "pdf"
-    : ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase())
-      ? "img"
-      : "ppt";
+const getDocumentMaterialType = (file: File): CourseMaterial["type"] => {
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (ext === "pdf") return "pdf";
+  if (["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes(ext)) return "img";
+  if (["ppt", "pptx"].includes(ext)) return "ppt";
+  return "file";
+};
 
-const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
+// txt/md는 파일 내용이 곧 본문이므로 서버 변환 없이 그대로 읽는다.
+const isPlainTextFile = (name: string) => ["txt", "md"].includes((name.split(".").pop() || "").toLowerCase());
+
+const extractMarkdownFromMaterialFile = (file: File) =>
+  isPlainTextFile(file.name) ? file.text() : extractMarkdownFromPDF(file);
 
 const formatFileNames = (files: Pick<File, "name">[]) =>
   files.length <= 2 ? files.map(file => file.name).join(", ") : `${files[0].name} 외 ${files.length - 1}개`;
@@ -577,7 +582,7 @@ export default function Quiz() {
 
     const supportedFiles = Array.from(fileList).filter(isSupportedDocumentFile);
     if (supportedFiles.length === 0) {
-      setMaterialNotice("PDF, PPT, PPTX, 이미지 파일만 업로드할 수 있습니다.");
+      setMaterialNotice("PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일만 업로드할 수 있습니다.");
       setUploadedFileName("");
       setExtractError("");
       return;
@@ -1142,7 +1147,7 @@ export default function Quiz() {
           <Card style={{ padding: 24, marginBottom: 16 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>강의자료</h3>
 
-            <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
+            <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.docx,.txt,.md,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
               onChange={e => { handleFiles(e.target.files); e.target.value = ""; }}
               style={{ display: "none" }} />
 
@@ -1159,7 +1164,7 @@ export default function Quiz() {
                 padding: "12px 16px", borderRadius: 10, background: "var(--color-surface)",
                 fontSize: 13, color: "var(--color-muted)", marginBottom: 14
               }}>
-                저장된 자료가 없습니다. PDF나 이미지를 업로드하거나 과목명으로만 퀴즈를 생성할 수 있습니다.
+                저장된 자료가 없습니다. PDF·문서·이미지를 업로드하거나 과목명으로만 퀴즈를 생성할 수 있습니다.
               </div>
             )}
 
