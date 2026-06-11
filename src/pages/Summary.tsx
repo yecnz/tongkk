@@ -853,7 +853,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
 
   return (
     <div>
-      <button onClick={onBack} style={{
+      <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
 
@@ -891,7 +891,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
       <div className="summary-template-grid">
         {templates.map(t => (
           <Card key={t.key} className="tongkk-hover-lift" style={{ padding: 0, overflow: "hidden" }}>
-            <button onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
+            <button type="button" onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
               width: "100%",
               minHeight: 190,
               padding: 24,
@@ -1193,7 +1193,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           </div>
         </div>
       )}
-      <button onClick={onBack} style={{
+      <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>{backLabel}</button>
       <Card style={{ padding: 28 }}>
@@ -1225,11 +1225,11 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             )}
             {!isLoading && (
               <>
-                <button onClick={handleCopyAll} style={{
+                <button type="button" onClick={handleCopyAll} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
                   background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer"
                 }}>전체 복사</button>
-                <button onClick={handleDownload} disabled={pdfSaving} style={{
+                <button type="button" onClick={handleDownload} disabled={pdfSaving} style={{
                   height: 34, padding: "0 14px", borderRadius: 10, border: "none",
                   background: pdfSaving ? "var(--color-tint-cyan)" : CYAN,
                   color: pdfSaving ? "var(--color-cyan-deep)" : "var(--color-on-brand)", fontSize: 13, fontWeight: 600,
@@ -1237,12 +1237,12 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                   opacity: pdfSaving ? 0.75 : 1,
                 }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
                 {realContent && !error && onGoToQuiz && (
-                  <button onClick={onGoToQuiz} style={{
+                  <button type="button" onClick={onGoToQuiz} style={{
                     height: 34, padding: "0 14px", borderRadius: 10, border: "none",
                     background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 700, cursor: "pointer"
                   }}>퀴즈 생성하기</button>
                 )}
-                <button onClick={() => handleTutorOpenChange(!isTutorOpen)} style={{
+                <button type="button" onClick={() => handleTutorOpenChange(!isTutorOpen)} style={{
                   height: 34,
                   padding: "0 14px",
                   borderRadius: 10,
@@ -1646,11 +1646,11 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
           </div>
         </div>
       )}
-      <button onClick={handleCopyAll} style={{
+      <button type="button" onClick={handleCopyAll} style={{
         padding: "9px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
         background: "var(--color-card)", color: "var(--color-text)", fontSize: 12, fontWeight: 800, cursor: "pointer",
       }}>전체 복사</button>
-      <button onClick={handleDownload} disabled={pdfSaving} style={{
+      <button type="button" onClick={handleDownload} disabled={pdfSaving} style={{
         padding: "9px 12px", borderRadius: 8, border: "none",
         background: pdfSaving ? "var(--color-tint-cyan)" : CYAN,
         color: pdfSaving ? "var(--color-cyan-deep)" : "var(--color-on-brand)", fontSize: 12, fontWeight: 800,
@@ -1658,7 +1658,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
         opacity: pdfSaving ? 0.75 : 1,
       }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
       {onGoToQuiz && (
-        <button onClick={onGoToQuiz} style={{
+        <button type="button" onClick={onGoToQuiz} style={{
           padding: "9px 12px", borderRadius: 8, border: "none",
           background: PINK, color: "var(--color-on-brand)", fontSize: 12, fontWeight: 800, cursor: "pointer",
         }}>퀴즈 생성하기</button>
@@ -2279,7 +2279,7 @@ const MaterialDetailView = ({
 
   return (
     <div>
-      <button onClick={onBack} style={{
+      <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>{backLabel}</button>
       <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -2465,7 +2465,7 @@ const MaterialDetailView = ({
                 <>
                   {multiSourceBadge(activeSummary.materialIds)}
                   <SummaryActions template={activeSummary.template} content={activeSummary.content} onGoToQuiz={onGoQuiz} />
-                  <button onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
+                  <button type="button" onClick={() => handleSummaryTutorOpenChange(!isSummaryTutorOpen)} style={{
                     padding: "9px 12px",
                     borderRadius: 8,
                     border: isSummaryTutorOpen ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
@@ -2541,7 +2541,7 @@ const MaterialDetailView = ({
                 <div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 요약이 없습니다</h3>
                   <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.</p>
-                  <button onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  <button type="button" onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     요약 생성하기
                   </button>
                 </div>
@@ -2671,7 +2671,7 @@ const MaterialDetailView = ({
                 <div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 퀴즈가 없습니다</h3>
                   <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.</p>
-                  <button onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+                  <button type="button" onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     퀴즈 생성하기
                   </button>
                 </div>
@@ -2713,7 +2713,7 @@ const MaterialDetailView = ({
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <button onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                          <button type="button" onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                             {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
                           </button>
                           <button
@@ -2799,7 +2799,7 @@ const MaterialDetailView = ({
                     </div>
                   );
                 })}
-                <button onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                <button type="button" onClick={onGoQuiz} style={{ justifySelf: "start", padding: "11px 16px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                   새 퀴즈 만들기
                 </button>
               </div>
@@ -2858,7 +2858,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 
   return (
     <div>
-      <button onClick={onBack} style={{
+      <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
       <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>퀴즈 생성</h2>
@@ -2884,7 +2884,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
             <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>난이도</h3>
             <div style={{ display: "flex", gap: 10 }}>
               {["낮음", "보통", "높음"].map(d => (
-                <button key={d} onClick={() => setDifficulty(d)} style={{
+                <button type="button" key={d} onClick={() => setDifficulty(d)} style={{
                   padding: "10px 24px", borderRadius: 10,
                   border: difficulty === d ? "none" : "1px solid var(--color-border-soft)",
                   background: difficulty === d ? PINK : "var(--color-card)",
@@ -2912,7 +2912,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
             <h3 style={{ margin: "0 0 12px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>문제 유형</h3>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {["O/X", "객관식", "단답형", "주관식"].map(t => (
-                <button key={t} onClick={() => toggleType(t)} style={{
+                <button type="button" key={t} onClick={() => toggleType(t)} style={{
                   padding: "10px 20px", borderRadius: 10,
                   border: types.includes(t) ? "none" : "1px solid var(--color-border-soft)",
                   background: types.includes(t) ? CYAN : "var(--color-card)",
@@ -2923,7 +2923,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
             </div>
           </div>
 
-          <button onClick={onCreate} style={{
+          <button type="button" onClick={onCreate} style={{
             padding: "16px 0", borderRadius: 14, border: "none",
             background: PINK, color: "var(--color-on-brand)", fontSize: 16, fontWeight: 700,
             cursor: "pointer", marginTop: 8
@@ -4054,7 +4054,7 @@ export default function Summary() {
                   : "기존 자료를 그대로 사용할게요. 원본 파일 연결이 없던 자료는 다시 연결을 시도합니다."}
               </div>
             </div>
-            <button
+            <button type="button"
               className="tongkk-hover-dim"
               onClick={() => setDuplicateNotice(null)}
               aria-label="중복 파일 안내 닫기"
@@ -4079,10 +4079,10 @@ export default function Summary() {
       )}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
@@ -4153,7 +4153,7 @@ export default function Summary() {
 
         {view === "upload" && selectedCourse && (
           <div>
-            <button onClick={() => navigate(pageRoutes["대시보드"])} style={{
+            <button type="button" onClick={() => navigate(pageRoutes["대시보드"])} style={{
               background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
             }}>← 대시보드로</button>
               <Card style={{ padding: 24 }}>
@@ -4195,7 +4195,7 @@ export default function Summary() {
                     <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.docx,.txt,.md,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
                       onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
                     <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--color-muted)" }}>강의자료 파일을 드래그하거나</p>
-                    <button style={{
+                    <button type="button" style={{
                       marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
                       background: "var(--color-card)", fontSize: 13, cursor: "pointer", color: "var(--color-text)"
                     }}>파일 선택</button>
@@ -4534,7 +4534,7 @@ export default function Summary() {
               )}
 
               {searched && (
-                <button
+                <button type="button"
                   onClick={handleGenerateFromSettings}
                   disabled={!selectedMarkdown || isExtracting || isSummarizing}
                   style={{

@@ -177,10 +177,10 @@ export default function ReviewNotes() {
       {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
       </div>
 
@@ -195,7 +195,7 @@ export default function ReviewNotes() {
             {[ALL, ...courseNames].map(name => {
               const active = filter === name;
               return (
-                <button key={name} onClick={() => setFilter(name)} style={{
+                <button type="button" key={name} onClick={() => setFilter(name)} style={{
                   padding: "8px 14px", borderRadius: 999,
                   border: active ? `1px solid ${PINK}` : `1px solid ${BORDER_COLOR}`,
                   background: active ? "var(--color-tint-pink)" : "var(--color-card)",

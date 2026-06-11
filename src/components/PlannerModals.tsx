@@ -93,7 +93,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
   return (
     <div style={{ background: "var(--glass-bg)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid var(--glass-border)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <button onClick={prevMonth} aria-label="이전 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>‹</button>
+        <button type="button" onClick={prevMonth} aria-label="이전 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>‹</button>
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-strong)" }}>{viewYear}년 {MONTH_NAMES[viewMonth]}</span>
           {planner && offCurrentMonth && (
@@ -103,7 +103,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
             }}>오늘</button>
           )}
         </span>
-        <button onClick={nextMonth} aria-label="다음 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>›</button>
+        <button type="button" onClick={nextMonth} aria-label="다음 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>›</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 6 }}>
         {DAY_NAMES.map((d, i) => (
@@ -134,7 +134,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
             const shownChips = chips.slice(0, 2);
             const extraChips = chips.length - shownChips.length;
             return (
-              <button key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} className="tongkk-cal-cell" style={{
+              <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} className="tongkk-cal-cell" style={{
                 width: "100%", minHeight: 62, borderRadius: 10, padding: "4px 4px 5px",
                 border: isSelected ? `1.5px solid ${PINK}` : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "1px solid transparent",
                 background: isSelected ? "color-mix(in srgb, var(--color-pink) 14%, transparent)" : "transparent",
@@ -175,7 +175,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           }
 
           return (
-            <button key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} style={{
+            <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} style={{
               width: "100%", aspectRatio: "1", borderRadius: "50%",
               border: isSelected ? "none" : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "none",
               background: isSelected ? PINK : "transparent",
@@ -259,8 +259,8 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         )}
         <CustomCalendar value={date} onChange={setDate} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
+          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button type="button" onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>{submitLabel}</button>
         </div>
@@ -296,8 +296,8 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           }}
         />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={handleAdd} style={{
+          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button type="button" onClick={handleAdd} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
@@ -529,8 +529,8 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
             </>
           )}
           <div className="flex gap-2.5 justify-end">
-            <button onClick={onClose} className="px-4 py-2.5 rounded-[10px] border border-border bg-card text-sm font-bold text-text cursor-pointer hover:bg-muted-surface">취소</button>
-            <button
+            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-[10px] border border-border bg-card text-sm font-bold text-text cursor-pointer hover:bg-muted-surface">취소</button>
+            <button type="button"
               onClick={handleAdd}
               disabled={!canAdd}
               className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
@@ -631,8 +631,8 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
         )}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button
+          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button type="button"
             onClick={handleSave}
             disabled={!canSave}
             style={{
