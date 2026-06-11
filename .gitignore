@@ -18,6 +18,7 @@ __pycache__/
 
 # editor / OS / tooling
 .claude/
+CLAUDE.md
 .DS_Store
 *.local
 .vscode/
