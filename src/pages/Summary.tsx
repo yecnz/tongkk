@@ -508,7 +508,11 @@ const mergeSourceCitations = (sources: string[]): string => {
     });
   }
   const parts = [...byFile.entries()]
-    .map(([file, locs]) => (file ? (locs.length ? `${file}, ${locs.join(", ")}` : file) : locs.join(", ")))
+    .map(([file, locs]) => {
+      // 페이지/슬라이드 번호 순으로 정렬한다(수집 순서대로면 p.34가 p.32 앞에 오는 등 뒤섞임).
+      locs.sort((a, b) => (parseInt(a.match(/\d+/)?.[0] ?? "0", 10)) - (parseInt(b.match(/\d+/)?.[0] ?? "0", 10)));
+      return file ? (locs.length ? `${file}, ${locs.join(", ")}` : file) : locs.join(", ");
+    })
     .filter(Boolean);
   return parts.length ? `(출처: ${parts.join("; ")})` : "";
 };
@@ -619,6 +623,42 @@ const getNodeText = (node: unknown): string => {
   return "";
 };
 
+// '방법/절차' 항목 정리 — 각 번호 항목(1. 2. ...) 내부(하위 bullet)에 흩어진 출처를 그 항목의
+// 제목 줄(번호 줄) 끝으로 끌어올려, bullet이 아니라 항목 제목 옆에 출처가 붙게 한다. 한 항목에
+// 여러 페이지가 섞여 있으면 위치를 모아 하나의 출처로 합친다(중복 제거).
+const formatMethodSection = (sectionLines: string[]): string[] => {
+  const SRC_G = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
+  const items: { head: string; body: string[] }[] = [];
+  let cur: { head: string; body: string[] } | null = null;
+  const preamble: string[] = [];
+  for (const raw of sectionLines) {
+    if (/^\s*\d+\.\s/.test(raw)) {
+      cur = { head: raw, body: [] };
+      items.push(cur);
+    } else if (cur) {
+      cur.body.push(raw);
+    } else {
+      preamble.push(raw);
+    }
+  }
+  if (!items.length) return sectionLines;
+  const out: string[] = [...preamble];
+  for (const { head, body } of items) {
+    const locs: string[] = [];
+    for (const src of ([head, ...body].join("\n").match(SRC_G) || [])) {
+      src.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "")
+        .split(",").map(part => part.trim()).filter(Boolean)
+        .forEach(part => { if (!locs.includes(part)) locs.push(part); });
+    }
+    // 페이지/슬라이드 번호 순으로 정렬한다(p.34가 p.32 앞에 오는 등 수집 순서 뒤섞임 방지).
+    locs.sort((a, b) => (parseInt(a.match(/\d+/)?.[0] ?? "0", 10)) - (parseInt(b.match(/\d+/)?.[0] ?? "0", 10)));
+    const headClean = head.replace(SRC_G, "").trimEnd();
+    out.push(locs.length ? `${headClean} (출처: ${locs.join(", ")})` : headClean);
+    body.forEach(l => out.push(l.replace(SRC_G, "").trimEnd()));
+  }
+  return out;
+};
+
 const hoistSourceToHeadings = (markdown: string): string => {
   const lines = sanitizeCitationTildes(markdown).split("\n");
   const result: string[] = [];
@@ -636,9 +676,15 @@ const hoistSourceToHeadings = (markdown: string): string => {
       const isNoSourceSection = /흐름|주요\s*용어|핵심\s*암기|참고\s*\/?\s*주의/.test(line);
       // '시험 포인트'는 헤딩에 모으지 않고 각 문제 옆 인라인 출처를 그대로 둔다.
       const isInlineSourceSection = /시험\s*포인트/.test(line);
+      // '방법/절차'는 항목(번호 목록)마다 출처가 많아 헤딩에 모으면 p.X가 잔뜩 붙는다.
+      // 시험 포인트처럼 각 항목 옆 인라인 출처를 그대로 둔다(헤딩에 모으지 않음).
+      const isKeepInlineSection = /방법\s*\/?\s*절차/.test(line);
       if (isInlineSourceSection) {
         result.push(line);
         formatExamCards(sectionLines).forEach(l => result.push(l));
+      } else if (isKeepInlineSection) {
+        result.push(line);
+        formatMethodSection(sectionLines).forEach(l => result.push(l));
       } else {
         const sources = isNoSourceSection ? [] : (sectionLines.join("\n").match(SOURCE_PATTERN) || []);
         const mergedSource = sources.length ? mergeSourceCitations(sources) : "";
