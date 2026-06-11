@@ -625,7 +625,7 @@ export const AITutorDrawer = ({
         border: "1px solid var(--color-border-soft)",
         borderRight: layout === "embedded" ? "1px solid var(--color-border-soft)" : isExpanded ? "1px solid var(--color-border-soft)" : "none",
         borderRadius: layout === "embedded" ? 0 : isExpanded ? 16 : "16px 0 0 16px",
-        padding: 20,
+        padding: isExpanded ? "16px 16px" : 20,
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
@@ -890,7 +890,7 @@ export const AITutorDrawer = ({
                     ? parseAiSuggestions(msg.content)
                     : { mainContent: msg.content, suggestions: [] };
                   return (
-                    <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: isExpanded && msg.role === "assistant" ? "100%" : "88%", display: "flex", flexDirection: "column", gap: 8 }}>
                       <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
                         {msg.images && msg.images.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: mainContent ? 8 : 0 }}>

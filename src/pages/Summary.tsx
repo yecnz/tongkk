@@ -2422,7 +2422,7 @@ const MaterialDetailView = ({
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
+              <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: isSummaryTutorExpanded ? "calc(100vh - 100px)" : SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
                 {showSummaryList && !isSummaryTutorExpanded && (
                   <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (
