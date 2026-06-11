@@ -92,7 +92,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
         .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
         .map(item => (
         <button key={item} onClick={() => { onNav(item); onClose(); }} style={{
-          padding: "14px 24px", border: "none", background: active === item ? "rgba(240,112,174,0.11)" : "transparent",
+          padding: "14px 24px", border: "none", background: active === item ? "color-mix(in srgb, var(--color-pink) 11%, transparent)" : "transparent",
           textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
           color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
         }}>{item}</button>
