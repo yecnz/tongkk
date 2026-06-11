@@ -2,6 +2,7 @@ import { createTtlCache } from './cache';
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import { deleteSummariesByMaterialId } from './summaries';
+import { deleteChatSessionsByMaterialId } from './summaryChats';
 
 export type MaterialKind = "pdf" | "ppt" | "img" | "file";
 
@@ -223,6 +224,9 @@ export const countCourseMaterialsFromServer = async (course: string): Promise<nu
   return total;
 };
 
+// 자료 한 건과 파생 데이터(요약·튜터 대화·원본 파일)를 모두 정리한다.
+// 퀴즈 세트와 풀이 기록은 의도적으로 남긴다 — 퀴즈는 문제(questions)를 자체 보유해
+// 자료 없이도 퀴즈 페이지에서 계속 풀 수 있고, 풀이 기록은 통계에 쓰인다.
 export const deleteCourseMaterialFromServer = async (course: string, materialId: string) => {
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) return;
@@ -235,13 +239,10 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
     .maybeSingle<{ file_path: string | null }>();
 
   if (loadError) throw new Error(formatSupabaseError(loadError));
-  if (material?.file_path) {
-    const removeResult = await supabase.storage
-      .from(MATERIAL_STORAGE_BUCKET)
-      .remove([material.file_path]);
-    if (removeResult.error) throw new Error(formatSupabaseError(removeResult.error));
-    invalidateSignedUrlCache(material.file_path);
-  }
+
+  // 파생 데이터부터 지운다. 중간에 실패해도 자료 본체가 남아 있어 삭제를 다시 시도할 수 있다.
+  await deleteSummariesByMaterialId(course, materialId);
+  await deleteChatSessionsByMaterialId(materialId);
 
   const { error } = await supabase
     .from('materials')
@@ -250,9 +251,17 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
     .eq('id', materialId);
 
   if (error) throw new Error(formatSupabaseError(error));
-
   invalidateMaterialsCache(course);
-  await deleteSummariesByMaterialId(course, materialId);
+
+  // Storage 원본은 마지막에 지운다. 여기서 실패하면 접근 경로가 없는 고아 파일만 남고
+  // 사용자 입장에서는 삭제가 끝난 것이므로 오류를 올리지 않는다.
+  if (material?.file_path) {
+    const removeResult = await supabase.storage
+      .from(MATERIAL_STORAGE_BUCKET)
+      .remove([material.file_path]);
+    if (removeResult.error) console.warn('자료 원본 파일 삭제 실패(고아 파일):', removeResult.error);
+    invalidateSignedUrlCache(material.file_path);
+  }
 };
 
 export const syncCourseMaterials = async (course: string, materials: CourseMaterial[]) => {
