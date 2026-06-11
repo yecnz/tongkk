@@ -118,11 +118,15 @@ const SettingsModal = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // 전체 데이터 파기는 되돌릴 수 없어, "삭제"를 직접 입력해야 버튼이 활성화된다.
+  const [confirmText, setConfirmText] = useState("");
+  const deleteReady = confirmText.trim() === "삭제";
   if (!type) return null;
 
   const title = type === "notice" ? "공지사항" : type === "contact" ? "문의하기" : "회원 데이터 삭제";
 
   const handleDelete = async () => {
+    if (!deleteReady) return;
     setLoading(true);
     setError("");
     try {
@@ -176,13 +180,25 @@ const SettingsModal = ({
               Supabase Auth 계정 자체 삭제는 관리자 권한이 필요한 별도 서버 기능입니다.
             </p>
             {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
+            <label style={{ display: "block", marginBottom: 6, fontSize: 12.5, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              계속하려면 <strong style={{ color: "var(--color-danger)" }}>삭제</strong>를 입력하세요
+            </label>
+            <input
+              value={confirmText}
+              onChange={event => setConfirmText(event.target.value)}
+              placeholder="삭제"
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12,
+              }}
+            />
             <button
               onClick={handleDelete}
-              disabled={loading}
+              disabled={loading || !deleteReady}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                background: loading ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
-                fontWeight: 800, cursor: loading ? "default" : "pointer"
+                background: loading || !deleteReady ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
+                fontWeight: 800, cursor: loading || !deleteReady ? "default" : "pointer"
               }}
             >
               {loading ? "삭제 중" : "내 앱 데이터 삭제"}

@@ -33,7 +33,6 @@ import {
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
-import { loadLastCourse, saveLastCourse } from "../services/lastCourse";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -2725,8 +2724,7 @@ export default function Summary() {
   const sessionDetailRef = useRef<SummaryViewDetail>(restoreFromUrl ? readSummaryViewDetail() : {});
   const sessionDetail = sessionDetailRef.current;
 
-  // 핸드오프·URL 모두 없으면(사이드바 단독 진입) 마지막 본 과목으로 폴백한다.
-  const initialCourse = ((locationState?.selectedCourse || (restoreFromUrl ? urlCourse : "")) || "").trim() || loadLastCourse();
+  const initialCourse = ((locationState?.selectedCourse || (restoreFromUrl ? urlCourse : "")) || "").trim();
   const fromDashboardRef = useRef(Boolean(locationState?.selectedCourse?.trim() && locationState?.fromDashboard));
   const pendingMaterialIdRef = useRef(
     hasHandoff && locationState?.viewMaterial
@@ -2877,11 +2875,6 @@ export default function Summary() {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
-
-  // 마지막 본 과목 기억 — 사이드바 단독 진입의 폴백으로 쓴다.
-  useEffect(() => {
-    if (selectedCourse) saveLastCourse(selectedCourse);
-  }, [selectedCourse]);
 
   useEffect(() => {
     if (!locationState?.openSummary && !locationState?.viewMaterial && !locationState?.createSummary) return;

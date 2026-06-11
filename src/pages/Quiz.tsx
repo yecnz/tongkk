@@ -55,6 +55,57 @@ const sourceLabels: Record<string, string> = {
   CHEAT_SHEET: "치트시트",
 };
 
+// 풀이 중 새로고침·이탈로 답안이 날아가지 않도록 진행 상태를 세션에 스냅샷한다.
+// 과목 설정 화면에서 "이어서 풀기" 배너로 복구하며, 제출(결과 진입) 시 지운다.
+type QuizDraft = {
+  course: string;
+  quizzes: QuizQuestion[];
+  current: number;
+  answers: Record<number, number | string>;
+  subjectiveGrades: Record<number, SubjectiveGradeResult>;
+  questionType: QuizQuestionType;
+  difficulty: QuizDifficulty;
+  examMode: boolean;
+  remainingSeconds: number | null;
+  quizStartedAt: number | null;
+  openedQuizTitle: string;
+  activeQuizSetId: string | null;
+  selectedMaterialIds: string[];
+  savedAt: number;
+};
+
+const QUIZ_DRAFT_KEY = "tongkk:quizDraft";
+const QUIZ_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+const readQuizDraft = (): QuizDraft | null => {
+  try {
+    const raw = sessionStorage.getItem(QUIZ_DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as QuizDraft;
+    if (!draft?.course || !Array.isArray(draft.quizzes) || draft.quizzes.length === 0) return null;
+    if (Date.now() - (draft.savedAt || 0) > QUIZ_DRAFT_MAX_AGE_MS) return null;
+    return draft;
+  } catch {
+    return null;
+  }
+};
+
+const writeQuizDraft = (draft: QuizDraft) => {
+  try {
+    sessionStorage.setItem(QUIZ_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // 저장 실패(용량 등) 시 복구만 못 할 뿐 풀이는 계속된다.
+  }
+};
+
+const clearQuizDraft = () => {
+  try {
+    sessionStorage.removeItem(QUIZ_DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+};
+
 const isSupportedDocumentFile = (file: File) =>
   ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
@@ -251,6 +302,10 @@ export default function Quiz() {
   // 과목 오답 분석(오답 다시 풀기 결과 화면)
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
+  // 이어 풀 수 있는 풀이 스냅샷(과목 설정 화면 배너로 노출).
+  const [resumableDraft, setResumableDraft] = useState<QuizDraft | null>(() => readQuizDraft());
+  // 이어풀기 직후 과목 데이터 로드가 늦게 끝나도 복원된 풀이 상태를 덮어쓰지 않게 하는 가드.
+  const resumedDraftRef = useRef(false);
 
   // Summary 페이지에서 navigate로 전달된 state 처리 (마운트 시 1회)
   useEffect(() => {
@@ -309,6 +364,9 @@ export default function Quiz() {
       // MINDMAP은 퀴즈 소스로 부적합 (JSON 구조)
       const usable = summaries.filter(s => s.template !== "MINDMAP");
       setSavedSummaries(usable);
+
+      // 이어풀기로 복원된 풀이 상태(선택 자료·세트·난이도 등)를 로드 완료가 덮어쓰지 않게 한다.
+      if (resumedDraftRef.current) return;
 
       const pendingMaterialIds = pendingMaterialIdsRef.current;
       pendingMaterialIdsRef.current = null;
@@ -433,6 +491,73 @@ export default function Quiz() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [view, reviewMode]);
+
+  // 풀이 진행 상태를 세션에 스냅샷 — 새로고침·이탈 후 "이어서 풀기"로 복구한다.
+  // 오답 다시 풀기(reviewActiveRef)는 원본 문항이 오답 노트에 남아 있어 제외한다.
+  useEffect(() => {
+    if (view !== "quiz" || reviewMode || reviewActiveRef.current || quizzes.length === 0 || !selectedCourse) return;
+    writeQuizDraft({
+      course: selectedCourse,
+      quizzes,
+      current,
+      answers,
+      subjectiveGrades,
+      questionType,
+      difficulty,
+      examMode,
+      remainingSeconds,
+      quizStartedAt,
+      openedQuizTitle,
+      activeQuizSetId,
+      selectedMaterialIds,
+      savedAt: Date.now(),
+    });
+  }, [
+    view, reviewMode, quizzes, current, answers, subjectiveGrades, questionType, difficulty,
+    examMode, remainingSeconds, quizStartedAt, openedQuizTitle, activeQuizSetId, selectedMaterialIds, selectedCourse,
+  ]);
+
+  // 결과 화면에 도달하면 풀이가 끝난 것이므로 스냅샷을 지운다.
+  useEffect(() => {
+    if (view !== "result") return;
+    clearQuizDraft();
+    setResumableDraft(null);
+  }, [view]);
+
+  // 과목 설정 화면의 "이어서 풀기" — 스냅샷 상태를 그대로 복원해 풀이 화면으로 진입한다.
+  const resumeDraft = () => {
+    const draft = resumableDraft;
+    if (!draft || draft.course !== selectedCourse) return;
+    resumedDraftRef.current = true;
+    const safeCurrent = Math.min(Math.max(draft.current, 0), draft.quizzes.length - 1);
+    setQuizzes(draft.quizzes);
+    setCurrent(safeCurrent);
+    setAnswers(draft.answers || {});
+    setSubjectiveGrades(draft.subjectiveGrades || {});
+    setQuestionType(draft.questionType);
+    setDifficulty(draft.difficulty);
+    setExamMode(draft.examMode);
+    setRemainingSeconds(draft.remainingSeconds);
+    setQuizStartedAt(draft.quizStartedAt ?? Date.now());
+    setOpenedQuizTitle(draft.openedQuizTitle);
+    setActiveQuizSetId(draft.activeQuizSetId);
+    if (draft.selectedMaterialIds.length > 0) setSelectedMaterialIds(draft.selectedMaterialIds);
+    setShortAnswerInput("");
+    setShowExplanation(draft.answers?.[safeCurrent] !== undefined && !draft.examMode);
+    setTimedOut(false);
+    setAttemptSavedKey("");
+    setAttemptSaveNotice("");
+    setReviewAttempt(null);
+    setReviewMode(false);
+    setError(null);
+    setResumableDraft(null);
+    setView("quiz");
+  };
+
+  const dismissDraft = () => {
+    clearQuizDraft();
+    setResumableDraft(null);
+  };
 
   const handleCourseBack = () => {
     // 자료 목록(materialList)을 거쳐 들어온 경우 이전 화면인 자료 목록으로 돌아간다.
@@ -623,6 +748,8 @@ export default function Quiz() {
     abortRef.current = controller;
     setView("generating");
     setError(null);
+    // 새 퀴즈를 만들면 이전 풀이 스냅샷 배너는 의미가 없어진다(스냅샷 자체는 새 풀이로 덮인다).
+    setResumableDraft(null);
     const markdownToUse = buildMaterialSourceMarkdown(selectedMaterials);
     // 진단 모드는 대시보드에서 넘어온 첫 생성 1회에만 적용.
     const diagnostic = diagnosticPendingRef.current;
@@ -902,7 +1029,11 @@ export default function Quiz() {
 
   const handleNav = (item: PageRouteLabel) => {
     if (view === "quiz" && !reviewMode) {
-      if (!window.confirm("퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다.\n페이지를 떠나시겠습니까?")) {
+      // 일반 풀이는 스냅샷이 남아 "이어서 풀기"로 복구되지만, 오답 다시 풀기는 스냅샷 대상이 아니다.
+      const message = reviewActiveRef.current
+        ? "퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다.\n페이지를 떠나시겠습니까?"
+        : "퀴즈 풀이 중입니다. 나중에 이 과목 퀴즈 화면에서 이어서 풀 수 있어요.\n페이지를 떠나시겠습니까?";
+      if (!window.confirm(message)) {
         setSidebar(false);
         return;
       }
@@ -939,6 +1070,37 @@ export default function Quiz() {
             <div style={{ marginBottom: 20, padding: "12px 16px", borderRadius: 10, background: "var(--color-tint-pink)", border: `1px solid ${PINK}`, fontSize: 13, color: PINK }}>
               {error}
             </div>
+          )}
+
+          {resumableDraft && resumableDraft.course === selectedCourse && (
+            <Card style={{ padding: "16px 20px", marginBottom: 16, border: `1px solid ${CYAN}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <p style={{ margin: "0 0 3px", fontSize: 14, fontWeight: 800, color: "var(--color-text-strong)" }}>풀던 퀴즈가 있어요</p>
+                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-text-secondary)" }}>
+                    {resumableDraft.openedQuizTitle || `${resumableDraft.course} 퀴즈`} · {Object.keys(resumableDraft.answers || {}).length}/{resumableDraft.quizzes.length}문항 응답
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={dismissDraft}
+                    style={{
+                      padding: "8px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                      background: "var(--color-card)", color: "var(--color-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    }}
+                  >지우기</button>
+                  <button
+                    type="button"
+                    onClick={resumeDraft}
+                    style={{
+                      padding: "8px 14px", borderRadius: 10, border: "none",
+                      background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                    }}
+                  >이어서 풀기</button>
+                </div>
+              </div>
+            </Card>
           )}
 
           <Card style={{ padding: 20, marginBottom: 16, border: "1px solid var(--color-tint-cyan)", background: "#F7FDFF" }}>
@@ -1543,7 +1705,12 @@ export default function Quiz() {
             {analyzeError && (
               <p style={{ margin: "0 0 12px", fontSize: 13, color: PINK }}>{analyzeError}</p>
             )}
-            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              <button onClick={() => navigate(pageRoutes["오답 노트"])} disabled={analyzing} style={{
+                padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
+                background: "var(--color-card)", fontSize: 14, fontWeight: 700,
+                cursor: analyzing ? "default" : "pointer", color: "var(--color-text)", opacity: analyzing ? 0.6 : 1
+              }}>오답 노트 보기</button>
               <button onClick={retryQuiz} disabled={analyzing} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
                 background: "var(--color-card)", fontSize: 14, fontWeight: 700,

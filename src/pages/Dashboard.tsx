@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card } from "../common";
 import { useCourses } from "../CourseContext";
+import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
@@ -36,7 +37,7 @@ import {
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 
-type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void };
+type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void; onAddAndUpload: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
 type DeleteCourseModalProps = { course: string; onClose: () => void; onDelete: (name: string) => void };
 type CourseDetailSection = "materials" | "summaries" | "quizzes";
@@ -75,28 +76,41 @@ const materialMeta = (material: CourseMaterial) => {
   return material.type.toUpperCase();
 };
 
-const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
+const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) => {
   const [name, setName] = useState("");
+  const courseName = name.trim();
   const handleAdd = () => {
-    const courseName = name.trim();
     if (!courseName) return;
     onAdd(courseName);
+    onClose();
+  };
+  // 새 과목의 다음 단계는 거의 항상 자료 업로드라, 추가와 동시에 업로드 화면으로 잇는 경로를 기본 동선으로 둔다.
+  const handleAddAndUpload = () => {
+    if (!courseName) return;
+    onAddAndUpload(courseName);
     onClose();
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
+      <Card style={{ padding: 28, width: "min(400px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
-        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="과목명 입력" style={{
+        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAddAndUpload(); }} placeholder="과목명 입력" autoFocus style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
         }}/>
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>추가</button>
+          <button onClick={handleAdd} disabled={!courseName} style={{
+            padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+            background: "var(--color-card)", color: courseName ? "var(--color-text)" : "var(--color-muted)",
+            cursor: courseName ? "pointer" : "default", fontSize: 14, fontWeight: 600
+          }}>추가만 하기</button>
+          <button onClick={handleAddAndUpload} disabled={!courseName} style={{
+            padding: "8px 18px", borderRadius: 10, border: "none",
+            background: courseName ? PINK : "var(--color-border-soft)", color: "var(--color-on-brand)",
+            cursor: courseName ? "pointer" : "default", fontSize: 14, fontWeight: 600
+          }}>추가하고 자료 올리기</button>
         </div>
       </Card>
     </div>
@@ -473,6 +487,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
+  const { showToast } = useToast();
   const [sidebar, setSidebar] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -850,10 +865,26 @@ export default function Dashboard() {
     });
   };
 
+  // 계획 삭제는 확인 모달 대신 토스트의 "되돌리기"로 복구를 보장한다(흐름을 끊지 않으면서 실수 방어).
   const deletePlan = (target: Plan, targetIndex: number) => {
+    const removeIndex = target.id ? plans.findIndex(item => item.id === target.id) : targetIndex;
+    if (removeIndex < 0) return;
+    const removed = plans[removeIndex];
     setPlans(prev => prev.filter((item, index) =>
-      target.id ? item.id !== target.id : index !== targetIndex
+      removed.id ? item.id !== removed.id : index !== removeIndex
     ));
+    showToast("학습 계획을 삭제했어요.", "info", {
+      duration: 6000,
+      action: {
+        label: "되돌리기",
+        onAction: () => setPlans(current => {
+          if (removed.id && current.some(item => item.id === removed.id)) return current;
+          const next = [...current];
+          next.splice(Math.min(removeIndex, next.length), 0, removed);
+          return next;
+        }),
+      },
+    });
   };
 
   const togglePlanSource = (sourceKey: string) => {
@@ -943,7 +974,16 @@ export default function Dashboard() {
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active={page} onNav={(item) => { navigate(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
-      {showAddCourse && <AddCourseModal onClose={() => setShowAddCourse(false)} onAdd={addCourse} />}
+      {showAddCourse && (
+        <AddCourseModal
+          onClose={() => setShowAddCourse(false)}
+          onAdd={addCourse}
+          onAddAndUpload={name => {
+            addCourse(name);
+            navigate(pageRoutes["자료 요약"], { state: { selectedCourse: name, fromDashboard: true } });
+          }}
+        />
+      )}
       {renamingCourse && <RenameCourseModal course={renamingCourse} courses={courses} onClose={() => setRenamingCourse(null)} onRename={renameCourse} />}
       {deletingCourse && <DeleteCourseModal course={deletingCourse} onClose={() => setDeletingCourse(null)} onDelete={deleteCourse} />}
       {detailCourse && (
@@ -1047,7 +1087,9 @@ export default function Dashboard() {
                 alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--color-text-secondary)",
               }}>
                 <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 850, color: "var(--color-text-strong)" }}>아직 등록된 강의가 없습니다.</h2>
-                <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--color-muted)" }}>강의를 추가하면 자료, 요약, 퀴즈를 관리할 수 있어요.</p>
+                <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.7, color: "var(--color-muted)" }}>
+                  강의를 만들고 강의자료를 올려보세요.<br />AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
+                </p>
                 <button onClick={() => setShowAddCourse(true)} style={{
                   padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
                   color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
@@ -1075,7 +1117,7 @@ export default function Dashboard() {
                       }}
                     >
                       <div>
-                        <h2 style={{ margin: "0 34px 10px 0", fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
+                        <h2 style={{ margin: "0 44px 10px 0", fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
                           {course}
                         </h2>
                         <p style={{ margin: 0, fontSize: 13, color: stats.error ? "var(--color-danger)" : "var(--color-text-secondary)", fontWeight: 700 }}>
@@ -1087,15 +1129,16 @@ export default function Dashboard() {
                         aria-label={`${course} 관리 메뉴`}
                         onClick={e => { e.stopPropagation(); setOpenCourseMenu(prev => prev === course ? null : course); }}
                         style={{
-                          position: "absolute", top: 14, right: 14,
-                          width: 30, height: 30, borderRadius: 9, border: "1px solid var(--color-border-soft)",
+                          // 모바일 터치를 고려해 히트 영역을 38px 이상으로 유지한다.
+                          position: "absolute", top: 10, right: 10,
+                          width: 38, height: 38, borderRadius: 10, border: "1px solid var(--color-border-soft)",
                           background: openCourseMenu === course ? "var(--color-surface)" : "var(--color-card)",
-                          color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "26px", padding: 0,
+                          color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "34px", padding: 0,
                         }}
                       >...</button>
                       {openCourseMenu === course && (
                         <div onClick={e => e.stopPropagation()} style={{
-                          position: "absolute", right: 14, top: 48, width: 128, padding: 6,
+                          position: "absolute", right: 10, top: 52, width: 128, padding: 6,
                           borderRadius: 12, border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
                           boxShadow: "0 12px 28px rgba(0,0,0,0.12)", zIndex: 20,
                         }}>
@@ -1508,6 +1551,7 @@ export default function Dashboard() {
                         ) : (
                           <button
                             type="button"
+                            className="tongkk-plan-text"
                             onClick={() => startEditPlan(p, i)}
                             title="클릭해서 수정"
                             style={{
@@ -1526,6 +1570,7 @@ export default function Dashboard() {
                               }}>AI</span>
                             )}
                             {p.text}
+                            <span className="tongkk-plan-edit-hint" aria-hidden>✎</span>
                           </button>
                         )}
                         {p.action && !isEditing && (p.action === "review_wrong" || resolvePlanCourse(p.course)) && (
