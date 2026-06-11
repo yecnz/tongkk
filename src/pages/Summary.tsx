@@ -842,14 +842,14 @@ const SummaryLoadingOverlay = ({ loadingStep }: { loadingStep?: string }) => {
 };
 
 // 새로고침 복원 중 보여줄 스켈레톤. 자료 상세 화면(헤더·탭·본문)의 뼈대를 회색 박스로 흉내내,
-// 빈 화면 깜빡임 없이 "곧 자료가 뜬다"는 인상을 준다. pulse 애니메이션으로 은은하게 깜빡인다.
+// 빈 화면 깜빡임 없이 "곧 자료가 뜬다"는 인상을 준다.
+// 펄스 애니메이션·reduced-motion 대응은 공용 .tongkk-skeleton-block(src/index.css)을 따른다.
 const RestoreSkeleton = () => {
   const sk = (style: CSSProperties) => (
-    <div style={{ background: "var(--color-muted-surface)", borderRadius: 8, animation: "tk-skeleton-pulse 1.2s ease-in-out infinite", ...style }} />
+    <div className="tongkk-skeleton-block" style={style} />
   );
   return (
     <>
-      <style>{`@keyframes tk-skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }`}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)" }}>
         {sk({ width: 190, height: 22 })}
         {sk({ width: 110, height: 34, marginLeft: "auto", borderRadius: 10 })}
@@ -3108,8 +3108,6 @@ export default function Summary() {
   const [summaryTemplate, setSummaryTemplate] = useState<SummaryTemplate>(readLastSummaryTemplate);
   const [summaryPageRange, setSummaryPageRange] = useState("");
   const [summaryFocusPrompt, setSummaryFocusPrompt] = useState("");
-  // 페이지 범위·집중 내용은 선택 입력이라 기본으로 접어둔다.
-  const [showSummaryAdvanced, setShowSummaryAdvanced] = useState(false);
   // 같은 자료·템플릿 요약이 이미 있을 때 "기존 요약 보기 / 새로 생성"을 묻는 모달.
   const [duplicateSummaryPrompt, setDuplicateSummaryPrompt] = useState<SavedSummary | null>(null);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
@@ -3143,8 +3141,6 @@ export default function Summary() {
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
   // 선택 자료에 페이지 마커가 하나도 없으면 '반영할 페이지'가 동작하지 않으므로 입력을 막고 안내한다.
   const selectedHasPageMarkers = selectedMaterials.some(material => hasPageMarkers(material.markdown));
-  // 페이지 범위·집중 내용이 입력된 채 접혀 있으면 접힘 버튼 옆에 "적용 중"을 표시한다.
-  const summaryAdvancedActive = Boolean((selectedHasPageMarkers && summaryPageRange.trim()) || summaryFocusPrompt.trim());
   // 페이지 범위 입력 힌트는 자료가 하나일 때만 명확하므로 그 경우에만 보여준다.
   const summaryPageHint = selectedMaterials.length === 1
     ? (selectedMaterials[0].pages
@@ -4525,55 +4521,34 @@ export default function Summary() {
                     })}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowSummaryAdvanced(prev => !prev)}
-                    aria-expanded={showSummaryAdvanced}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8, padding: 0,
-                      border: "none", background: "none", cursor: "pointer",
-                      fontSize: 13, fontWeight: 700, color: "var(--color-muted)",
-                    }}
-                  >
-                    <span aria-hidden="true" style={{ fontSize: 10 }}>{showSummaryAdvanced ? "▼" : "▶"}</span>
-                    세부 설정 (반영할 페이지 · 집중할 내용)
-                    {!showSummaryAdvanced && summaryAdvancedActive && (
-                      <span style={{ padding: "3px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>적용 중</span>
-                    )}
-                  </button>
-
-                  {showSummaryAdvanced && (
-                    <div style={{ marginTop: 14 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
-                        반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
-                      </label>
-                      {selectedHasPageMarkers ? (
-                        <input
-                          value={summaryPageRange}
-                          onChange={e => setSummaryPageRange(e.target.value)}
-                          placeholder={summaryPageHint ? `예: 1-5, 8  (${summaryPageHint})` : "예: 1-5, 8"}
-                          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", marginBottom: 16 }}
-                        />
-                      ) : (
-                        <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
-                          {selectedMaterials.length > 0
-                            ? "선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요."
-                            : "자료를 선택하면 페이지 범위를 지정할 수 있어요."}
-                        </div>
-                      )}
-
-                      <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
-                        집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
-                      </label>
-                      <textarea
-                        value={summaryFocusPrompt}
-                        onChange={e => setSummaryFocusPrompt(e.target.value)}
-                        placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
-                        rows={2}
-                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
-                      />
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                    반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
+                  </label>
+                  {selectedHasPageMarkers ? (
+                    <input
+                      value={summaryPageRange}
+                      onChange={e => setSummaryPageRange(e.target.value)}
+                      placeholder={summaryPageHint ? `예: 1-5, 8  (${summaryPageHint})` : "예: 1-5, 8"}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", marginBottom: 16 }}
+                    />
+                  ) : (
+                    <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
+                      {selectedMaterials.length > 0
+                        ? "선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요."
+                        : "자료를 선택하면 페이지 범위를 지정할 수 있어요."}
                     </div>
                   )}
+
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                    집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
+                  </label>
+                  <textarea
+                    value={summaryFocusPrompt}
+                    onChange={e => setSummaryFocusPrompt(e.target.value)}
+                    placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
+                    rows={2}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+                  />
                 </Card>
               )}
 
