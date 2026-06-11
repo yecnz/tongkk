@@ -29,13 +29,13 @@ const formatDate = (timestamp: number) => {
 
 const scoreColor = (score: number) => {
   if (score >= 80) return CYAN;
-  if (score >= 60) return "#6574F7";
+  if (score >= 60) return "var(--color-indigo)";
   return PINK;
 };
 
 const progressColor = (progress: number) => {
   if (progress >= 70) return CYAN;
-  if (progress >= 40) return "#6574F7";
+  if (progress >= 40) return "var(--color-indigo)";
   return PINK;
 };
 
@@ -132,7 +132,7 @@ export default function Stats() {
           <SummaryCard label="연속 학습일" value={`${streak}일`} accent={PINK} note={streak > 0 ? "연속 학습 중이에요" : "오늘 기록 없음"} />
           <SummaryCard label="총 학습시간" value={formatStudyTime(minutes)} accent={CYAN} note={`${attempts.length}회 풀이 기준`} />
           <SummaryCard label="평균 점수" value={`${average}%`} accent={scoreColor(average)} note={scoreDelta === null ? "이전 기록 없음" : `${scoreDelta >= 0 ? "+" : ""}${scoreDelta}%p 변화`} />
-          <SummaryCard label="최근 집중 과목" value={bestCourse ? bestCourse.courseName : "-"} accent="#6574F7" note={bestCourse ? `진척도 ${bestCourse.progressPercent}% · ${bestCourse.attempts}회` : "과목 기록 없음"} />
+          <SummaryCard label="최근 집중 과목" value={bestCourse ? bestCourse.courseName : "-"} accent="var(--color-indigo)" note={bestCourse ? `진척도 ${bestCourse.progressPercent}% · ${bestCourse.attempts}회` : "과목 기록 없음"} />
         </div>
 
         <div style={{ marginBottom: 18 }}>

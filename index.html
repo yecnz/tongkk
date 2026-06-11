@@ -11,6 +11,11 @@
       (function () {
         var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
         document.documentElement.dataset.platform = /windows|win32|win64/i.test(p) ? "windows" : "mac";
+        // 마지막 테마를 첫 페인트 전에 복원해 다크 사용자에게 라이트가 번쩍이지 않게 한다.
+        // 진실 원천은 서버 프로필(src/services/theme.ts의 applyTheme가 로드 후 보정)이고 여기선 캐시만 읽는다.
+        try {
+          if (localStorage.getItem("tongkk:theme") === "dark") document.documentElement.dataset.theme = "dark";
+        } catch (e) { /* 저장소 접근 불가 시 라이트 기본값 유지 */ }
       })();
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />

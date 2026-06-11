@@ -173,9 +173,9 @@ function loadOffsets(persistKey?: string): OffsetMap {
 }
 
 const DEPTH_COLORS = [
-  { bg: "#EDE9FF", border: "#C4B5FD", text: "#5B21B6" },
-  { bg: "#f5f5f5", border: "#e0e0e0", text: "#333" },
-  { bg: "#E0F5F7", border: "rgba(0, 192, 232, 0.38)", text: "#0E7490" },
+  { bg: "var(--color-tint-violet)", border: "color-mix(in srgb, var(--color-violet) 45%, transparent)", text: "var(--color-violet-deep)" },
+  { bg: "var(--color-muted-surface)", border: "var(--color-border-soft)", text: "var(--color-text-strong)" },
+  { bg: "var(--color-tint-cyan)", border: "color-mix(in srgb, var(--color-cyan) 38%, transparent)", text: "var(--color-cyan-deep)" },
 ];
 
 const toolBtn: CSSProperties = {
@@ -398,10 +398,10 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
       clone.querySelectorAll("button").forEach(b => b.remove());
       clone.querySelectorAll("span").forEach(s => { s.style.lineHeight = `${NODE_H}px`; });
       holder.setAttribute("data-theme", "light"); // CSS 변수를 라이트 톤으로 고정(엣지 색 등)
-      holder.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;";
+      holder.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;"; // hex-ok: PDF 캡처 라이트 고정
       holder.appendChild(clone);
       document.body.appendChild(holder);
-      const canvas = await html2canvas(clone, { backgroundColor: "#ffffff", scale: 3, useCORS: true });
+      const canvas = await html2canvas(clone, { backgroundColor: "#ffffff", scale: 3, useCORS: true }); // hex-ok: PDF 캡처 라이트 고정
       const a = document.createElement("a");
       a.href = canvas.toDataURL("image/png");
       a.download = "tongkk-mindmap.png";

@@ -21,14 +21,14 @@ import { CustomCalendar, AddDdayModal, AddPlanModal, AddPaceModal, EditPaceModal
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 // 할 일 / 페이스 마감 마커 색(과제=핑크·일정=청록·시험=보라와 구분).
-const PLAN_MARKER_COLOR = "#64748b";
-const PLAN_DONE_MARKER_COLOR = "#cbd5e1";
+const PLAN_MARKER_COLOR = "var(--color-text-secondary)";
+const PLAN_DONE_MARKER_COLOR = "var(--color-border)";
 // 선택 날짜 패널에서 페이스 항목 상태 라벨/색.
 const PACE_STATUS_META: Record<"done" | "today" | "upcoming" | "overdue", { label: string; color: string }> = {
-  done: { label: "완료", color: "#6b7785" },
-  today: { label: "오늘", color: "#0a7491" },
-  upcoming: { label: "예정", color: "#475569" },
-  overdue: { label: "밀림", color: "#c0397e" },
+  done: { label: "완료", color: "var(--color-muted)" },
+  today: { label: "오늘", color: "var(--color-cyan-deep)" },
+  upcoming: { label: "예정", color: "var(--color-text-secondary)" },
+  overdue: { label: "밀림", color: "var(--color-pink-deep)" },
 };
 // 칸 칩 정렬: 급한 상태가 먼저 — 잘릴 때 overdue/today가 done 뒤에 숨지 않도록.
 const TONE_RANK: Record<string, number> = { overdue: 0, today: 1, upcoming: 2, done: 3 };
@@ -248,7 +248,7 @@ export default function Calendar() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 16 }}>
               {[
-                { label: "할 일", color: PLAN_MARKER_COLOR, soft: "#eef1f6", shape: "dot" as const },
+                { label: "할 일", color: PLAN_MARKER_COLOR, soft: "var(--color-muted-surface)", shape: "dot" as const },
                 { label: "과제", color: ddayTypeColors.assignment.solid, soft: ddayTypeColors.assignment.soft, shape: "chip" as const },
                 { label: "일정", color: ddayTypeColors.event.solid, soft: ddayTypeColors.event.soft, shape: "chip" as const },
                 { label: "시험", color: ddayTypeColors.exam.solid, soft: ddayTypeColors.exam.soft, shape: "chip" as const },
@@ -300,7 +300,7 @@ export default function Calendar() {
                       }}>
                         {entry.readOnly ? (
                           <span aria-hidden style={{
-                            width: 22, height: 22, borderRadius: "50%", border: "2px solid #e6e6e6",
+                            width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--color-border-soft)",
                             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                             color: CYAN, fontSize: 12, lineHeight: 1,
                           }}>↻</span>
