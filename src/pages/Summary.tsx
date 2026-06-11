@@ -75,7 +75,7 @@ type FileIconProps = { type: FileKind };
 // range: 같은 본문이 살아 있을 때 구절 위치 보정용 / scrollY: 확대 등으로 본문이 언마운트돼
 // range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
 type DragAnchor = { range: Range; top: number; scrollY: number };
-type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
+type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string; isLoading?: boolean; loadingStep?: string };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void; onRetry?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
@@ -519,11 +519,17 @@ const formatExamCards = (sectionLines: string[]): string[] => {
   type Item = { question: string; answer: string[] };
   const items: Item[] = [];
   let cur: Item | null = null;
+  // '답:'은 **답:**(굵게)·전각 콜론(：) 변형도 답으로 인식해, 답이 새 질문으로 잘못 쪼개져
+  // 별도 박스로 분리되는 것을 막는다.
+  const ANSWER_LABEL = /^\*{0,2}\s*답\s*[:：]\s*\*{0,2}\s*/;
   for (const raw of sectionLines) {
-    const content = raw.replace(/^>\s*/, "").trim();
-    if (content.trim() === "") continue;
+    let content = raw.replace(/^>\s*/, "").trim();
+    if (content === "") continue;
+    // LLM이 가끔 질문 앞에 붙이는 '시험 포인트:' 라벨(굵게 포함)을 떼어낸다.
+    content = content.replace(/^\*{0,2}\s*시험\s*포인트\s*[:：]\s*\*{0,2}\s*/, "");
+    if (content === "") continue;
     const deBullet = content.replace(/^-\s*/, "");
-    const isAnswer = /^답\s*:/.test(deBullet);
+    const isAnswer = ANSWER_LABEL.test(deBullet);
     const isBullet = /^-\s*/.test(content);
     if (!isAnswer && !isBullet) {
       cur = { question: content, answer: [] };
@@ -551,12 +557,12 @@ const formatExamCards = (sectionLines: string[]): string[] => {
     out.push(`> ${question}`);
     if (answerLines.length) {
       out.push(">");
-      const labelIdx = answerLines.findIndex(a => /^답\s*:/.test(a));
+      const labelIdx = answerLines.findIndex(a => ANSWER_LABEL.test(a));
       const label = labelIdx >= 0 ? answerLines[labelIdx] : "답:";
       const points = answerLines.filter((_, k) => k !== labelIdx);
       // '답:' 라벨 줄에 답 내용이 같은 줄에 붙어 있으면(예: '답: RWM이다') 분리해서
       // '답:'은 라벨로만 두고 내용은 하위 bullet로 내린다. (단답·목록답 모두 같은 카드 형태로 통일)
-      const inlineAnswer = label.replace(/^답\s*:\s*/, "").trim();
+      const inlineAnswer = label.replace(ANSWER_LABEL, "").trim();
       if (inlineAnswer) points.unshift(inlineAnswer);
       out.push("> - 답:");               // '답:' (박스 안, 렌더 시 글머리 숨김)
       for (const p of points) out.push(`>   - ${p}`);  // 답 내용도 박스 안 중첩 리스트
@@ -755,7 +761,7 @@ const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { co
     : <FormattedAiText content={content} template={template} />;
 };
 
-const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewProps) => {
+const TemplateSelectView = ({ onSelect, onBack, pageHint, isLoading = false, loadingStep = "" }: TemplateSelectViewProps) => {
   const [pageRange, setPageRange] = useState("");
   const [focusPrompt, setFocusPrompt] = useState("");
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
@@ -766,9 +772,27 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   ];
 
   return (
-    <div>
-      <button onClick={onBack} style={{
-        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+    <div style={{ position: "relative" }}>
+      {/* 요약 생성 중에는 결과 전용 화면으로 넘어가지 않고 이 템플릿 화면 위에 오버레이로 로딩을 보여준다. */}
+      {isLoading && (
+        <div style={{
+          position: "absolute", inset: -8, zIndex: 10, borderRadius: 14,
+          background: "color-mix(in srgb, var(--color-page) 78%, transparent)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
+        }}>
+          <div style={{
+            width: 36, height: 36,
+            border: `3px solid ${PINK}`, borderTop: "3px solid transparent",
+            borderRadius: "50%", animation: "spin 0.8s linear infinite"
+          }}/>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>
+            {loadingStep || "요약 중..."}
+          </p>
+        </div>
+      )}
+      <button onClick={onBack} disabled={isLoading} style={{
+        background: "none", border: "none", color: "var(--color-muted)", cursor: isLoading ? "default" : "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
 
       <div style={{ marginBottom: 24 }}>
@@ -3461,7 +3485,6 @@ export default function Summary() {
     if (selectedMarkdown) {
       // "요약 새로 생성"은 같은 자료여도 항상 새로 만든다(중복 허용). 기존 요약을 재사용하지 않는다.
       setIsSummarizing(true);
-      setView("summaryResult");
       setSummaryText("");
       setActiveSummaryId(null);
       setSummaryError("");
@@ -3472,6 +3495,8 @@ export default function Summary() {
       const generatedMaterialIds = [...selectedMaterialIds];
       const startTime = Date.now();
       try {
+        // 요약 성공 시 자료 상세로 이동했는지 표시. 이동하지 못하면 결과 화면으로 폴백한다.
+        let movedToDetail = false;
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 작성 중...`);
         const response = await summarizeWithTemplate(selectedMarkdown, template, {
           pages: opts?.pageRange,
@@ -3498,6 +3523,14 @@ export default function Summary() {
           persistedAt = persistedSummary.createdAt;
           // 자료별 "요약 N" 배지·중복 생성 확인이 새 요약을 바로 반영하도록 목록을 갱신한다.
           setSummaries(prev => [persistedSummary, ...prev.filter(item => item.id !== persistedSummary.id)]);
+          // 요약 성공 → 결과 전용 화면(summaryResult)을 건너뛰고 자료 상세의 요약 탭으로 이동한다.
+          const targetMaterial = selectedMaterials[0];
+          if (targetMaterial) {
+            setActiveMaterial(targetMaterial);
+            setMaterialDetailInitialTab("summary");
+            setView("materialDetail");
+            movedToDetail = true;
+          }
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
         // 생성을 기다리지 않고 다른 화면으로 이동한 경우 완료를 토스트로 알린다.
@@ -3520,11 +3553,9 @@ export default function Summary() {
               }),
             },
           });
-        } else if (viewRef.current !== "summaryResult") {
-          showToast("요약이 완성됐어요.", "success", {
-            duration: 10000,
-            action: { label: "보러 가기", onAction: () => setView("summaryResult") },
-          });
+        } else if (!movedToDetail) {
+          // 코스·자료 정보가 없어 자료 상세로 못 갈 때만 결과 화면으로 폴백한다.
+          setView("summaryResult");
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "요약 실패";
@@ -3532,11 +3563,8 @@ export default function Summary() {
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
         if (!isMountedRef.current) {
           showToast(`요약 생성에 실패했어요: ${message}`, "error", { duration: 10000 });
-        } else if (viewRef.current !== "summaryResult") {
-          showToast("요약 생성에 실패했어요.", "error", {
-            duration: 10000,
-            action: { label: "다시 시도", onAction: () => { void handleTemplateSelect(template, opts, backView); } },
-          });
+        } else {
+          setView("summaryResult"); // 실패 시에만 에러·재시도를 결과 화면에서 보여준다.
         }
       } finally {
         setIsSummarizing(false);
@@ -3886,7 +3914,7 @@ export default function Summary() {
         style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
       >
         {view === "templates" && (
-          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
+          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} isLoading={isSummarizing} loadingStep={loadingStep} />
         )}
 
         {view === "summaryResult" && selectedTemplate && (

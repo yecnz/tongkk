@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
 import { useCourses } from "../CourseContext";
 import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
@@ -1154,12 +1154,19 @@ export default function Dashboard() {
           <SidebarIcon />
         </button>
         <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <NoticeBanner messages={[
+          { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: PINK },
+          "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",
+          "Tongkk는 무료! 사용료 대신 여러분의 피드백을 먹고 자랍니다 ^.^ ",
+          "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했으니 오른쪽 공지사항을 참고해주세요."
+,
+        ]} />
         <button
           className="tongkk-hover-dim"
           onClick={() => setShowNotice(true)}
           aria-label="공지사항"
           style={{
-            marginLeft: "auto", display: "flex", alignItems: "center", gap: 7,
+            display: "flex", alignItems: "center", gap: 7,
             padding: "8px 14px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`,
             background: "var(--color-card)", color: "var(--color-text-secondary)",
             fontSize: 13.5, fontWeight: 700, cursor: "pointer",

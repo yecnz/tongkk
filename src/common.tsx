@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 // 피드백을 받을 팀 메일 (사이드바 하단·문의 메일 공통)
@@ -118,6 +118,78 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
       </div>
     </div>
     </>
+  );
+};
+
+// 헤더용 공지 배너. 여러 멘트가 일정 시간마다 위로 슬라이드되며 전환되고, 끝까지 가면
+// 끊김 없이 처음으로 순환한다(첫 항목을 끝에 한 번 더 붙여 점프를 숨김). 호버 시 멈춘다.
+// 항목은 문자열, 또는 색을 따로 줄 때는 { text, color } 객체로 넣는다(color 미지정 시 기본 청록).
+// 색은 옵션 A(연한 청록 tint 배경 + 진한 청록 글자)로, 라이트/다크 토큰을 자동으로 따른다.
+type NoticeItem = string | { text: string; color?: string };
+
+const NOTICE_HEIGHT = 38;   // 배너·각 멘트 줄 높이(px)
+const NOTICE_ROTATE_MS = 4000;  // 한 멘트가 머무는 시간
+const NOTICE_SLIDE_MS = 600;    // 슬라이드 전환 시간
+
+export const NoticeBanner = ({ messages = [] }: { messages?: NoticeItem[] }) => {
+  const count = messages.length;
+  const [index, setIndex] = useState(0);
+  const [animate, setAnimate] = useState(true);
+  const [paused, setPaused] = useState(false);
+
+  // 멘트가 2개 이상일 때만 일정 시간마다 다음으로 슬라이드한다(호버 중엔 멈춤).
+  useEffect(() => {
+    if (count <= 1 || paused) return;
+    const id = setInterval(() => setIndex(i => i + 1), NOTICE_ROTATE_MS);
+    return () => clearInterval(id);
+  }, [count, paused]);
+
+  // 복제된 첫 항목(index === count)까지 슬라이드한 뒤 전환을 끄고 0으로 되돌려 순환시킨다.
+  useEffect(() => {
+    if (index !== count || count === 0) return;
+    const t = setTimeout(() => { setAnimate(false); setIndex(0); }, NOTICE_SLIDE_MS);
+    return () => clearTimeout(t);
+  }, [index, count]);
+
+  // 0으로 점프한 직후 다음 프레임에 전환을 다시 켠다(점프가 보이지 않게).
+  useEffect(() => {
+    if (animate) return;
+    const r = requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
+    return () => cancelAnimationFrame(r);
+  }, [animate]);
+
+  // 끊김 없는 순환을 위해 첫 항목을 끝에 한 번 더 붙인다.
+  const lines = count ? [...messages, messages[0]] : [];
+
+  return (
+    <div
+      className="tk-notice"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      style={{
+        flex: 1, overflow: "hidden", height: NOTICE_HEIGHT,
+        borderRadius: 10, background: "var(--color-muted-surface)",
+      }}
+    >
+      {lines.length > 0 && (
+        <div style={{
+          transform: `translateY(-${index * NOTICE_HEIGHT}px)`,
+          transition: animate ? `transform ${NOTICE_SLIDE_MS}ms ease` : "none",
+        }}>
+          {lines.map((item, i) => {
+            const text = typeof item === "string" ? item : item.text;
+            const color = typeof item === "string" ? undefined : item.color;
+            return (
+              <div key={i} style={{
+                height: NOTICE_HEIGHT, display: "flex", alignItems: "center", justifyContent: "center",
+                whiteSpace: "nowrap", color: color ?? "var(--color-cyan-deep)",
+                fontSize: 14, fontWeight: 700,
+              }}>{text}</div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };
 
