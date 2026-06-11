@@ -1646,6 +1646,12 @@ const TutorSplitDivider = ({ onPointerDown }: { onPointerDown: (event: ReactPoin
 // revoke하지 않고 재사용한다(자료 id = 파일명+크기라 내용이 바뀌면 키도 달라진다).
 const pptPreviewUrlCache = new Map<string, string>();
 
+// 자료 상세에서 삭제 확인 모달이 다루는 대상(요약 또는 퀴즈 세트).
+type DeleteTarget =
+  | { kind: "summary"; summary: SavedSummary }
+  | { kind: "quiz"; quizSet: SavedQuizSet }
+  | null;
+
 const MaterialDetailView = ({
   material,
   selectedCourse,
@@ -1684,7 +1690,10 @@ const MaterialDetailView = ({
   const [showSummaryList, setShowSummaryList] = useState(false);
   // 퀴즈 탭에서 카드를 눌러 펼친 퀴즈 세트(최신 풀이 채점 이력 표시)
   const [expandedQuizSetId, setExpandedQuizSetId] = useState<string | null>(null);
-  const { showToast } = useToast();
+  // 삭제 확인 모달 대상(요약/퀴즈)과 진행·오류 상태. 네이티브 confirm 대신 클릭형 모달로 처리한다.
+  const [pendingDelete, setPendingDelete] = useState<DeleteTarget>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
@@ -1860,32 +1869,44 @@ const MaterialDetailView = ({
     return map;
   }, new Map());
 
-  const handleDeleteSummary = async (summary: SavedSummary) => {
-    if (!summary.id) return;
-    if (!window.confirm(`'${templateLabels[summary.template]}' 요약을 삭제할까요?\n연결된 AI 튜터 대화도 함께 삭제됩니다.`)) return;
-    try {
-      await deleteSummaryById(selectedCourse, summary.id);
-      const next = summaries.filter(item => item.id !== summary.id);
-      setSummaries(next);
-      if (activeSummaryId === summary.id) {
-        const fallback = next.find(item => item.template === "GENERAL") || next[0];
-        setActiveSummaryId(fallback?.id || "");
-      }
-      showToast("요약을 삭제했습니다.", "success");
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "요약 삭제에 실패했습니다.", "error");
-    }
+  // × 버튼은 바로 지우지 않고 확인 모달을 연다.
+  const requestDelete = (target: NonNullable<DeleteTarget>) => {
+    setDeleteError("");
+    setPendingDelete(target);
+  };
+  const closeDelete = () => {
+    if (deleteBusy) return; // 삭제 진행 중에는 닫지 않는다.
+    setPendingDelete(null);
+    setDeleteError("");
   };
 
-  const handleDeleteQuizSet = async (quizSet: SavedQuizSet) => {
-    if (!window.confirm(`'${quizSet.title}' 퀴즈를 삭제할까요?`)) return;
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    setDeleteError("");
     try {
-      await deleteQuizSetById(selectedCourse, quizSet.id);
-      setQuizSets(prev => prev.filter(item => item.id !== quizSet.id));
-      setExpandedQuizSetId(prev => (prev === quizSet.id ? null : prev));
-      showToast("퀴즈를 삭제했습니다.", "success");
+      if (pendingDelete.kind === "summary") {
+        const { summary } = pendingDelete;
+        if (summary.id) {
+          await deleteSummaryById(selectedCourse, summary.id);
+          const next = summaries.filter(item => item.id !== summary.id);
+          setSummaries(next);
+          if (activeSummaryId === summary.id) {
+            const fallback = next.find(item => item.template === "GENERAL") || next[0];
+            setActiveSummaryId(fallback?.id || "");
+          }
+        }
+      } else {
+        const { quizSet } = pendingDelete;
+        await deleteQuizSetById(selectedCourse, quizSet.id);
+        setQuizSets(prev => prev.filter(item => item.id !== quizSet.id));
+        setExpandedQuizSetId(prev => (prev === quizSet.id ? null : prev));
+      }
+      setPendingDelete(null);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "퀴즈 삭제에 실패했습니다.", "error");
+      setDeleteError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+    } finally {
+      setDeleteBusy(false);
     }
   };
   const hasSummaries = summaries.length > 0;
@@ -2302,7 +2323,7 @@ const MaterialDetailView = ({
                         </button>
                         <button
                           type="button"
-                          onClick={e => { e.stopPropagation(); handleDeleteSummary(summary); }}
+                          onClick={e => { e.stopPropagation(); requestDelete({ kind: "summary", summary }); }}
                           aria-label={`${templateLabels[summary.template]} 요약 삭제`}
                           title="삭제"
                           style={{
@@ -2449,7 +2470,7 @@ const MaterialDetailView = ({
                           </button>
                           <button
                             type="button"
-                            onClick={e => { e.stopPropagation(); handleDeleteQuizSet(quizSet); }}
+                            onClick={e => { e.stopPropagation(); requestDelete({ kind: "quiz", quizSet }); }}
                             aria-label={`${quizSet.title} 퀴즈 삭제`}
                             title="삭제"
                             style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 16, lineHeight: "32px", padding: 0 }}
@@ -2539,6 +2560,41 @@ const MaterialDetailView = ({
         )}
         </div>
       </Card>
+      {pendingDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Card style={{ padding: 28, width: "min(380px, 100%)" }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>
+              {pendingDelete.kind === "summary" ? "요약을 삭제할까요?" : "퀴즈를 삭제할까요?"}
+            </h3>
+            <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
+              {pendingDelete.kind === "summary"
+                ? `'${templateLabels[pendingDelete.summary.template]}' 요약과 연결된 AI 튜터 대화가 함께 삭제됩니다. 삭제 후에는 되돌릴 수 없습니다.`
+                : `'${pendingDelete.quizSet.title}' 퀴즈가 삭제됩니다. 풀이 기록은 통계에 남습니다. 삭제 후에는 되돌릴 수 없습니다.`}
+            </p>
+            {deleteError && (
+              <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--color-danger)", fontWeight: 700, lineHeight: 1.5 }}>{deleteError}</p>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={closeDelete}
+                disabled={deleteBusy}
+                style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleteBusy}
+                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "light-dark(#4b5563, #5b6473)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
+              >
+                {deleteBusy ? "삭제 중" : "삭제"}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
