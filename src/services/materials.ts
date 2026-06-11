@@ -1,4 +1,4 @@
-import { createTtlCache } from './cache';
+import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import { deleteSummariesByMaterialId } from './summaries';
@@ -21,11 +21,11 @@ export type CourseMaterial = {
 
 const MATERIAL_STORAGE_BUCKET = 'course-materials';
 
-// 자료 목록은 화면 이동마다 다시 받지만 업로드/삭제 때만 바뀐다 → 짧게 캐싱.
+// 자료 목록은 화면 이동마다 다시 받지만 업로드/삭제 때만 바뀐다 → fresh 30초 + stale 30분(SWR).
 // variant로 본문(markdown) 포함 여부를 구분해, 가벼운 캐시를 본문 필요한 화면에 잘못 주지 않게 한다.
-const materialsCache = createTtlCache<CourseMaterial[]>(30_000);
+const materialsCache = createTtlCache<CourseMaterial[]>(30_000, SWR_STALE_TTL_MS);
 // 대시보드 통계용 개수 캐시 — 목록 본문을 받지 않고 count(개수)만 보관한다.
-const materialsCountCache = createTtlCache<number>(30_000);
+const materialsCountCache = createTtlCache<number>(30_000, SWR_STALE_TTL_MS);
 export const invalidateMaterialsCache = (course?: string) => {
   materialsCache.invalidate(course);
   materialsCountCache.invalidate(course);
@@ -172,28 +172,39 @@ export const loadCourseMaterialsFromServer = async (
   const cached = materialsCache.get(cacheKey);
   if (cached) return cached;
 
-  const courseId = (await findCourseRecord(course))?.id;
-  if (!courseId) return [];
+  const fetchList = async (): Promise<CourseMaterial[]> => {
+    const courseId = (await findCourseRecord(course))?.id;
+    if (!courseId) return [];
 
-  const { data, error } = options?.includeMarkdown
-    ? await supabase
-        .from('materials')
-        .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
-        .eq('course_id', courseId)
-        .order('updated_at', { ascending: false })
-    : await supabase
-        .from('materials')
-        .select('id, name, size, type, pages, slides, file_path, mime_type, updated_at')
-        .eq('course_id', courseId)
-        .order('updated_at', { ascending: false });
+    const { data, error } = options?.includeMarkdown
+      ? await supabase
+          .from('materials')
+          .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
+          .eq('course_id', courseId)
+          .order('updated_at', { ascending: false })
+      : await supabase
+          .from('materials')
+          .select('id, name, size, type, pages, slides, file_path, mime_type, updated_at')
+          .eq('course_id', courseId)
+          .order('updated_at', { ascending: false });
 
-  if (error) throw new Error(formatSupabaseError(error));
+    if (error) throw new Error(formatSupabaseError(error));
 
-  const materials = (data || [])
-    .map(toCourseMaterial);
+    const materials = (data || [])
+      .map(toCourseMaterial);
 
-  materialsCache.set(cacheKey, materials);
-  return materials;
+    materialsCache.set(cacheKey, materials);
+    return materials;
+  };
+
+  // 만료됐지만 stale 윈도우 안이면 일단 보여주고 백그라운드로 갱신한다(SWR).
+  const stale = materialsCache.getStale(cacheKey);
+  if (stale) {
+    materialsCache.revalidate(cacheKey, fetchList);
+    return stale;
+  }
+
+  return fetchList();
 };
 
 // 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
@@ -203,25 +214,37 @@ export const countCourseMaterialsFromServer = async (course: string): Promise<nu
   const cachedCount = materialsCountCache.get(cacheKey);
   if (cachedCount !== undefined) return cachedCount;
 
+  // 목록 캐시 파생은 fresh만 사용한다 — stale 목록에서 count를 만들어 set하면
+  // stale 데이터가 fresh로 승격되는 경로가 생긴다.
   const cachedList = materialsCache.get(`${course}::light`) ?? materialsCache.get(`${course}::full`);
   if (cachedList) {
     materialsCountCache.set(cacheKey, cachedList.length);
     return cachedList.length;
   }
 
-  const courseId = (await findCourseRecord(course))?.id;
-  if (!courseId) return 0;
+  const fetchCount = async (): Promise<number> => {
+    const courseId = (await findCourseRecord(course))?.id;
+    if (!courseId) return 0;
 
-  const { count, error } = await supabase
-    .from('materials')
-    .select('*', { count: 'exact', head: true })
-    .eq('course_id', courseId);
+    const { count, error } = await supabase
+      .from('materials')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', courseId);
 
-  if (error) throw new Error(formatSupabaseError(error));
+    if (error) throw new Error(formatSupabaseError(error));
 
-  const total = count ?? 0;
-  materialsCountCache.set(cacheKey, total);
-  return total;
+    const total = count ?? 0;
+    materialsCountCache.set(cacheKey, total);
+    return total;
+  };
+
+  const staleCount = materialsCountCache.getStale(cacheKey);
+  if (staleCount !== undefined) {
+    materialsCountCache.revalidate(cacheKey, fetchCount);
+    return staleCount;
+  }
+
+  return fetchCount();
 };
 
 // 자료 한 건과 파생 데이터(요약·튜터 대화·원본 파일)를 모두 정리한다.
