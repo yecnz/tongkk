@@ -1886,9 +1886,11 @@ const MaterialDetailView = ({
   const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
   const isLegacyPpt = lowerMaterialName.endsWith(".ppt");
   const isPresentation = material.type === "ppt" || isPptx || isLegacyPpt;
+  // 텍스트 붙여넣기 자료: 원본 파일 없이 markdown만 저장된다. mimeType이 비어 있는 옛 자료는 id 접두사로 판별한다.
+  const isTextMaterial = !material.filePath && (material.mimeType === "text/plain" || material.id.startsWith("text:"));
   const hasReviewContext = Boolean(reviewContext.trim());
-  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : "자료";
-  const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : "페이지 정보 없음";
+  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : isTextMaterial ? "텍스트" : "자료";
+  const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : isTextMaterial && material.size ? `${material.size.toLocaleString()}자` : "페이지 정보 없음";
   const previewFailure = previewError ? classifyUploadFailure(previewError) : null;
 
   useEffect(() => {
@@ -2121,6 +2123,27 @@ const MaterialDetailView = ({
   );
 
   const renderOriginalTab = () => {
+    // 텍스트 붙여넣기 자료: 원본 파일이 없으므로 저장된 마크다운 본문을 바로 렌더링한다.
+    // FormattedAiText는 AI 출력 전용 후처리(출처 헤딩 합치기 등)를 거치므로, 사용자가 쓴 원문에는 적용하지 않는다.
+    if (isTextMaterial) {
+      return (
+        <div style={{
+          background: "var(--color-surface)",
+          padding: 24,
+          fontSize: 14,
+          color: "var(--color-text)",
+          lineHeight: 1.8,
+          height: "100%",
+          overflowY: "auto",
+          boxSizing: "border-box",
+        }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {material.markdown || "표시할 내용이 없습니다."}
+          </ReactMarkdown>
+        </div>
+      );
+    }
+
     if (fileLoading || previewLoading) {
       return (
         <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
@@ -2207,7 +2230,8 @@ const MaterialDetailView = ({
             원본 PPT/PPTX 열기
           </a>
         )}
-        {material.filePath && (
+        {/* 원본 파일이 없어도(50MB 초과 등) 변환 텍스트는 저장돼 있으므로 본문을 보여준다. */}
+        {(material.filePath || material.markdown) && (
           <FormattedAiText content={material.markdown || "표시할 변환 내용이 없습니다."} />
         )}
       </div>
