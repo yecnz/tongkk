@@ -154,9 +154,13 @@ const getFileType = (name: string): FileKind => {
 };
 
 const isSupportedDocumentFile = (file: File) =>
-  ["pdf", "ppt", "pptx", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
+  ["pdf", "ppt", "pptx", "docx", "txt", "md", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"].includes((file.name.split(".").pop() || "").toLowerCase());
 
-const extractMarkdownFromMaterialFile = (file: File) => extractMarkdownFromPDF(file);
+// txt/md는 파일 내용이 곧 본문이므로 서버 변환 없이 그대로 읽는다.
+const isPlainTextFile = (name: string) => ["txt", "md"].includes((name.split(".").pop() || "").toLowerCase());
+
+const extractMarkdownFromMaterialFile = (file: File) =>
+  isPlainTextFile(file.name) ? file.text() : extractMarkdownFromPDF(file);
 
 const getFileNameKey = (name: string) => name.trim().toLowerCase();
 const getUploadStatusId = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
@@ -171,7 +175,7 @@ const classifyUploadFailure = (message: string): { kind: UploadFailureKind; labe
     return {
       kind: "unsupported",
       label: "지원하지 않는 파일",
-      guide: "PDF, PPT/PPTX, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
+      guide: "PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
     };
   }
   if (
@@ -1888,11 +1892,19 @@ const MaterialDetailView = ({
   const isPptx = material.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || lowerMaterialName.endsWith(".pptx");
   const isLegacyPpt = lowerMaterialName.endsWith(".ppt");
   const isPresentation = material.type === "ppt" || isPptx || isLegacyPpt;
-  // 텍스트 붙여넣기 자료: 원본 파일 없이 markdown만 저장된다. mimeType이 비어 있는 옛 자료는 id 접두사로 판별한다.
-  const isTextMaterial = !material.filePath && (material.mimeType === "text/plain" || material.id.startsWith("text:"));
+  const isImage = material.type === "img" || (material.mimeType || "").startsWith("image/");
+  const isDocx = material.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || lowerMaterialName.endsWith(".docx");
+  // 텍스트 자료: 붙여넣기(원본 파일 없음)와 txt/md 업로드 모두 저장된 markdown이 곧 본문이라 같은 방식으로 렌더링한다.
+  // mimeType이 비어 있는 옛 붙여넣기 자료는 id 접두사로 판별한다.
+  const isTextMaterial = (material.mimeType || "").startsWith("text/") || material.id.startsWith("text:")
+    || lowerMaterialName.endsWith(".txt") || lowerMaterialName.endsWith(".md");
   const hasReviewContext = Boolean(reviewContext.trim());
-  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : isTextMaterial ? "텍스트" : "자료";
-  const pageInfo = material.pages ? `${material.pages}페이지` : material.slides ? `${material.slides}슬라이드` : isTextMaterial && material.size ? `${material.size.toLocaleString()}자` : "페이지 정보 없음";
+  const fileTypeLabel = material.type === "pdf" ? "PDF" : material.type === "ppt" ? "PPT" : material.type === "img" ? "이미지" : isDocx ? "DOCX" : isTextMaterial ? "텍스트" : "자료";
+  const pageInfo = material.pages ? `${material.pages}페이지`
+    : material.slides ? `${material.slides}슬라이드`
+    : isTextMaterial && !material.filePath && material.size ? `${material.size.toLocaleString()}자`
+    : material.size ? `${(material.size / (1024 * 1024)).toFixed(1)}MB`
+    : "페이지 정보 없음";
   const previewFailure = previewError ? classifyUploadFailure(previewError) : null;
 
   useEffect(() => {
@@ -1930,7 +1942,7 @@ const MaterialDetailView = ({
     setPreviewPdfUrl(null);
     setPreviewError("");
 
-    if (!fileUrl || !isPresentation) {
+    if (!fileUrl || !(isPresentation || isDocx)) {
       setPreviewLoading(false);
       return () => {
         ignore = true;
@@ -1955,7 +1967,7 @@ const MaterialDetailView = ({
         if (!ignore) setPreviewPdfUrl(url);
       })
       .catch(err => {
-        if (!ignore) setPreviewError(err instanceof Error ? err.message : "PPT/PPTX 미리보기 변환에 실패했습니다.");
+        if (!ignore) setPreviewError(err instanceof Error ? err.message : "원본 미리보기 변환에 실패했습니다.");
       })
       .finally(() => {
         if (!ignore) setPreviewLoading(false);
@@ -1964,7 +1976,7 @@ const MaterialDetailView = ({
     return () => {
       ignore = true;
     };
-  }, [fileUrl, isPresentation, material.id, material.name]);
+  }, [fileUrl, isPresentation, isDocx, material.id, material.name]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -2149,7 +2161,30 @@ const MaterialDetailView = ({
     if (fileLoading || previewLoading) {
       return (
         <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
-          {previewLoading ? "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다." : "원본 파일을 불러오는 중입니다."}
+          {previewLoading
+            ? (isDocx ? "DOCX 미리보기를 PDF로 변환하는 중입니다." : "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다.")
+            : (isImage ? "원본 이미지를 불러오는 중입니다." : "원본 파일을 불러오는 중입니다.")}
+        </div>
+      );
+    }
+
+    if (fileUrl && isImage) {
+      return (
+        <div style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "auto",
+          background: "var(--color-surface)",
+          display: "grid",
+          placeItems: "center",
+          padding: 24,
+          boxSizing: "border-box",
+        }}>
+          <img
+            src={fileUrl}
+            alt={material.name}
+            style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
+          />
         </div>
       );
     }
@@ -2193,7 +2228,7 @@ const MaterialDetailView = ({
     const noOriginalMessage =
       !material.filePath && originalSize != null && originalSize > MAX_ORIGINAL_FILE_BYTES
         ? `이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.`
-        : "이 자료는 원본 PDF 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 PDF를 다시 업로드하면 다음부터 PDF 뷰어로 열립니다.";
+        : "이 자료는 원본 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 파일을 다시 업로드하면 다음부터 원본 보기로 열립니다.";
 
     return (
       <div style={{
@@ -2216,20 +2251,22 @@ const MaterialDetailView = ({
           fontWeight: 700,
           lineHeight: 1.55,
         }}>
-          {previewFailure ? `${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.` : fileError || (isPresentation
-            ? (isLegacyPpt
-              ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
-              : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
+          {previewFailure ? `${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.` : fileError || (isPresentation || isDocx
+            ? (isDocx
+              ? "DOCX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
+              : isLegacyPpt
+                ? "PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다."
+                : "PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.")
             : noOriginalMessage)}
         </div>
-        {fileUrl && isPresentation && (
+        {fileUrl && (isPresentation || isDocx) && (
           <a
             href={fileUrl}
             target="_blank"
             rel="noreferrer"
             style={{ display: "inline-flex", marginBottom: 16, color: CYAN, fontSize: 13, fontWeight: 800, textDecoration: "none" }}
           >
-            원본 PPT/PPTX 열기
+            {isDocx ? "원본 DOCX 열기" : "원본 PPT/PPTX 열기"}
           </a>
         )}
         {/* 원본 파일이 없어도(50MB 초과 등) 변환 텍스트는 저장돼 있으므로 본문을 보여준다. */}
@@ -4146,7 +4183,7 @@ export default function Summary() {
                       transition: "all 0.2s", marginBottom: 20
                     }}
                   >
-                    <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
+                    <input ref={fileRef} type="file" multiple accept=".pdf,.ppt,.pptx,.docx,.txt,.md,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff"
                       onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
                     <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--color-muted)" }}>강의자료 파일을 드래그하거나</p>
                     <button style={{

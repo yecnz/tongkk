@@ -662,8 +662,8 @@ def _validate_wrong_analysis(parsed: dict[str, object]) -> dict[str, object]:
 
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
-SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", *SUPPORTED_IMAGE_EXTENSIONS}
-SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
+SUPPORTED_CONVERT_EXTENSIONS = {".pdf", ".ppt", ".pptx", ".docx", *SUPPORTED_IMAGE_EXTENSIONS}
+SUPPORTED_PREVIEW_EXTENSIONS = {".pdf", ".ppt", ".pptx", ".docx"}
 SUPPORTED_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"}
 MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
 # PDF/PPT 등 비이미지 문서 업로드 크기 상한(메모리·디스크 보호). 이미지(OCR)는 MAX_OCR_IMAGE_BYTES를 따른다.
@@ -696,7 +696,7 @@ def _find_office_binary() -> str | None:
 def _convert_presentation_to_pdf(file_path: str) -> bytes:
     office_binary = _find_office_binary()
     if not office_binary:
-        raise RuntimeError("PPT/PPTX 미리보기를 사용하려면 서버에 LibreOffice가 설치되어 있어야 합니다.")
+        raise RuntimeError("PPT/PPTX·DOCX 미리보기를 사용하려면 서버에 LibreOffice가 설치되어 있어야 합니다.")
 
     with tempfile.TemporaryDirectory() as output_dir:
         command = [
@@ -716,15 +716,15 @@ def _convert_presentation_to_pdf(file_path: str) -> bytes:
                 timeout=_env_int("PPT_PREVIEW_TIMEOUT_SECONDS", 120),
             )
         except subprocess.TimeoutExpired as e:
-            raise RuntimeError("PPT/PPTX PDF 변환 시간이 초과되었습니다.") from e
+            raise RuntimeError("문서 PDF 변환 시간이 초과되었습니다.") from e
 
         if completed.returncode != 0:
             detail = (completed.stderr or completed.stdout or "").strip()
-            raise RuntimeError(f"PPT/PPTX PDF 변환 실패: {detail or 'LibreOffice 변환 오류'}")
+            raise RuntimeError(f"문서 PDF 변환 실패: {detail or 'LibreOffice 변환 오류'}")
 
         pdf_files = sorted(Path(output_dir).glob("*.pdf"))
         if not pdf_files:
-            raise RuntimeError("PPT/PPTX 변환 결과 PDF를 찾지 못했습니다.")
+            raise RuntimeError("문서 변환 결과 PDF를 찾지 못했습니다.")
 
         return pdf_files[0].read_bytes()
 
@@ -1172,7 +1172,7 @@ async def convert_document_to_markdown(
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX, 이미지 파일만 지원합니다.")
+        raise HTTPException(status_code=400, detail="PDF, PPT/PPTX, DOCX, 이미지 파일만 지원합니다.")
 
     file_bytes = await file.read()
     if suffix in SUPPORTED_IMAGE_EXTENSIONS:
@@ -1261,7 +1261,7 @@ async def convert_document_to_pdf_preview(
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_PREVIEW_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="PDF, PPT, PPTX 파일만 미리보기를 지원합니다.")
+        raise HTTPException(status_code=400, detail="PDF, PPT/PPTX, DOCX 파일만 미리보기를 지원합니다.")
 
     file_bytes = await file.read()
     if not file_bytes:

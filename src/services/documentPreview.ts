@@ -34,7 +34,7 @@ export async function createPdfPreviewFromUrl(fileUrl: string, fileName: string)
     return URL.createObjectURL(previewBlob);
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('PPT/PPTX 미리보기 변환 시간이 초과되었습니다.');
+      throw new Error('원본 미리보기 변환 시간이 초과되었습니다.');
     }
     throw err;
   } finally {
