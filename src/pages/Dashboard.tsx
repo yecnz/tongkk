@@ -572,7 +572,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { courses, addCourse, renameCourse, deleteCourse } = useCourses();
+  const { courses, addCourse, renameCourse, deleteCourse, hasLoadedCourses } = useCourses();
   const { showToast } = useToast();
   const [sidebar, setSidebar] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
@@ -1237,7 +1237,18 @@ export default function Dashboard() {
         <div className="dash-main-grid">
           {/* 강의 목록 카드 그리드 */}
           <div>
-            {courses.length === 0 ? (
+            {!hasLoadedCourses ? (
+              /* 첫 동기화 전에는 빈 상태 대신 스켈레톤 — 재진입 시 "강의가 없습니다"가
+                 깜빡여 데이터가 사라진 것처럼 보이는 문제를 막는다. */
+              <div aria-hidden style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                {[0, 1, 2].map(i => (
+                  <Card key={i} style={{ minHeight: 120, padding: 20 }}>
+                    <div className="tongkk-skeleton-block" style={{ width: "55%", height: 18, marginBottom: 12 }} />
+                    <div className="tongkk-skeleton-block" style={{ width: "75%", height: 13 }} />
+                  </Card>
+                ))}
+              </div>
+            ) : courses.length === 0 ? (
               <div style={{
                 minHeight: 300, display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--color-text-secondary)",

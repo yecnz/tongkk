@@ -348,6 +348,23 @@ body.tongkk-sidebar-open #root {
   }
 }
 
+/* ── 첫 로딩 스켈레톤 ──
+   서버 동기화 전 빈 상태가 깜빡이는 자리에 놓는 자리표시 블록. 모션 민감 사용자는 정지. */
+.tongkk-skeleton-block {
+  border-radius: 8px;
+  background: var(--color-muted-surface);
+  animation: tongkk-skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes tongkk-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tongkk-skeleton-block {
+    animation: none;
+  }
+}
+
 /* 요약 화면·AI 튜터에서만 표면색(--color-surface)을 살짝 진한 연한 회색으로 덮어쓴다.
    나머지 화면은 @theme의 기본값을 그대로 쓴다. 적용: Summary 페이지 루트에 클래스 부여. */
 .tongkk-soft-surface {
