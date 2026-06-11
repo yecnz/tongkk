@@ -75,7 +75,7 @@ type FileIconProps = { type: FileKind };
 // range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
 type DragAnchor = { range: Range; top: number; scrollY: number };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void; onRetry?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
   selectedCourse: string;
@@ -315,8 +315,8 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
 
 const markdownStyles = {
   paragraph: { margin: "0 0 10px", lineHeight: 1.8, color: "var(--color-text)" } satisfies CSSProperties,
-  // '근거로 본 자료: ...' 출처 줄 — 본문보다 작고 흐리게 보여 보조 정보임을 드러낸다.
-  sourceNote: { margin: "0 0 10px", fontSize: 12.5, lineHeight: 1.6, color: "var(--color-muted)" } satisfies CSSProperties,
+  // '근거로 본 자료: ...' 출처 줄 — 본문(15px)보다 확실히 작고 옅게. 눈에 띄지 않아도 되는 보조 정보다.
+  sourceNote: { margin: "0 0 10px", fontSize: 12, lineHeight: 1.55, color: "color-mix(in srgb, var(--color-muted) 75%, transparent)" } satisfies CSSProperties,
   list: { margin: "6px 0 14px", paddingLeft: 24, lineHeight: 1.75 } satisfies CSSProperties,
   tableWrap: { overflowX: "auto", margin: "12px 0 16px" } satisfies CSSProperties,
 };
@@ -340,8 +340,10 @@ const markdownComponents: Components = {
   h5: ({ children }) => <h5 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</h5>,
   h6: ({ children }) => <h6 style={{ margin: "12px 0 8px", fontSize: 13, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</h6>,
   p: ({ children }) => {
-    const style = isSourceNoteText(getNodeText(children)) ? markdownStyles.sourceNote : markdownStyles.paragraph;
-    return <p style={style}>{renderHighlightSyntax(children)}</p>;
+    const text = getNodeText(children);
+    // 출처 줄은 내부 굵게·하이라이트 스타일이 흐린 톤을 깨지 않도록 순수 텍스트로만 렌더한다.
+    if (isSourceNoteText(text)) return <p style={markdownStyles.sourceNote}>{text.replace(/\*\*/g, "")}</p>;
+    return <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>;
   },
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
@@ -398,8 +400,12 @@ const cheatSheetMarkdownComponents: Components = {
     </h2>
   ),
   p: ({ children }) => {
-    const muted = isSourceNoteText(getNodeText(children));
-    return <p style={{ margin: "0 0 8px", fontSize: muted ? 12.5 : undefined, lineHeight: muted ? 1.55 : 1.65, color: muted ? "var(--color-muted)" : "var(--color-text)" }}>{renderHighlightSyntax(children)}</p>;
+    const text = getNodeText(children);
+    // 출처 줄은 본문보다 확실히 작고 옅게, 내부 마크업 무시하고 순수 텍스트로 렌더한다.
+    if (isSourceNoteText(text)) {
+      return <p style={{ margin: "0 0 8px", fontSize: 11.5, lineHeight: 1.5, color: "color-mix(in srgb, var(--color-muted) 75%, transparent)" }}>{text.replace(/\*\*/g, "")}</p>;
+    }
+    return <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</p>;
   },
   ul: ({ children }) => <ul style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ margin: "6px 0 12px", paddingLeft: 20, lineHeight: 1.65, listStyleType: "decimal" }}>{children}</ol>,
@@ -767,7 +773,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
 
       <div className="summary-template-grid">
         {templates.map(t => (
-          <Card key={t.key} style={{ padding: 0, overflow: "hidden" }}>
+          <Card key={t.key} className="tongkk-hover-lift" style={{ padding: 0, overflow: "hidden" }}>
             <button onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
               width: "100%",
               minHeight: 190,
@@ -794,7 +800,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   );
 };
 
-const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, sourceMarkdown, sourcePages, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, sourceMarkdown, sourcePages, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz, onRetry }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -1220,6 +1226,18 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             fontSize: 14, color: "var(--color-danger)", lineHeight: 1.6
           }}>
             <strong>요약 실패:</strong> {error}
+            {onRetry && (
+              <div style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  style={{
+                    padding: "9px 18px", borderRadius: 10, border: "none",
+                    background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                  }}
+                >같은 설정으로 다시 시도</button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="summary-result-grid" style={{
@@ -2835,6 +2853,8 @@ export default function Summary() {
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
+  // 마지막 요약 생성 인자 — 실패 시 재시도용.
+  const lastSummaryArgsRef = useRef<{ template: SummaryTemplate; opts?: { pageRange?: string; focusPrompt?: string }; backView: SummaryView } | null>(null);
   // templates(템플릿 선택) 화면에서 "돌아가기" 시 돌아갈 화면.
   // 자료 상세에서 진입하면 materialDetail, 그 외에는 upload(과목 자료)로 돌아간다.
   const [templatesBackView, setTemplatesBackView] = useState<SummaryView>("upload");
@@ -3018,12 +3038,6 @@ export default function Summary() {
     // searchParams/setSearchParams는 비교·갱신용이며 stable하므로 의존성에서 제외한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, selectedCourse, activeMaterial?.id, activeMaterialTab, activeSummaryId, selectedTemplate, selectedMaterialIds]);
-
-  useEffect(() => {
-    if (!duplicateNotice) return;
-    const timer = window.setTimeout(() => setDuplicateNotice(null), 3600);
-    return () => window.clearTimeout(timer);
-  }, [duplicateNotice]);
 
   const updateUploadStatus = (file: File, nextStatus: Omit<UploadFileStatus, "id" | "name" | "file">) => {
     setUploadStatuses(prev => upsertUploadStatus(prev, {
@@ -3325,6 +3339,8 @@ export default function Summary() {
   };
 
   const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates") => {
+    // 실패 시 "같은 설정으로 다시 시도"가 마지막 생성 인자를 그대로 재사용한다.
+    lastSummaryArgsRef.current = { template, opts, backView };
     setSelectedTemplate(template);
     setSummaryPages(opts?.pageRange || ""); // 요약에 쓴 페이지 범위를 보관해 튜터의 원본 본문도 같은 범위로 좁힌다.
     setSummaryError("");
@@ -3589,6 +3605,7 @@ export default function Summary() {
               </div>
             </div>
             <button
+              className="tongkk-hover-dim"
               onClick={() => setDuplicateNotice(null)}
               aria-label="중복 파일 안내 닫기"
               style={{
@@ -3612,10 +3629,10 @@ export default function Summary() {
       )}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
@@ -3650,6 +3667,10 @@ export default function Summary() {
             resetTutorHistory={isInitialRouteEntryRef.current}
             initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
+            onRetry={lastSummaryArgsRef.current ? () => {
+              const args = lastSummaryArgsRef.current;
+              if (args) void handleTemplateSelect(args.template, args.opts, args.backView);
+            } : undefined}
           />
         )}
 
@@ -3704,6 +3725,7 @@ export default function Summary() {
                 </div>
                 {inputMode === "file" ? (
                   <div
+                    className="tongkk-dropzone"
                     onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}

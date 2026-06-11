@@ -45,8 +45,8 @@ type AITutorDrawerProps = {
 
 const markdownStyles = {
   paragraph: { margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" } satisfies CSSProperties,
-  // '근거로 본 자료: ...' 출처 줄 — 본문보다 작고 흐리게 보여 보조 정보임을 드러낸다.
-  sourceNote: { margin: "0 0 8px", fontSize: 12, lineHeight: 1.55, color: "var(--color-muted)" } satisfies CSSProperties,
+  // '근거로 본 자료: ...' 출처 줄 — 본문(13px)보다 확실히 작고 옅게. 눈에 띄지 않아도 되는 보조 정보다.
+  sourceNote: { margin: "0 0 8px", fontSize: 11, lineHeight: 1.5, color: "color-mix(in srgb, var(--color-muted) 75%, transparent)" } satisfies CSSProperties,
   list: { margin: "6px 0 10px", paddingLeft: 20, lineHeight: 1.65 } satisfies CSSProperties,
 };
 
@@ -104,7 +104,12 @@ const markdownComponents: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 12px", fontSize: 18, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
   h2: ({ children }) => <h2 style={{ margin: "16px 0 10px", fontSize: 16, lineHeight: 1.4, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
   h3: ({ children }) => <h3 style={{ margin: "14px 0 8px", fontSize: 14, lineHeight: 1.4, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
-  p: ({ children }) => <p style={isSourceNoteText(nodeToText(children)) ? markdownStyles.sourceNote : markdownStyles.paragraph}>{children}</p>,
+  p: ({ children }) => {
+    const text = nodeToText(children);
+    // 출처 줄은 내부 굵게·코드 스타일이 흐린 톤을 깨지 않도록 순수 텍스트로만 렌더한다.
+    if (isSourceNoteText(text)) return <p style={markdownStyles.sourceNote}>{text.replace(/\*\*/g, "")}</p>;
+    return <p style={markdownStyles.paragraph}>{children}</p>;
+  },
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ ...markdownStyles.list, listStyleType: "decimal" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 5, paddingLeft: 3 }}>{children}</li>,
@@ -120,6 +125,19 @@ const markdownComponents: Components = {
       {children}
     </pre>
   ),
+  // GFM 표 — 컴포넌트가 없으면 브라우저 기본(테두리 없음)으로 풀려 표처럼 안 보인다.
+  // 채팅 말풍선이 좁으니 가로 스크롤 래퍼로 감싼다.
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "10px 0 12px" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: "7px 9px", background: "var(--color-border)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid var(--color-border-soft)", textAlign: "left", whiteSpace: "nowrap" }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td style={{ padding: "6px 9px", border: "1px solid var(--color-border-soft)", color: "var(--color-text)", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
 
 const FormattedTutorText = ({ content }: { content: string }) => {

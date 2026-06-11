@@ -153,7 +153,7 @@ export default function Calendar() {
   });
   const dayPaceEntries = sortByUrgency(paceEntriesByDate[selectedDate] ?? []);
   const pacePlanById = Object.fromEntries(pacePlans.map(plan => [plan.id, plan] as const));
-  // 오늘 이미 반영했는지(lastActivityAt 날짜 == 오늘) — 오늘 칸의 수동 페이스만 체크 가능.
+  // 오늘 이미 반영했는지(lastActivityAt 날짜 == 오늘) — 오늘 칸의 중복 체크를 막는 데 쓴다.
   const isPaceDoneToday = (timestamp?: number) => timestamp !== undefined && paceDateKey(new Date(timestamp)) === todayStr;
 
   // ── 핸들러 ──
@@ -180,10 +180,11 @@ export default function Calendar() {
   const deletePacePlan = (planId: string) => setPacePlans(prev => prev.filter(p => p.id !== planId));
   const updatePacePlan = (planId: string, updates: { ddayId: string; totalUnits: number; doneUnits: number }) =>
     setPacePlans(prev => prev.map(p => (p.id === planId ? { ...p, ...updates } : p)));
-  // 오늘 분량 체크: 수동 기준 플랜의 진행도를 그날 권장량만큼 올린다(상한 totalUnits).
-  const completePaceToday = (planId: string, amount: number) =>
+  // 분량 체크: 수동 기준 플랜의 진행도를 그날 권장량만큼 올린다(상한 totalUnits).
+  // 오늘 체크만 lastActivityAt을 갱신한다 — 지난 날짜 체크가 오늘 칸까지 완료로 보이게 하지 않기 위해.
+  const completePaceOn = (planId: string, amount: number, isToday: boolean) =>
     setPacePlans(prev => prev.map(p => (p.id === planId
-      ? { ...p, doneUnits: Math.min(p.totalUnits, p.doneUnits + amount), lastActivityAt: Date.now() }
+      ? { ...p, doneUnits: Math.min(p.totalUnits, p.doneUnits + amount), ...(isToday ? { lastActivityAt: Date.now() } : {}) }
       : p)));
 
   const addBtnStyle: CSSProperties = {
@@ -228,10 +229,10 @@ export default function Calendar() {
       )}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-surface)" }}>
-        <button onClick={() => setSidebar(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       </div>
 
       <div className="app-container">
@@ -289,9 +290,10 @@ export default function Calendar() {
                 <>
                   {dayPaceEntries.map((entry, idx) => {
                     const plan = pacePlanById[entry.planId];
-                    const checkedToday = plan ? isPaceDoneToday(plan.lastActivityAt) : false;
+                    const checkedToday = selectedIsToday && plan ? isPaceDoneToday(plan.lastActivityAt) : false;
                     const done = entry.status === "done" || checkedToday;
-                    const canCheck = selectedIsToday && !entry.readOnly && !done && Boolean(plan);
+                    // 어제 공부하고 체크를 잊은 경우를 보정할 수 있게, 오늘뿐 아니라 지난 날짜도 체크를 허용한다(미래 제외).
+                    const canCheck = selectedDate <= todayStr && !entry.readOnly && !done && Boolean(plan);
                     const meta = PACE_STATUS_META[done ? "done" : entry.status];
                     return (
                       <div key={`pace-${entry.planId}-${idx}`} style={{
@@ -308,8 +310,8 @@ export default function Calendar() {
                           <button
                             type="button"
                             disabled={!canCheck}
-                            onClick={() => { if (canCheck) completePaceToday(entry.planId, entry.units); }}
-                            aria-label={`${entry.course} 오늘 분량 완료`}
+                            onClick={() => { if (canCheck) completePaceOn(entry.planId, entry.units, selectedIsToday); }}
+                            aria-label={`${entry.course} ${selectedIsToday ? "오늘" : "이 날"} 분량 완료`}
                             style={{
                               width: 22, height: 22, borderRadius: "50%",
                               border: `2px solid ${done ? CYAN : "var(--color-border-soft)"}`, background: done ? CYAN : "var(--color-card)",
@@ -331,8 +333,8 @@ export default function Calendar() {
                         </div>
                         {plan && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                            <button type="button" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
-                            <button type="button" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                            <button type="button" className="tongkk-icon-btn" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
+                            <button type="button" className="tongkk-icon-btn danger" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                           </div>
                         )}
                       </div>
@@ -359,7 +361,7 @@ export default function Calendar() {
                         flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
                         color: p.done ? "var(--color-muted)" : "var(--color-text)", textDecoration: p.done ? "line-through" : "none",
                       }}>{p.text}</span>
-                      <button type="button" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                      <button type="button" className="tongkk-icon-btn danger" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                     </div>
                   ))}
                 </>
@@ -393,8 +395,8 @@ export default function Calendar() {
                         <span style={{ fontSize: 13, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
                           {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                         </span>
-                        <button type="button" onClick={() => setEditingDday(d)} aria-label={`${d.subj} 수정`} title="수정" style={editBtnStyle}>✎</button>
-                        <button type="button" onClick={() => deleteDday(d)} aria-label={`${d.subj} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                        <button type="button" className="tongkk-icon-btn" onClick={() => setEditingDday(d)} aria-label={`${d.subj} 수정`} title="수정" style={editBtnStyle}>✎</button>
+                        <button type="button" className="tongkk-icon-btn danger" onClick={() => deleteDday(d)} aria-label={`${d.subj} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                       </div>
                     </div>
                   );
