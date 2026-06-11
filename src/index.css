@@ -105,6 +105,24 @@ body.tongkk-sidebar-open #root {
   to { transform: translateX(0); }
 }
 
+/* 좁은 화면 — 사이드바를 push 대신 overlay로. 240px push가 본문을 다 먹기 때문.
+   백드롭은 데스크탑에선 숨기고(push 모드) 768px 이하에서만 보여 탭으로 닫게 한다. */
+.tongkk-sidebar-backdrop {
+  display: none;
+}
+@media (max-width: 768px) {
+  body.tongkk-sidebar-open #root {
+    padding-left: 0;
+  }
+  .tongkk-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 99; /* 사이드바(z-index:100) 바로 아래 */
+  }
+}
+
 /* ── 공통 페이지 컨테이너 ──
    페이지 본문의 폭·여백을 한곳에서 관리한다. max-width로 큰 화면에서의 과확대를 막고,
    clamp 패딩으로 좁은 화면에 자연스럽게 대응한다(스케일은 #root zoom으로 고정이라
@@ -141,6 +159,18 @@ body.tongkk-sidebar-open #root {
   grid-template-columns: 1fr 1fr;
   gap: 24px;
 }
+.option-grid-4 {
+  /* 4지선다형 옵션 버튼 줄(퀴즈 문제 유형, 요약 종류) — 480px에서 2×2로 접힘 */
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.mypage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
 
 @media (max-width: 1024px) {
   .summary-template-grid {
@@ -157,6 +187,33 @@ body.tongkk-sidebar-open #root {
      좁은 화면에서만 !important로 1열을 강제한다. */
   .summary-result-grid {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .mypage-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 휴대폰(~480px) ── */
+@media (max-width: 480px) {
+  .option-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .summary-template-grid {
+    grid-template-columns: 1fr;
+  }
+  /* 헤더의 공지/피드백 버튼은 아이콘만 남긴다(aria-label은 버튼에 이미 있음) */
+  .header-btn-label {
+    display: none;
+  }
+  /* iOS 사파리는 포커스된 입력의 글자가 16px 미만이면 화면을 강제 확대한다.
+     인라인 fontSize(13~14px)를 덮어써야 하므로 !important가 필요하다. */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 

@@ -74,9 +74,12 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
 
   // height:100vh 대신 top/bottom 0 — #root에 zoom이 걸려 있어 100vh는 축소되지만
   // 뷰포트 모서리 기준 offset은 zoom과 무관하게 전체 높이를 채운다(정의: src/index.css).
+  // 백드롭은 768px 이하(overlay 모드)에서만 CSS로 표시된다.
   return (
+    <>
+    <div className="tongkk-sidebar-backdrop" onClick={onClose} aria-hidden="true" />
     <div className="tongkk-sidebar" style={{
-      position: "fixed", top: 0, left: 0, bottom: 0, width: 240,
+      position: "fixed", top: 0, left: 0, bottom: 0, width: 240, maxWidth: "80vw",
       background: CARD_BACKGROUND, borderRight: `1px solid ${BORDER_COLOR}`, zIndex: 100,
       display: "flex", flexDirection: "column", padding: "24px 0",
       boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
@@ -114,6 +117,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
         </p>
       </div>
     </div>
+    </>
   );
 };
 

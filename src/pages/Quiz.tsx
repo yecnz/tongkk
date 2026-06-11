@@ -1133,7 +1133,7 @@ export default function Quiz() {
             </div>
 
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 유형</label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+            <div className="option-grid-4" style={{ marginBottom: 20 }}>
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
                 <button key={t} onClick={() => setQuestionType(t)} style={{
                   padding: "10px 0", borderRadius: 10,
@@ -1144,7 +1144,7 @@ export default function Quiz() {
               ))}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)" }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", cursor: "pointer" }}>
                 <input
                   type="checkbox"

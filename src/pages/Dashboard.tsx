@@ -84,7 +84,7 @@ const AddCourseModal = ({ onClose, onAdd }: CourseModalProps) => {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
+      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
         <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="과목명 입력" style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
@@ -115,7 +115,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: 340 }}>
+      <Card style={{ padding: 28, width: "min(340px, calc(100vw - 32px))" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 이름 변경</h3>
         <input
           value={name}
@@ -146,7 +146,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
 
 const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-    <Card style={{ padding: 28, width: 360 }}>
+    <Card style={{ padding: 28, width: "min(360px, calc(100vw - 32px))" }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>강의를 삭제할까요?</h3>
       <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
         {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
@@ -873,7 +873,7 @@ export default function Dashboard() {
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
-          공지사항
+          <span className="header-btn-label">공지사항</span>
         </button>
         <button
           onClick={() => setShowFeedback(true)}
@@ -886,7 +886,7 @@ export default function Dashboard() {
           }}
         >
           <PaperPlaneIcon />
-          피드백 보내기
+          <span className="header-btn-label">피드백 보내기</span>
         </button>
       </div>
 

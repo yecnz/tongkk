@@ -3982,7 +3982,7 @@ export default function Summary() {
                   <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>요약 설정</h3>
 
                   <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>요약 종류</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+                  <div className="option-grid-4" style={{ marginBottom: 20 }}>
                     {([
                       { key: "GENERAL", name: "일반 요약" },
                       { key: "LECTURE_NOTE", name: "강의 노트" },
