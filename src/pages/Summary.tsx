@@ -4,13 +4,12 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import {
-  deleteSummariesByMaterialId,
   deleteSummaryById,
   loadSummariesFromServer,
   saveSummaryToServer,
@@ -23,6 +22,7 @@ import { parseMindmapJson } from "../components/mindmapData";
 import {
   combineMaterialsMarkdown,
   createCourseMaterialFileUrl,
+  deleteCourseMaterialFromServer,
   getFileMaterialId,
   loadCourseMaterialsFromServer,
   saveCourseMaterials,
@@ -30,6 +30,7 @@ import {
   MAX_ORIGINAL_FILE_BYTES,
   type CourseMaterial,
 } from "../services/materials";
+import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmModal";
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
@@ -80,6 +81,7 @@ type MaterialDetailViewProps = {
   material: CourseMaterial;
   selectedCourse: string;
   onBack: () => void;
+  backLabel?: string;
   onGoSummary: () => void;
   onGoQuiz: () => void;
   onOpenQuiz: (quizSet: SavedQuizSet) => void;
@@ -90,6 +92,7 @@ type MaterialDetailViewProps = {
   relatedMaterials?: CourseMaterial[];
   onSelectRelatedMaterial?: (material: CourseMaterial) => void;
   onTabChange?: (tab: MaterialDetailTab) => void;
+  onRequestDelete?: () => void;
 };
 type QuizCreateViewProps = { fileName?: string; onBack: () => void; onCreate: () => void };
 
@@ -1705,6 +1708,7 @@ const MaterialDetailView = ({
   material,
   selectedCourse,
   onBack,
+  backLabel = "← 과목 자료로",
   onGoSummary,
   onGoQuiz,
   onOpenQuiz,
@@ -1715,6 +1719,7 @@ const MaterialDetailView = ({
   relatedMaterials = [],
   onSelectRelatedMaterial,
   onTabChange,
+  onRequestDelete,
 }: MaterialDetailViewProps) => {
   const [activeTab, setActiveTab] = useState<MaterialDetailTab>(initialTab);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -2105,7 +2110,7 @@ const MaterialDetailView = ({
     <div>
       <button onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-      }}>← 과목 자료로</button>
+      }}>{backLabel}</button>
       <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{
           flexShrink: 0,
@@ -2167,6 +2172,27 @@ const MaterialDetailView = ({
                 );
               })}
           </div>
+          {onRequestDelete && (
+            <button
+              type="button"
+              onClick={onRequestDelete}
+              aria-label={`${material.name} 삭제`}
+              style={{
+                height: 30,
+                padding: "0 12px",
+                borderRadius: 8,
+                border: `1px solid ${BORDER_COLOR}`,
+                background: "var(--color-card)",
+                color: "var(--color-danger)",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 800,
+                flexShrink: 0,
+              }}
+            >
+              자료 삭제
+            </button>
+          )}
         </div>
           {relatedMaterials.length > 1 && (
             <div style={{ padding: "0 18px 12px", background: "var(--color-card)" }}>
@@ -3372,16 +3398,33 @@ export default function Summary() {
     }
   };
 
-  const handleDeleteMaterial = async (material: CourseMaterial) => {
-    if (!selectedCourse) return;
+  // 자료 삭제 확인 모달 대상과 진행·오류 상태. 요약/퀴즈 삭제 모달과 같은 패턴.
+  const [pendingMaterialDelete, setPendingMaterialDelete] = useState<CourseMaterial | null>(null);
+  const [materialDeleteBusy, setMaterialDeleteBusy] = useState(false);
+  const [materialDeleteError, setMaterialDeleteError] = useState("");
 
-    const nextMaterials = materials.filter(item => item.id !== material.id);
+  // × 버튼·자료 상세의 삭제 버튼은 바로 지우지 않고 확인 모달을 연다(Storage 원본까지 지워져 복구 불가).
+  const requestDeleteMaterial = (material: CourseMaterial) => {
+    setMaterialDeleteError("");
+    setPendingMaterialDelete(material);
+  };
+
+  const closeDeleteMaterial = () => {
+    if (materialDeleteBusy) return; // 삭제 진행 중에는 닫지 않는다.
+    setPendingMaterialDelete(null);
+    setMaterialDeleteError("");
+  };
+
+  const confirmDeleteMaterial = async () => {
+    const material = pendingMaterialDelete;
+    if (!material || !selectedCourse) return;
+
+    setMaterialDeleteBusy(true);
+    setMaterialDeleteError("");
     try {
-      await Promise.all([
-        saveCourseMaterials(selectedCourse, nextMaterials),
-        deleteSummariesByMaterialId(selectedCourse, material.id),
-      ]);
-      setMaterials(nextMaterials);
+      // 자료 본체와 파생 데이터(요약·튜터 대화·원본 파일)를 한 번에 정리한다. 퀴즈는 남긴다.
+      await deleteCourseMaterialFromServer(selectedCourse, material.id);
+      setMaterials(prev => prev.filter(item => item.id !== material.id));
       setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
       // 자료와 함께 지워진 요약을 목록에서도 빼 "요약 N" 배지를 맞춘다.
       setSummaries(prev => prev.filter(summary => !summary.materialIds?.includes(material.id)));
@@ -3393,8 +3436,17 @@ export default function Summary() {
         filesRef.current = nextFiles;
         return nextFiles;
       });
+      setPendingMaterialDelete(null);
+      // 상세 화면에서 지웠다면 더 볼 자료가 없으므로 목록(또는 대시보드 출발이면 대시보드)으로 돌아간다.
+      if (view === "materialDetail" && activeMaterial?.id === material.id) {
+        if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]);
+        else setView("upload");
+      }
+      showToast("자료를 삭제했어요.", "info");
     } catch (err) {
-      setExtractError(err instanceof Error ? err.message : "강의자료 삭제 실패");
+      setMaterialDeleteError(err instanceof Error ? err.message : "강의자료 삭제에 실패했습니다.");
+    } finally {
+      setMaterialDeleteBusy(false);
     }
   };
 
@@ -3871,6 +3923,7 @@ export default function Summary() {
             material={activeMaterial}
             selectedCourse={selectedCourse}
             onBack={() => { if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]); else setView("upload"); }}
+            backLabel={fromDashboardRef.current ? "← 대시보드로" : "← 과목 자료로"}
             onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
             onOpenQuiz={handleOpenMaterialQuiz}
@@ -3881,6 +3934,7 @@ export default function Summary() {
             relatedMaterials={materials.filter(material => selectedMaterialIds.includes(material.id))}
             onSelectRelatedMaterial={handleSelectRelatedMaterial}
             onTabChange={setActiveMaterialTab}
+            onRequestDelete={() => requestDeleteMaterial(activeMaterial)}
           />
         )}
 
@@ -4187,27 +4241,6 @@ export default function Summary() {
                         >
                           학습
                         </button>
-                        <button
-                          type="button"
-                          onClick={e => { e.stopPropagation(); handleDeleteMaterial(material); }}
-                          aria-label={`${material.name} 삭제`}
-                          title="삭제"
-                          style={{
-                            width: 26,
-                            height: 26,
-                            borderRadius: 8,
-                            border: `1px solid ${BORDER_COLOR}`,
-                            background: CARD_BACKGROUND,
-                            color: "var(--color-muted)",
-                            cursor: "pointer",
-                            fontSize: 16,
-                            lineHeight: "24px",
-                            padding: 0,
-                            flexShrink: 0,
-                          }}
-                        >
-                          ×
-                        </button>
                       </div>
                       );
                     })}
@@ -4309,6 +4342,16 @@ export default function Summary() {
           </div>
         )}
       </div>
+      {pendingMaterialDelete && (
+        <MaterialDeleteConfirmModal
+          materialName={pendingMaterialDelete.name}
+          summaryCount={summaries.filter(summary => summary.materialIds?.includes(pendingMaterialDelete.id)).length}
+          busy={materialDeleteBusy}
+          error={materialDeleteError}
+          onCancel={closeDeleteMaterial}
+          onConfirm={confirmDeleteMaterial}
+        />
+      )}
     </div>
   );
 }

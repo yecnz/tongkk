@@ -5,7 +5,8 @@ import { useCourses } from "../CourseContext";
 import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
-import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, type CourseMaterial } from "../services/materials";
+import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, deleteCourseMaterialFromServer, type CourseMaterial } from "../services/materials";
+import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmModal";
 import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, countQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
@@ -48,6 +49,8 @@ type CourseDetailModalProps = {
   onGoSummary: () => void;
   onGoQuiz: () => void;
   onOpenMaterial: (material: CourseMaterial, initialTab?: "original" | "summary" | "quiz") => void;
+  // 자료 삭제 후 대시보드 강의 카드의 "자료 N · 요약 N" 통계를 갱신하기 위한 알림.
+  onMaterialDeleted?: () => void;
 };
 type PlanSource = {
   key: string;
@@ -184,12 +187,18 @@ const CourseDetailModal = ({
   onGoSummary,
   onGoQuiz,
   onOpenMaterial,
+  onMaterialDeleted,
 }: CourseDetailModalProps) => {
+  const { showToast } = useToast();
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // 자료 삭제 확인 모달 대상과 진행·오류 상태. 요약 페이지와 같은 모달을 공유한다.
+  const [pendingDelete, setPendingDelete] = useState<CourseMaterial | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     let ignore = false;
@@ -221,6 +230,37 @@ const CourseDetailModal = ({
   const emptyText = loading ? "불러오는 중..." : "아직 자료가 없습니다";
   const summaryCountFor = (materialId: string) => summaries.filter(s => s.materialIds?.includes(materialId)).length;
   const quizCountFor = (materialId: string) => quizSets.filter(q => q.materialIds?.includes(materialId)).length;
+
+  // 삭제 버튼은 바로 지우지 않고 확인 모달을 연다(Storage 원본까지 지워져 복구 불가).
+  const requestDelete = (material: CourseMaterial) => {
+    setDeleteError("");
+    setPendingDelete(material);
+  };
+  const closeDelete = () => {
+    if (deleteBusy) return; // 삭제 진행 중에는 닫지 않는다.
+    setPendingDelete(null);
+    setDeleteError("");
+  };
+  const confirmDelete = async () => {
+    const material = pendingDelete;
+    if (!material) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      // 자료 본체와 파생 데이터(요약·튜터 대화·원본 파일)를 한 번에 정리한다. 퀴즈는 남는다.
+      await deleteCourseMaterialFromServer(course, material.id);
+      setMaterials(prev => prev.filter(item => item.id !== material.id));
+      // 자료와 함께 지워진 요약을 빼 "요약 N" 배지를 맞춘다.
+      setSummaries(prev => prev.filter(summary => !summary.materialIds?.includes(material.id)));
+      setPendingDelete(null);
+      showToast("자료를 삭제했어요.", "info");
+      onMaterialDeleted?.();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "강의자료 삭제에 실패했습니다.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   return (
     <div style={{
@@ -283,38 +323,69 @@ const CourseDetailModal = ({
                 const summaryCount = summaryCountFor(material.id);
                 const quizCount = quizCountFor(material.id);
                 return (
-                  <button
+                  // 행 전체는 상세 이동 버튼, 오른쪽 ×는 삭제 버튼. 버튼 안에 버튼을 넣을 수 없어 div로 감싼다.
+                  <div
                     key={material.id}
-                    type="button"
-                    className="tongkk-hover-row"
-                    onClick={() => onOpenMaterial(material)}
                     style={{
-                      width: "100%",
-                      padding: "14px 0",
-                      border: "none",
-                      borderBottom: index < materials.length - 1 ? "1px solid var(--color-border-soft)" : "none",
-                      background: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
+                      gap: 10,
+                      borderBottom: index < materials.length - 1 ? "1px solid var(--color-border-soft)" : "none",
                     }}
                   >
-                    <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", lineHeight: 1.45, wordBreak: "break-word" }}>
-                        {material.name}
+                    <button
+                      type="button"
+                      className="tongkk-hover-row"
+                      onClick={() => onOpenMaterial(material)}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: "14px 0",
+                        border: "none",
+                        background: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", lineHeight: 1.45, wordBreak: "break-word" }}>
+                          {material.name}
+                        </span>
+                        <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "var(--color-muted)" }}>
+                          {materialMeta(material)}
+                        </span>
                       </span>
-                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "var(--color-muted)" }}>
-                        {materialMeta(material)}
+                      <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
+                        <span style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)" }}>요약 {summaryCount}</span>
+                        <span style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)" }}>퀴즈 {quizCount}</span>
                       </span>
-                    </span>
-                    <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
-                      <span style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)" }}>요약 {summaryCount}</span>
-                      <span style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)" }}>퀴즈 {quizCount}</span>
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => requestDelete(material)}
+                      aria-label={`${material.name} 삭제`}
+                      title="삭제"
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 8,
+                        border: `1px solid ${BORDER_COLOR}`,
+                        background: "var(--color-card)",
+                        color: "var(--color-muted)",
+                        cursor: "pointer",
+                        fontSize: 16,
+                        lineHeight: "24px",
+                        padding: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -344,6 +415,16 @@ const CourseDetailModal = ({
           }}>퀴즈 새로 생성</button>
         </div>
       </Card>
+      {pendingDelete && (
+        <MaterialDeleteConfirmModal
+          materialName={pendingDelete.name}
+          summaryCount={summaryCountFor(pendingDelete.id)}
+          busy={deleteBusy}
+          error={deleteError}
+          onCancel={closeDelete}
+          onConfirm={confirmDelete}
+        />
+      )}
     </div>
   );
 };
@@ -524,6 +605,8 @@ export default function Dashboard() {
   const [detailCourse, setDetailCourse] = useState<string | null>(null);
   const [detailSection, setDetailSection] = useState<CourseDetailSection | undefined>(undefined);
   const [courseStats, setCourseStats] = useState<Record<string, CourseStats>>({});
+  // "자료 복습하기" 클릭 후 요약 목록 조회 중 중복 클릭 방지.
+  const [reviewNavigating, setReviewNavigating] = useState(false);
   // 페이스 플랜은 학습 캘린더에서 관리한다. 대시보드는 "오늘 추천 과목" 계산을 위해 읽기 전용으로만 로드.
   const [pacePlans, setPacePlans] = useState<PacePlan[]>([]);
   // 퀴즈 기준 플랜의 진행도를 파생 계산하기 위한 과목별 응시 기록 {count, createdAt}.
@@ -564,6 +647,20 @@ export default function Dashboard() {
   const openCourseDetail = (course: string, section?: CourseDetailSection) => {
     setDetailSection(section);
     setDetailCourse(course);
+  };
+
+  // 자료 삭제 등으로 개수가 바뀐 과목의 통계만 다시 받는다(서비스 계층이 캐시를 무효화해 둔 상태).
+  const refreshCourseStats = async (course: string) => {
+    try {
+      const [materials, summaries, quizzes] = await Promise.all([
+        countCourseMaterialsFromServer(course),
+        countSummariesFromServer(course),
+        countQuizSetsFromServer(course),
+      ]);
+      setCourseStats(prev => ({ ...prev, [course]: { materials, summaries, quizzes, loading: false, error: "" } }));
+    } catch {
+      // 통계 갱신 실패는 치명적이지 않다. 다음 대시보드 로드에서 다시 맞춰진다.
+    }
   };
 
   useEffect(() => {
@@ -971,6 +1068,44 @@ export default function Dashboard() {
       : stepView.dday
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
+  // "자료 복습하기" 대상 과목: 추천 과목 → 요약 있는 과목 → 자료 있는 과목 순.
+  // (페이스 플랜이 없어도 복습 동선이 끊기지 않게 한다.)
+  const reviewCourse = recommendedCourse
+    ?? courses.find(course => (courseStats[course]?.summaries ?? 0) > 0)
+    ?? courses.find(course => (courseStats[course]?.materials ?? 0) > 0)
+    ?? null;
+
+  // "자료 복습하기"는 라벨대로 '보러' 간다: 가장 최근 요약이 달린 자료 상세(요약 탭)로
+  // 바로 이동하고, 과목에 요약이 아직 없으면 요약 설정 화면으로 폴백한다.
+  const handleReviewMaterials = async () => {
+    if (!reviewCourse || reviewNavigating) return;
+    setReviewNavigating(true);
+    const fallbackState = { selectedCourse: reviewCourse, fromDashboard: true };
+    try {
+      const summaries = await loadSummariesFromServer(reviewCourse);
+      const latest = [...summaries]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .find(summary => (summary.materialIds || []).length > 0);
+      if (latest?.materialIds?.length) {
+        navigate(pageRoutes["자료 요약"], {
+          state: {
+            ...fallbackState,
+            viewMaterial: true,
+            materialId: latest.materialIds[0],
+            materialIds: latest.materialIds,
+            materialDetailTab: "summary" as const,
+          },
+        });
+        return;
+      }
+      navigate(pageRoutes["자료 요약"], { state: fallbackState });
+    } catch {
+      // 요약 조회가 실패해도 동선은 끊지 않는다 — 기존처럼 과목의 요약 화면으로 보낸다.
+      navigate(pageRoutes["자료 요약"], { state: fallbackState });
+    } finally {
+      setReviewNavigating(false);
+    }
+  };
 
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -1006,6 +1141,7 @@ export default function Dashboard() {
               state: { selectedCourse: detailCourse, materialId: material.id, viewMaterial: true, materialDetailTab: initialTab, fromDashboard: true },
             });
           }}
+          onMaterialDeleted={() => { void refreshCourseStats(detailCourse); }}
         />
       )}
       {showAddDday && <AddDdayModal onClose={() => setShowAddDday(false)} onAdd={(type, s, d) => setDdays(prev => [...prev, { id: createClientId(), type, subj: s, date: d }])} />}
@@ -1070,14 +1206,20 @@ export default function Dashboard() {
             </button>
             <button
               type="button"
-              onClick={() => navigate(
-                pageRoutes["자료 요약"],
-                recommendedCourse ? { state: { selectedCourse: recommendedCourse, fromDashboard: true } } : undefined,
-              )}
-              className="flex flex-col items-start gap-1 rounded-[14px] border border-cyan bg-white px-5 py-4 text-left cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
+              onClick={() => void handleReviewMaterials()}
+              disabled={!reviewCourse}
+              className={reviewCourse
+                ? "flex flex-col items-start gap-1 rounded-[14px] border border-cyan bg-white px-5 py-4 text-left cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
+                : "flex flex-col items-start gap-1 rounded-[14px] border border-cyan/40 bg-white px-5 py-4 text-left cursor-default opacity-60 dark:bg-slate-900"}
             >
               <span className="text-base font-extrabold text-cyan">자료 복습하기</span>
-              <span className="text-xs font-semibold text-cyan/80">요약과 자료 보기</span>
+              <span className="text-xs font-semibold text-cyan/80">
+                {!reviewCourse
+                  ? "과목과 자료를 먼저 추가해보세요"
+                  : (courseStats[reviewCourse]?.summaries ?? 0) > 0
+                    ? `${reviewCourse} 최근 요약 보기`
+                    : `${reviewCourse} 요약 만들러 가기`}
+              </span>
             </button>
           </div>
         </Card>
