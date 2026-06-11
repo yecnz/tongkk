@@ -6,6 +6,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
+import { summarizeWithTemplateStream } from "../services/summaryStream";
 import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
@@ -895,6 +896,14 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   const mindmapPaneRef = useRef<HTMLDivElement | null>(null);
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
+  // 스트리밍 생성 중 텍스트 끝 지점. 사용자가 하단 근처에 있을 때만 따라 내려간다.
+  const streamEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isLoading || !realContent) return;
+    const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 240;
+    if (nearBottom) streamEndRef.current?.scrollIntoView({ block: "end" });
+  }, [isLoading, realContent]);
 
   // 완성된 질문을 그대로 튜터 입력창에 채운다(마인드맵 노드 질문 등).
   const askTutorWithQuestion = (question: string, anchor: DragAnchor | null) => {
@@ -1284,7 +1293,27 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           </div>
         )}
 
-        {isLoading ? (
+        {isLoading && realContent ? (
+          // 스트리밍 생성 중: 지금까지 생성된 텍스트를 그대로 렌더링해 타자기 효과를 낸다.
+          <div style={{
+            background: "var(--color-card)", borderRadius: 12, padding: 28,
+            border: "1px solid var(--color-border-soft)",
+            fontSize: 15, color: "var(--color-text)", lineHeight: 1.85,
+            overflowX: "auto",
+          }}>
+            <FormattedAiText content={realContent} template={template} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 18, fontSize: 13, color: "var(--color-muted)" }}>
+              <div style={{
+                width: 14, height: 14, flexShrink: 0,
+                border: `2px solid ${PINK}`, borderTop: "2px solid transparent",
+                borderRadius: "50%", animation: "spin 0.8s linear infinite"
+              }}/>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+              {loadingStep || "요약 생성 중..."}
+            </div>
+            <div ref={streamEndRef} />
+          </div>
+        ) : isLoading ? (
           <div style={{
             background: "var(--color-surface)", borderRadius: 12, padding: 48,
             display: "flex", flexDirection: "column", alignItems: "center", gap: 16
@@ -3522,10 +3551,28 @@ export default function Summary() {
         // 요약 성공 시 자료 상세로 이동했는지 표시. 이동하지 못하면 결과 화면으로 폴백한다.
         let movedToDetail = false;
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 작성 중...`);
-        const response = await summarizeWithTemplate(selectedMarkdown, template, {
-          pages: opts?.pageRange,
-          focusPrompt: opts?.focusPrompt,
-        });
+        let response: { result: string; threadId: string };
+        if (template === "MINDMAP") {
+          // 마인드맵은 JSON 출력이라 부분 렌더링이 불가능해 기존 단일 호출을 유지한다.
+          response = await summarizeWithTemplate(selectedMarkdown, template, {
+            pages: opts?.pageRange,
+            focusPrompt: opts?.focusPrompt,
+          });
+        } else {
+          // 스트리밍 경로: 결과 화면으로 먼저 이동해 생성 중인 텍스트를 타자기처럼 보여준다.
+          setView("summaryResult");
+          const result = await summarizeWithTemplateStream(selectedMarkdown, template, {
+            pages: opts?.pageRange,
+            focusPrompt: opts?.focusPrompt,
+            onDelta: text => setSummaryText(text),
+            onProgress: (chunkIndex, chunkTotal) => setLoadingStep(
+              chunkTotal > 1
+                ? `${templateLabels[template]} 작성 중... (${chunkIndex}/${chunkTotal} 구간)`
+                : `${templateLabels[template]} 형식으로 요약 작성 중...`,
+            ),
+          });
+          response = { result, threadId: "" };
+        }
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
         let persistedId: string | undefined;
@@ -3937,8 +3984,9 @@ export default function Summary() {
         // 넓은 뷰(요약 결과·자료 상세)는 기존의 더 촘촘한 여백을 유지한다(인라인이 클래스보다 우선).
         style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
       >
-        {/* 요약 생성 중에는 어느 화면(templates·upload)에서 시작했든 전체 화면 로딩 오버레이를 띄운다. */}
-        {isSummarizing && <SummaryLoadingOverlay loadingStep={loadingStep} />}
+        {/* 요약 생성 중에는 전체 화면 로딩 오버레이를 띄운다.
+            단, 스트리밍 텍스트가 결과 화면에 흐르기 시작하면 오버레이를 걷어 타자기 효과를 보여준다. */}
+        {isSummarizing && !(view === "summaryResult" && summaryText) && <SummaryLoadingOverlay loadingStep={loadingStep} />}
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}

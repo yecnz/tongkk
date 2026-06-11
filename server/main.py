@@ -24,7 +24,7 @@ load_dotenv(SERVER_DIR / ".env")
 from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field, model_validator
@@ -270,6 +270,14 @@ class SummarizeRequest(BaseModel):
     pages: str | None = None
     # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
     focus_prompt: str | None = None
+
+
+class SummarizeStreamRequest(SummarizeRequest):
+    # 구간 분할 생성: 전체 chunk_total개 중 chunk_index(1-base)번째 구간 요청임을 알린다.
+    chunk_index: int | None = Field(default=None, ge=1)
+    chunk_total: int | None = Field(default=None, ge=1)
+    # 직전 구간 요약의 끝부분. 제목 수준·흐름을 이어가되 내용 반복을 막는 용도.
+    previous_tail: str | None = Field(default=None, max_length=6000)
 
 
 class AgentRequest(BaseModel):
@@ -1370,6 +1378,18 @@ async def extract_text_with_google_vision(
     return {"text": text}
 
 
+def _summary_system_content(focus_prompt: str | None) -> str:
+    if focus_prompt and focus_prompt.strip():
+        return (
+            f"{SUMMARY_SYSTEM_PROMPT}\n\n"
+            "[사용자 집중 요청]\n"
+            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {focus_prompt.strip()}\n"
+            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
+            "원문에 없는 내용을 지어내지 마."
+        )
+    return SUMMARY_SYSTEM_PROMPT
+
+
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
@@ -1379,15 +1399,7 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
         markdown=markdown,
     )
 
-    system_content = SUMMARY_SYSTEM_PROMPT
-    if req.focus_prompt and req.focus_prompt.strip():
-        system_content = (
-            f"{SUMMARY_SYSTEM_PROMPT}\n\n"
-            "[사용자 집중 요청]\n"
-            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {req.focus_prompt.strip()}\n"
-            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
-            "원문에 없는 내용을 지어내지 마."
-        )
+    system_content = _summary_system_content(req.focus_prompt)
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -1405,6 +1417,78 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     except Exception as e:
         logger.exception("/summarize 실패")
         raise HTTPException(status_code=502, detail="요약 생성 중 오류가 발생했습니다.") from e
+
+
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _summary_chunk_instructions(req: SummarizeStreamRequest) -> str:
+    """구간 분할 생성 시, 구간임을 알리고 직전 구간과 자연스럽게 이어지게 하는 지시."""
+    lines = [
+        "\n\n[구간 분할 요약]",
+        f"지금 주어진 강의자료는 전체 자료를 나눈 {req.chunk_total}개 구간 중 {req.chunk_index}번째 구간이다.",
+        "- 이 구간의 내용만 정리하고, 전체 자료에 대한 서론·총정리·마무리 멘트를 만들지 마.",
+    ]
+    if req.chunk_index == 1:
+        lines.append("- 첫 구간이므로 문서 제목(# 수준)을 한 번만 만들고 시작해.")
+    else:
+        lines.append("- 첫 구간이 아니므로 문서 제목(# 수준)을 다시 만들지 말고, 이어지는 단원 제목(## 수준)부터 바로 시작해.")
+    if req.previous_tail and req.previous_tail.strip():
+        lines.append(
+            "- 아래는 직전 구간 요약의 끝부분이다. 제목 수준과 흐름이 자연스럽게 이어지게 하되, 같은 내용을 반복하지 마.\n"
+            "[직전 구간 요약 끝부분]\n"
+            f"{req.previous_tail.strip()}"
+        )
+    return "\n".join(lines)
+
+
+@app.post("/summarize/stream")
+async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_api_user)):
+    """요약을 SSE로 토큰 단위 스트리밍한다.
+
+    한 요청의 출력이 짧게 유지되도록 클라이언트가 자료를 구간으로 나눠 호출하고,
+    응답이 계속 흐르는 동안은 Cloudflare 터널 응답 대기 제한(~100초)에 걸리지 않는다.
+    이벤트: {"delta": str} 반복 → {"done": true, "finish_reason": str}. 오류 시 {"error": str}.
+    """
+    markdown = _filter_markdown_by_pages(req.markdown, req.pages)
+    prompt = SUMMARY_USER_PROMPT.format(
+        template_label=TEMPLATE_LABELS[req.template],
+        template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
+        markdown=markdown,
+    )
+
+    system_content = _summary_system_content(req.focus_prompt)
+    if req.chunk_index and req.chunk_total and req.chunk_total > 1:
+        system_content += _summary_chunk_instructions(req)
+
+    async def event_stream():
+        finish_reason = ""
+        try:
+            llm = build_llm(req.model, max_tokens=SUMMARY_MAX_TOKENS)
+            async for chunk in llm.astream([
+                SystemMessage(content=system_content),
+                HumanMessage(content=prompt),
+            ]):
+                text = _message_content_to_text(chunk.content)
+                if text:
+                    yield _sse_event({"delta": text})
+                metadata = getattr(chunk, "response_metadata", None) or {}
+                reason = metadata.get("finish_reason") or metadata.get("stop_reason")
+                if reason:
+                    finish_reason = str(reason)
+        except Exception:
+            logger.exception("/summarize/stream 실패")
+            yield _sse_event({"error": "요약 생성 중 오류가 발생했습니다."})
+            return
+        yield _sse_event({"done": True, "finish_reason": finish_reason})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        # 프록시(Vite·Cloudflare)가 스트림을 버퍼링하지 않도록 명시한다.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/agent")
