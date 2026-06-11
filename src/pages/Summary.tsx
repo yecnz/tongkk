@@ -4,6 +4,8 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { summarizeWithTemplateStream } from "../services/summaryStream";
@@ -765,7 +767,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
         columnGap: 34,
         columnRule: "1px solid var(--color-border-soft)",
       }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={cheatSheetMarkdownComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={cheatSheetMarkdownComponents}>
           {cleaned}
         </ReactMarkdown>
       </div>
@@ -773,7 +775,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
       {cleaned}
     </ReactMarkdown>
   );
@@ -2258,9 +2260,11 @@ const MaterialDetailView = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          // 진행 단계·삭제 버튼은 축소되지 않으므로, 좁은 화면에서는 다음 줄로 내려 제목이 0px로 찌그러지지 않게 한다.
+          flexWrap: "wrap",
           gap: 16,
         }}>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ flex: "1 1 auto", minWidth: 160 }}>
             <h2 style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", wordBreak: "break-word" }}>
               {material.name}
             </h2>

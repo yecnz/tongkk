@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, normalizeBoldSpacing } from "../common";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
@@ -145,7 +147,7 @@ const FormattedTutorText = ({ content }: { content: string }) => {
   if (!cleaned) return null;
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
       {cleaned}
     </ReactMarkdown>
   );
