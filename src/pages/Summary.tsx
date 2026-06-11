@@ -33,6 +33,7 @@ import {
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
+import { loadLastCourse, saveLastCourse } from "../services/lastCourse";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -75,7 +76,7 @@ type FileIconProps = { type: FileKind };
 // range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
 type DragAnchor = { range: Range; top: number; scrollY: number };
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
-type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void };
+type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void; onRetry?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
   selectedCourse: string;
@@ -800,7 +801,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   );
 };
 
-const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, sourceMarkdown, sourcePages, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz }: SummaryResultViewProps) => {
+const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, sourceMarkdown, sourcePages, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz, onRetry }: SummaryResultViewProps) => {
   const data = summaryData[template];
   const displayContent = realContent || data.content;
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
@@ -1226,6 +1227,18 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             fontSize: 14, color: "var(--color-danger)", lineHeight: 1.6
           }}>
             <strong>요약 실패:</strong> {error}
+            {onRetry && (
+              <div style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  style={{
+                    padding: "9px 18px", borderRadius: 10, border: "none",
+                    background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                  }}
+                >같은 설정으로 다시 시도</button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="summary-result-grid" style={{
@@ -2712,7 +2725,8 @@ export default function Summary() {
   const sessionDetailRef = useRef<SummaryViewDetail>(restoreFromUrl ? readSummaryViewDetail() : {});
   const sessionDetail = sessionDetailRef.current;
 
-  const initialCourse = ((locationState?.selectedCourse || (restoreFromUrl ? urlCourse : "")) || "").trim();
+  // 핸드오프·URL 모두 없으면(사이드바 단독 진입) 마지막 본 과목으로 폴백한다.
+  const initialCourse = ((locationState?.selectedCourse || (restoreFromUrl ? urlCourse : "")) || "").trim() || loadLastCourse();
   const fromDashboardRef = useRef(Boolean(locationState?.selectedCourse?.trim() && locationState?.fromDashboard));
   const pendingMaterialIdRef = useRef(
     hasHandoff && locationState?.viewMaterial
@@ -2841,6 +2855,8 @@ export default function Summary() {
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
+  // 마지막 요약 생성 인자 — 실패 시 재시도용.
+  const lastSummaryArgsRef = useRef<{ template: SummaryTemplate; opts?: { pageRange?: string; focusPrompt?: string }; backView: SummaryView } | null>(null);
   // templates(템플릿 선택) 화면에서 "돌아가기" 시 돌아갈 화면.
   // 자료 상세에서 진입하면 materialDetail, 그 외에는 upload(과목 자료)로 돌아간다.
   const [templatesBackView, setTemplatesBackView] = useState<SummaryView>("upload");
@@ -2861,6 +2877,11 @@ export default function Summary() {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
+
+  // 마지막 본 과목 기억 — 사이드바 단독 진입의 폴백으로 쓴다.
+  useEffect(() => {
+    if (selectedCourse) saveLastCourse(selectedCourse);
+  }, [selectedCourse]);
 
   useEffect(() => {
     if (!locationState?.openSummary && !locationState?.viewMaterial && !locationState?.createSummary) return;
@@ -3024,12 +3045,6 @@ export default function Summary() {
     // searchParams/setSearchParams는 비교·갱신용이며 stable하므로 의존성에서 제외한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, selectedCourse, activeMaterial?.id, activeMaterialTab, activeSummaryId, selectedTemplate, selectedMaterialIds]);
-
-  useEffect(() => {
-    if (!duplicateNotice) return;
-    const timer = window.setTimeout(() => setDuplicateNotice(null), 3600);
-    return () => window.clearTimeout(timer);
-  }, [duplicateNotice]);
 
   const updateUploadStatus = (file: File, nextStatus: Omit<UploadFileStatus, "id" | "name" | "file">) => {
     setUploadStatuses(prev => upsertUploadStatus(prev, {
@@ -3331,6 +3346,8 @@ export default function Summary() {
   };
 
   const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates") => {
+    // 실패 시 "같은 설정으로 다시 시도"가 마지막 생성 인자를 그대로 재사용한다.
+    lastSummaryArgsRef.current = { template, opts, backView };
     setSelectedTemplate(template);
     setSummaryPages(opts?.pageRange || ""); // 요약에 쓴 페이지 범위를 보관해 튜터의 원본 본문도 같은 범위로 좁힌다.
     setSummaryError("");
@@ -3656,6 +3673,10 @@ export default function Summary() {
             resetTutorHistory={isInitialRouteEntryRef.current}
             initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
+            onRetry={lastSummaryArgsRef.current ? () => {
+              const args = lastSummaryArgsRef.current;
+              if (args) void handleTemplateSelect(args.template, args.opts, args.backView);
+            } : undefined}
           />
         )}
 

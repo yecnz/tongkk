@@ -123,6 +123,27 @@ body.tongkk-sidebar-open #root {
   }
 }
 
+/* 대시보드 학습계획 텍스트는 클릭하면 편집되지만 시각 단서가 없어, hover 시 연필을 보여준다.
+   hover가 없는 터치 환경에서는 항상 옅게 노출해 발견 가능성을 유지한다. */
+.tongkk-plan-edit-hint {
+  opacity: 0;
+  margin-left: 6px;
+  color: var(--color-muted);
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-block;
+  transition: opacity 0.15s ease;
+}
+.tongkk-plan-text:hover .tongkk-plan-edit-hint,
+.tongkk-plan-text:focus-visible .tongkk-plan-edit-hint {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tongkk-plan-edit-hint {
+    opacity: 0.45;
+  }
+}
+
 /* ── 공통 페이지 컨테이너 ──
    페이지 본문의 폭·여백을 한곳에서 관리한다. max-width로 큰 화면에서의 과확대를 막고,
    clamp 패딩으로 좁은 화면에 자연스럽게 대응한다(스케일은 #root zoom으로 고정이라
@@ -220,7 +241,7 @@ body.tongkk-sidebar-open #root {
 /* 요약 화면·AI 튜터에서만 표면색(--color-surface)을 살짝 진한 연한 회색으로 덮어쓴다.
    나머지 화면은 @theme의 기본값(#fafafa)을 그대로 쓴다. 적용: Summary 페이지 루트에 클래스 부여. */
 .tongkk-soft-surface {
-  --color-surface: light-dark(#eceef2, #252932);
+  --color-surface: light-dark(#f2f4f8, #252932);
 }
 
 button,

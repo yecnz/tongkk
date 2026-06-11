@@ -125,6 +125,19 @@ const markdownComponents: Components = {
       {children}
     </pre>
   ),
+  // GFM 표 — 컴포넌트가 없으면 브라우저 기본(테두리 없음)으로 풀려 표처럼 안 보인다.
+  // 채팅 말풍선이 좁으니 가로 스크롤 래퍼로 감싼다.
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "10px 0 12px" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: "7px 9px", background: "var(--color-border)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid var(--color-border-soft)", textAlign: "left", whiteSpace: "nowrap" }}>
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td style={{ padding: "6px 9px", border: "1px solid var(--color-border-soft)", color: "var(--color-text)", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
 
 const FormattedTutorText = ({ content }: { content: string }) => {
