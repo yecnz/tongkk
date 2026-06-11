@@ -127,6 +127,8 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           const shownMarkers = dayMarkers.slice(0, 3);
           const extraMarkers = dayMarkers.length - shownMarkers.length;
           const weekdayColor = i % 7 === 0 ? "var(--color-sunday)" : i % 7 === 6 ? "var(--color-saturday)" : "var(--color-text)";
+          // 스크린리더가 "1", "2" 대신 날짜 맥락을 읽도록 전체 날짜를 접근성 이름으로 준다.
+          const dayLabel = `${viewYear}년 ${viewMonth + 1}월 ${day}일 (${DAY_NAMES[i % 7]})`;
 
           // 월간 계획표 모드: 큰 칸 + 날짜 위 작은 점(마감/할 일) + 학습 칩.
           if (planner) {
@@ -134,7 +136,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
             const shownChips = chips.slice(0, 2);
             const extraChips = chips.length - shownChips.length;
             return (
-              <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} className="tongkk-cal-cell" style={{
+              <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} aria-label={dayLabel} aria-pressed={isSelected} className="tongkk-cal-cell" style={{
                 width: "100%", minHeight: 62, borderRadius: 10, padding: "4px 4px 5px",
                 border: isSelected ? `1.5px solid ${PINK}` : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "1px solid transparent",
                 background: isSelected ? "color-mix(in srgb, var(--color-pink) 14%, transparent)" : "transparent",
@@ -175,7 +177,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           }
 
           return (
-            <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} style={{
+            <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} aria-label={dayLabel} aria-pressed={isSelected} style={{
               width: "100%", aspectRatio: "1", borderRadius: "50%",
               border: isSelected ? "none" : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "none",
               background: isSelected ? PINK : "transparent",
@@ -217,7 +219,15 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const [type, setType] = useState<DdayType>(initialType);
   const [subj, setSubj] = useState(initialSubj);
   const [date, setDate] = useState(initialDate);
+  // 빈 값 제출이 조용히 무시되면 "버튼이 안 먹는다"고 느끼므로, 빠진 항목을 명시한다.
+  const [error, setError] = useState("");
   const placeholder = `${ddayTypeLabels[type]}명`;
+  const handleSubmit = () => {
+    if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해주세요.`); return; }
+    if (!date) { setError("달력에서 날짜를 선택해주세요."); return; }
+    onAdd(type, subj.trim(), date);
+    onClose();
+  };
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ width: "min(380px, 100%)", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
@@ -247,20 +257,22 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
             );
           })}
         </div>
-        <input value={subj} onChange={e => setSubj(e.target.value)} placeholder={placeholder} aria-label={placeholder} style={{
+        <input value={subj} onChange={e => { setSubj(e.target.value); if (error) setError(""); }} onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }} placeholder={placeholder} aria-label={placeholder} style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, boxSizing: "border-box", marginBottom: 14,
           background: "var(--glass-bg)"
         }}/>
-        {date && (
-          <div style={{ marginBottom: 10, fontSize: 13, color: PINK, fontWeight: 600, textAlign: "center" }}>
-            선택된 날짜: {date}
-          </div>
+        {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
+        <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? PINK : "var(--color-muted)" }}>
+          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택해주세요 (필수)"}
+        </div>
+        <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
+        {error && (
+          <p role="alert" style={{ margin: "12px 0 0", fontSize: 12.5, fontWeight: 700, color: "var(--color-danger)" }}>{error}</p>
         )}
-        <CustomCalendar value={date} onChange={setDate} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button type="button" onClick={() => { if (subj.trim() && date) { onAdd(type, subj.trim(), date); onClose(); }}} style={{
+          <button type="button" onClick={handleSubmit} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>{submitLabel}</button>
         </div>
@@ -273,9 +285,10 @@ type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
 
 export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   const [txt, setTxt] = useState("");
+  const [error, setError] = useState("");
   const handleAdd = () => {
     const planText = txt.trim();
-    if (!planText) return;
+    if (!planText) { setError("학습 계획을 입력해주세요."); return; }
     onAdd(planText);
     onClose();
   };
@@ -286,15 +299,19 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
         <input
           value={txt}
-          onChange={e => setTxt(e.target.value)}
+          onChange={e => { setTxt(e.target.value); if (error) setError(""); }}
           onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
           placeholder="학습 계획을 입력하세요"
+          aria-label="학습 계획"
           autoFocus
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-            fontSize: 14, boxSizing: "border-box", marginBottom: 16
+            fontSize: 14, boxSizing: "border-box", marginBottom: error ? 8 : 16
           }}
         />
+        {error && (
+          <p role="alert" style={{ margin: "0 0 16px", fontSize: 12.5, fontWeight: 700, color: "var(--color-danger)" }}>{error}</p>
+        )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleAdd} style={{

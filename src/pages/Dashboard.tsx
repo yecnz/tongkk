@@ -98,10 +98,14 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <Card style={{ padding: 28, width: "min(400px, 100%)" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
-        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAddAndUpload(); }} placeholder="과목명 입력" autoFocus style={{
+        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAddAndUpload(); }} placeholder="과목명 입력" aria-label="과목명" autoFocus style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 16
+          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 8
         }}/>
+        {/* 버튼이 비활성인 이유를 알 수 있게 안내한다(빈 값 제출이 조용히 막히면 고장으로 느껴짐). */}
+        {!courseName && (
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-muted)" }}>과목명을 입력하면 추가할 수 있어요.</p>
+        )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleAdd} disabled={!courseName} style={{
@@ -1150,7 +1154,7 @@ export default function Dashboard() {
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
@@ -1317,7 +1321,7 @@ export default function Dashboard() {
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: PINK }}>D-day</h3>
-                <button type="button" onClick={() => setShowAddDday(true)} style={{
+                <button type="button" onClick={() => setShowAddDday(true)} aria-label="D-day 추가" title="D-day 추가" style={{
                   background: "none", border: "none", fontSize: 20, color: PINK, cursor: "pointer", lineHeight: 1
                 }}>+</button>
               </div>
