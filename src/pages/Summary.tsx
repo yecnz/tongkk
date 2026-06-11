@@ -74,7 +74,7 @@ type FileIconProps = { type: FileKind };
 // range: 같은 본문이 살아 있을 때 구절 위치 보정용 / scrollY: 확대 등으로 본문이 언마운트돼
 // range가 떨어져 나갔을 때 쓰는 드래그 당시 스크롤 위치(근사 복귀용).
 type DragAnchor = { range: Range; top: number; scrollY: number };
-type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
+type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string; isLoading?: boolean; loadingStep?: string };
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void; onRetry?: () => void };
 type MaterialDetailViewProps = {
   material: CourseMaterial;
@@ -730,7 +730,7 @@ const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { co
     : <FormattedAiText content={content} template={template} />;
 };
 
-const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewProps) => {
+const TemplateSelectView = ({ onSelect, onBack, pageHint, isLoading = false, loadingStep = "" }: TemplateSelectViewProps) => {
   const [pageRange, setPageRange] = useState("");
   const [focusPrompt, setFocusPrompt] = useState("");
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
@@ -741,9 +741,27 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   ];
 
   return (
-    <div>
-      <button onClick={onBack} style={{
-        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
+    <div style={{ position: "relative" }}>
+      {/* 요약 생성 중에는 결과 전용 화면으로 넘어가지 않고 이 템플릿 화면 위에 오버레이로 로딩을 보여준다. */}
+      {isLoading && (
+        <div style={{
+          position: "absolute", inset: -8, zIndex: 10, borderRadius: 14,
+          background: "color-mix(in srgb, var(--color-page) 78%, transparent)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
+        }}>
+          <div style={{
+            width: 36, height: 36,
+            border: `3px solid ${PINK}`, borderTop: "3px solid transparent",
+            borderRadius: "50%", animation: "spin 0.8s linear infinite"
+          }}/>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-text)" }}>
+            {loadingStep || "요약 중..."}
+          </p>
+        </div>
+      )}
+      <button onClick={onBack} disabled={isLoading} style={{
+        background: "none", border: "none", color: "var(--color-muted)", cursor: isLoading ? "default" : "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>← 돌아가기</button>
 
       <div style={{ marginBottom: 24 }}>
@@ -3354,7 +3372,6 @@ export default function Summary() {
     if (selectedMarkdown) {
       // "요약 새로 생성"은 같은 자료여도 항상 새로 만든다(중복 허용). 기존 요약을 재사용하지 않는다.
       setIsSummarizing(true);
-      setView("summaryResult");
       setSummaryText("");
       setActiveSummaryId(null);
       setSummaryError("");
@@ -3363,6 +3380,8 @@ export default function Summary() {
       setResultBackView(backView);
       const startTime = Date.now();
       try {
+        // 요약 성공 시 자료 상세로 이동했는지 표시. 이동하지 못하면 결과 화면으로 폴백한다.
+        let movedToDetail = false;
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 중...`);
         const response = await summarizeWithTemplate(selectedMarkdown, template, {
           pages: opts?.pageRange,
@@ -3382,11 +3401,23 @@ export default function Summary() {
           // 중복 허용: 같은 자료·템플릿이어도 기존 요약을 지우지 않고 항상 새로 저장한다.
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
           setActiveSummaryId(persistedSummary.id || null);
+          // 요약 성공 → 결과 전용 화면(summaryResult)을 건너뛰고 자료 상세의 요약 탭으로 이동한다.
+          // (materialDetail이 새로 마운트되며 방금 저장한 요약을 서버에서 다시 불러와 최신순으로 보여줌)
+          const targetMaterial = selectedMaterials[0];
+          if (targetMaterial) {
+            setActiveMaterial(targetMaterial);
+            setMaterialDetailInitialTab("summary");
+            setView("materialDetail");
+            movedToDetail = true;
+          }
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
+        // 코스·자료 정보가 없어 자료 상세로 못 갈 때만 결과 화면으로 폴백한다.
+        if (!movedToDetail) setView("summaryResult");
       } catch (err) {
         setSummaryError(err instanceof Error ? err.message : "요약 실패");
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
+        setView("summaryResult"); // 실패 시에만 에러·재시도를 결과 화면에서 보여준다.
       } finally {
         setIsSummarizing(false);
         setLoadingStep("");
@@ -3648,7 +3679,7 @@ export default function Summary() {
         style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
       >
         {view === "templates" && (
-          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
+          <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} isLoading={isSummarizing} loadingStep={loadingStep} />
         )}
 
         {view === "summaryResult" && selectedTemplate && (
