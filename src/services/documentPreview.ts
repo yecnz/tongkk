@@ -1,4 +1,4 @@
-import { BACKEND_URL, getAuthRequestHeaders, parseApiError } from './backend';
+import { BACKEND_URL, fetchWithTunnelRetry, getAuthRequestHeaders, parseApiError } from './backend';
 
 export async function createPdfPreviewFromUrl(fileUrl: string, fileName: string): Promise<string> {
   const sourceResponse = await fetch(fileUrl);
@@ -14,15 +14,17 @@ export async function createPdfPreviewFromUrl(fileUrl: string, fileName: string)
   formData.append('file', sourceFile);
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 180_000);
+  // 터널 타임아웃(~100초) 후 재시도 2회가 들어갈 수 있도록 전체 예산 확보
+  const timeoutId = window.setTimeout(() => controller.abort(), 300_000);
 
   try {
-    const response = await fetch(`${BACKEND_URL}/preview/pdf`, {
+    // LibreOffice 변환(최대 120초)이 터널 제한을 넘겨도 서버 캐시에 남으므로 재시도로 회수
+    const response = await fetchWithTunnelRetry(`${BACKEND_URL}/preview/pdf`, {
       method: 'POST',
       headers: await getAuthRequestHeaders(),
       body: formData,
       signal: controller.signal,
-    });
+    }, [3_000, 10_000]);
 
     if (!response.ok) {
       throw new Error(await parseApiError(response));
