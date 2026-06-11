@@ -52,10 +52,9 @@ type PlanSource = {
   key: string;
   label: string;
   meta: string;
-  kind: DdayType | "carryover" | "review";
+  kind: DdayType | "review";
   daysLeft?: number;
   dday?: Dday;
-  plan?: Plan;
   // kind가 review일 때: 간격 반복 복습 후보 정보.
   review?: { course: string; daysSince: number; scorePercent: number };
 };
@@ -499,6 +498,8 @@ export default function Dashboard() {
   const [studyPlanGoal, setStudyPlanGoal] = useState<StudyPlanGoal>("exam");
   const [studyPlanFamiliarity, setStudyPlanFamiliarity] = useState<StudyPlanFamiliarity>("attended");
   const [studyPlanDailyMinutes, setStudyPlanDailyMinutes] = useState(60);
+  // 미완료 이월: 항목을 일일이 고르게 하지 않고 토글 하나로 전부 반영/제외한다.
+  const [includeCarryover, setIncludeCarryover] = useState(true);
   const [editingPlanKey, setEditingPlanKey] = useState<string | null>(null);
   const [editingPlanText, setEditingPlanText] = useState("");
   const [openCourseMenu, setOpenCourseMenu] = useState<string | null>(null);
@@ -621,9 +622,10 @@ export default function Dashboard() {
 
   const sortedDdays = [...ddays].sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const displayDdays = showAllDdays ? sortedDdays : sortedDdays.slice(0, 3);
-  const incompletePlans = plans.filter(plan => !plan.done);
+  // 이월 후보: 오늘까지의 미완료 항목만(시험 대비로 미래 날짜에 배치된 항목은 밀린 게 아니므로 제외).
+  const todayKey = paceDateKey(new Date());
+  const incompletePlans = plans.filter(plan => !plan.done && (!plan.date || plan.date <= todayKey));
   const makeDdaySourceKey = (dday: Dday, index: number) => `dday-${dday.id || `${dday.subj}-${dday.date}-${index}`}`;
-  const makePlanSourceKey = (plan: Plan, index: number) => `plan-${plan.id || `${plan.text}-${index}`}`;
   // 간격 반복 복습 후보: 과목별 최근 응시가 1~7일 전이면 다시 꺼내 인출 연습을 제안한다.
   const reviewCandidates = Object.entries(courseQuizAttempts).flatMap(([course, attempts]) => {
     const latest = attempts[0];
@@ -645,13 +647,6 @@ export default function Dashboard() {
         dday,
       };
     }),
-    ...incompletePlans.map((plan, index) => ({
-      key: makePlanSourceKey(plan, index),
-      label: plan.text,
-      meta: "미완료",
-      kind: "carryover" as const,
-      plan,
-    })),
     ...reviewCandidates.map(candidate => ({
       key: `review-${candidate.course}`,
       label: candidate.course,
@@ -660,14 +655,14 @@ export default function Dashboard() {
       review: candidate,
     })),
   ];
-  const canGenerateStudyPlan = planSources.length > 0;
+  const canGenerateStudyPlan = planSources.length > 0 || incompletePlans.length > 0;
   const selectedPlanSources = planSources.filter(source => selectedPlanSourceKeys.includes(source.key));
-  const carryoverPlanSources = planSources.filter(source => source.kind === "carryover");
   const reviewPlanSources = planSources.filter(source => source.kind === "review");
-  const ddayPlanSources = planSources.filter(source => source.kind !== "carryover" && source.kind !== "review");
+  const ddayPlanSources = planSources.filter(source => source.kind !== "review");
+  // 소스 칩을 하나도 안 골라도 이월 토글만 켜져 있으면 생성 가능.
+  const canSubmitPlan = selectedPlanSources.length > 0 || (includeCarryover && incompletePlans.length > 0);
 
-  const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode) => {
-    const carryoverCount = sources.filter(source => source.kind === "carryover").length;
+  const summarizePlanSources = (sources: PlanSource[], mode: StudyPlanMode, carryoverCount: number) => {
     const assignmentCount = sources.filter(source => source.kind === "assignment").length;
     const examCount = sources.filter(source => source.kind === "exam").length;
     const eventCount = sources.filter(source => source.kind === "event").length;
@@ -688,11 +683,7 @@ export default function Dashboard() {
   };
 
   const getRecommendedPlanSourceKeys = (mode: StudyPlanMode) => {
-    const carryoverLimit = mode === "harder" ? 5 : mode === "lighter" ? 1 : mode === "event" ? 1 : 2;
     const ddayLimit = mode === "harder" ? 5 : mode === "lighter" ? 1 : 3;
-    const carryoverSources = planSources
-      .filter(source => source.kind === "carryover")
-      .slice(0, carryoverLimit);
     // 과제·시험은 마감 전 미리 준비하는 "마감형"으로 함께 보고, 일정(event)은 당일 위주로 본다.
     const isDeadlineKind = (kind: PlanSource["kind"]) => kind === "assignment" || kind === "exam";
     const ddaySources = planSources
@@ -712,7 +703,7 @@ export default function Dashboard() {
       .filter(source => source.kind === "review")
       .sort((a, b) => (b.review?.daysSince ?? 0) - (a.review?.daysSince ?? 0))
       .slice(0, reviewLimit);
-    return [...carryoverSources, ...ddaySources, ...reviewSources].map(source => source.key);
+    return [...ddaySources, ...reviewSources].map(source => source.key);
   };
 
   // 진단 퀴즈 대상 과목: 선택한 시험 D-day와 이름이 닿는 과목 → 자료 있는 과목 → 첫 과목 순.
@@ -730,22 +721,22 @@ export default function Dashboard() {
     const recommendedSources = planSources.filter(source => recommendedKeys.includes(source.key));
     setPendingStudyPlanMode(mode);
     setSelectedPlanSourceKeys(recommendedKeys);
-    setPlanSourceMessage(summarizePlanSources(recommendedSources, mode));
+    setIncludeCarryover(incompletePlans.length > 0);
+    setPlanSourceMessage(summarizePlanSources(recommendedSources, mode, incompletePlans.length));
     setStudyPlanError("");
     setShowPlanSourcePicker(true);
   };
 
   const requestStudyPlan = async () => {
-    if (selectedPlanSources.length === 0 || studyPlanLoading) return;
+    if (!canSubmitPlan || studyPlanLoading) return;
     setStudyPlanLoading(true);
     setStudyPlanError("");
     try {
       const selectedDdays = selectedPlanSources
         .map(source => source.dday)
         .filter((dday): dday is Dday => Boolean(dday));
-      const selectedIncompletePlans = selectedPlanSources
-        .map(source => source.plan)
-        .filter((plan): plan is Plan => Boolean(plan));
+      // 이월은 토글 하나로 전부 반영(너무 많으면 최근 8개까지만).
+      const carryoverToSend = includeCarryover ? incompletePlans.slice(0, 8) : [];
       const selectedReviews = selectedPlanSources
         .map(source => source.review)
         .filter((review): review is NonNullable<PlanSource["review"]> => Boolean(review));
@@ -768,7 +759,7 @@ export default function Dashboard() {
           daysSinceLastAttempt: latest ? Math.floor((Date.now() - latest.createdAt) / 86400000) : null,
         };
       });
-      const result = await generateStudyPlan(selectedDdays, selectedIncompletePlans, pendingStudyPlanMode, {
+      const result = await generateStudyPlan(selectedDdays, carryoverToSend, pendingStudyPlanMode, {
         goal: studyPlanGoal,
         familiarity: studyPlanFamiliarity,
         dailyMinutes: studyPlanDailyMinutes,
@@ -783,9 +774,9 @@ export default function Dashboard() {
       setPlanUndoSnapshot({ plans, message: studyPlanMessage });
       setStudyPlanMessage(result.message);
       // 직접 작성한 계획과 완료된 항목은 유지하고,
-      // 이전 AI 생성 미완료 항목과 이번에 소스로 넘긴 미완료 항목만 새 AI 계획으로 교체한다.
-      const replacedIds = new Set(selectedIncompletePlans.map(plan => plan.id).filter(Boolean));
-      const replacedRefs = new Set<Plan>(selectedIncompletePlans);
+      // 이전 AI 생성 미완료 항목과 이번에 이월로 넘긴 미완료 항목만 새 AI 계획으로 교체한다.
+      const replacedIds = new Set(carryoverToSend.map(plan => plan.id).filter(Boolean));
+      const replacedRefs = new Set<Plan>(carryoverToSend);
       setPlans(prev => [
         ...prev.filter(item => {
           if (replacedRefs.has(item) || (item.id && replacedIds.has(item.id))) return false;
@@ -1305,10 +1296,9 @@ export default function Dashboard() {
                     {planSourceMessage}
                   </p>
                   <p style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
-                    직접 작성한 계획은 그대로 유지되고, 선택한 미완료 항목과 이전 AI 계획만 새로 짜드려요.
+                    직접 작성한 계획은 그대로 유지돼요. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
                   </p>
                   {([
-                    { title: "남아있는 학습계획", sources: carryoverPlanSources },
                     { title: "D-day", sources: ddayPlanSources },
                     { title: "복습 추천", sources: reviewPlanSources },
                   ] as const).map(group => (
@@ -1318,12 +1308,8 @@ export default function Dashboard() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                           {group.sources.map(source => {
                             const selected = selectedPlanSourceKeys.includes(source.key);
-                            const accent = source.kind === "carryover" ? "var(--color-text-secondary)"
-                              : source.kind === "review" ? CYAN
-                              : ddayTypeColors[source.kind].solid;
-                            const selectedBackground = source.kind === "carryover" ? "var(--color-surface)"
-                              : source.kind === "review" ? "var(--color-tint-cyan)"
-                              : ddayTypeColors[source.kind].soft;
+                            const accent = source.kind === "review" ? CYAN : ddayTypeColors[source.kind].solid;
+                            const selectedBackground = source.kind === "review" ? "var(--color-tint-cyan)" : ddayTypeColors[source.kind].soft;
                             return (
                               <button
                                 key={source.key}
@@ -1346,6 +1332,24 @@ export default function Dashboard() {
                       </div>
                     )
                   ))}
+                  {incompletePlans.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "var(--color-muted)" }}>남아있는 학습계획</p>
+                      <button
+                        type="button"
+                        onClick={() => setIncludeCarryover(prev => !prev)}
+                        style={{
+                          padding: "6px 9px", borderRadius: 999,
+                          border: `1px solid ${includeCarryover ? "var(--color-text-secondary)" : "var(--color-border-soft)"}`,
+                          background: includeCarryover ? "var(--color-surface)" : "var(--color-card)",
+                          color: includeCarryover ? "var(--color-text-secondary)" : "var(--color-muted)",
+                          cursor: "pointer", fontSize: 12, fontWeight: includeCarryover ? 800 : 650,
+                        }}
+                      >
+                        {includeCarryover ? "✓ " : ""}남은 계획 {incompletePlans.length}개 함께 반영
+                      </button>
+                    </div>
+                  )}
                   {([
                     {
                       title: "공부 목표",
@@ -1436,12 +1440,12 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={requestStudyPlan}
-                      disabled={selectedPlanSources.length === 0 || studyPlanLoading}
+                      disabled={!canSubmitPlan || studyPlanLoading}
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "none",
-                        background: selectedPlanSources.length === 0 || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
+                        background: !canSubmitPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
                         color: "var(--color-on-brand)",
-                        cursor: selectedPlanSources.length === 0 || studyPlanLoading ? "default" : "pointer",
+                        cursor: !canSubmitPlan || studyPlanLoading ? "default" : "pointer",
                         fontSize: 12, fontWeight: 800,
                       }}
                     >
