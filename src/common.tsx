@@ -92,13 +92,13 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
       boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
     }}>
       <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button className="tongkk-hover-fade" onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
-        <button className="tongkk-hover-dim" onClick={onClose} style={{ background: "none", border: "none", borderRadius: 8, padding: "2px 8px", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
+        <button type="button" className="tongkk-hover-fade" onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="사이드바 닫기" style={{ background: "none", border: "none", borderRadius: 8, padding: "2px 8px", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
       </div>
       {(Object.keys(pageRoutes) as PageRouteLabel[])
         .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
         .map(item => (
-        <button key={item} className={active === item ? undefined : "tongkk-hover-row"} onClick={() => { onNav(item); onClose(); }} style={{
+        <button type="button" key={item} className={active === item ? undefined : "tongkk-hover-row"} onClick={() => { onNav(item); onClose(); }} style={{
           padding: "14px 24px", border: "none", background: active === item ? "color-mix(in srgb, var(--color-pink) 11%, transparent)" : "transparent",
           textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
           color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"

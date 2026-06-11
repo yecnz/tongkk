@@ -224,10 +224,10 @@ type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => voi
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-      <button className="tongkk-hover-dim" onClick={onOpenSidebar} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+      <button type="button" className="tongkk-hover-dim" onClick={onOpenSidebar} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
-      <button className="tongkk-hover-fade" onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+      <button type="button" className="tongkk-hover-fade" onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
       <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ {label}</span>
     </div>
     {extra}
@@ -1065,7 +1065,7 @@ export default function Quiz() {
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div className="app-container narrow">
-          <button onClick={handleCourseBack} style={{
+          <button type="button" onClick={handleCourseBack} style={{
             background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
           }}>← 돌아가기</button>
 
@@ -1261,7 +1261,7 @@ export default function Quiz() {
               <p style={{ margin: "0 0 8px", fontSize: 14, color: "var(--color-muted)" }}>
                 강의자료 파일을 여러 개 드래그하거나
               </p>
-              <button style={{
+              <button type="button" style={{
                 padding: "7px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
                 background: "var(--color-card)", fontSize: 13, cursor: "pointer", color: "var(--color-text)"
               }}>파일 선택</button>
@@ -1291,7 +1291,7 @@ export default function Quiz() {
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 수</label>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[5, 10, 15, 20].map(n => (
-                <button key={n} onClick={() => setCount(n)} style={{
+                <button type="button" key={n} onClick={() => setCount(n)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
                   border: count === n ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                   background: count === n ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -1303,7 +1303,7 @@ export default function Quiz() {
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>난이도</label>
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {(["쉬움", "보통", "어려움"] as QuizDifficulty[]).map(d => (
-                <button key={d} onClick={() => setDifficulty(d)} style={{
+                <button type="button" key={d} onClick={() => setDifficulty(d)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
                   border: difficulty === d ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                   background: difficulty === d ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -1315,7 +1315,7 @@ export default function Quiz() {
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 유형</label>
             <div className="option-grid-4" style={{ marginBottom: 20 }}>
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
-                <button key={t} onClick={() => setQuestionType(t)} style={{
+                <button type="button" key={t} onClick={() => setQuestionType(t)} style={{
                   padding: "10px 0", borderRadius: 10,
                   border: questionType === t ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                   background: questionType === t ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -1360,7 +1360,7 @@ export default function Quiz() {
             </div>
           </Card>
 
-          <button onClick={generate} disabled={!canGenerate} style={{
+          <button type="button" onClick={generate} disabled={!canGenerate} style={{
             width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
             background: canGenerate ? PINK : "var(--color-border-soft)",
             color: canGenerate ? "var(--color-on-brand)" : "var(--color-muted)",
@@ -1385,7 +1385,7 @@ export default function Quiz() {
           <p style={{ fontSize: 13, color: "var(--color-muted)" }}>
             {selectedCourse} · {count}문제 · {difficulty} · {questionType}{sourceName ? ` · ${sourceName}` : ""}
           </p>
-          <button onClick={cancelGeneration} style={{
+          <button type="button" onClick={cancelGeneration} style={{
             marginTop: 20, padding: "10px 28px", borderRadius: 10,
             border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
             fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-muted)"
@@ -1545,7 +1545,7 @@ export default function Quiz() {
         <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
           <div style={{ textAlign: "left", marginBottom: 16 }}>
-            <button onClick={handleResultBack} style={{
+            <button type="button" onClick={handleResultBack} style={{
               background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, padding: 0
             }}>← 돌아가기</button>
           </div>
@@ -1714,24 +1714,24 @@ export default function Quiz() {
               <p style={{ margin: "0 0 12px", fontSize: 13, color: PINK }}>{analyzeError}</p>
             )}
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              <button onClick={() => navigate(pageRoutes["오답 노트"])} disabled={analyzing} style={{
+              <button type="button" onClick={() => navigate(pageRoutes["오답 노트"])} disabled={analyzing} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
                 background: "var(--color-card)", fontSize: 14, fontWeight: 700,
                 cursor: analyzing ? "default" : "pointer", color: "var(--color-text)", opacity: analyzing ? 0.6 : 1
               }}>오답 노트 보기</button>
-              <button onClick={retryQuiz} disabled={analyzing} style={{
+              <button type="button" onClick={retryQuiz} disabled={analyzing} style={{
                 padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
                 background: "var(--color-card)", fontSize: 14, fontWeight: 700,
                 cursor: analyzing ? "default" : "pointer", color: "var(--color-text)", opacity: analyzing ? 0.6 : 1
               }}>다시 풀기</button>
               {reviewActiveRef.current ? (
-                <button onClick={handleAnalyzeWrong} disabled={analyzing} style={{
+                <button type="button" onClick={handleAnalyzeWrong} disabled={analyzing} style={{
                   padding: "12px 24px", borderRadius: 12, border: "none",
                   background: PINK, fontSize: 14, fontWeight: 600,
                   cursor: analyzing ? "default" : "pointer", color: "var(--color-on-brand)", opacity: analyzing ? 0.7 : 1
                 }}>{analyzing ? "분석 중..." : "과목 오답 분석"}</button>
               ) : (
-                <button onClick={() => setView("courseDetail")} style={{
+                <button type="button" onClick={() => setView("courseDetail")} style={{
                   padding: "12px 24px", borderRadius: 12, border: "none",
                   background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-on-brand)"
                 }}>새로 풀기</button>
@@ -1758,7 +1758,7 @@ export default function Quiz() {
         <div style={{ padding: 24, maxWidth: 600, margin: "40px auto" }}>
           <Card style={{ padding: 28, textAlign: "center" }}>
             <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--color-text-secondary)" }}>표시할 퀴즈가 없습니다.</p>
-            <button onClick={() => setView("courseDetail")} style={{
+            <button type="button" onClick={() => setView("courseDetail")} style={{
               padding: "10px 20px", borderRadius: 10, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700, cursor: "pointer"
             }}>설정으로 돌아가기</button>
@@ -1890,7 +1890,7 @@ export default function Quiz() {
                   />
                 )}
                 {!reviewMode && (
-                  <button
+                  <button type="button"
                     onClick={isSubjective ? submitSubjectiveAnswer : submitShortAnswer}
                     disabled={!shortAnswerInput.trim() || selected !== undefined || grading}
                     style={{
@@ -1941,7 +1941,7 @@ export default function Quiz() {
                 else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
                 else if (isSelected) { bg = "var(--color-muted-surface)"; border = "var(--color-muted)"; color = "var(--color-text-strong)"; }
                 return (
-                  <button key={i} className={answered ? undefined : "tongkk-quiz-option"} onClick={() => selectAnswer(i)} style={{
+                  <button type="button" key={i} className={answered ? undefined : "tongkk-quiz-option"} onClick={() => selectAnswer(i)} style={{
                     padding: "14px 18px", borderRadius: 12, border: `1.5px solid ${border}`,
                     background: bg, textAlign: "left", fontSize: 14, color, cursor: answered ? "default" : "pointer",
                     fontWeight: isSelected || (revealAnswer && isCorrect) ? 600 : 400, transition: "all 0.2s"
@@ -1967,17 +1967,17 @@ export default function Quiz() {
             )
           )}
           {reviewMode ? (
-            <button onClick={exitReviewToResult} style={{
+            <button type="button" onClick={exitReviewToResult} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
             }}>결과로 돌아가기</button>
           ) : current < quizzes.length - 1 ? (
-            <button onClick={goNextActive} style={{
+            <button type="button" onClick={goNextActive} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
             }}>다음</button>
           ) : (
-            <button onClick={submitQuiz} style={{
+            <button type="button" onClick={submitQuiz} style={{
               marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
             }}>결과 보기</button>

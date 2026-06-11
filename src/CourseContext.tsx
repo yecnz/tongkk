@@ -14,6 +14,9 @@ type CourseContextValue = {
   renameCourse: (oldName: string, newName: string) => void;
   deleteCourse: (name: string) => void;
   isSyncingCourses: boolean;
+  // 첫 서버 동기화가 끝났는지(성공/실패 무관). isSyncingCourses는 초기값이 false라
+  // 첫 페인트에 빈 상태가 깜빡이는 것을 막을 수 없어 별도 플래그를 둔다.
+  hasLoadedCourses: boolean;
   courseSyncError: string;
 };
 
@@ -24,6 +27,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<string[]>([]);
   const [courseRecords, setCourseRecords] = useState<CourseRecord[]>([]);
   const [isSyncingCourses, setIsSyncingCourses] = useState(false);
+  const [hasLoadedCourses, setHasLoadedCourses] = useState(false);
   const [courseSyncError, setCourseSyncError] = useState("");
 
   const applyServerCourses = useCallback((serverCourses: CourseRecord[]) => {
@@ -42,6 +46,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     let ignore = false;
     if (!user) {
       setCourses([]);
+      setHasLoadedCourses(false);
       return () => {
         ignore = true;
       };
@@ -58,7 +63,11 @@ export function CourseProvider({ children }: { children: ReactNode }) {
           setCourseSyncError(err instanceof Error ? err.message : "강의 목록 동기화 실패");
         }
       } finally {
-        if (!ignore) setIsSyncingCourses(false);
+        if (!ignore) {
+          setIsSyncingCourses(false);
+          // 실패해도 true로 — 스켈레톤이 무한히 남지 않고 빈 상태+오류 안내로 넘어간다.
+          setHasLoadedCourses(true);
+        }
       }
     };
 
@@ -111,7 +120,7 @@ export function CourseProvider({ children }: { children: ReactNode }) {
       });
   };
 
-  const value = { courses, addCourse, renameCourse, deleteCourse, isSyncingCourses, courseSyncError };
+  const value = { courses, addCourse, renameCourse, deleteCourse, isSyncingCourses, hasLoadedCourses, courseSyncError };
 
   return (
     <CourseContext.Provider value={value}>

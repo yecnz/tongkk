@@ -483,7 +483,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
               {node.label}
             </span>
             {node.hasChildren && (
-              <button
+              <button type="button"
                 onClick={e => { e.stopPropagation(); toggle(node.id); }}
                 onPointerDown={e => e.stopPropagation()}
                 aria-label={collapsed.has(node.id) ? `${node.label} 펼치기` : `${node.label} 접기`}
@@ -521,17 +521,17 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         {focusId && (
-          <button onClick={clearFocus} style={toolBtn}>← 전체 보기</button>
+          <button type="button" onClick={clearFocus} style={toolBtn}>← 전체 보기</button>
         )}
-        <button onClick={expandAll} style={toolBtn}>모두 펼치기</button>
-        <button onClick={collapseAll} style={toolBtn}>모두 접기</button>
+        <button type="button" onClick={expandAll} style={toolBtn}>모두 펼치기</button>
+        <button type="button" onClick={collapseAll} style={toolBtn}>모두 접기</button>
         {!focusId && hasOffsets && (
-          <button onClick={resetLayout} style={toolBtn} title="끌어 둔 노드 위치를 자동 정렬로 되돌립니다">정렬 초기화</button>
+          <button type="button" onClick={resetLayout} style={toolBtn} title="끌어 둔 노드 위치를 자동 정렬로 되돌립니다">정렬 초기화</button>
         )}
         <span style={divider} />
-        <button onClick={() => zoomBy(1 / 1.2)} style={iconBtn} aria-label="축소">−</button>
-        <button onClick={resetView} style={toolBtn} title="100%로 초기화">{Math.round(tf.k * 100)}%</button>
-        <button onClick={() => zoomBy(1.2)} style={iconBtn} aria-label="확대">+</button>
+        <button type="button" onClick={() => zoomBy(1 / 1.2)} style={iconBtn} aria-label="축소">−</button>
+        <button type="button" onClick={resetView} style={toolBtn} title="100%로 초기화">{Math.round(tf.k * 100)}%</button>
+        <button type="button" onClick={() => zoomBy(1.2)} style={iconBtn} aria-label="확대">+</button>
         <span style={{ flex: 1, minWidth: 8 }} />
         {focusId && (
           <span style={{
@@ -546,7 +546,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
             단독 학습: {root.label}
           </span>
         )}
-        <button
+        <button type="button"
           onClick={toggleStudyMode}
           aria-pressed={studyMode}
           title="켜면 노드를 클릭해 AI 튜터에게 질문할 수 있어요"
@@ -559,7 +559,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
         >
           {studyMode ? "학습 모드 켜짐" : "학습 모드"}
         </button>
-        <button
+        <button type="button"
           onClick={exportPng}
           disabled={exporting}
           style={{ ...toolBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? "default" : "pointer" }}

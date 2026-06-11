@@ -21,7 +21,7 @@ type ProfileEditModalProps = {
 type SettingsDialog = "notice" | "contact" | "deleteAccount" | null;
 
 const Toggle = ({ on, onToggle }: ToggleProps) => (
-  <button onClick={onToggle} style={{
+  <button type="button" onClick={onToggle} style={{
     width: 46, height: 26, borderRadius: 13, border: "none", padding: 2,
     background: on ? CYAN : "var(--color-border-soft)", cursor: "pointer", transition: "background 0.2s",
     display: "flex", alignItems: "center"
@@ -66,8 +66,8 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Card style={{ padding: 28, width: "min(360px, calc(100vw - 32px))" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <Card style={{ padding: 28, width: "min(360px, 100%)" }}>
         <h3 style={{ margin: "0 0 24px", fontSize: 17, fontWeight: 700 }}>프로필 편집</h3>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
           <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}>
@@ -96,8 +96,8 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
         }} />
         {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button onClick={handleSave} disabled={saving} style={{
+          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
+          <button type="button" onClick={handleSave} disabled={saving} style={{
             padding: "8px 18px", borderRadius: 10, border: "none", background: saving ? "var(--color-muted)" : PINK,
             color: "var(--color-on-brand)", cursor: saving ? "default" : "pointer", fontSize: 14, fontWeight: 600
           }}>{saving ? "저장 중" : "저장"}</button>
@@ -145,7 +145,7 @@ const SettingsModal = ({
       <Card style={{ width: "min(430px, 100%)", padding: 26 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>{title}</h3>
-          <button className="tongkk-hover-dim" onClick={onClose} style={{
+          <button type="button" className="tongkk-hover-dim" onClick={onClose} style={{
             width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
             color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px"
           }}>×</button>
@@ -192,7 +192,7 @@ const SettingsModal = ({
                 fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12,
               }}
             />
-            <button
+            <button type="button"
               onClick={handleDelete}
               disabled={loading || !deleteReady}
               style={{
@@ -298,10 +298,10 @@ export default function MyPage() {
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
@@ -312,7 +312,7 @@ export default function MyPage() {
           <Card style={{ padding: 28 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>프로필</h3>
-              <button onClick={() => setShowEdit(true)} style={{
+              <button type="button" onClick={() => setShowEdit(true)} style={{
                 background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
                 color: PINK, fontSize: 13, fontWeight: 600
               }}>
@@ -337,7 +337,7 @@ export default function MyPage() {
               </div>
             </div>
             {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
-            <button onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
+            <button type="button" onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
               width: "100%", padding: "9px 0", borderRadius: 10,
               border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-muted)",
               fontSize: 13, cursor: "pointer"
@@ -358,7 +358,7 @@ export default function MyPage() {
                   {[{ label: "작게", value: 0.8 }, { label: "보통", value: 0.9 }, { label: "크게", value: 1 }].map(opt => {
                     const selected = uiScale === opt.value;
                     return (
-                      <button key={opt.label} onClick={() => changeUiScale(opt.value)} style={{
+                      <button type="button" key={opt.label} onClick={() => changeUiScale(opt.value)} style={{
                         padding: "6px 12px", borderRadius: 8,
                         border: selected ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                         background: selected ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -385,7 +385,7 @@ export default function MyPage() {
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)", lineHeight: 1.6 }}>
               과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
             </p>
-            <button onClick={() => setSettingsDialog("deleteAccount")} style={{
+            <button type="button" onClick={() => setSettingsDialog("deleteAccount")} style={{
               width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-danger) 45%, transparent)",
               background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 13, fontWeight: 700, cursor: "pointer"
             }}>내 앱 데이터 삭제</button>
@@ -402,7 +402,7 @@ export default function MyPage() {
                 { label: "공지사항", type: "notice" as const },
                 { label: "문의하기", type: "contact" as const },
               ].map((item, index) => (
-                <button key={item.label} className="tongkk-hover-row" onClick={() => setSettingsDialog(item.type)} style={{
+                <button type="button" key={item.label} className="tongkk-hover-row" onClick={() => setSettingsDialog(item.type)} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "14px 0", border: "none", background: "none", cursor: "pointer",
                   borderBottom: index === 0 ? "1px solid var(--color-border-soft)" : "none", width: "100%", textAlign: "left"
