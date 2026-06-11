@@ -59,3 +59,26 @@ export function createTtlCache<T>(ttlMs: number, staleTtlMs = 0) {
     },
   };
 }
+
+export type TtlCache<T> = ReturnType<typeof createTtlCache<T>>;
+
+// fresh 캐시 → stale 반환 + 백그라운드 갱신(SWR) → 직접 조회 순의 공용 읽기 경로.
+// 각 서비스의 load/count 함수가 같은 분기를 반복하지 않도록 모았다.
+// fetcher는 기존 관례대로 성공 경로에서 cache.set을 직접 한다.
+export async function readThroughCache<T>(
+  cache: TtlCache<T>,
+  key: string,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  const fresh = cache.get(key);
+  if (fresh !== undefined) return fresh;
+
+  // 만료됐지만 stale 윈도우 안이면 일단 보여주고 백그라운드로 갱신한다(SWR).
+  const stale = cache.getStale(key);
+  if (stale !== undefined) {
+    cache.revalidate(key, fetcher);
+    return stale;
+  }
+
+  return fetcher();
+}

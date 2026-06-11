@@ -1,4 +1,4 @@
-import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
+import { createTtlCache, readThroughCache, SWR_STALE_TTL_MS } from './cache';
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import { deleteSummariesByMaterialId } from './summaries';
@@ -173,8 +173,6 @@ export const loadCourseMaterialsFromServer = async (
   options?: { includeMarkdown?: boolean },
 ): Promise<CourseMaterial[]> => {
   const cacheKey = `${course}::${options?.includeMarkdown ? 'full' : 'light'}`;
-  const cached = materialsCache.get(cacheKey);
-  if (cached) return cached;
 
   const fetchList = async (): Promise<CourseMaterial[]> => {
     const courseId = (await findCourseRecord(course))?.id;
@@ -201,14 +199,7 @@ export const loadCourseMaterialsFromServer = async (
     return materials;
   };
 
-  // 만료됐지만 stale 윈도우 안이면 일단 보여주고 백그라운드로 갱신한다(SWR).
-  const stale = materialsCache.getStale(cacheKey);
-  if (stale) {
-    materialsCache.revalidate(cacheKey, fetchList);
-    return stale;
-  }
-
-  return fetchList();
+  return readThroughCache(materialsCache, cacheKey, fetchList);
 };
 
 // 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
@@ -242,13 +233,7 @@ export const countCourseMaterialsFromServer = async (course: string): Promise<nu
     return total;
   };
 
-  const staleCount = materialsCountCache.getStale(cacheKey);
-  if (staleCount !== undefined) {
-    materialsCountCache.revalidate(cacheKey, fetchCount);
-    return staleCount;
-  }
-
-  return fetchCount();
+  return readThroughCache(materialsCountCache, cacheKey, fetchCount);
 };
 
 // 자료 한 건과 파생 데이터(요약·튜터 대화·원본 파일)를 모두 정리한다.

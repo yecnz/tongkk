@@ -197,7 +197,7 @@ const SettingsModal = ({
               disabled={loading || !deleteReady}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                background: loading || !deleteReady ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
+                background: loading || !deleteReady ? "var(--color-border-soft)" : "var(--color-danger)", color: "var(--color-on-brand)",
                 fontWeight: 800, cursor: loading || !deleteReady ? "default" : "pointer"
               }}
             >

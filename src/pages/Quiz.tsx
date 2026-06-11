@@ -1108,7 +1108,7 @@ export default function Quiz() {
             </Card>
           )}
 
-          <Card style={{ padding: 20, marginBottom: 16, border: "1px solid var(--color-tint-cyan)", background: "#F7FDFF" }}>
+          <Card style={{ padding: 20, marginBottom: 16, border: "1px solid var(--color-tint-cyan)", background: "color-mix(in srgb, var(--color-tint-cyan) 45%, var(--color-card))" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
               <div>
                 <h3 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>페이스메이커</h3>

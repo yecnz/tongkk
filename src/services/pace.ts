@@ -105,12 +105,6 @@ export const PACE_SPRINT_DAYS = 3;
 // 연결 D-day가 오늘~D-3 사이면 스퍼트 구간(새 학습 중단 → 복습·시험모드).
 export const isPaceSprint = (daysLeft: number) => daysLeft >= 0 && daysLeft <= PACE_SPRINT_DAYS;
 
-// ── P7/P8. 일별 학습 기록 기반 스트릭 + 주간 회고 ──────────────────────
-// PaceLog: dateKey("YYYY-MM-DD") -> 그날 완료한 새 학습 개수와 복습 세션 수.
-// 예전 저장값(number)도 읽을 수 있게 두 형태를 함께 지원한다.
-export type PaceLogEntry = number | { units: number; reviewSessions?: number };
-export type PaceLog = Record<string, PaceLogEntry>;
-
 export const paceDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
@@ -119,61 +113,6 @@ const addDays = (date: Date, delta: number) => {
   next.setHours(0, 0, 0, 0);
   next.setDate(next.getDate() + delta);
   return next;
-};
-
-// 연속 학습일. 주 1회 '휴식권'으로 한 번의 공백은 streak를 끊지 않는다.
-// 오늘 아직 안 했어도 어제까지의 streak는 유지된다(오늘은 진행 중으로 간주).
-export const paceStreak = (
-  log: PaceLog,
-  now = new Date(),
-): { days: number; restUsed: boolean } => {
-  let days = 0;
-  let restUsed = false;
-  for (let i = 0; i < 400; i++) {
-    const entry = log[paceDateKey(addDays(now, -i))];
-    const units = typeof entry === "number" ? entry : entry?.units ?? 0;
-    const reviewSessions = typeof entry === "number" ? 0 : entry?.reviewSessions ?? 0;
-    const active = units > 0 || reviewSessions > 0;
-    if (active) {
-      days += 1;
-      continue;
-    }
-    if (i === 0) continue; // 오늘은 아직 진행 중일 수 있으니 끊지 않는다
-    if (days > 0 && !restUsed) {
-      restUsed = true; // 휴식권 1회 사용, streak 유지
-      continue;
-    }
-    break;
-  }
-  return { days, restUsed };
-};
-
-// 최근 7일(오늘 포함) 동안의 학습 개수 합과 활동 일수.
-export const paceWeekStats = (
-  log: PaceLog,
-  now = new Date(),
-): { units: number; activeDays: number; reviewSessions: number } => {
-  let units = 0;
-  let activeDays = 0;
-  let reviewSessions = 0;
-  for (let i = 0; i < 7; i++) {
-    const entry = log[paceDateKey(addDays(now, -i))];
-    const value = typeof entry === "number" ? entry : entry?.units ?? 0;
-    const reviews = typeof entry === "number" ? 0 : entry?.reviewSessions ?? 0;
-    if (value > 0 || reviews > 0) {
-      units += value;
-      reviewSessions += reviews;
-      activeDays += 1;
-    }
-  }
-  return { units, activeDays, reviewSessions };
-};
-
-// 다음 주 목표: 이번 주 실적과 전체 잔여 분량을 보고 무리 없는 주간 목표를 제안.
-export const paceWeeklyGoal = (thisWeekUnits: number, totalRemaining: number): number => {
-  const base = Math.max(thisWeekUnits, 1);
-  const suggested = Math.ceil(base * 1.1); // 이번 주보다 살짝 높게
-  return clamp(suggested, 1, Math.max(totalRemaining, 1));
 };
 
 // ── 캘린더용: 페이스 플랜을 날짜별 학습 칩으로 펼친다 ────────────────────
