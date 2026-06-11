@@ -1,4 +1,4 @@
-import { createTtlCache } from './cache';
+import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
 import { fetchCourses } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { QuizDifficulty, QuizQuestion, QuizQuestionType } from './gpt';
@@ -47,11 +47,11 @@ const getCourseId = async (course: string) => {
   return found.id;
 };
 
-// 퀴즈 세트 목록은 화면 이동마다 다시 받지만 생성 때만 바뀐다 → 짧게 캐싱.
+// 퀴즈 세트 목록은 화면 이동마다 다시 받지만 생성 때만 바뀐다 → fresh 30초 + stale 30분(SWR).
 // variant로 문제 본문(questions) 포함 여부를 구분한다.
-const quizSetsCache = createTtlCache<SavedQuizSet[]>(30_000);
+const quizSetsCache = createTtlCache<SavedQuizSet[]>(30_000, SWR_STALE_TTL_MS);
 // 대시보드 통계용 개수 캐시 — 목록 본문을 받지 않고 count(개수)만 보관한다.
-const quizSetsCountCache = createTtlCache<number>(30_000);
+const quizSetsCountCache = createTtlCache<number>(30_000, SWR_STALE_TTL_MS);
 export const invalidateQuizSetsCache = (course?: string) => {
   quizSetsCache.invalidate(course);
   quizSetsCountCache.invalidate(course);
@@ -68,25 +68,36 @@ export async function loadQuizSetsFromServer(
   const cached = quizSetsCache.get(cacheKey);
   if (cached) return cached;
 
-  const courseId = await getCourseId(course);
-  if (!courseId) return [];
+  const fetchList = async (): Promise<SavedQuizSet[]> => {
+    const courseId = await getCourseId(course);
+    if (!courseId) return [];
 
-  const { data, error } = options?.includeQuestions
-    ? await supabase
-        .from('quiz_sets')
-        .select('id, title, difficulty, question_type, count, material_ids, questions, created_at, updated_at')
-        .eq('course_id', courseId)
-        .order('created_at', { ascending: false })
-    : await supabase
-        .from('quiz_sets')
-        .select('id, title, difficulty, question_type, count, material_ids, created_at, updated_at')
-        .eq('course_id', courseId)
-        .order('created_at', { ascending: false });
+    const { data, error } = options?.includeQuestions
+      ? await supabase
+          .from('quiz_sets')
+          .select('id, title, difficulty, question_type, count, material_ids, questions, created_at, updated_at')
+          .eq('course_id', courseId)
+          .order('created_at', { ascending: false })
+      : await supabase
+          .from('quiz_sets')
+          .select('id, title, difficulty, question_type, count, material_ids, created_at, updated_at')
+          .eq('course_id', courseId)
+          .order('created_at', { ascending: false });
 
-  if (error) throw new Error(formatSupabaseError(error));
-  const quizSets = (data || []).map(toSavedQuizSet);
-  quizSetsCache.set(cacheKey, quizSets);
-  return quizSets;
+    if (error) throw new Error(formatSupabaseError(error));
+    const quizSets = (data || []).map(toSavedQuizSet);
+    quizSetsCache.set(cacheKey, quizSets);
+    return quizSets;
+  };
+
+  // 만료됐지만 stale 윈도우 안이면 일단 보여주고 백그라운드로 갱신한다(SWR).
+  const stale = quizSetsCache.getStale(cacheKey);
+  if (stale) {
+    quizSetsCache.revalidate(cacheKey, fetchList);
+    return stale;
+  }
+
+  return fetchList();
 }
 
 // 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
@@ -96,25 +107,37 @@ export async function countQuizSetsFromServer(course: string): Promise<number> {
   const cachedCount = quizSetsCountCache.get(cacheKey);
   if (cachedCount !== undefined) return cachedCount;
 
+  // 목록 캐시 파생은 fresh만 사용한다 — stale 목록에서 count를 만들어 set하면
+  // stale 데이터가 fresh로 승격되는 경로가 생긴다.
   const cachedList = quizSetsCache.get(`${course}::light`) ?? quizSetsCache.get(`${course}::full`);
   if (cachedList) {
     quizSetsCountCache.set(cacheKey, cachedList.length);
     return cachedList.length;
   }
 
-  const courseId = await getCourseId(course);
-  if (!courseId) return 0;
+  const fetchCount = async (): Promise<number> => {
+    const courseId = await getCourseId(course);
+    if (!courseId) return 0;
 
-  const { count, error } = await supabase
-    .from('quiz_sets')
-    .select('*', { count: 'exact', head: true })
-    .eq('course_id', courseId);
+    const { count, error } = await supabase
+      .from('quiz_sets')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', courseId);
 
-  if (error) throw new Error(formatSupabaseError(error));
+    if (error) throw new Error(formatSupabaseError(error));
 
-  const total = count ?? 0;
-  quizSetsCountCache.set(cacheKey, total);
-  return total;
+    const total = count ?? 0;
+    quizSetsCountCache.set(cacheKey, total);
+    return total;
+  };
+
+  const staleCount = quizSetsCountCache.getStale(cacheKey);
+  if (staleCount !== undefined) {
+    quizSetsCountCache.revalidate(cacheKey, fetchCount);
+    return staleCount;
+  }
+
+  return fetchCount();
 }
 
 export async function saveQuizSetToServer(

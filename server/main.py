@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import base64
+import hashlib
 import zipfile
 import shutil
 import subprocess
@@ -29,6 +30,8 @@ from markitdown import MarkItDown
 from pydantic import BaseModel, Field, model_validator
 
 from agent import run_study_agent, build_llm, build_openai_llm
+
+import convert_cache
 
 
 app = FastAPI()
@@ -898,7 +901,7 @@ def _collect_visual_inputs(file_path: str, suffix: str, force: bool = False) -> 
     return []
 
 
-def _visual_batches(items: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+def _visual_batches(items: list) -> list[list]:
     return [
         items[index:index + VISUAL_ANALYSIS_BATCH_SIZE]
         for index in range(0, len(items), VISUAL_ANALYSIS_BATCH_SIZE)
@@ -929,6 +932,63 @@ _VISUAL_SYSTEM_PROMPT = """너는 대학 강의자료의 이미지(슬라이드,
 - 한국어로 답한다."""
 
 
+# 변환 로직(텍스트 추출, _run_visual_llm의 사용자 프롬프트 문자열, 배치 구성 등)을 바꾸면
+# 반드시 수동으로 올릴 것 — 아래 지문은 env 설정과 시스템 프롬프트만 추적한다.
+CONVERT_PIPELINE_VERSION = "1"
+
+# 캐시 키에 들어가는 설정 지문. 프롬프트·모델·DPI 등이 바뀌면 키 공간이 통째로 갈려
+# 기존 캐시가 자동 무효화된다(모듈 로드 시 1회 계산).
+_CONVERT_CONFIG_FINGERPRINT = hashlib.sha256("|".join([
+    CONVERT_PIPELINE_VERSION,
+    _VISUAL_SYSTEM_PROMPT,
+    VISUAL_ANALYSIS_MODE,
+    VISUAL_ANALYSIS_MODEL,
+    VISUAL_ANALYSIS_GEMINI_MODEL,
+    VISUAL_ANALYSIS_OPENAI_MODEL,
+    str(VISUAL_ANALYSIS_MAX_ITEMS),
+    str(VISUAL_ANALYSIS_BATCH_SIZE),
+    str(VISUAL_CONTEXT_MAX_CHARS),
+    str(PDF_VISUAL_RENDER_DPI),
+    str(PDF_VISUAL_TEXT_PAGE_CHARS),
+]).encode("utf-8")).hexdigest()
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _file_cache_key(file_bytes: bytes, suffix: str) -> str:
+    return f"{hashlib.sha256(file_bytes).hexdigest()}|{suffix}|{_CONVERT_CONFIG_FINGERPRINT}"
+
+
+def _visual_item_cache_key(item: dict[str, str]) -> str:
+    # label 포함은 필수 — 캐시된 섹션 제목('## PDF N페이지')에서 페이지 마커(<!-- p.N -->)를
+    # 다시 심으므로, 같은 이미지라도 라벨이 다르면 다른 항목으로 취급해야 정합이 맞는다.
+    return "|".join([
+        _sha256_text(item["data_url"]),
+        _sha256_text(item.get("context") or ""),
+        item["label"],
+        _CONVERT_CONFIG_FINGERPRINT,
+    ])
+
+
+def _preview_cache_key(file_bytes: bytes, suffix: str) -> str:
+    # LibreOffice 교체 등으로 변환 결과가 달라지면 CONVERT_PIPELINE_VERSION을 올려 무효화한다.
+    return f"{hashlib.sha256(file_bytes).hexdigest()}|{suffix}|preview|{CONVERT_PIPELINE_VERSION}"
+
+
+def _visual_llm_ready() -> bool:
+    """_build_visual_llm과 동일한 API 키 체크만 수행한다(클라이언트 생성 없이).
+
+    키 부재로 시각 분석이 조용히 빠진 '열화' markdown을 캐시에 저장하지 않기 위한 판정용.
+    VISUAL_ANALYSIS_MODE가 off면 키가 없어도 저장 가능하다(off는 설정 지문에 들어 있어
+    모드를 켜면 자동으로 다른 키 공간이 된다).
+    """
+    if VISUAL_ANALYSIS_MODEL == "GPT":
+        return bool(os.getenv("OPENAI_API_KEY"))
+    return bool(os.getenv("GEMINI_API_KEY"))
+
+
 def _build_visual_llm():
     """시각 분석용 LLM을 만든다. 키가 없으면 None을 돌려 호출부가 분석을 건너뛰게 한다."""
     if VISUAL_ANALYSIS_MODEL == "GPT":
@@ -940,14 +1000,64 @@ def _build_visual_llm():
     return build_llm("Gemini", model_name=VISUAL_ANALYSIS_GEMINI_MODEL)
 
 
+_NO_CONTENT_SENTINEL = "유의미한 학습 내용 없음"
+
+
+def _split_visual_sections(text: str, labels: list[str]) -> list[str] | None:
+    """배치 응답을 라벨 제목 줄 기준으로 item별 섹션으로 나눈다.
+
+    각 라벨의 제목 줄을 앞에서부터 순차 탐색(이전 매치 끝 이후에서만 다음 라벨 검색)해,
+    전부 순서대로 발견될 때만 분리한다. 하나라도 실패하면 None(보수적 폴백 — 통짜 사용).
+    분리 성공 시 첫 제목 앞의 서두 텍스트는 버려진다 — 의도된 동작이며 모델 인사말
+    수준이라 손실이 없다.
+    """
+    positions: list[int] = []
+    cursor = 0
+    for label in labels:
+        match = re.compile(
+            rf"(?m)^#{{1,6}}\s+[^\n]*{re.escape(label)}[^\n]*$"
+        ).search(text, cursor)
+        if match is None:
+            return None
+        positions.append(match.start())
+        cursor = match.end()
+    ends = positions[1:] + [len(text)]
+    return [text[start:end].strip() for start, end in zip(positions, ends)]
+
+
+def _is_no_content_section(section: str) -> bool:
+    """제목 줄을 뺀 본문이 '유의미한 학습 내용 없음'뿐인 섹션인지 판별한다."""
+    body = "\n".join(
+        line for line in section.splitlines() if not line.lstrip().startswith("#")
+    ).strip()
+    return body == _NO_CONTENT_SENTINEL
+
+
 def _run_visual_llm(visual_inputs: list[dict[str, str]], shared_context: str = "") -> str:
     """이미지 목록을 시각 분석 모델에 보내 해석 결과(섹션들)를 합쳐 돌려준다."""
     llm = _build_visual_llm()
     if llm is None:
         return ""
 
-    sections: list[str] = []
-    for batch in _visual_batches(visual_inputs):
+    # shared_context가 없을 때(=PDF 페이지·단독 이미지)만 item 단위 캐시를 쓴다.
+    # PPTX는 본문 전체를 공통 맥락으로 줘 item이 자기 완결적이지 않으므로 제외.
+    # 캐시에는 페이지 마커 태깅 전 텍스트가 저장되지만, 태깅(_tag_visual_pdf_pages)은
+    # 호출부가 조립 결과에 매번 다시 적용하므로 안전하다.
+    use_item_cache = not shared_context
+    sections_by_index: dict[int, str] = {}
+    misses: list[tuple[int, dict[str, str]]] = []
+    if use_item_cache:
+        for index, item in enumerate(visual_inputs):
+            cached = convert_cache.get_visual_section(_visual_item_cache_key(item))
+            if cached is not None:
+                sections_by_index[index] = cached
+            else:
+                misses.append((index, item))
+    else:
+        misses = list(enumerate(visual_inputs))
+
+    for batch_pairs in _visual_batches(misses):
+        batch = [item for _, item in batch_pairs]
         content: list[dict[str, object]] = [{
             "type": "text",
             "text": (
@@ -978,10 +1088,25 @@ def _run_visual_llm(visual_inputs: list[dict[str, str]], shared_context: str = "
             HumanMessage(content=content),
         ])
         text = _message_content_to_text(response.content).strip()
-        if text and text != "유의미한 학습 내용 없음":
-            sections.append(text)
+        if not text or text == _NO_CONTENT_SENTINEL:
+            continue
+        if use_item_cache:
+            split_sections = _split_visual_sections(text, [item["label"] for item in batch])
+            if split_sections is not None:
+                for (index, item), section in zip(batch_pairs, split_sections):
+                    convert_cache.set_visual_section(_visual_item_cache_key(item), section)
+                    sections_by_index[index] = section
+                continue
+        # 분리 실패(또는 PPTX 공통 맥락 모드): 통짜 텍스트를 배치 첫 item 위치에 두고 저장하지 않는다.
+        sections_by_index[batch_pairs[0][0]] = text
 
-    return "\n\n".join(sections)
+    # '유의미한 학습 내용 없음' 섹션은 캐시에는 남기되(유효 결과 — 재변환 때 LLM 호출 절약)
+    # 출력에서는 제외한다(현행 배치 단위 스킵과 동등).
+    return "\n\n".join(
+        sections_by_index[index]
+        for index in sorted(sections_by_index)
+        if not _is_no_content_section(sections_by_index[index])
+    )
 
 
 def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = "") -> str:
@@ -1049,6 +1174,13 @@ async def convert_document_to_markdown(
             detail=f"문서 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 변환할 수 있습니다.",
         )
 
+    # 전역(사용자 무관) 캐시: 같은 수업 수강생들이 바이트 동일 강의자료를 올리는 구조라
+    # 해시 캐시 적중률이 높다. SQLite I/O는 threadpool로 감싸 이벤트 루프를 막지 않는다.
+    cache_key = _file_cache_key(file_bytes, suffix)
+    cached_markdown = await run_in_threadpool(convert_cache.get_markdown, cache_key)
+    if cached_markdown is not None:
+        return {"markdown": cached_markdown}
+
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(file_bytes)
         tmp_path = tmp.name
@@ -1057,15 +1189,25 @@ async def convert_document_to_markdown(
         if suffix in SUPPORTED_IMAGE_EXTENSIONS:
             # 1순위: 시각 분석 모델로 이미지를 읽고 해석한다(텍스트가 없는 그래프·도식도 처리).
             analysis = ""
+            analysis_failed = False
             try:
                 analysis = await run_in_threadpool(_analyze_uploaded_image, tmp_path)
             except Exception:
                 logger.exception("업로드 이미지 시각 분석 실패")
+                analysis_failed = True
             if analysis:
-                return {"markdown": f"# 이미지 분석 결과\n\n{analysis}"}
+                markdown = f"# 이미지 분석 결과\n\n{analysis}"
+                await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
+                return {"markdown": markdown}
             # 폴백: 시각 분석 키가 없거나 결과가 비면 기존 Tesseract OCR로 글자만 추출한다.
             text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
-            return {"markdown": f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."}
+            markdown = f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."
+            # 키 부재(열화)·분석 예외(일시 장애)로 폴백된 OCR-only 결과는 저장하지 않는다 —
+            # 키/장애 복구 후에도 TTL 동안 굳는 것을 막는다. 키가 있고 분석이 정상 수행됐다면
+            # '로고 → 유의미 없음 → OCR 폴백'도 유효한 결과이므로 저장한다(빈 결과는 제외).
+            if text and not analysis_failed and _visual_llm_ready():
+                await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
+            return {"markdown": markdown}
 
         # 1단계: 텍스트 레이어 추출 (PDF는 페이지 마커 포함)
         if suffix == ".pdf":
@@ -1079,13 +1221,22 @@ async def convert_document_to_markdown(
             result = await run_in_threadpool(md_converter.convert, tmp_path)
             base_markdown = (result.text_content or "").strip()
         visual_markdown = ""
+        visual_failed = False
         try:
             visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
         except Exception:
             logger.exception("이미지/손글씨 분석 실패")
             visual_markdown = "# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석을 완료하지 못했습니다."
+            visual_failed = True
         markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
-        return {"markdown": "\n\n---\n\n".join(markdown_parts)}
+        markdown = "\n\n---\n\n".join(markdown_parts)
+        # 시각 분석이 예외로 플레이스홀더가 됐거나, 분석이 필요한 자료인데 API 키 부재로
+        # 조용히 빠진 열화 결과는 저장하지 않는다(키 복구 후에도 TTL 동안 굳는 것 차단).
+        # 그 외(분석 완료·분석 대상 없음·모드 off)는 저장한다.
+        degraded = _should_analyze_visuals(base_markdown, suffix) and not _visual_llm_ready()
+        if not visual_failed and not degraded:
+            await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
+        return {"markdown": markdown}
     except Exception as e:
         logger.exception("/convert 처리 실패")
         raise HTTPException(status_code=500, detail="문서 변환 중 오류가 발생했습니다.") from e
@@ -1118,12 +1269,23 @@ async def convert_document_to_pdf_preview(
             headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
         )
 
+    # PPT/PPTX만 LibreOffice 변환을 거치므로 그 결과를 캐싱한다(수 MB 블롭 I/O는 threadpool로).
+    preview_key = _preview_cache_key(file_bytes, suffix)
+    cached_pdf = await run_in_threadpool(convert_cache.get_preview, preview_key)
+    if cached_pdf is not None:
+        return Response(
+            content=cached_pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
+        )
+
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
     try:
         pdf_bytes = await run_in_threadpool(_convert_presentation_to_pdf, tmp_path)
+        await run_in_threadpool(convert_cache.set_preview, preview_key, pdf_bytes)
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",

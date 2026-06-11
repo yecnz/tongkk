@@ -1,3 +1,4 @@
+import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
 import { invalidateMaterialsCache } from './materials';
 import { invalidateQuizSetsCache } from './quizSets';
 import { invalidateSummariesCache } from './summaries';
@@ -24,17 +25,17 @@ const toCourseRecord = (row: CourseRow): CourseRecord => ({
   updatedAt: new Date(row.updated_at).getTime(),
 });
 
-let _coursesCache: { data: CourseRecord[]; expiry: number } | null = null;
-const COURSES_CACHE_TTL = 30_000;
+// 과목 목록은 거의 모든 화면이 이름→id 변환에 쓴다 → fresh 30초 + stale 30분(SWR).
+const coursesCache = createTtlCache<CourseRecord[]>(30_000, SWR_STALE_TTL_MS);
+const COURSES_CACHE_KEY = 'courses';
 
 export function invalidateCoursesCache() {
-  _coursesCache = null;
+  coursesCache.invalidate();
 }
 
-export async function fetchCourses(): Promise<CourseRecord[]> {
-  if (_coursesCache && Date.now() < _coursesCache.expiry) {
-    return _coursesCache.data;
-  }
+const fetchCoursesFromServer = async (): Promise<CourseRecord[]> => {
+  // 로그아웃 직후의 백그라운드 revalidate에서는 이 호출이 throw할 수 있다 —
+  // revalidate()가 에러를 삼키므로 그대로 둔다.
   await requireSupabaseUser();
   const { data, error } = await supabase
     .from('courses')
@@ -43,8 +44,21 @@ export async function fetchCourses(): Promise<CourseRecord[]> {
 
   if (error) throw new Error(formatSupabaseError(error));
   const result = (data || []).map(toCourseRecord);
-  _coursesCache = { data: result, expiry: Date.now() + COURSES_CACHE_TTL };
+  coursesCache.set(COURSES_CACHE_KEY, result);
   return result;
+};
+
+export async function fetchCourses(): Promise<CourseRecord[]> {
+  const cached = coursesCache.get(COURSES_CACHE_KEY);
+  if (cached) return cached;
+
+  const stale = coursesCache.getStale(COURSES_CACHE_KEY);
+  if (stale) {
+    coursesCache.revalidate(COURSES_CACHE_KEY, fetchCoursesFromServer);
+    return stale;
+  }
+
+  return fetchCoursesFromServer();
 }
 
 export async function createCourse(name: string): Promise<CourseRecord> {
