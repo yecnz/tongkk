@@ -1756,6 +1756,26 @@ const SPLIT_ROW_HEIGHT = "calc(100vh - 180px)";
 const SPLIT_ROW_MIN_HEIGHT = 440;
 const TUTOR_SPLIT_STORAGE_KEY = "tongkk:summaryTutorSplit";
 
+// 자료별 '마지막에 본 요약' id를 기억해, 다음에 자료 상세로 들어올 때 그 요약을 먼저 보여준다.
+const LAST_SUMMARY_KEY = "tongkk-last-summary-by-material";
+const readLastSummaryId = (materialId: string): string => {
+  try {
+    const map = JSON.parse(localStorage.getItem(LAST_SUMMARY_KEY) || "{}") as Record<string, string>;
+    return map[materialId] || "";
+  } catch {
+    return "";
+  }
+};
+const writeLastSummaryId = (materialId: string, summaryId: string) => {
+  try {
+    const map = JSON.parse(localStorage.getItem(LAST_SUMMARY_KEY) || "{}") as Record<string, string>;
+    map[materialId] = summaryId;
+    localStorage.setItem(LAST_SUMMARY_KEY, JSON.stringify(map));
+  } catch {
+    /* localStorage 사용 불가 시 무시 */
+  }
+};
+
 // 요약 ↔ AI 튜터의 가로 점유 비율을 드래그로 조절하고 localStorage에 기억한다.
 // ratio는 왼쪽(요약/원본)이 차지하는 비율(0~1). 분할 컨테이너에 containerRef를 달아야 한다.
 const useTutorSplit = (initial = 0.62) => {
@@ -2054,7 +2074,11 @@ const MaterialDetailView = ({
             (attempt.quizSetId ? materialQuizSetIds.has(attempt.quizSetId) : false)
           )
           .sort((a, b) => b.createdAt - a.createdAt);
-        const defaultSummary = materialSummaries.find(summary => summary.template === "GENERAL") || materialSummaries[0];
+        // 마지막에 본 요약이 있으면 그걸 먼저, 없으면 일반 요약(GENERAL), 그것도 없으면 최신.
+        const lastViewedId = readLastSummaryId(material.id);
+        const defaultSummary = materialSummaries.find(summary => summary.id === lastViewedId)
+          || materialSummaries.find(summary => summary.template === "GENERAL")
+          || materialSummaries[0];
 
         setSummaries(materialSummaries);
         setQuizSets(materialQuizSets);
@@ -2072,6 +2096,11 @@ const MaterialDetailView = ({
       ignore = true;
     };
   }, [selectedCourse, material.id]);
+
+  // 사용자가 요약을 전환할 때마다 '마지막에 본 요약'으로 기억한다(다음 진입 시 그 요약을 먼저 보여줌).
+  useEffect(() => {
+    if (activeSummaryId) writeLastSummaryId(material.id, activeSummaryId);
+  }, [activeSummaryId, material.id]);
 
   const activeSummary = summaries.find(summary => summary.id === activeSummaryId) || summaries[0];
   const recentQuizAttempt = quizAttempts[0];
