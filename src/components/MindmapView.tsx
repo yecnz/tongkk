@@ -176,6 +176,7 @@ const DEPTH_COLORS = [
   { bg: "var(--color-tint-violet)", border: "color-mix(in srgb, var(--color-violet) 45%, transparent)", text: "var(--color-violet-deep)" },
   { bg: "var(--color-muted-surface)", border: "var(--color-border-soft)", text: "var(--color-text-strong)" },
   { bg: "var(--color-tint-cyan)", border: "color-mix(in srgb, var(--color-cyan) 38%, transparent)", text: "var(--color-cyan-deep)" },
+  { bg: "var(--color-surface)", border: "var(--color-border-soft)", text: "var(--color-text)" },
 ];
 
 const toolBtn: CSSProperties = {
@@ -443,7 +444,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }
       </svg>
 
       {nodes.map(node => {
-        const c = DEPTH_COLORS[Math.min(node.depth, 2)];
+        const c = DEPTH_COLORS[Math.min(node.depth, DEPTH_COLORS.length - 1)];
         return (
           <div
             key={node.id}
