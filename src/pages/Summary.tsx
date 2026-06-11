@@ -488,11 +488,17 @@ const formatExamCards = (sectionLines: string[]): string[] => {
   type Item = { question: string; answer: string[] };
   const items: Item[] = [];
   let cur: Item | null = null;
+  // '답:'은 **답:**(굵게)·전각 콜론(：) 변형도 답으로 인식해, 답이 새 질문으로 잘못 쪼개져
+  // 별도 박스로 분리되는 것을 막는다.
+  const ANSWER_LABEL = /^\*{0,2}\s*답\s*[:：]\s*\*{0,2}\s*/;
   for (const raw of sectionLines) {
-    const content = raw.replace(/^>\s*/, "").trim();
-    if (content.trim() === "") continue;
+    let content = raw.replace(/^>\s*/, "").trim();
+    if (content === "") continue;
+    // LLM이 가끔 질문 앞에 붙이는 '시험 포인트:' 라벨(굵게 포함)을 떼어낸다.
+    content = content.replace(/^\*{0,2}\s*시험\s*포인트\s*[:：]\s*\*{0,2}\s*/, "");
+    if (content === "") continue;
     const deBullet = content.replace(/^-\s*/, "");
-    const isAnswer = /^답\s*:/.test(deBullet);
+    const isAnswer = ANSWER_LABEL.test(deBullet);
     const isBullet = /^-\s*/.test(content);
     if (!isAnswer && !isBullet) {
       cur = { question: content, answer: [] };
@@ -520,12 +526,12 @@ const formatExamCards = (sectionLines: string[]): string[] => {
     out.push(`> ${question}`);
     if (answerLines.length) {
       out.push(">");
-      const labelIdx = answerLines.findIndex(a => /^답\s*:/.test(a));
+      const labelIdx = answerLines.findIndex(a => ANSWER_LABEL.test(a));
       const label = labelIdx >= 0 ? answerLines[labelIdx] : "답:";
       const points = answerLines.filter((_, k) => k !== labelIdx);
       // '답:' 라벨 줄에 답 내용이 같은 줄에 붙어 있으면(예: '답: RWM이다') 분리해서
       // '답:'은 라벨로만 두고 내용은 하위 bullet로 내린다. (단답·목록답 모두 같은 카드 형태로 통일)
-      const inlineAnswer = label.replace(/^답\s*:\s*/, "").trim();
+      const inlineAnswer = label.replace(ANSWER_LABEL, "").trim();
       if (inlineAnswer) points.unshift(inlineAnswer);
       out.push("> - 답:");               // '답:' (박스 안, 렌더 시 글머리 숨김)
       for (const p of points) out.push(`>   - ${p}`);  // 답 내용도 박스 안 중첩 리스트
