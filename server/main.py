@@ -307,6 +307,10 @@ class StudyPlanRequest(BaseModel):
     ddays: list[StudyPlanDday] = Field(default_factory=list)
     incomplete_plans: list[StudyPlanItem] = Field(default_factory=list)
     mode: Literal["balanced", "lighter", "harder", "assignment", "event", "reroll"] = "balanced"
+    # 콜드 스타트 대응 학습자 정보(선택). 없으면 기존과 동일하게 동작한다.
+    goal: Literal["exam", "assignment", "review"] | None = None
+    familiarity: Literal["new", "attended", "reviewed"] | None = None
+    daily_minutes: int | None = Field(default=None, ge=30, le=480)
 
 
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
@@ -346,12 +350,19 @@ STUDY_PLAN_SYSTEM_PROMPT = """너는 대학생의 마감 일정과 미완료 항
 - mode가 assignment면 과제 작업을 우선한다.
 - mode가 event면 일정 준비 작업을 우선한다.
 
+학습자 정보가 주어지면 다음을 반영한다:
+- goal이 exam이면 단순 읽기보다 스스로 떠올려 확인하는 작업(퀴즈 풀기, 오답 다시 보기, 핵심 개념 말로 설명해보기)을 우선한다.
+- familiarity가 new(처음 공부)면 초심자 루틴으로 쪼갠다: 요약이나 목차로 전체 훑어보기(10~15분) → 자료 정독(30~40분) → 퀴즈로 확인(15분) 순서를 지키고, 쉬운 단원부터 배치한다.
+- familiarity가 attended(수업은 들음)면 훑어보기는 짧게 줄이고 정독과 확인 위주로 짠다.
+- familiarity가 reviewed(한 번 복습함)면 다시 읽기보다 퀴즈·오답 같은 확인 작업 위주로 짠다.
+- daily_minutes가 주어지면 모든 항목의 minutes 합계가 그 값을 넘지 않게 한다.
+
 출력 형식:
 {"message":"짧은 한두 문장 안내","items":[{"text":"작업명","minutes":30,"source_id":"D-day id 또는 null","source_type":"assignment 또는 event 또는 carryover"}]}"""
 
 STUDY_PLAN_USER_PROMPT = """오늘 날짜: {today}
 조정 모드: {mode}
-
+{learner_section}
 [D-day 목록]
 {ddays_json}
 
@@ -1310,9 +1321,18 @@ async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_u
     if not req.ddays and not req.incomplete_plans:
         raise HTTPException(status_code=400, detail="D-day나 미완료 학습 계획이 필요합니다.")
 
+    learner_info = {
+        key: value
+        for key, value in (("goal", req.goal), ("familiarity", req.familiarity), ("daily_minutes", req.daily_minutes))
+        if value is not None
+    }
+    learner_section = (
+        f"\n[학습자 정보]\n{json.dumps(learner_info, ensure_ascii=False)}\n\n" if learner_info else "\n"
+    )
     prompt = STUDY_PLAN_USER_PROMPT.format(
         today=date.today().isoformat(),
         mode=req.mode,
+        learner_section=learner_section,
         ddays_json=json.dumps([item.model_dump() for item in req.ddays], ensure_ascii=False),
         incomplete_json=json.dumps([item.model_dump() for item in req.incomplete_plans], ensure_ascii=False),
     )

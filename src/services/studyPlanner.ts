@@ -22,6 +22,7 @@ export type Plan = {
   done: boolean;
   minutes?: number;
   sourceType?: DdayType | "carryover";
+  origin?: "manual" | "ai"; // 없으면 manual로 간주(하위호환).
   date?: string; // "YYYY-MM-DD". 없으면 "오늘"로 간주(하위호환).
 };
 

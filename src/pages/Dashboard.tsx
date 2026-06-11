@@ -8,7 +8,7 @@ import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, type Cou
 import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, countQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
-import { generateStudyPlan, type StudyPlanMode } from "../services/studyPlan";
+import { generateStudyPlan, type StudyPlanMode, type StudyPlanGoal, type StudyPlanFamiliarity } from "../services/studyPlan";
 import {
   isPaceSprint,
   paceCatchUpTarget,
@@ -490,6 +490,12 @@ export default function Dashboard() {
   const [studyPlanMessage, setStudyPlanMessage] = useState("");
   const [studyPlanLoading, setStudyPlanLoading] = useState(false);
   const [studyPlanError, setStudyPlanError] = useState("");
+  // AI 생성 직전의 계획 스냅샷. 있으면 "되돌리기" 버튼을 노출한다.
+  const [planUndoSnapshot, setPlanUndoSnapshot] = useState<{ plans: Plan[]; message: string } | null>(null);
+  // 콜드 스타트 대응: 학습 기록이 없어도 좋은 계획이 나오도록 사용자가 알려주는 학습 상태.
+  const [studyPlanGoal, setStudyPlanGoal] = useState<StudyPlanGoal>("exam");
+  const [studyPlanFamiliarity, setStudyPlanFamiliarity] = useState<StudyPlanFamiliarity>("attended");
+  const [studyPlanDailyMinutes, setStudyPlanDailyMinutes] = useState(60);
   const [editingPlanKey, setEditingPlanKey] = useState<string | null>(null);
   const [editingPlanText, setEditingPlanText] = useState("");
   const [openCourseMenu, setOpenCourseMenu] = useState<string | null>(null);
@@ -706,21 +712,46 @@ export default function Dashboard() {
       const selectedIncompletePlans = selectedPlanSources
         .map(source => source.plan)
         .filter((plan): plan is Plan => Boolean(plan));
-      const result = await generateStudyPlan(selectedDdays, selectedIncompletePlans, pendingStudyPlanMode);
+      const result = await generateStudyPlan(selectedDdays, selectedIncompletePlans, pendingStudyPlanMode, {
+        goal: studyPlanGoal,
+        familiarity: studyPlanFamiliarity,
+        dailyMinutes: studyPlanDailyMinutes,
+      });
+      // 되돌리기용 스냅샷(생성 직전 상태). 다음 생성 전까지 유지된다.
+      setPlanUndoSnapshot({ plans, message: studyPlanMessage });
       setStudyPlanMessage(result.message);
-      setPlans(result.items.map(item => ({
-        id: createClientId(),
-        text: `${item.text} ${item.minutes}분`,
-        done: false,
-        minutes: item.minutes,
-        sourceType: item.sourceType,
-      })));
+      // 직접 작성한 계획과 완료된 항목은 유지하고,
+      // 이전 AI 생성 미완료 항목과 이번에 소스로 넘긴 미완료 항목만 새 AI 계획으로 교체한다.
+      const replacedIds = new Set(selectedIncompletePlans.map(plan => plan.id).filter(Boolean));
+      const replacedRefs = new Set<Plan>(selectedIncompletePlans);
+      setPlans(prev => [
+        ...prev.filter(item => {
+          if (replacedRefs.has(item) || (item.id && replacedIds.has(item.id))) return false;
+          if (item.origin === "ai" && !item.done) return false;
+          return true;
+        }),
+        ...result.items.map(item => ({
+          id: createClientId(),
+          text: `${item.text} ${item.minutes}분`,
+          done: false,
+          minutes: item.minutes,
+          sourceType: item.sourceType,
+          origin: "ai" as const,
+        })),
+      ]);
       setShowPlanSourcePicker(false);
     } catch (err) {
       setStudyPlanError(err instanceof Error ? err.message : "학습 계획 생성 실패");
     } finally {
       setStudyPlanLoading(false);
     }
+  };
+
+  const undoStudyPlan = () => {
+    if (!planUndoSnapshot) return;
+    setPlans(planUndoSnapshot.plans);
+    setStudyPlanMessage(planUndoSnapshot.message);
+    setPlanUndoSnapshot(null);
   };
 
   const deleteDday = (target: Dday) => {
@@ -1079,7 +1110,22 @@ export default function Dashboard() {
                 </button>
               </div>
               {studyPlanMessage ? (
-                <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>{studyPlanMessage}</p>
+                <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
+                  {studyPlanMessage}
+                  {planUndoSnapshot && (
+                    <button
+                      type="button"
+                      onClick={undoStudyPlan}
+                      style={{
+                        marginLeft: 8, padding: "2px 8px", borderRadius: 999,
+                        border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
+                        color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 11, fontWeight: 750,
+                      }}
+                    >
+                      되돌리기
+                    </button>
+                  )}
+                </p>
               ) : (
                 <p style={{ margin: "0 0 12px", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                   D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
@@ -1159,8 +1205,11 @@ export default function Dashboard() {
                   marginBottom: 14, padding: 12, borderRadius: 12,
                   border: "1px solid #eef7f9", background: "#fbfeff",
                 }}>
-                  <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "var(--color-text)" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 13, lineHeight: 1.55, color: "var(--color-text)" }}>
                     {planSourceMessage}
+                  </p>
+                  <p style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
+                    직접 작성한 계획은 그대로 유지되고, 선택한 미완료 항목과 이전 AI 계획만 새로 짜드려요.
                   </p>
                   {([
                     { title: "남아있는 학습계획", sources: carryoverPlanSources },
@@ -1194,6 +1243,63 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )
+                  ))}
+                  {([
+                    {
+                      title: "공부 목표",
+                      value: studyPlanGoal,
+                      set: (v: string) => setStudyPlanGoal(v as StudyPlanGoal),
+                      options: [
+                        { label: "시험 대비", value: "exam" },
+                        { label: "과제", value: "assignment" },
+                        { label: "평소 복습", value: "review" },
+                      ],
+                    },
+                    {
+                      title: "지금 상태",
+                      value: studyPlanFamiliarity,
+                      set: (v: string) => setStudyPlanFamiliarity(v as StudyPlanFamiliarity),
+                      options: [
+                        { label: "처음 봐요", value: "new" },
+                        { label: "수업은 들었어요", value: "attended" },
+                        { label: "복습해 봤어요", value: "reviewed" },
+                      ],
+                    },
+                    {
+                      title: "하루 공부 시간",
+                      value: String(studyPlanDailyMinutes),
+                      set: (v: string) => setStudyPlanDailyMinutes(Number(v)),
+                      options: [
+                        { label: "30분", value: "30" },
+                        { label: "1시간", value: "60" },
+                        { label: "2시간+", value: "120" },
+                      ],
+                    },
+                  ] as const).map(question => (
+                    <div key={question.title} style={{ marginBottom: 12 }}>
+                      <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 850, color: "var(--color-muted)" }}>{question.title}</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                        {question.options.map(option => {
+                          const selected = question.value === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => question.set(option.value)}
+                              style={{
+                                padding: "6px 9px", borderRadius: 999,
+                                border: `1px solid ${selected ? CYAN : "var(--color-border-soft)"}`,
+                                background: selected ? "var(--color-tint-cyan)" : "var(--color-card)",
+                                color: selected ? CYAN : "var(--color-text-secondary)",
+                                cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
+                              }}
+                            >
+                              {selected ? "✓ " : ""}{option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button
@@ -1285,6 +1391,13 @@ export default function Dashboard() {
                               lineHeight: 1.45, wordBreak: "break-word",
                             }}
                           >
+                            {p.origin === "ai" && (
+                              <span style={{
+                                display: "inline-block", marginRight: 6, padding: "1px 6px", borderRadius: 999,
+                                background: "var(--color-tint-cyan)", color: CYAN, fontSize: 10, fontWeight: 850,
+                                verticalAlign: "1px", textDecoration: "none",
+                              }}>AI</span>
+                            )}
                             {p.text}
                           </button>
                         )}

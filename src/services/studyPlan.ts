@@ -2,6 +2,15 @@ import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type StudyPlanMode = 'balanced' | 'lighter' | 'harder' | 'assignment' | 'event' | 'reroll';
 
+// 콜드 스타트 대응: 학습 기록이 없어도 좋은 계획을 짜도록 사용자가 알려주는 학습 상태.
+export type StudyPlanGoal = 'exam' | 'assignment' | 'review';
+export type StudyPlanFamiliarity = 'new' | 'attended' | 'reviewed';
+export type StudyPlanContext = {
+  goal: StudyPlanGoal;
+  familiarity: StudyPlanFamiliarity;
+  dailyMinutes: number;
+};
+
 export type StudyPlanDday = {
   id?: string;
   type?: 'assignment' | 'event';
@@ -32,6 +41,7 @@ export async function generateStudyPlan(
   ddays: StudyPlanDday[],
   incompletePlans: StudyPlanCarryover[],
   mode: StudyPlanMode,
+  context?: StudyPlanContext,
 ): Promise<GeneratedStudyPlan> {
   const response = await fetch(`${BACKEND_URL}/study-plan`, {
     method: 'POST',
@@ -45,6 +55,9 @@ export async function generateStudyPlan(
       })),
       incomplete_plans: incompletePlans,
       mode,
+      goal: context?.goal,
+      familiarity: context?.familiarity,
+      daily_minutes: context?.dailyMinutes,
     }),
   });
 
