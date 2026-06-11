@@ -841,6 +841,39 @@ const SummaryLoadingOverlay = ({ loadingStep }: { loadingStep?: string }) => {
   );
 };
 
+// 새로고침 복원 중 보여줄 스켈레톤. 자료 상세 화면(헤더·탭·본문)의 뼈대를 회색 박스로 흉내내,
+// 빈 화면 깜빡임 없이 "곧 자료가 뜬다"는 인상을 준다. pulse 애니메이션으로 은은하게 깜빡인다.
+const RestoreSkeleton = () => {
+  const sk = (style: CSSProperties) => (
+    <div style={{ background: "var(--color-muted-surface)", borderRadius: 8, animation: "tk-skeleton-pulse 1.2s ease-in-out infinite", ...style }} />
+  );
+  return (
+    <>
+      <style>{`@keyframes tk-skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }`}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)" }}>
+        {sk({ width: 190, height: 22 })}
+        {sk({ width: 110, height: 34, marginLeft: "auto", borderRadius: 10 })}
+        {sk({ width: 110, height: 34, borderRadius: 10 })}
+      </div>
+      <div style={{ maxWidth: 1480, margin: "0 auto", padding: "18px 20px" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {sk({ flex: 1, height: 44, borderRadius: 12 })}
+          {sk({ flex: 1, height: 44, borderRadius: 12 })}
+          {sk({ flex: 1, height: 44, borderRadius: 12 })}
+        </div>
+        <div style={{ border: `1px solid ${BORDER_COLOR}`, borderRadius: 14, padding: 24 }}>
+          {sk({ width: "35%", height: 22, marginBottom: 18 })}
+          {sk({ width: "100%", height: 13, marginBottom: 12 })}
+          {sk({ width: "96%", height: 13, marginBottom: 12 })}
+          {sk({ width: "90%", height: 13, marginBottom: 12 })}
+          {sk({ width: "78%", height: 13, marginBottom: 12 })}
+          {sk({ width: "86%", height: 13 })}
+        </div>
+      </div>
+    </>
+  );
+};
+
 const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewProps) => {
   const [pageRange, setPageRange] = useState("");
   const [focusPrompt, setFocusPrompt] = useState("");
@@ -3029,6 +3062,8 @@ export default function Summary() {
   // 초기 view를 URL의 view와 일치시킨다. upload로 시작하면 복원되기 전에 URL 동기화가
   // 새로고침 URL(view=material 등)을 upload로 덮어써, 복원에 쓸 material id가 날아간다.
   const [view, setView] = useState<SummaryView>(restoreFromUrl && urlView ? urlView : "upload");
+  // 새로고침(URL 복원) 시 자료를 불러오는 동안 스켈레톤(콘텐츠 뼈대)을 보여준다. 복원이 끝나면 끈다.
+  const [restoringFromUrl, setRestoringFromUrl] = useState(restoreFromUrl);
   // 요약 안내 팝업 '다시 보지 않기' 설정은 계정별(Supabase 프로필)로 저장한다.
   // 로드 전에는 true(숨김)로 두어, 불러오기 전에 팝업이 깜빡이지 않게 한다.
   const [hideSummaryNoticePref, setHideSummaryNoticePref] = useState(true);
@@ -3268,6 +3303,9 @@ export default function Summary() {
       })
       .catch(error => {
         setExtractError(error instanceof Error ? error.message : "강의자료 불러오기 실패");
+      })
+      .finally(() => {
+        if (!ignore) setRestoringFromUrl(false);
       });
 
     return () => {
@@ -3834,6 +3872,12 @@ export default function Summary() {
 
   return (
     <div className="tongkk-soft-surface" style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      {/* 새로고침 복원 중 — 빈 화면 대신 자료 상세 모양의 스켈레톤을 덮어 덜 답답하게 한다. */}
+      {restoringFromUrl && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: PAGE_BACKGROUND, overflowY: "auto" }}>
+          <RestoreSkeleton />
+        </div>
+      )}
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {showMultiSummaryNotice && view === "upload" && (
         <div
