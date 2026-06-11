@@ -916,7 +916,7 @@ export default function Quiz() {
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
         <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
-        <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
+        <div className="app-container narrow">
           <button onClick={handleCourseBack} style={{
             background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
           }}>← 돌아가기</button>

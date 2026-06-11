@@ -277,7 +277,7 @@ export default function MyPage() {
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
-      <div style={{ padding: 24, maxWidth: 860, margin: "0 auto" }}>
+      <div className="app-container narrow">
         {/* 상단: 프로필 (왼) + 앱 설정 (오) */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20, alignItems: "start" }}>
           {/* 프로필 */}

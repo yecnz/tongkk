@@ -764,7 +764,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      <div className="summary-template-grid">
         {templates.map(t => (
           <Card key={t.key} style={{ padding: 0, overflow: "hidden" }}>
             <button onClick={() => onSelect(t.key, { pageRange, focusPrompt })} style={{
@@ -1221,10 +1221,11 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             <strong>요약 실패:</strong> {error}
           </div>
         ) : (
-          <div style={{
+          <div className="summary-result-grid" style={{
             display: "grid",
             // 마인드맵일 때는 AI 튜터가 마인드맵과 같은 화면 비율(50:50)을 차지하도록 두 칸을 동일하게,
             // 텍스트 요약일 때는 읽기 폭 유지를 위해 기존처럼 튜터를 고정 400px로 둔다.
+            // ~768px에선 .summary-result-grid(src/index.css)가 1열로 강제한다.
             gridTemplateColumns: isResultExpanded
               ? "minmax(0, 1fr)"
               : isTutorOpen
@@ -2492,7 +2493,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
       }}>← 돌아가기</button>
       <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>퀴즈 생성</h2>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+      <div className="summary-quizcreate-grid">
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border-soft)" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)" }}>요약된 파일 미리보기</span>
@@ -3496,11 +3497,11 @@ export default function Summary() {
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
       </div>
 
-      <div style={{
-        padding: view === "summaryResult" || view === "materialDetail" ? "18px 20px" : 24,
-        maxWidth: view === "summaryResult" || view === "materialDetail" ? 1480 : 1100,
-        margin: "0 auto",
-      }}>
+      <div
+        className={view === "summaryResult" || view === "materialDetail" ? "app-container wide" : "app-container"}
+        // 넓은 뷰(요약 결과·자료 상세)는 기존의 더 촘촘한 여백을 유지한다(인라인이 클래스보다 우선).
+        style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
+      >
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}

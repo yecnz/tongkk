@@ -56,8 +56,8 @@ export const SidebarIcon = () => (
   </svg>
 );
 
-// 피드백 보내기 버튼의 종이비행기 아이콘
-const PaperPlaneIcon = () => (
+// 피드백 보내기 버튼의 종이비행기 아이콘 (사이드바·대시보드 헤더 공용)
+export const PaperPlaneIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 2 11 13" />
     <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
@@ -72,9 +72,11 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
     return () => document.body.classList.remove("tongkk-sidebar-open");
   }, []);
 
+  // height:100vh 대신 top/bottom 0 — #root에 zoom이 걸려 있어 100vh는 축소되지만
+  // 뷰포트 모서리 기준 offset은 zoom과 무관하게 전체 높이를 채운다(정의: src/index.css).
   return (
     <div className="tongkk-sidebar" style={{
-      position: "fixed", top: 0, left: 0, width: 240, height: "100vh",
+      position: "fixed", top: 0, left: 0, bottom: 0, width: 240,
       background: CARD_BACKGROUND, borderRight: `1px solid ${BORDER_COLOR}`, zIndex: 100,
       display: "flex", flexDirection: "column", padding: "24px 0",
       boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"

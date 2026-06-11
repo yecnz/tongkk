@@ -13,6 +13,7 @@ import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
+import UpdatePrompt from "./UpdatePrompt";
 
 function ProtectedApp() {
   const { user, loading } = useAuth();
@@ -74,6 +75,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      <UpdatePrompt />
     </ToastProvider>
   );
 }

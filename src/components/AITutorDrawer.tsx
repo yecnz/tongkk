@@ -530,13 +530,16 @@ export const AITutorDrawer = ({
           }}
         />
       )}
+      {/* fixed 드로어 높이는 100vh 대신 top/bottom 고정 — #root zoom 하에서 100vh는 축소돼
+          하단이 비기 때문. 뷰포트 모서리 offset은 zoom과 무관하게 전체 높이를 채운다. */}
       <aside style={{
         position: layout === "embedded" ? "relative" : "fixed",
         top: layout === "embedded" ? "auto" : isExpanded ? 24 : 0,
+        bottom: layout === "embedded" ? "auto" : isExpanded ? 24 : 0,
         left: layout === "embedded" ? undefined : isExpanded ? "50%" : undefined,
         right: layout === "embedded" ? "auto" : isExpanded ? "auto" : 0,
         width: layout === "embedded" ? "100%" : isExpanded ? "min(1080px, calc(100vw - 48px))" : "min(420px, 100vw)",
-        height: layout === "embedded" ? (embeddedHeight ?? (fill ? "100%" : 1100)) : isExpanded ? "calc(100vh - 48px)" : "100vh",
+        height: layout === "embedded" ? (embeddedHeight ?? (fill ? "100%" : 1100)) : undefined,
         minHeight: layout === "embedded" ? (embeddedHeight ?? (fill ? 0 : 1100)) : undefined,
         zIndex: layout === "embedded" ? "auto" : isExpanded ? 260 : 190,
         border: "1px solid var(--color-border-soft)",
@@ -549,7 +552,7 @@ export const AITutorDrawer = ({
         background: "var(--color-card)",
         boxShadow: layout === "embedded" ? "none" : isExpanded ? "0 24px 80px rgba(0,0,0,0.22)" : isOpen ? "-18px 0 44px rgba(0,0,0,0.16)" : "none",
         transform: layout === "embedded" ? "translateX(0)" : isExpanded ? "translateX(-50%)" : isOpen ? "translateX(0)" : "translateX(104%)",
-        transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease, width 0.18s ease, height 0.18s ease",
+        transition: layout === "embedded" ? "none" : "transform 0.22s ease, box-shadow 0.22s ease, width 0.18s ease, top 0.18s ease, bottom 0.18s ease",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>AI 튜터</h3>
