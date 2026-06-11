@@ -11,11 +11,12 @@ import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import {
   deleteSummariesByMaterialId,
+  deleteSummaryById,
   loadSummariesFromServer,
   saveSummaryToServer,
   type SavedSummary,
 } from "../services/summaries";
-import { loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
+import { deleteQuizSetById, loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer, type SavedQuizAttempt } from "../services/quizAttempts";
 import { MindmapView } from "../components/MindmapView";
 import { parseMindmapJson } from "../components/mindmapData";
@@ -1683,6 +1684,7 @@ const MaterialDetailView = ({
   const [showSummaryList, setShowSummaryList] = useState(false);
   // 퀴즈 탭에서 카드를 눌러 펼친 퀴즈 세트(최신 풀이 채점 이력 표시)
   const [expandedQuizSetId, setExpandedQuizSetId] = useState<string | null>(null);
+  const { showToast } = useToast();
   const lowerMaterialName = material.name.toLowerCase();
   // 드래그해서 질문한 본문 구절의 위치. 튜터를 닫을 때 그 자리로 스크롤을 되돌린다.
   const dragAnchorRef = useRef<DragAnchor | null>(null);
@@ -1857,6 +1859,35 @@ const MaterialDetailView = ({
     if (attempt.quizSetId && !map.has(attempt.quizSetId)) map.set(attempt.quizSetId, attempt);
     return map;
   }, new Map());
+
+  const handleDeleteSummary = async (summary: SavedSummary) => {
+    if (!summary.id) return;
+    if (!window.confirm(`'${templateLabels[summary.template]}' 요약을 삭제할까요?\n연결된 AI 튜터 대화도 함께 삭제됩니다.`)) return;
+    try {
+      await deleteSummaryById(selectedCourse, summary.id);
+      const next = summaries.filter(item => item.id !== summary.id);
+      setSummaries(next);
+      if (activeSummaryId === summary.id) {
+        const fallback = next.find(item => item.template === "GENERAL") || next[0];
+        setActiveSummaryId(fallback?.id || "");
+      }
+      showToast("요약을 삭제했습니다.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "요약 삭제에 실패했습니다.", "error");
+    }
+  };
+
+  const handleDeleteQuizSet = async (quizSet: SavedQuizSet) => {
+    if (!window.confirm(`'${quizSet.title}' 퀴즈를 삭제할까요?`)) return;
+    try {
+      await deleteQuizSetById(selectedCourse, quizSet.id);
+      setQuizSets(prev => prev.filter(item => item.id !== quizSet.id));
+      setExpandedQuizSetId(prev => (prev === quizSet.id ? null : prev));
+      showToast("퀴즈를 삭제했습니다.", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "퀴즈 삭제에 실패했습니다.", "error");
+    }
+  };
   const hasSummaries = summaries.length > 0;
   const hasQuizSets = quizSets.length > 0;
   const hasLowRecentScore = Boolean(recentQuizAttempt && recentQuizAttempt.scorePercent < LOW_QUIZ_SCORE_THRESHOLD);
@@ -2251,24 +2282,48 @@ const MaterialDetailView = ({
                 {showSummaryList && !isSummaryTutorExpanded && (
                   <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (
-                      <button
-                        key={summary.id || `${summary.template}-${summary.createdAt}`}
-                        type="button"
-                        onClick={() => setActiveSummaryId(summary.id || "")}
-                        style={{
-                          padding: "12px 13px",
-                          borderRadius: 10,
-                          border: activeSummary?.id === summary.id ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
-                          background: activeSummary?.id === summary.id ? "var(--color-tint-pink)" : "var(--color-card)",
-                          color: activeSummary?.id === summary.id ? PINK : "var(--color-text)",
-                          textAlign: "left",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
-                        <span style={{ display: "block", fontSize: 11, color: "var(--color-muted)" }}>{formatHubDate(summary.createdAt)}</span>
-                      </button>
+                      <div key={summary.id || `${summary.template}-${summary.createdAt}`} style={{ position: "relative", flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveSummaryId(summary.id || "")}
+                          style={{
+                            width: "100%",
+                            padding: "12px 34px 12px 13px",
+                            borderRadius: 10,
+                            border: activeSummary?.id === summary.id ? "1px solid color-mix(in srgb, var(--color-pink) 33%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                            background: activeSummary?.id === summary.id ? "var(--color-tint-pink)" : "var(--color-card)",
+                            color: activeSummary?.id === summary.id ? PINK : "var(--color-text)",
+                            textAlign: "left",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <strong style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{templateLabels[summary.template]}</strong>
+                          <span style={{ display: "block", fontSize: 11, color: "var(--color-muted)" }}>{formatHubDate(summary.createdAt)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); handleDeleteSummary(summary); }}
+                          aria-label={`${templateLabels[summary.template]} 요약 삭제`}
+                          title="삭제"
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            right: 8,
+                            width: 22,
+                            height: 22,
+                            borderRadius: 6,
+                            border: `1px solid ${BORDER_COLOR}`,
+                            background: "var(--color-card)",
+                            color: "var(--color-muted)",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            lineHeight: "20px",
+                            padding: 0,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                     <button
                       type="button"
@@ -2388,9 +2443,20 @@ const MaterialDetailView = ({
                             {latestAttempt && <span style={{ color: CYAN }}>{isExpanded ? "풀이 이력 접기 ▴" : "풀이 이력 보기 ▾"}</span>}
                           </div>
                         </div>
-                        <button onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ flexShrink: 0, padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
-                          {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
-                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <button onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ padding: "10px 14px", borderRadius: 9, border: "none", background: CYAN, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                            {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); handleDeleteQuizSet(quizSet); }}
+                            aria-label={`${quizSet.title} 퀴즈 삭제`}
+                            title="삭제"
+                            style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 16, lineHeight: "32px", padding: 0 }}
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                       {isExpanded && latestAttempt && (
                         <div style={{ marginTop: 14, borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: 14, display: "grid", gap: 12 }}>

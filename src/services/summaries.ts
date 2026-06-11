@@ -133,6 +133,14 @@ export async function deleteSummariesByMaterialId(course: string, materialId: st
   invalidateSummariesCache(course);
 }
 
+// 요약 한 건을 id로 삭제한다. RLS로 본인 행만 지워지며, 연결된 summary_chat_sessions는
+// schema의 on delete cascade로 함께 삭제된다.
+export async function deleteSummaryById(course: string, id: string): Promise<void> {
+  const { error } = await supabase.from('summaries').delete().eq('id', id);
+  if (error) throw new Error(formatSupabaseError(error));
+  invalidateSummariesCache(course);
+}
+
 const sortedIds = (ids: string[]) => [...ids].sort();
 const sameIds = (a: string[], b: string[]) => {
   const sa = sortedIds(a), sb = sortedIds(b);
