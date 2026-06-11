@@ -262,6 +262,34 @@ const clearSummaryViewDetail = () => {
   }
 };
 
+// 마지막으로 사용한 요약 템플릿을 기억해 다음 생성의 기본값으로 쓴다.
+const LAST_SUMMARY_TEMPLATE_KEY = "tongkk:lastSummaryTemplate";
+const readLastSummaryTemplate = (): SummaryTemplate => {
+  try {
+    const raw = localStorage.getItem(LAST_SUMMARY_TEMPLATE_KEY);
+    return raw && raw in templateLabels ? (raw as SummaryTemplate) : "GENERAL";
+  } catch {
+    return "GENERAL";
+  }
+};
+const writeLastSummaryTemplate = (template: SummaryTemplate) => {
+  try {
+    localStorage.setItem(LAST_SUMMARY_TEMPLATE_KEY, template);
+  } catch {
+    // noop
+  }
+};
+
+// '반영할 페이지'는 변환 시점에 심는 페이지 마커(<!-- p.N -->, <!-- Slide number: N -->)에
+// 의존한다. 마커가 없는(기능 추가 전 변환된) 자료는 페이지 선택이 동작하지 않는다.
+const PAGE_MARKER_PATTERN = /<!--\s*(?:p\.|Slide number:\s*)\d+\s*-->/;
+const hasPageMarkers = (markdown: string) => PAGE_MARKER_PATTERN.test(markdown);
+
+// 기본 선택 자료: 전체가 아니라 가장 최근 업로드 1개. 여러 자료를 한 번에 요약하면
+// 출력 한도 때문에 내용이 줄어들어, 앱 스스로도 한 개씩 요약을 권장한다.
+const latestMaterialIds = (list: CourseMaterial[]) =>
+  list.length === 0 ? [] : [list.reduce((latest, item) => (item.updatedAt > latest.updatedAt ? item : latest)).id];
+
 const summaryData: Record<SummaryTemplate, SummarySample> = {
   GENERAL: {
     title: "일반 요약",
@@ -1218,6 +1246,9 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
             <p style={{ margin: 0, fontSize: 14, color: "var(--color-muted)" }}>
               {loadingStep || "처리 중..."}
+            </p>
+            <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-muted)", opacity: 0.8 }}>
+              기다리지 않고 다른 화면으로 이동해도 돼요. 완성되면 알려드릴게요.
             </p>
           </div>
         ) : error ? (
@@ -2707,6 +2738,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const locationState = (location.state as LocationState) || null;
   const isInitialRouteEntryRef = useRef(isInitialRouteEntry(location.key));
@@ -2832,12 +2864,18 @@ export default function Summary() {
   const [loadingStep, setLoadingStep] = useState("");
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  // 과목의 기존 요약 목록 — 자료별 "요약 N" 배지와 중복 생성 확인에 쓴다.
+  const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<CourseMaterial | null>(null);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   // 요약 진입 화면의 "요약 설정"(퀴즈 설정처럼)에서 고른 값. 하단 "요약 생성하기"가 이 값으로 바로 생성한다.
-  const [summaryTemplate, setSummaryTemplate] = useState<SummaryTemplate>("GENERAL");
+  const [summaryTemplate, setSummaryTemplate] = useState<SummaryTemplate>(readLastSummaryTemplate);
   const [summaryPageRange, setSummaryPageRange] = useState("");
   const [summaryFocusPrompt, setSummaryFocusPrompt] = useState("");
+  // 페이지 범위·집중 내용은 선택 입력이라 기본으로 접어둔다.
+  const [showSummaryAdvanced, setShowSummaryAdvanced] = useState(false);
+  // 같은 자료·템플릿 요약이 이미 있을 때 "기존 요약 보기 / 새로 생성"을 묻는 모달.
+  const [duplicateSummaryPrompt, setDuplicateSummaryPrompt] = useState<SavedSummary | null>(null);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
   const [activeMaterialTab, setActiveMaterialTab] = useState<MaterialDetailTab>("original");
   const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
@@ -2855,6 +2893,10 @@ export default function Summary() {
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
   // 마지막 요약 생성 인자 — 실패 시 재시도용.
   const lastSummaryArgsRef = useRef<{ template: SummaryTemplate; opts?: { pageRange?: string; focusPrompt?: string }; backView: SummaryView } | null>(null);
+  // 요약 생성은 화면을 떠나도 계속 진행된다. 완료 시점에 사용자가 결과 화면을 보고
+  // 있는지(viewRef), 아예 다른 페이지로 떠났는지(isMountedRef)를 보고 토스트로 알린다.
+  const viewRef = useRef<SummaryView>("upload");
+  const isMountedRef = useRef(true);
   // templates(템플릿 선택) 화면에서 "돌아가기" 시 돌아갈 화면.
   // 자료 상세에서 진입하면 materialDetail, 그 외에는 upload(과목 자료)로 돌아간다.
   const [templatesBackView, setTemplatesBackView] = useState<SummaryView>("upload");
@@ -2863,6 +2905,10 @@ export default function Summary() {
   );
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
+  // 선택 자료에 페이지 마커가 하나도 없으면 '반영할 페이지'가 동작하지 않으므로 입력을 막고 안내한다.
+  const selectedHasPageMarkers = selectedMaterials.some(material => hasPageMarkers(material.markdown));
+  // 페이지 범위·집중 내용이 입력된 채 접혀 있으면 접힘 버튼 옆에 "적용 중"을 표시한다.
+  const summaryAdvancedActive = Boolean((selectedHasPageMarkers && summaryPageRange.trim()) || summaryFocusPrompt.trim());
   // 페이지 범위 입력 힌트는 자료가 하나일 때만 명확하므로 그 경우에만 보여준다.
   const summaryPageHint = selectedMaterials.length === 1
     ? (selectedMaterials[0].pages
@@ -2875,6 +2921,17 @@ export default function Summary() {
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
+
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!locationState?.openSummary && !locationState?.viewMaterial && !locationState?.createSummary) return;
@@ -2894,9 +2951,10 @@ export default function Summary() {
       loadCourseMaterialsFromServer(selectedCourse, { includeMarkdown: true }),
       loadSummariesFromServer(selectedCourse, { includeContent: true }),
     ])
-      .then(([nextMaterials, summaries]) => {
+      .then(([nextMaterials, nextSummaries]) => {
         if (ignore) return;
         setMaterials(nextMaterials);
+        setSummaries(nextSummaries);
         const pendingMaterialId = pendingMaterialIdRef.current;
         if (pendingMaterialId) {
           pendingMaterialIdRef.current = "";
@@ -2924,7 +2982,7 @@ export default function Summary() {
           pendingCreateSummaryRef.current = false;
           const validMaterialIds = pendingMaterialIdsRef.current.filter(id => nextMaterials.some(material => material.id === id));
           pendingMaterialIdsRef.current = [];
-          setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : nextMaterials.map(material => material.id));
+          setSelectedMaterialIds(validMaterialIds.length > 0 ? validMaterialIds : latestMaterialIds(nextMaterials));
           setSelectedTemplate(null);
           setActiveSummaryId(null);
           setSummaryText("");
@@ -2942,7 +3000,7 @@ export default function Summary() {
         const pendingSummary = pendingSummaryRef.current;
         if (pendingSummary) {
           pendingSummaryRef.current = null;
-          const matchingSummaries = summaries
+          const matchingSummaries = nextSummaries
             .filter(item =>
               (pendingSummary.id && item.id === pendingSummary.id) ||
               (
@@ -2987,7 +3045,7 @@ export default function Summary() {
           const validPreviousIds = prev.filter(id => nextMaterials.some(material => material.id === id));
           return validPreviousIds.length > 0
             ? validPreviousIds
-            : nextMaterials.map(material => material.id);
+            : latestMaterialIds(nextMaterials);
         });
 
         // URL에서 자료 목록을 복원하거나, 자료 상세·요약 복원이 실패한 경우(자료 삭제 등)의 안전 착지.
@@ -3325,6 +3383,8 @@ export default function Summary() {
       ]);
       setMaterials(nextMaterials);
       setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
+      // 자료와 함께 지워진 요약을 목록에서도 빼 "요약 N" 배지를 맞춘다.
+      setSummaries(prev => prev.filter(summary => !summary.materialIds?.includes(material.id)));
       setFiles(prev => {
         const nextFiles = prev.filter(file =>
           getFileMaterialId(file) !== material.id &&
@@ -3341,6 +3401,7 @@ export default function Summary() {
   const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates") => {
     // 실패 시 "같은 설정으로 다시 시도"가 마지막 생성 인자를 그대로 재사용한다.
     lastSummaryArgsRef.current = { template, opts, backView };
+    writeLastSummaryTemplate(template);
     setSelectedTemplate(template);
     setSummaryPages(opts?.pageRange || ""); // 요약에 쓴 페이지 범위를 보관해 튜터의 원본 본문도 같은 범위로 좁힌다.
     setSummaryError("");
@@ -3355,32 +3416,76 @@ export default function Summary() {
       setElapsedTime(null);
       setAgentThreadId("");
       setResultBackView(backView);
+      // 완료 토스트의 "보러 가기"가 페이지 재진입 후 이 요약을 다시 열 수 있도록 생성 인자를 붙잡아 둔다.
+      const generatedMaterialIds = [...selectedMaterialIds];
       const startTime = Date.now();
       try {
-        setLoadingStep(`${templateLabels[template]} 형식으로 요약 중...`);
+        setLoadingStep(`${templateLabels[template]} 형식으로 요약 작성 중...`);
         const response = await summarizeWithTemplate(selectedMarkdown, template, {
           pages: opts?.pageRange,
           focusPrompt: opts?.focusPrompt,
         });
         setSummaryText(response.result);
         setAgentThreadId(response.threadId);
+        let persistedId: string | undefined;
+        let persistedAt = Date.now();
         if (selectedCourse) {
+          setLoadingStep("요약 저장 중...");
           const selectedMaterialNames = selectedMaterials.map(material => material.name);
           const savedSummary = {
             template,
             content: response.result,
             createdAt: Date.now(),
-            materialIds: selectedMaterialIds,
+            materialIds: generatedMaterialIds,
             materialNames: selectedMaterialNames,
           };
-          // 중복 허용: 같은 자료·템플릿이어도 기존 요약을 지우지 않고 항상 새로 저장한다.
+          // 같은 자료·템플릿 조합이면 서버가 기존 요약을 덮어쓴다(upsert) — 생성 전 확인 모달에서 안내한다.
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
           setActiveSummaryId(persistedSummary.id || null);
+          persistedId = persistedSummary.id;
+          persistedAt = persistedSummary.createdAt;
+          // 자료별 "요약 N" 배지·중복 생성 확인이 새 요약을 바로 반영하도록 목록을 갱신한다.
+          setSummaries(prev => [persistedSummary, ...prev.filter(item => item.id !== persistedSummary.id)]);
         }
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
+        // 생성을 기다리지 않고 다른 화면으로 이동한 경우 완료를 토스트로 알린다.
+        if (!isMountedRef.current) {
+          showToast("요약이 완성됐어요.", "success", {
+            duration: 10000,
+            action: {
+              label: "보러 가기",
+              onAction: () => navigate(pageRoutes["자료 요약"], {
+                state: {
+                  selectedCourse,
+                  fromDashboard: fromDashboardRef.current,
+                  openSummary: true,
+                  summaryId: persistedId,
+                  summaryTemplate: template,
+                  summaryContent: response.result,
+                  summaryCreatedAt: persistedAt,
+                  materialIds: generatedMaterialIds,
+                },
+              }),
+            },
+          });
+        } else if (viewRef.current !== "summaryResult") {
+          showToast("요약이 완성됐어요.", "success", {
+            duration: 10000,
+            action: { label: "보러 가기", onAction: () => setView("summaryResult") },
+          });
+        }
       } catch (err) {
-        setSummaryError(err instanceof Error ? err.message : "요약 실패");
+        const message = err instanceof Error ? err.message : "요약 실패";
+        setSummaryError(message);
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
+        if (!isMountedRef.current) {
+          showToast(`요약 생성에 실패했어요: ${message}`, "error", { duration: 10000 });
+        } else if (viewRef.current !== "summaryResult") {
+          showToast("요약 생성에 실패했어요.", "error", {
+            duration: 10000,
+            action: { label: "다시 시도", onAction: () => { void handleTemplateSelect(template, opts, backView); } },
+          });
+        }
       } finally {
         setIsSummarizing(false);
         setLoadingStep("");
@@ -3390,6 +3495,41 @@ export default function Summary() {
       setActiveSummaryId(null);
       setView("summaryResult");
     }
+  };
+
+  // 설정 화면 하단 "요약 생성하기". 같은 자료·템플릿 요약이 이미 있으면 서버가 덮어쓰므로,
+  // 생성 전에 "기존 요약 보기 / 새로 생성"을 먼저 묻는다.
+  const startSummaryFromSettings = () => {
+    void handleTemplateSelect(
+      summaryTemplate,
+      { pageRange: selectedHasPageMarkers ? summaryPageRange : "", focusPrompt: summaryFocusPrompt },
+      "upload",
+    );
+  };
+
+  const handleGenerateFromSettings = () => {
+    const existing = summaries
+      .filter(item => item.template === summaryTemplate && sameMaterialIds(item.materialIds, selectedMaterialIds))
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
+    if (existing?.content) {
+      setDuplicateSummaryPrompt(existing);
+      return;
+    }
+    startSummaryFromSettings();
+  };
+
+  const openExistingSummary = (summary: SavedSummary) => {
+    setSelectedTemplate(summary.template);
+    setActiveSummaryId(summary.id || null);
+    setSummaryText(summary.content);
+    setSummaryPages("");
+    setIsSummarizing(false);
+    setSummaryError("");
+    setElapsedTime(null);
+    setLoadingStep("");
+    setAgentThreadId("");
+    setResultBackView("upload");
+    setView("summaryResult");
   };
 
   const handleGoToQuiz = () => {
@@ -3553,6 +3693,58 @@ export default function Summary() {
                   background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
                 }}
               >확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {duplicateSummaryPrompt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="기존 요약 확인"
+          onClick={() => setDuplicateSummaryPrompt(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.32)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "min(420px, 100%)", background: "var(--color-card)", borderRadius: 18, padding: "28px 26px",
+            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
+          }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>
+              이미 만든 요약이 있어요
+            </h3>
+            <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "var(--color-text)", wordBreak: "keep-all" }}>
+              같은 자료의 <b style={{ color: "var(--color-text-strong)" }}>{templateLabels[duplicateSummaryPrompt.template]}</b> 요약을{" "}
+              {formatHubDate(duplicateSummaryPrompt.createdAt)}에 만들었어요.
+              새로 생성하면 <b style={{ color: "var(--color-text-strong)" }}>기존 요약을 덮어쓰게 돼요</b>.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicateSummaryPrompt(null);
+                  startSummaryFromSettings();
+                }}
+                style={{
+                  padding: "9px 16px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                }}
+              >새로 생성</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const existing = duplicateSummaryPrompt;
+                  setDuplicateSummaryPrompt(null);
+                  if (existing) openExistingSummary(existing);
+                }}
+                style={{
+                  padding: "9px 16px", borderRadius: 10, border: "none",
+                  background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer",
+                }}
+              >기존 요약 보기</button>
             </div>
           </div>
         </div>
@@ -3916,6 +4108,7 @@ export default function Summary() {
                     </div>
                     {materials.map(material => {
                       const isSelected = selectedMaterialIds.includes(material.id);
+                      const materialSummaryCount = summaries.filter(summary => summary.materialIds?.includes(material.id)).length;
                       return (
                       <div
                         key={material.id}
@@ -3941,6 +4134,29 @@ export default function Summary() {
                         </div>
                         <FileIcon type={material.type} />
                         <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--color-text-strong)" }}>{material.name}</span>
+                        {materialSummaryCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setActiveMaterial(material);
+                              setSelectedMaterialIds([material.id]);
+                              setMaterialDetailInitialTab("summary");
+                              setMaterialDetailTutorQuestion("");
+                              setMaterialDetailReviewContext("");
+                              setMaterialDetailReviewTitle("");
+                              setView("materialDetail");
+                            }}
+                            title="이 자료의 기존 요약 보기"
+                            style={{
+                              height: 22, padding: "0 9px", borderRadius: 999, border: "none",
+                              background: "var(--color-tint-pink)", color: PINK,
+                              fontSize: 11, fontWeight: 800, cursor: "pointer", flexShrink: 0,
+                            }}
+                          >
+                            요약 {materialSummaryCount}
+                          </button>
+                        )}
                         <span style={{ fontSize: 12, color: "var(--color-muted)" }}>
                           {material.pages ? `${material.pages}p` : material.slides ? `${material.slides}s` : ""}
                         </span>
@@ -4023,42 +4239,71 @@ export default function Summary() {
                     })}
                   </div>
 
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
-                    반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
-                  </label>
-                  <input
-                    value={summaryPageRange}
-                    onChange={e => setSummaryPageRange(e.target.value)}
-                    placeholder={summaryPageHint ? `예: 1-5, 8  (${summaryPageHint})` : "예: 1-5, 8"}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", marginBottom: 16 }}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSummaryAdvanced(prev => !prev)}
+                    aria-expanded={showSummaryAdvanced}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8, padding: 0,
+                      border: "none", background: "none", cursor: "pointer",
+                      fontSize: 13, fontWeight: 700, color: "var(--color-muted)",
+                    }}
+                  >
+                    <span aria-hidden="true" style={{ fontSize: 10 }}>{showSummaryAdvanced ? "▼" : "▶"}</span>
+                    세부 설정 (반영할 페이지 · 집중할 내용)
+                    {!showSummaryAdvanced && summaryAdvancedActive && (
+                      <span style={{ padding: "3px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>적용 중</span>
+                    )}
+                  </button>
 
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
-                    집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
-                  </label>
-                  <textarea
-                    value={summaryFocusPrompt}
-                    onChange={e => setSummaryFocusPrompt(e.target.value)}
-                    placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
-                    rows={2}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
-                  />
+                  {showSummaryAdvanced && (
+                    <div style={{ marginTop: 14 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                        반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
+                      </label>
+                      {selectedHasPageMarkers ? (
+                        <input
+                          value={summaryPageRange}
+                          onChange={e => setSummaryPageRange(e.target.value)}
+                          placeholder={summaryPageHint ? `예: 1-5, 8  (${summaryPageHint})` : "예: 1-5, 8"}
+                          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", marginBottom: 16 }}
+                        />
+                      ) : (
+                        <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
+                          {selectedMaterials.length > 0
+                            ? "선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요."
+                            : "자료를 선택하면 페이지 범위를 지정할 수 있어요."}
+                        </div>
+                      )}
+
+                      <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                        집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
+                      </label>
+                      <textarea
+                        value={summaryFocusPrompt}
+                        onChange={e => setSummaryFocusPrompt(e.target.value)}
+                        placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
+                        rows={2}
+                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+                      />
+                    </div>
+                  )}
                 </Card>
               )}
 
               {searched && (
                 <button
-                  onClick={() => handleTemplateSelect(summaryTemplate, { pageRange: summaryPageRange, focusPrompt: summaryFocusPrompt }, "upload")}
-                  disabled={!selectedMarkdown || isExtracting}
+                  onClick={handleGenerateFromSettings}
+                  disabled={!selectedMarkdown || isExtracting || isSummarizing}
                   style={{
                     width: "100%", padding: "14px 0", borderRadius: 12, border: "none", marginTop: 16,
-                    background: selectedMarkdown && !isExtracting ? PINK : "var(--color-border-soft)",
-                    color: selectedMarkdown && !isExtracting ? "var(--color-on-brand)" : "var(--color-muted)",
+                    background: selectedMarkdown && !isExtracting && !isSummarizing ? PINK : "var(--color-border-soft)",
+                    color: selectedMarkdown && !isExtracting && !isSummarizing ? "var(--color-on-brand)" : "var(--color-muted)",
                     fontSize: 16, fontWeight: 700,
-                    cursor: selectedMarkdown && !isExtracting ? "pointer" : "not-allowed",
+                    cursor: selectedMarkdown && !isExtracting && !isSummarizing ? "pointer" : "not-allowed",
                   }}
                 >
-                  {isExtracting ? "자료 분석 중..." : "요약 생성하기"}
+                  {isExtracting ? "자료 분석 중..." : isSummarizing ? "요약 생성 중..." : "요약 생성하기"}
                 </button>
               )}
           </div>
