@@ -30,7 +30,7 @@ export const SOFT_SHADOW = "var(--shadow-card)";
 export const normalizeBoldSpacing = (text: string): string =>
   text
     .replace(/(^|\s)\*\*[^\S\n]+([^*\n\s](?:[^*\n]*[^*\n\s])?)[^\S\n]+\*\*(?=$|\s|[.,!?;:)\]])/g, "$1**$2**")
-    .replace(/(\*\*[^*\n]+?[)\]}>.,!?;:'"’”])\*\*(?=[가-힣A-Za-z0-9])/g, "$1\u200B**");
+    .replace(/(\*\*[^*\n]+?[^\s가-힣A-Za-z0-9*])\*\*(?=[가-힣A-Za-z0-9])/g, "$1\u200B**");
 
 export const pageRoutes = {
   "대시보드": "/",
