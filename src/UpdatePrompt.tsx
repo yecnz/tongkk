@@ -61,7 +61,7 @@ export default function UpdatePrompt() {
         borderRadius: 12,
         background: "var(--color-card)",
         border: "1px solid var(--color-border)",
-        boxShadow: "0 12px 30px rgba(15, 23, 42, 0.16)",
+        boxShadow: "var(--shadow-card)",
         color: "var(--color-text-strong)",
         fontSize: 14,
         fontWeight: 600,

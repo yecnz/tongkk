@@ -128,13 +128,13 @@ const suggestedTutorQuestions: Record<SummaryTemplate, string[]> = {
 };
 
 const FileIcon = ({ type }: FileIconProps) => {
-  const colors: Record<FileKind, string> = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60", file: "#999" };
+  const colors: Record<FileKind, string> = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60", file: "#999" }; // hex-ok: 파일 타입 고정 배지색(흰 글자 대비, 양 모드 공통)
   const labels: Record<FileKind, string> = { pdf: "PDF", ppt: "PPT", img: "IMG", file: "FILE" };
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
       width: 40, height: 28, borderRadius: 6, fontSize: 11, fontWeight: 700,
-      color: "#fff", background: colors[type] || "#999"
+      color: "var(--color-on-brand)", background: colors[type] || colors.file
     }}>{labels[type] || "FILE"}</span>
   );
 };
@@ -286,13 +286,13 @@ const renderHighlightSyntax = (children: ReactNode): ReactNode => {
     return children.split(/(§EXAM§[\s\S]*?§\/EXAM§|==[^=]+==|\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)|\*\*[^*]+\*\*)/g).map((part, index) => {
       if (part.startsWith("§EXAM§") && part.endsWith("§/EXAM§")) {
         return (
-          <mark key={index} style={{ padding: "1px 6px", borderRadius: 5, background: "#FFF3BF", color: "#222" }}>
+          <mark key={index} style={{ padding: "1px 6px", borderRadius: 5, background: "var(--color-tint-yellow)", color: "var(--color-text-strong)" }}>
             <strong style={{ fontWeight: 800 }}>시험 포인트:</strong> {part.slice(6, -7)}
           </mark>
         );
       }
       if (part.startsWith("==") && part.endsWith("==")) {
-        return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "#FFF0F6", color: "#222", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
+        return <mark key={index} style={{ padding: "1px 5px", borderRadius: 5, background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800 }}>{part.slice(2, -2)}</mark>;
       }
       if (part.match(/^\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)$/)) {
         return <span key={index} style={{ display: "inline-flex", alignItems: "center", marginLeft: 4, padding: "2px 7px", borderRadius: 999, background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 850, verticalAlign: "middle" }}>{part.slice(1, -1).replace(/^출처:\s*/, "")}</span>;
@@ -380,11 +380,11 @@ const markdownComponents: Components = {
     </div>
   ),
   th: ({ children }) => (
-    <th style={{ padding: "9px 12px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left", whiteSpace: "nowrap" }}>
+    <th style={{ padding: "9px 12px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid color-mix(in srgb, var(--color-pink) 30%, transparent)", textAlign: "left", whiteSpace: "nowrap" }}>
       {children}
     </th>
   ),
-  td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid #f0e0e8", color: "var(--color-text)", lineHeight: 1.6 }}>{children}</td>,
+  td: ({ children }) => <td style={{ padding: "8px 12px", border: "1px solid var(--color-border-soft)", color: "var(--color-text)", lineHeight: 1.6 }}>{children}</td>,
 };
 
 const cheatSheetMarkdownComponents: Components = {
@@ -416,11 +416,11 @@ const cheatSheetMarkdownComponents: Components = {
     </div>
   ),
   th: ({ children }) => (
-    <th style={{ padding: "8px 9px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid #f0c0d0", textAlign: "left" }}>
+    <th style={{ padding: "8px 9px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid color-mix(in srgb, var(--color-pink) 30%, transparent)", textAlign: "left" }}>
       {children}
     </th>
   ),
-  td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid #f0e0e8", color: "var(--color-text)", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
+  td: ({ children }) => <td style={{ padding: "7px 9px", border: "1px solid var(--color-border-soft)", color: "var(--color-text)", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
 
 const SOURCE_PATTERN = /\(출처:\s*(?:[^()]*\([^)]*\))*[^()]*\)/g;
@@ -728,10 +728,10 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
   const [pageRange, setPageRange] = useState("");
   const [focusPrompt, setFocusPrompt] = useState("");
   const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
-    { key: "GENERAL", name: "일반 요약", desc: "강의 자료 내용을 깔끔하게 정리", accent: "#555" },
+    { key: "GENERAL", name: "일반 요약", desc: "강의 자료 내용을 깔끔하게 정리", accent: "var(--color-text)" },
     { key: "LECTURE_NOTE", name: "강의 노트", desc: "개념, 흐름, 시험 포인트를 구조화", accent: PINK },
     { key: "MINDMAP", name: "마인드맵", desc: "중심 주제와 하위 개념의 관계를 구조화", accent: CYAN },
-    { key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 빠르게 보는 암기표", accent: "#7C3AED" },
+    { key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 빠르게 보는 암기표", accent: "var(--color-violet)" },
   ];
 
   return (
@@ -904,7 +904,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
       // 캡처 전 전체 뷰포트를 흰 막으로 덮어 다른 콘텐츠 유입 차단
       const backdrop = document.createElement("div");
       backdrop.setAttribute("data-pdf-backdrop", "");
-      backdrop.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;";
+      backdrop.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;"; // hex-ok: PDF 내보내기 라이트 고정
       document.body.appendChild(backdrop);
 
       exportNode.style.left = "0px";
@@ -914,7 +914,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
       void exportNode.getBoundingClientRect();
 
       const canvas = await html2canvas(exportNode, {
-        backgroundColor: "#ffffff",
+        backgroundColor: "#ffffff", // hex-ok: PDF 내보내기 라이트 고정
         scale: 2,
         useCORS: true,
         scrollX: 0,
@@ -1077,7 +1077,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             <span style={{
               padding: "9px 18px", borderRadius: 999, border: "2px solid var(--color-border-soft)",
               background: "var(--color-card)", fontSize: 17, fontWeight: 600, flex: "0 0 auto",
-              color: template === "GENERAL" ? "#555" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "#7C3AED"
+              color: template === "GENERAL" ? "var(--color-text)" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "var(--color-violet)"
             }}>{templateLabels[template]}</span>
             {isLoading && (
               <span style={{ fontSize: 13, color: "var(--color-muted)", fontWeight: 700 }}>
@@ -1088,7 +1088,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
           <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
             {isLoading && (
               <span style={{
-                padding: "6px 10px", borderRadius: 999, background: "#FFF7FB",
+                padding: "6px 10px", borderRadius: 999, background: "var(--color-tint-pink)",
                 color: PINK, fontSize: 12, fontWeight: 800
               }}>요약 중</span>
             )}
@@ -1105,9 +1105,9 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                   background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 700, cursor: "pointer"
                 }}>전체 복사</button>
                 <button onClick={handleDownload} disabled={pdfSaving} style={{
-                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #e0e0e0",
-                  background: pdfSaving ? "#d9f5f9" : "#70dff0",
-                  color: "#555", fontSize: 13, fontWeight: 600,
+                  height: 34, padding: "0 14px", borderRadius: 10, border: "none",
+                  background: pdfSaving ? "var(--color-tint-cyan)" : CYAN,
+                  color: pdfSaving ? "var(--color-cyan-deep)" : "var(--color-on-brand)", fontSize: 13, fontWeight: 600,
                   cursor: pdfSaving ? "default" : "pointer",
                   opacity: pdfSaving ? 0.75 : 1,
                 }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
@@ -1177,8 +1177,8 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
               zIndex: -1,
               width: 794,
               padding: 48,
-              background: "#fff",
-              color: "#222",
+              background: "#fff", // hex-ok: PDF 내보내기 라이트 고정
+              color: "#222", // hex-ok: PDF 내보내기 라이트 고정
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
               fontSize: 14,
               lineHeight: "25px",
@@ -1188,10 +1188,10 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
             <h1 style={{
               margin: "0 0 22px",
               paddingBottom: 14,
-              borderBottom: "2px solid #f0f0f0",
+              borderBottom: "2px solid #f0f0f0", // hex-ok: PDF 내보내기 라이트 고정
               fontSize: 24,
               lineHeight: 1.35,
-              color: "#222",
+              color: "#222", // hex-ok: PDF 내보내기 라이트 고정
             }}>
               Tongkk {templateLabels[template]} 요약
             </h1>
@@ -1343,7 +1343,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
       if (!exportNode) return;
       const backdrop = document.createElement("div");
       backdrop.setAttribute("data-pdf-backdrop", "");
-      backdrop.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;";
+      backdrop.style.cssText = "position:fixed;inset:0;background:#fff;z-index:99998;"; // hex-ok: PDF 내보내기 라이트 고정
       document.body.appendChild(backdrop);
       exportNode.style.left = "0px";
       exportNode.style.top = "0px";
@@ -1351,7 +1351,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
       exportNode.style.letterSpacing = "0.01px";
       void exportNode.getBoundingClientRect();
       const canvas = await html2canvas(exportNode, {
-        backgroundColor: "#ffffff",
+        backgroundColor: "#ffffff", // hex-ok: PDF 내보내기 라이트 고정
         scale: 2,
         useCORS: true,
         scrollX: 0,
@@ -1504,8 +1504,8 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
       }}>전체 복사</button>
       <button onClick={handleDownload} disabled={pdfSaving} style={{
         padding: "9px 12px", borderRadius: 8, border: "none",
-        background: pdfSaving ? "#d9f5f9" : "#70dff0",
-        color: "#555", fontSize: 12, fontWeight: 800,
+        background: pdfSaving ? "var(--color-tint-cyan)" : CYAN,
+        color: pdfSaving ? "var(--color-cyan-deep)" : "var(--color-on-brand)", fontSize: 12, fontWeight: 800,
         cursor: pdfSaving ? "default" : "pointer",
         opacity: pdfSaving ? 0.75 : 1,
       }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
@@ -1527,8 +1527,8 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
           zIndex: -1,
           width: 794,
           padding: 48,
-          background: "#fff",
-          color: "#222",
+          background: "#fff", // hex-ok: PDF 내보내기 라이트 고정
+          color: "#222", // hex-ok: PDF 내보내기 라이트 고정
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
           fontSize: 14,
           lineHeight: "25px",
@@ -1538,10 +1538,10 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
         <h1 style={{
           margin: "0 0 22px",
           paddingBottom: 14,
-          borderBottom: "2px solid #f0f0f0",
+          borderBottom: "2px solid #f0f0f0", // hex-ok: PDF 내보내기 라이트 고정
           fontSize: 24,
           lineHeight: 1.35,
-          color: "#222",
+          color: "#222", // hex-ok: PDF 내보내기 라이트 고정
         }}>
           Tongkk {templateLabels[template]} 요약
         </h1>
@@ -1652,7 +1652,7 @@ const TutorSplitDivider = ({ onPointerDown }: { onPointerDown: (event: ReactPoin
         width: hover ? 6 : 4,
         height: 52,
         borderRadius: 999,
-        background: hover ? PINK : "#d4d4d4",
+        background: hover ? PINK : "var(--color-border)",
         transition: "background 0.15s ease, width 0.15s ease",
       }} />
     </div>
@@ -2041,8 +2041,8 @@ const MaterialDetailView = ({
           marginBottom: 18,
           padding: "12px 14px",
           borderRadius: 10,
-          background: fileError || previewError ? "var(--color-tint-pink)" : "#FFF8E8",
-          color: fileError || previewError ? "var(--color-danger)" : "#9A6B00",
+          background: fileError || previewError ? "var(--color-tint-pink)" : "var(--color-tint-yellow)",
+          color: fileError || previewError ? "var(--color-danger)" : "var(--color-amber-deep)",
           fontSize: 13,
           fontWeight: 700,
           lineHeight: 1.55,
@@ -3461,7 +3461,7 @@ export default function Summary() {
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
               <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "#FFF7ED",
+                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-yellow)",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
               }}>📝</span>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>요약 안내</h3>
@@ -3526,7 +3526,7 @@ export default function Summary() {
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "#FFF7ED", color: "#F59E0B",
+                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-yellow)", color: "var(--color-amber-deep)",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0,
               }}>!</span>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>원본은 저장하지 않았어요</h3>
@@ -3571,7 +3571,7 @@ export default function Summary() {
             zIndex: 140,
             padding: "14px 16px",
             borderRadius: 12,
-            border: "1px solid #f6c8df",
+            border: "1px solid color-mix(in srgb, var(--color-pink) 35%, transparent)",
             background: "var(--color-card)",
             boxShadow: "0 14px 36px rgba(0,0,0,0.14)",
           }}
@@ -3731,9 +3731,9 @@ export default function Summary() {
                     onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
                     onClick={() => fileRef.current?.click()}
                     style={{
-                      border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
+                      border: `2px dashed ${dragOver ? "color-mix(in srgb, var(--color-cyan) 40%, transparent)" : BORDER_COLOR}`,
                       borderRadius: 14, padding: "40px 20px", textAlign: "center",
-                      cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
+                      cursor: "pointer", background: dragOver ? "var(--color-tint-cyan)" : MUTED_SURFACE,
                       transition: "all 0.2s", marginBottom: 20
                     }}
                   >
@@ -3815,15 +3815,15 @@ export default function Summary() {
                         const isFailed = status.state === "failed";
                         const isDone = status.state === "done";
                         const isDuplicate = status.state === "duplicate";
-                        const tone = isFailed ? "#E53E3E" : isDone ? "#2F9E44" : isDuplicate ? "#B7791F" : status.state === "previewing" ? CYAN : PINK;
-                        const background = isFailed ? "#FFF5F5" : isDone ? "#F1FFF5" : isDuplicate ? "#FFF8E8" : "#FFF7FB";
+                        const tone = isFailed ? "var(--color-danger)" : isDone ? "var(--color-success)" : isDuplicate ? "var(--color-amber-deep)" : status.state === "previewing" ? CYAN : PINK;
+                        const background = isFailed ? "var(--color-tint-pink)" : isDone ? "var(--color-tint-green)" : isDuplicate ? "var(--color-tint-yellow)" : "var(--color-tint-pink)";
                         const linkedMaterial = status.materialId ? materials.find(material => material.id === status.materialId) : null;
 
                         return (
                           <div key={status.id} style={{
                             padding: 12,
                             borderRadius: 12,
-                            border: `1px solid ${isFailed ? "#FED7D7" : "var(--color-border-soft)"}`,
+                            border: `1px solid ${isFailed ? "color-mix(in srgb, var(--color-danger) 35%, transparent)" : "var(--color-border-soft)"}`,
                             background: "var(--color-card)",
                           }}>
                             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -3926,14 +3926,14 @@ export default function Summary() {
                         )}
                         style={{
                           display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
-                          background: isSelected ? "#fff7fa" : MUTED_SURFACE,
+                          background: isSelected ? "var(--color-tint-pink)" : MUTED_SURFACE,
                           border: isSelected ? "1.5px solid color-mix(in srgb, var(--color-pink) 27%, transparent)" : `1px solid ${BORDER_COLOR}`,
                           borderRadius: 10, marginBottom: 8, cursor: "pointer",
                         }}>
                         <div style={{
                           width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
                           background: isSelected ? PINK : "transparent",
-                          border: isSelected ? `2px solid ${PINK}` : "2px solid #ccc",
+                          border: isSelected ? `2px solid ${PINK}` : "2px solid var(--color-muted)",
                           transition: "all 0.15s",
                           display: "flex", alignItems: "center", justifyContent: "center",
                         }}>

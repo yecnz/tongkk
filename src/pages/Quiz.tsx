@@ -1184,8 +1184,8 @@ export default function Quiz() {
                     <div key={material.id} style={{
                       display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10, alignItems: "center",
                       padding: "12px 14px", borderRadius: 10, marginBottom: 8,
-                      background: isSelected ? "#f8fbff" : MUTED_SURFACE,
-                      border: isSelected ? "1px solid #cfd8e6" : `1px solid ${BORDER_COLOR}`,
+                      background: isSelected ? "var(--color-tint-cyan)" : MUTED_SURFACE,
+                      border: isSelected ? "1px solid color-mix(in srgb, var(--color-cyan) 35%, transparent)" : `1px solid ${BORDER_COLOR}`,
                     }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, cursor: "pointer" }}>
                         <input
@@ -1217,8 +1217,8 @@ export default function Quiz() {
                               disabled={!isSelected}
                               onClick={() => setMaterialSources(prev => ({ ...prev, [material.id]: option.value }))}
                               style={{
-                                border: isActiveSource ? "1px solid rgba(240, 112, 174, 0.24)" : `1px solid ${BORDER_COLOR}`,
-                                background: isActiveSource ? "rgba(240, 112, 174, 0.07)" : CARD_BACKGROUND,
+                                border: isActiveSource ? "1px solid color-mix(in srgb, var(--color-pink) 24%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                                background: isActiveSource ? "color-mix(in srgb, var(--color-pink) 7%, transparent)" : CARD_BACKGROUND,
                                 color: isActiveSource ? PINK : "var(--color-text-secondary)",
                                 borderRadius: 999,
                                 padding: "6px 10px",
@@ -1247,9 +1247,9 @@ export default function Quiz() {
               onDrop={handleDrop}
               onClick={() => fileRef.current?.click()}
               style={{
-                border: `2px dashed ${dragOver ? "#cfd8e6" : BORDER_COLOR}`,
+                border: `2px dashed ${dragOver ? "color-mix(in srgb, var(--color-cyan) 40%, transparent)" : BORDER_COLOR}`,
                 borderRadius: 12, padding: "28px 20px", textAlign: "center",
-                cursor: "pointer", background: dragOver ? "#f8fbff" : MUTED_SURFACE,
+                cursor: "pointer", background: dragOver ? "var(--color-tint-cyan)" : MUTED_SURFACE,
                 transition: "all 0.2s", marginBottom: 12
               }}
             >
@@ -1269,7 +1269,7 @@ export default function Quiz() {
               </div>
             )}
             {!isExtracting && uploadedFileName && !extractError && (
-              <span style={{ fontSize: 13, color: "#4CAF50" }}>{uploadedFileName} 분석 완료 — 퀴즈에 반영됩니다</span>
+              <span style={{ fontSize: 13, color: "var(--color-success)" }}>{uploadedFileName} 분석 완료 — 퀴즈에 반영됩니다</span>
             )}
             {!isExtracting && materialNotice && (
               <span style={{ display: "block", marginTop: 8, fontSize: 13, color: CYAN }}>{materialNotice}</span>
@@ -1547,9 +1547,9 @@ export default function Quiz() {
           <Card style={{ padding: 40 }}>
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
-              background: scorePercent >= 80 ? "var(--color-tint-cyan)" : scorePercent >= 50 ? "#FFF8E8" : "var(--color-tint-pink)",
+              background: scorePercent >= 80 ? "var(--color-tint-cyan)" : scorePercent >= 50 ? "var(--color-tint-yellow)" : "var(--color-tint-pink)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 32, fontWeight: 800, color: scorePercent >= 80 ? CYAN : scorePercent >= 50 ? "#E8A800" : PINK
+              fontSize: 32, fontWeight: 800, color: scorePercent >= 80 ? CYAN : scorePercent >= 50 ? "var(--color-amber-deep)" : PINK
             }}>{scorePercent}%</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700 }}>
               {timedOut ? "시간이 종료되었습니다" : scorePercent >= 80 ? "훌륭해요!" : scorePercent >= 50 ? "좋은 시작이에요!" : "조금 더 노력해봐요!"}
@@ -1934,7 +1934,7 @@ export default function Quiz() {
                 let bg = "var(--color-surface)", border = "var(--color-border-soft)", color = "var(--color-text)";
                 if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = CYAN; }
                 else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
-                else if (isSelected) { bg = "#f3f3f3"; border = "#d8d8d8"; color = "#333"; }
+                else if (isSelected) { bg = "var(--color-muted-surface)"; border = "var(--color-muted)"; color = "var(--color-text-strong)"; }
                 return (
                   <button key={i} className={answered ? undefined : "tongkk-quiz-option"} onClick={() => selectAnswer(i)} style={{
                     padding: "14px 18px", borderRadius: 12, border: `1.5px solid ${border}`,

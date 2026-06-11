@@ -37,4 +37,11 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // 빌드/검사 보조 스크립트는 Node 환경에서 돈다(예: scripts/check-inline-hex.mjs).
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

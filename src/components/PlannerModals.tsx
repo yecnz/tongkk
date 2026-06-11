@@ -32,10 +32,10 @@ export type CalendarChip = {
 };
 // 톤 색: 9px→10px와 함께 대비를 끌어올리고, done(회색·취소선)과 upcoming(슬레이트)을 구분.
 const CHIP_TONES: Record<NonNullable<CalendarChip["tone"]>, { bg: string; fg: string }> = {
-  done: { bg: "#edf0f4", fg: "#6b7785" },
-  today: { bg: "#E2F6FC", fg: "#0a7491" },
-  upcoming: { bg: "#eef1f6", fg: "#475569" },
-  overdue: { bg: "#FFEAF2", fg: "#c0397e" },
+  done: { bg: "var(--color-muted-surface)", fg: "var(--color-muted)" },
+  today: { bg: "var(--color-tint-cyan)", fg: "var(--color-cyan-deep)" },
+  upcoming: { bg: "var(--color-muted-surface)", fg: "var(--color-text-secondary)" },
+  overdue: { bg: "var(--color-tint-pink)", fg: "var(--color-pink-deep)" },
 };
 type CustomCalendarProps = {
   value: string;
@@ -99,7 +99,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           {planner && offCurrentMonth && (
             <button type="button" onClick={goToToday} style={{
               border: "none", cursor: "pointer", fontSize: 11, fontWeight: 800,
-              color: "#0a7491", background: "#E2F6FC", borderRadius: 999, padding: "2px 9px",
+              color: "var(--color-cyan-deep)", background: "var(--color-tint-cyan)", borderRadius: 999, padding: "2px 9px",
             }}>오늘</button>
           )}
         </span>
@@ -108,7 +108,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 6 }}>
         {DAY_NAMES.map((d, i) => (
           <div key={d} style={{ textAlign: "center", fontSize: 12, fontWeight: 600, padding: "4px 0",
-            color: i === 0 ? "#FF6B6B" : i === 6 ? "#5B9CF6" : "#6b7280" }}>{d}</div>
+            color: i === 0 ? "var(--color-sunday)" : i === 6 ? "var(--color-saturday)" : "var(--color-muted)" }}>{d}</div>
         ))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
@@ -126,7 +126,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           const dayMarkers = markers?.[dateStr] ?? [];
           const shownMarkers = dayMarkers.slice(0, 3);
           const extraMarkers = dayMarkers.length - shownMarkers.length;
-          const weekdayColor = i % 7 === 0 ? "#FF6B6B" : i % 7 === 6 ? "#5B9CF6" : "var(--color-text)";
+          const weekdayColor = i % 7 === 0 ? "var(--color-sunday)" : i % 7 === 6 ? "var(--color-saturday)" : "var(--color-text)";
 
           // 월간 계획표 모드: 큰 칸 + 날짜 위 작은 점(마감/할 일) + 학습 칩.
           if (planner) {
@@ -136,14 +136,14 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
             return (
               <button key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} className="tongkk-cal-cell" style={{
                 width: "100%", minHeight: 62, borderRadius: 10, padding: "4px 4px 5px",
-                border: isSelected ? `1.5px solid ${PINK}` : isToday ? "1px solid rgba(0,192,232,0.55)" : "1px solid transparent",
-                background: isSelected ? "rgba(240,112,174,0.14)" : "transparent",
+                border: isSelected ? `1.5px solid ${PINK}` : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "1px solid transparent",
+                background: isSelected ? "color-mix(in srgb, var(--color-pink) 14%, transparent)" : "transparent",
                 cursor: "pointer", display: "flex", flexDirection: "column",
                 alignItems: "stretch", gap: 2, overflow: "hidden", textAlign: "left",
               }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 3, paddingLeft: 1 }}>
                   <span style={{ fontSize: 11, lineHeight: 1, fontWeight: isSelected || isToday ? 800 : 600,
-                    color: isSelected ? "var(--color-text-strong)" : isToday ? "#0a7491" : weekdayColor }}>{day}</span>
+                    color: isSelected ? "var(--color-text-strong)" : isToday ? "var(--color-cyan-deep)" : weekdayColor }}>{day}</span>
                   {dayMarkers.length > 0 && (
                     <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
                       {shownMarkers.map((marker, mi) => (
@@ -177,9 +177,9 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
           return (
             <button key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} style={{
               width: "100%", aspectRatio: "1", borderRadius: "50%",
-              border: isSelected ? "none" : isToday ? "1px solid rgba(0,192,232,0.55)" : "none",
+              border: isSelected ? "none" : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "none",
               background: isSelected ? PINK : "transparent",
-              color: isSelected ? "var(--color-on-brand)" : isToday ? "#0a7491" : "var(--color-text-strong)",
+              color: isSelected ? "var(--color-on-brand)" : isToday ? "var(--color-cyan-deep)" : "var(--color-text-strong)",
               fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
               cursor: "pointer", transition: "background 0.15s",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
@@ -188,7 +188,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
               {dayMarkers.length > 0 && (
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, height: 5 }}>
                   {shownMarkers.map((marker, mi) => (
-                    <span key={mi} style={{ width: 5, height: 5, borderRadius: "50%", background: isSelected ? "#fff" : marker.color }} />
+                    <span key={mi} style={{ width: 5, height: 5, borderRadius: "50%", background: isSelected ? "var(--color-on-brand)" : marker.color }} />
                   ))}
                   {extraMarkers > 0 && (
                     <span style={{ fontSize: 8, fontWeight: 700, lineHeight: 1, color: isSelected ? "var(--color-on-brand)" : "var(--color-muted)" }}>+{extraMarkers}</span>
@@ -401,8 +401,8 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
     onAdd(course, ddayId, total, unitLabel, basis);
     onClose();
   };
-  const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-white text-sm text-[#222] outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10 dark:bg-slate-800 dark:text-slate-100";
-  const labelClass = "block mb-2 text-xs font-extrabold text-[#667085] dark:text-slate-300";
+  const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-card text-sm text-text-strong outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10";
+  const labelClass = "block mb-2 text-xs font-extrabold text-text-secondary";
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4 py-6">
       <Card className="w-[min(430px,100%)] overflow-hidden">
@@ -412,7 +412,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
               <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan">
                 PACE PLAN
               </span>
-              <h3 className="m-0 text-[19px] font-extrabold text-[#222] dark:text-slate-100">페이스 플랜 만들기</h3>
+              <h3 className="m-0 text-[19px] font-extrabold text-text-strong">페이스 플랜 만들기</h3>
               <p className="m-0 mt-1 text-sm leading-6 text-muted">
                 마감일과 분량을 연결해서 오늘 할 양을 계산해요.
               </p>
@@ -483,10 +483,10 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                                 : "border-border bg-white cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
                           }`}
                         >
-                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-[#344054] dark:text-slate-200"}`}>
+                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-text"}`}>
                             {option.title}
                           </span>
-                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-[#667085] dark:text-slate-300"}`}>
+                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-text-secondary"}`}>
                             {option.hint}
                           </span>
                         </button>
@@ -502,7 +502,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                           : "border-border bg-white hover:bg-slate-50 dark:bg-slate-800"
                       }`}
                     >
-                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan" : "text-[#344054] dark:text-slate-200"}`}>직접 입력</span>
+                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan" : "text-text"}`}>직접 입력</span>
                       <span className="shrink-0 text-xs font-semibold text-muted">숫자로 직접 지정</span>
                     </button>
                   </div>
@@ -523,13 +523,13 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                 </div>
               )}
               <div className="mb-5 flex items-center justify-between gap-3 rounded-[12px] bg-pink/10 px-4 py-3">
-                <span className="shrink-0 text-xs font-bold text-[#667085] dark:text-slate-300">하루 권장 학습량</span>
+                <span className="shrink-0 text-xs font-bold text-text-secondary">하루 권장 학습량</span>
                 <span className="text-right text-sm font-extrabold text-pink">{previewText}</span>
               </div>
             </>
           )}
           <div className="flex gap-2.5 justify-end">
-            <button onClick={onClose} className="px-4 py-2.5 rounded-[10px] border border-border bg-white text-sm font-bold text-[#555] cursor-pointer hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200">취소</button>
+            <button onClick={onClose} className="px-4 py-2.5 rounded-[10px] border border-border bg-card text-sm font-bold text-text cursor-pointer hover:bg-muted-surface">취소</button>
             <button
               onClick={handleAdd}
               disabled={!canAdd}
@@ -637,7 +637,7 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
             disabled={!canSave}
             style={{
               padding: "8px 18px", borderRadius: 10, border: "none",
-              background: canSave ? PINK : "#d8d8d8", color: "var(--color-on-brand)",
+              background: canSave ? PINK : "var(--color-muted)", color: "var(--color-on-brand)",
               cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600,
             }}
           >저장</button>

@@ -116,7 +116,7 @@ const markdownComponents: Components = {
   strong: ({ children }) => <strong style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</strong>,
   em: ({ children }) => <em style={{ color: "var(--color-text)" }}>{children}</em>,
   code: ({ children, className }) => (
-    <code className={className} style={{ padding: className ? 0 : "1px 5px", borderRadius: 5, background: className ? "transparent" : "var(--color-surface)", color: className ? "inherit" : "#d6336c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
+    <code className={className} style={{ padding: className ? 0 : "1px 5px", borderRadius: 5, background: className ? "transparent" : "var(--color-surface)", color: className ? "inherit" : "var(--color-pink-deep)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
       {children}
     </code>
   ),
@@ -678,7 +678,7 @@ export const AITutorDrawer = ({
                           overflowY: "auto",
                           background: "var(--color-card)",
                           borderRadius: 12,
-                          border: "1px solid #ececec",
+                          border: "1px solid var(--color-border-soft)",
                           boxShadow: "0 12px 32px rgba(0,0,0,0.16)",
                           padding: 6,
                           display: "flex",
@@ -961,7 +961,7 @@ export const AITutorDrawer = ({
                   type="button"
                   onClick={() => removeAttachedImage(index)}
                   aria-label={`첨부 이미지 ${index + 1} 삭제`}
-                  style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 11, lineHeight: "18px", textAlign: "center", cursor: "pointer", padding: 0 }}
+                  style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)", color: "var(--color-on-brand)", fontSize: 11, lineHeight: "18px", textAlign: "center", cursor: "pointer", padding: 0 }}
                 >
                   ×
                 </button>

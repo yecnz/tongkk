@@ -84,7 +84,7 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
             <div style={{
               position: "absolute", bottom: 0, right: 0, width: 26, height: 26,
               borderRadius: "50%", background: PINK, display: "flex", alignItems: "center", justifyContent: "center",
-              border: "2px solid #fff", color: "var(--color-on-brand)", fontSize: 13
+              border: "2px solid var(--color-on-brand)", color: "var(--color-on-brand)", fontSize: 13
             }}>✎</div>
             <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
           </div>
@@ -98,7 +98,7 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button onClick={handleSave} disabled={saving} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: saving ? "#ddd" : PINK,
+            padding: "8px 18px", borderRadius: 10, border: "none", background: saving ? "var(--color-muted)" : PINK,
             color: "var(--color-on-brand)", cursor: saving ? "default" : "pointer", fontSize: 14, fontWeight: 600
           }}>{saving ? "저장 중" : "저장"}</button>
         </div>
@@ -386,7 +386,7 @@ export default function MyPage() {
               과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
             </p>
             <button onClick={() => setSettingsDialog("deleteAccount")} style={{
-              width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #fca5a5",
+              width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-danger) 45%, transparent)",
               background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 13, fontWeight: 700, cursor: "pointer"
             }}>내 앱 데이터 삭제</button>
             <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--color-muted)", lineHeight: 1.5 }}>
@@ -408,7 +408,7 @@ export default function MyPage() {
                   borderBottom: index === 0 ? "1px solid var(--color-border-soft)" : "none", width: "100%", textAlign: "left"
                 }}>
                   <span style={{ fontSize: 14, color: "var(--color-text)" }}>{item.label}</span>
-                  <span style={{ color: "#ddd", fontSize: 14 }}>›</span>
+                  <span style={{ color: "var(--color-muted)", fontSize: 14 }}>›</span>
                 </button>
               ))}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderTop: "1px solid var(--color-border-soft)" }}>

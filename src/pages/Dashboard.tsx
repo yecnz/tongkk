@@ -292,7 +292,7 @@ const CourseDetailModal = ({
                       width: "100%",
                       padding: "14px 0",
                       border: "none",
-                      borderBottom: index < materials.length - 1 ? "1px solid #f3f3f3" : "none",
+                      borderBottom: index < materials.length - 1 ? "1px solid var(--color-border-soft)" : "none",
                       background: "none",
                       cursor: "pointer",
                       textAlign: "left",
@@ -306,13 +306,13 @@ const CourseDetailModal = ({
                       <span style={{ minWidth: 0, fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)", lineHeight: 1.45, wordBreak: "break-word" }}>
                         {material.name}
                       </span>
-                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#c4c4c4" }}>
+                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "var(--color-muted)" }}>
                         {materialMeta(material)}
                       </span>
                     </span>
                     <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
-                      <span style={{ color: summaryCount > 0 ? PINK : "#ccc" }}>요약 {summaryCount}</span>
-                      <span style={{ color: quizCount > 0 ? CYAN : "#ccc" }}>퀴즈 {quizCount}</span>
+                      <span style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)" }}>요약 {summaryCount}</span>
+                      <span style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)" }}>퀴즈 {quizCount}</span>
                     </span>
                   </button>
                 );
@@ -1053,7 +1053,7 @@ export default function Dashboard() {
 
       <div className="app-container">
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
-          <h2 className="m-0 text-xl font-extrabold leading-7 text-[#222] dark:text-slate-100">
+          <h2 className="m-0 text-xl font-extrabold leading-7 text-text-strong">
             공부 시작하기
           </h2>
           <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
@@ -1155,7 +1155,7 @@ export default function Dashboard() {
                   );
                 })}
                 <button onClick={() => setShowAddCourse(true)} style={{
-                  minHeight: 120, borderRadius: 18, border: "1px dashed #d8dde8",
+                  minHeight: 120, borderRadius: 18, border: "1px dashed var(--color-border)",
                   background: "var(--color-card)", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
                 }}>+ 강의 추가하기</button>
               </div>
@@ -1182,7 +1182,7 @@ export default function Dashboard() {
                     return (
                       <div key={d.id || `${d.subj}-${d.date}-${i}`} style={{
                         display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "10px 0", borderBottom: i < displayDdays.length - 1 ? "1px solid #f5f5f5" : "none"
+                        padding: "10px 0", borderBottom: i < displayDdays.length - 1 ? "1px solid var(--color-border-soft)" : "none"
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <span style={{
@@ -1292,7 +1292,7 @@ export default function Dashboard() {
                     title="AI 계획 옵션"
                     style={{
                       width: 30, flexShrink: 0, borderRadius: 8,
-                      border: "1px solid #eaf7fa", background: "var(--color-card)",
+                      border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-card)",
                       color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
                     }}
                   >
@@ -1325,7 +1325,7 @@ export default function Dashboard() {
                       onClick={() => openPlanSourcePicker(action.mode)}
                       disabled={!canGenerateStudyPlan || studyPlanLoading}
                       style={{
-                        padding: "6px 9px", borderRadius: 8, border: "1px solid #f0f0f0",
+                        padding: "6px 9px", borderRadius: 8, border: "1px solid var(--color-border-soft)",
                         background: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-surface)" : "var(--color-card)",
                         color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : "var(--color-text-secondary)",
                         cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
@@ -1340,7 +1340,7 @@ export default function Dashboard() {
               {showPlanSourcePicker && (
                 <div style={{
                   marginBottom: 14, padding: 12, borderRadius: 12,
-                  border: "1px solid #eef7f9", background: "#fbfeff",
+                  border: "1px solid color-mix(in srgb, var(--color-cyan) 18%, transparent)", background: "var(--color-card)",
                 }}>
                   <p style={{ margin: "0 0 4px", fontSize: 13, lineHeight: 1.55, color: "var(--color-text)" }}>
                     {planSourceMessage}
@@ -1525,7 +1525,7 @@ export default function Dashboard() {
                     return (
                       <div key={p.id || `${p.text}-${i}`} style={{
                         display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-                        borderTop: showTopBorder ? "1px solid #f5f5f5" : "none"
+                        borderTop: showTopBorder ? "1px solid var(--color-border-soft)" : "none"
                       }}>
                         <button onClick={() => {
                           setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));

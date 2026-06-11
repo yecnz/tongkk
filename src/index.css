@@ -26,13 +26,27 @@
   --color-text: light-dark(#444444, #c5cad3);
   --color-text-secondary: light-dark(#666666, #9298a4);
   --color-muted: light-dark(#888888, #6b7280);
-  --color-on-brand: #ffffff;       /* 브랜드색 배경 위 글자 — 라이트·다크 공통 */
+  --color-on-brand: #ffffff;       /* hex-ok: 브랜드색 배경 위 글자 — 라이트·다크 공통 */
 
   /* 틴트·상태 */
   --color-tint-pink: light-dark(#fff0f6, #2a1f26);
   --color-tint-cyan: light-dark(#e8fafe, #18272e);
   --color-tint-violet: light-dark(#ede9fe, #241f33);
+  --color-tint-yellow: light-dark(#fff3bf, #2e2a1a);
+  --color-tint-green: light-dark(#f1fff5, #1d2a21);
   --color-danger: light-dark(#e53e3e, #e08585);
+  --color-success: light-dark(#2f9e44, #86c796);
+  --color-amber-deep: light-dark(#9a6b00, #d9b56a);
+
+  /* 틴트 배경 위 글자용 딥 톤 — 라이트에선 진하게, 다크에선 밝은 파스텔로 뒤집힌다 */
+  --color-pink-deep: light-dark(#c0397e, #e8a3c5);
+  --color-cyan-deep: light-dark(#0a7491, #7cc8de);
+  --color-violet-deep: light-dark(#5b21b6, #c3b3ee);
+
+  /* 캘린더 요일·통계 보조색 */
+  --color-sunday: light-dark(#ff6b6b, #e38d8d);
+  --color-saturday: light-dark(#5b9cf6, #8db4ec);
+  --color-indigo: light-dark(#6574f7, #8b96e8);
 
   /* 비색상 토큰 */
   --radius-card: 18px;
@@ -333,7 +347,7 @@ body.tongkk-sidebar-open #root {
 }
 
 /* 요약 화면·AI 튜터에서만 표면색(--color-surface)을 살짝 진한 연한 회색으로 덮어쓴다.
-   나머지 화면은 @theme의 기본값(#fafafa)을 그대로 쓴다. 적용: Summary 페이지 루트에 클래스 부여. */
+   나머지 화면은 @theme의 기본값을 그대로 쓴다. 적용: Summary 페이지 루트에 클래스 부여. */
 .tongkk-soft-surface {
   --color-surface: light-dark(#f2f4f8, #252932);
 }
