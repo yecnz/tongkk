@@ -47,11 +47,18 @@ export default function LoginModal({ onClose, initialMode = "signIn", subtitle }
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    const trimmedEmail = email.trim();
+    // 회원가입 시 이메일 형식 검사. type="email"의 기본 검사는 'a@b'(점 없는 형식)도 통과시켜
+    // 깨진 이메일로 가입되면 이후 이메일 변경이 막히므로, 여기서 'name@domain.tld' 형식을 강제한다.
+    if (mode === "signUp" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("이메일 형식이 올바르지 않아요. 예: name@example.com");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
-      if (mode === "signIn") await signIn(email.trim(), password);
-      else await signUp(email.trim(), password);
+      if (mode === "signIn") await signIn(trimmedEmail, password);
+      else await signUp(trimmedEmail, password);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "인증에 실패했습니다.");
