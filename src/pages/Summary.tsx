@@ -489,6 +489,31 @@ const isCitationLocation = (part: string): boolean =>
   /^OCR\s*이미지/i.test(part) ||
   /^\d+(?:\s*[-–~]\s*\d+)?\s*(?:p|페이지|쪽)?$/i.test(part);
 
+// 위치 목록을 페이지 번호 순으로 정렬하고, 연속된 페이지는 범위(p.90-93)로 압축한다.
+// 페이지가 아닌 위치(slide N 등)는 정렬·압축하지 않고 뒤에 그대로 붙인다.
+// (범위 기호는 '-' — '~'는 마크다운 취소선으로 깨질 수 있어 sanitizeCitationTildes와 통일.)
+const compressLocations = (locs: string[]): string[] => {
+  const pages = [...new Set(
+    locs.map(loc => loc.match(/^p\.(\d+)$/)?.[1]).filter(Boolean).map(n => parseInt(n as string, 10)),
+  )].sort((a, b) => a - b);
+  const others = locs.filter(loc => !/^p\.\d+$/.test(loc));
+  const ranges: string[] = [];
+  let start = -1;
+  let prev = -1;
+  for (const p of pages) {
+    if (start === -1) {
+      start = prev = p;
+    } else if (p === prev + 1) {
+      prev = p;
+    } else {
+      ranges.push(start === prev ? `p.${start}` : `p.${start}-${prev}`);
+      start = prev = p;
+    }
+  }
+  if (start !== -1) ranges.push(start === prev ? `p.${start}` : `p.${start}-${prev}`);
+  return [...ranges, ...others];
+};
+
 // 한 섹션에 흩어진 여러 (출처: ...)를 파일별로 묶어 하나로 합친다. (페이지/슬라이드 중복 제거)
 const mergeSourceCitations = (sources: string[]): string => {
   const byFile = new Map<string, string[]>();
@@ -510,9 +535,9 @@ const mergeSourceCitations = (sources: string[]): string => {
   }
   const parts = [...byFile.entries()]
     .map(([file, locs]) => {
-      // 페이지/슬라이드 번호 순으로 정렬한다(수집 순서대로면 p.34가 p.32 앞에 오는 등 뒤섞임).
-      locs.sort((a, b) => (parseInt(a.match(/\d+/)?.[0] ?? "0", 10)) - (parseInt(b.match(/\d+/)?.[0] ?? "0", 10)));
-      return file ? (locs.length ? `${file}, ${locs.join(", ")}` : file) : locs.join(", ");
+      // 페이지 번호 순 정렬 + 연속 구간을 범위(p.90-93)로 압축.
+      const compressed = compressLocations(locs);
+      return file ? (compressed.length ? `${file}, ${compressed.join(", ")}` : file) : compressed.join(", ");
     })
     .filter(Boolean);
   return parts.length ? `(출처: ${parts.join("; ")})` : "";
@@ -555,6 +580,13 @@ const markInlineExamPoints = (markdown: string): string =>
     .replace(/\(\s*시험\s*포인트\s*:\s*([^)]*?)\s*\)/g, (_m, c) => `§EXAM§${c}§/EXAM§`);
 
 // 시험 포인트 섹션을 항목별로 재구성한다.
+// 단일 출처 문자열 '(출처: ...)' 안의 페이지를 정렬·범위 압축한다(시험 포인트 질문 옆 출처용).
+const normalizeCitation = (citation: string): string => {
+  const inner = citation.replace(/^\(출처:\s*/, "").replace(/\)\s*$/, "");
+  const compressed = compressLocations(inner.split(",").map(part => part.trim()).filter(Boolean));
+  return compressed.length ? `(출처: ${compressed.join(", ")})` : "";
+};
+
 // - 질문과 답을 같은 '>' 인용문 박스 안에 넣어 한 카드로 묶는다(출처는 질문 줄 끝으로 모음).
 // - '답:'과 답 내용도 박스 안에서 리스트로 들여쓴다. ('답:'은 렌더 시 글머리 숨김)
 const formatExamCards = (sectionLines: string[]): string[] => {
@@ -586,11 +618,15 @@ const formatExamCards = (sectionLines: string[]): string[] => {
   items.forEach((it, idx) => {
     let question = it.question;
     const answerLines = it.answer.filter(a => a.trim() !== "");
-    if (!SRC.test(question)) {
+    const qm = question.match(SRC);
+    if (qm) {
+      // 질문에 이미 있는 출처도 페이지 정렬·범위 압축한다.
+      question = question.replace(SRC, normalizeCitation(qm[0]));
+    } else {
       for (let a = 0; a < answerLines.length; a++) {
         const m = answerLines[a].match(SRC);
         if (m) {
-          question = `${question} ${m[0]}`;
+          question = `${question} ${normalizeCitation(m[0])}`;
           answerLines[a] = answerLines[a].replace(SRC, "").replace(/\s+$/, "");
           break;
         }
@@ -651,10 +687,10 @@ const formatMethodSection = (sectionLines: string[]): string[] => {
         .split(",").map(part => part.trim()).filter(Boolean)
         .forEach(part => { if (!locs.includes(part)) locs.push(part); });
     }
-    // 페이지/슬라이드 번호 순으로 정렬한다(p.34가 p.32 앞에 오는 등 수집 순서 뒤섞임 방지).
-    locs.sort((a, b) => (parseInt(a.match(/\d+/)?.[0] ?? "0", 10)) - (parseInt(b.match(/\d+/)?.[0] ?? "0", 10)));
+    // 페이지 번호 순 정렬 + 연속 구간을 범위(p.90-93)로 압축.
+    const compressed = compressLocations(locs);
     const headClean = head.replace(SRC_G, "").trimEnd();
-    out.push(locs.length ? `${headClean} (출처: ${locs.join(", ")})` : headClean);
+    out.push(compressed.length ? `${headClean} (출처: ${compressed.join(", ")})` : headClean);
     body.forEach(l => out.push(l.replace(SRC_G, "").trimEnd()));
   }
   return out;
