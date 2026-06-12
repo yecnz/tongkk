@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://13.125.43.148/:path*"
+      "destination": "https://api.tongkk.com/:path*"
     },
     {
       "source": "/(.*)",
