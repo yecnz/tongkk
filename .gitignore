@@ -12,6 +12,9 @@ dist-ssr/
 !.env.example
 server/.env
 
+# 로컬 1회용 관리자 스크립트 (service_role 키로 실행 — 절대 커밋 금지)
+fix-user-email.mjs
+
 # python
 __pycache__/
 *.py[cod]
