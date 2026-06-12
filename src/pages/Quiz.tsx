@@ -13,6 +13,7 @@ import {
   type WrongAnalysisItem,
 } from "../services/gpt";
 import { saveWrongAnswerAnalysisToServer } from "../services/wrongAnswerAnalyses";
+import { useAuth } from "../AuthContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
 import { loadSummariesFromServer, type SavedSummary } from "../services/summaries";
@@ -237,6 +238,7 @@ const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
 export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const reviewState = location.state as QuizLocationState;
   const reviewQuestions = reviewState?.reviewQuestions || null;
   const hasReviewQuestions = Boolean(reviewQuestions && reviewQuestions.length > 0);
@@ -1053,7 +1055,8 @@ export default function Quiz() {
   );
 
   // 단독 과목 선택/자료 목록 브라우징 제거: 핸드오프 없이 진입하면 대시보드로 보낸다.
-  if (view === "courseList" || view === "materialList") {
+  // 게스트도 마찬가지 — 새로고침으로 history state가 재생돼도 진입을 막는다.
+  if (!user || view === "courseList" || view === "materialList") {
     return <Navigate to={pageRoutes["대시보드"]} replace />;
   }
 

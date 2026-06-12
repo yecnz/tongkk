@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useToast } from "../ToastContext";
+import { useAuth } from "../AuthContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
 import { loadQuizSetsFromServer } from "../services/quizSets";
 import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer } from "../services/wrongAnswerAnalyses";
@@ -23,6 +24,7 @@ type WrongEntry = {
 
 export default function ReviewNotes() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "오답 노트";
   const [sidebar, setSidebar] = useState(false);
@@ -35,6 +37,13 @@ export default function ReviewNotes() {
 
   useEffect(() => {
     let ignore = false;
+    // 게스트는 조회 없이 빈 상태로 — 로그인하면(user 갱신) 자동 재로딩.
+    if (!user) {
+      setAttempts([]);
+      setAnalyses(new Map());
+      setLoading(false);
+      return () => { ignore = true; };
+    }
     setLoading(true);
     Promise.all([
       loadAllQuizAttemptsFromServer({ includeAnswers: true }),
@@ -49,7 +58,7 @@ export default function ReviewNotes() {
       .catch(err => { if (!ignore) showToast(err instanceof Error ? err.message : "오답 노트를 불러오지 못했습니다.", "error"); })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
-  }, [showToast]);
+  }, [user, showToast]);
 
   // attempts는 created_at desc → 처음 만난 question 텍스트가 가장 최근 회차
   const wrongEntries = useMemo(() => {

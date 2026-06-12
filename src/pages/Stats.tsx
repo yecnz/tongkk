@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useToast } from "../ToastContext";
+import { useAuth } from "../AuthContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
 import {
   averageScore,
@@ -60,6 +61,7 @@ const CHART_TOP_PAD = 22;
 
 export default function Stats() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "학습 통계";
   const [sidebar, setSidebar] = useState(false);
@@ -70,13 +72,19 @@ export default function Stats() {
 
   useEffect(() => {
     let ignore = false;
+    // 게스트는 조회 없이 빈 상태로 — 로그인하면(user 갱신) 자동 재로딩.
+    if (!user) {
+      setAttempts([]);
+      setLoading(false);
+      return () => { ignore = true; };
+    }
     setLoading(true);
     loadAllQuizAttemptsFromServer()
       .then(rows => { if (!ignore) setAttempts(rows); })
       .catch(err => { if (!ignore) showToast(err instanceof Error ? err.message : "학습 통계를 불러오지 못했습니다.", "error"); })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
-  }, [showToast]);
+  }, [user, showToast]);
 
   const trend = useMemo(() => scoreTrend(attempts), [attempts]);
   const courses = useMemo(() => coursePerformance(attempts), [attempts]);

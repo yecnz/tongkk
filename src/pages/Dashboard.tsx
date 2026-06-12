@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
 import { useCourses } from "../CourseContext";
+import { useAuth } from "../AuthContext";
+import { useAuthGate } from "../AuthGateContext";
 import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
@@ -572,6 +574,8 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { requireAuth } = useAuthGate();
   const { courses, addCourse, renameCourse, deleteCourse, hasLoadedCourses } = useCourses();
   const { showToast } = useToast();
   const [sidebar, setSidebar] = useState(false);
@@ -669,6 +673,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     let ignore = false;
+    // 게스트(또는 세션 만료)면 서버 호출 없이 빈 상태로 — user가 deps에 있어 로그인 시 자동 재로딩.
+    if (!user) {
+      setDdays([]);
+      setPlans([]);
+      setDashboardStateLoaded(false);
+      return () => {
+        ignore = true;
+      };
+    }
     Promise.all([
       loadDashboardState<Dday[]>("ddays", []),
       loadDashboardState<Plan[]>("plans", []),
@@ -685,7 +698,7 @@ export default function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!dashboardStateLoaded) return;
@@ -699,6 +712,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     let ignore = false;
+    if (!user) {
+      setPacePlans([]);
+      return () => { ignore = true; };
+    }
     loadDashboardState<PacePlan[]>("pacePlans", [])
       .then(next => {
         if (ignore) return;
@@ -706,7 +723,7 @@ export default function Dashboard() {
       })
       .catch(error => console.warn("페이스 플랜 불러오기 실패", error));
     return () => { ignore = true; };
-  }, []);
+  }, [user]);
 
   // 응시 기록 로드: 페이스 플랜 진행도·준비도 계산 + 간격 반복 복습 추천 + AI 계획 컨텍스트에 사용.
   // 과목 집합이 바뀔 때만 재조회하도록 안정 키에 의존(수동 플랜 변경 시 불필요한 재조회 방지).
@@ -833,6 +850,7 @@ export default function Dashboard() {
   })();
 
   const openPlanSourcePicker = (mode: StudyPlanMode) => {
+    if (!requireAuth("AI 학습 계획을 만들려면 로그인이 필요해요")) return;
     if (!canGenerateStudyPlan) return;
     const recommendedKeys = getRecommendedPlanSourceKeys(mode);
     const recommendedSources = planSources.filter(source => recommendedKeys.includes(source.key));
@@ -1257,7 +1275,7 @@ export default function Dashboard() {
                 <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.7, color: "var(--color-muted)" }}>
                   강의를 만들고 강의자료를 올려보세요.<br />AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
                 </p>
-                <button type="button" onClick={() => setShowAddCourse(true)} style={{
+                <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
                   padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
                   color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
                   boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
@@ -1318,7 +1336,7 @@ export default function Dashboard() {
                     </Card>
                   );
                 })}
-                <button type="button" onClick={() => setShowAddCourse(true)} style={{
+                <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
                   minHeight: 120, borderRadius: 18, border: "1px dashed var(--color-border)",
                   background: "var(--color-card)", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
                 }}>+ 강의 추가하기</button>
@@ -1332,7 +1350,7 @@ export default function Dashboard() {
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: PINK }}>D-day</h3>
-                <button type="button" onClick={() => setShowAddDday(true)} aria-label="D-day 추가" title="D-day 추가" style={{
+                <button type="button" onClick={() => { if (!requireAuth("D-day를 추가하려면 로그인이 필요해요")) return; setShowAddDday(true); }} aria-label="D-day 추가" title="D-day 추가" style={{
                   background: "none", border: "none", fontSize: 20, color: PINK, cursor: "pointer", lineHeight: 1
                 }}>+</button>
               </div>
@@ -1465,7 +1483,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowAddPlan(true)}
+                  onClick={() => { if (!requireAuth("학습 계획을 추가하려면 로그인이 필요해요")) return; setShowAddPlan(true); }}
                   style={{
                     flex: 1, padding: "8px 10px", borderRadius: 8,
                     border: `1px solid ${CYAN}`, background: "var(--color-card)",

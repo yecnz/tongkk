@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
+import { AuthGateProvider } from "./AuthGateContext";
 import { CourseProvider } from "./CourseContext";
 import { ToastProvider } from "./ToastContext";
+import { OnboardingGate } from "./components/OnboardingModal";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
@@ -15,7 +17,7 @@ import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
 import UpdatePrompt from "./UpdatePrompt";
 
-function ProtectedApp() {
+function AppShell() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
@@ -49,8 +51,6 @@ function ProtectedApp() {
     );
   }
 
-  if (!user) return <Navigate to="/auth" replace />;
-
   return (
     <CourseProvider>
       <Routes>
@@ -72,10 +72,13 @@ function App() {
     <ToastProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/*" element={<ProtectedApp />} />
-          </Routes>
+          <AuthGateProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/*" element={<AppShell />} />
+            </Routes>
+            <OnboardingGate />
+          </AuthGateProvider>
         </BrowserRouter>
       </AuthProvider>
       <UpdatePrompt />
