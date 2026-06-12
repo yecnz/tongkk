@@ -147,7 +147,8 @@ const FormattedTutorText = ({ content }: { content: string }) => {
   if (!cleaned) return null;
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
+    // 단일 '~'(예: 'p.8~p.9' 페이지 범위)를 취소선으로 오인하지 않도록 singleTilde:false. '~~'만 취소선.
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
       {cleaned}
     </ReactMarkdown>
   );
