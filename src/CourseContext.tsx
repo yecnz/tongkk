@@ -46,7 +46,9 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     let ignore = false;
     if (!user) {
       setCourses([]);
-      setHasLoadedCourses(false);
+      setCourseSyncError("");
+      // 게스트는 동기화 대상이 없으므로 곧바로 빈 상태로 — false면 스켈레톤에 영원히 갇힌다.
+      setHasLoadedCourses(true);
       return () => {
         ignore = true;
       };
@@ -55,6 +57,8 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     const loadServerCourses = async () => {
       setIsSyncingCourses(true);
       setCourseSyncError("");
+      // 로그인 직후 첫 동기화 동안은 스켈레톤을 보여준다(빈 상태 깜빡임 방지).
+      setHasLoadedCourses(false);
       try {
         const serverCourses = await reloadCourses();
         if (!ignore) applyServerCourses(serverCourses);

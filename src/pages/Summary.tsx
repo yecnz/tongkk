@@ -9,6 +9,7 @@ import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { summarizeWithTemplateStream } from "../services/summaryStream";
+import { useAuth } from "../AuthContext";
 import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
@@ -3045,6 +3046,7 @@ const QuizCreateView = ({ fileName, onBack, onCreate }: QuizCreateViewProps) => 
 export default function Summary() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const locationState = (location.state as LocationState) || null;
@@ -3254,7 +3256,8 @@ export default function Summary() {
   }, []);
 
   useEffect(() => {
-    if (!selectedCourse) return;
+    // 게스트는 곧바로 대시보드로 리다이렉트되므로 조회하지 않는다(호출하면 인증 오류).
+    if (!user || !selectedCourse) return;
     let ignore = false;
 
     Promise.all([
@@ -3382,11 +3385,14 @@ export default function Summary() {
     return () => {
       ignore = true;
     };
-  }, [selectedCourse]);
+  }, [user, selectedCourse]);
 
   // 보던 화면을 URL(위치)과 세션(세부)에 반영해 새로고침/딥링크 복원을 지원한다.
   // state -> URL/세션 단방향 동기화이며, replace로 갱신해 히스토리를 더럽히지 않는다.
   useEffect(() => {
+    // 게스트는 아래 가드의 <Navigate>가 대시보드로 보내는 중 — 여기서 setSearchParams(replace)를
+    // 호출하면 같은 커밋의 리다이렉트를 덮어써 /summary에 갇히므로 동기화를 건너뛴다.
+    if (!user) return;
     if (!selectedCourse) {
       if (searchParams.toString()) setSearchParams(new URLSearchParams(), { replace: true });
       clearSummaryViewDetail();
@@ -3939,7 +3945,8 @@ export default function Summary() {
     setMaterialDetailReviewTitle("");
   };
 
-  if (!selectedCourse) return <Navigate to={pageRoutes["대시보드"]} replace />;
+  // 게스트는 핸드오프를 받을 경로가 없다 — URL 딥링크(/summary?course=X)로 들어와도 대시보드로.
+  if (!user || !selectedCourse) return <Navigate to={pageRoutes["대시보드"]} replace />;
 
   return (
     <div className="tongkk-soft-surface" style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>

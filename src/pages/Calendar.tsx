@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import type { PageRouteLabel } from "../common";
 import { useCourses } from "../CourseContext";
+import { useAuth } from "../AuthContext";
+import { useAuthGate } from "../AuthGateContext";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { buildPaceCalendarEntries, paceDateKey, type PacePlan } from "../services/pace";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
@@ -40,6 +42,8 @@ const formatPanelDate = (dateStr: string) => {
 
 export default function Calendar() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { requireAuth } = useAuthGate();
   const { courses } = useCourses();
   const page: PageRouteLabel = "학습 캘린더";
   const [sidebar, setSidebar] = useState(false);
@@ -64,6 +68,14 @@ export default function Calendar() {
   // (load는 .then 콜백에서 setState → effect 내 동기 setState 아님)
   useEffect(() => {
     let ignore = false;
+    // 게스트(또는 세션 만료)면 서버 호출 없이 빈 상태로 — user가 deps에 있어 로그인 시 자동 재로딩.
+    if (!user) {
+      setDdays([]);
+      setPlans([]);
+      setPacePlans([]);
+      setLoaded(false);
+      return () => { ignore = true; };
+    }
     Promise.all([
       loadDashboardState<Dday[]>("ddays", []),
       loadDashboardState<Plan[]>("plans", []),
@@ -78,7 +90,7 @@ export default function Calendar() {
       })
       .catch(error => console.warn("학습 캘린더 상태 불러오기 실패", error));
     return () => { ignore = true; };
-  }, []);
+  }, [user]);
 
   useEffect(() => { if (loaded) saveDashboardState("ddays", ddays).catch(console.warn); }, [loaded, ddays]);
   useEffect(() => { if (loaded) saveDashboardState("plans", plans).catch(console.warn); }, [loaded, plans]);
@@ -280,8 +292,8 @@ export default function Calendar() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>할 일</span>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button type="button" onClick={() => setShowAddPlan(true)} style={addBtnStyle}>+ 할 일</button>
-                  <button type="button" onClick={() => setShowAddPace(true)} style={addBtnStyle}>+ 페이스</button>
+                  <button type="button" onClick={() => { if (!requireAuth("할 일을 추가하려면 로그인이 필요해요")) return; setShowAddPlan(true); }} style={addBtnStyle}>+ 할 일</button>
+                  <button type="button" onClick={() => { if (!requireAuth("페이스를 추가하려면 로그인이 필요해요")) return; setShowAddPace(true); }} style={addBtnStyle}>+ 페이스</button>
                 </div>
               </div>
               {dayPaceEntries.length === 0 && dayPlanEntries.length === 0 ? (
@@ -370,7 +382,7 @@ export default function Calendar() {
               {/* 그 날의 마감 / 일정 */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>마감 · 일정</span>
-                <button type="button" onClick={() => setShowAddDday(true)} style={addBtnStyle}>+ D-day</button>
+                <button type="button" onClick={() => { if (!requireAuth("D-day를 추가하려면 로그인이 필요해요")) return; setShowAddDday(true); }} style={addBtnStyle}>+ D-day</button>
               </div>
               {dayDdays.length === 0 ? (
                 <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>이 날의 D-day가 없습니다</p>

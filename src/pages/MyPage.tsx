@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useAuth } from "../AuthContext";
+import { useAuthGate } from "../AuthGateContext";
 import {
   deleteOwnAppData,
   loadUserProfile,
@@ -213,6 +214,7 @@ const SettingsModal = ({
 export default function MyPage() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { requireAuth, openLogin } = useAuthGate();
   const [sidebar, setSidebar] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialog>(null);
@@ -250,6 +252,13 @@ export default function MyPage() {
 
   useEffect(() => {
     let ignore = false;
+    // 게스트는 프로필 조회 없이 기본값 유지 — 로그인하면(user 갱신) 자동 재로딩.
+    if (!user) {
+      setError("");
+      return () => {
+        ignore = true;
+      };
+    }
     const loadInitialProfile = async () => {
       try {
         const nextProfile = await loadUserProfile();
@@ -265,9 +274,10 @@ export default function MyPage() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [user]);
 
   const updateProfile = async (nextProfile: UserProfile) => {
+    if (!requireAuth("설정을 저장하려면 로그인이 필요해요")) return;
     setProfile(nextProfile);
     applyTheme(nextProfile.darkMode);
     try {
@@ -288,7 +298,7 @@ export default function MyPage() {
   const handleDeleteData = async () => {
     await deleteOwnAppData();
     await signOut();
-    navigate("/auth", { replace: true });
+    navigate("/", { replace: true });
   };
 
   return (
@@ -312,36 +322,53 @@ export default function MyPage() {
           <Card style={{ padding: 28 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>프로필</h3>
-              <button type="button" onClick={() => setShowEdit(true)} style={{
-                background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
-                color: PINK, fontSize: 13, fontWeight: 600
-              }}>
-                <span style={{ fontSize: 14 }}>✎</span> 편집
-              </button>
+              {user && (
+                <button type="button" onClick={() => setShowEdit(true)} style={{
+                  background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                  color: PINK, fontSize: 13, fontWeight: 600
+                }}>
+                  <span style={{ fontSize: 14 }}>✎</span> 편집
+                </button>
+              )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
-                background: profile.avatarUrl ? "none" : `${CYAN}40`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: CYAN, fontWeight: 800, fontSize: 18
-              }}>
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : profile.nickname.slice(0, 2).toUpperCase()}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-strong)", marginBottom: 3 }}>{profile.nickname}</div>
-                <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
-                <div style={{ fontSize: 12, color: "var(--color-muted)", wordBreak: "break-all" }}>{user?.email}</div>
-              </div>
-            </div>
-            {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
-            <button type="button" onClick={() => signOut().then(() => navigate("/auth", { replace: true }))} style={{
-              width: "100%", padding: "9px 0", borderRadius: 10,
-              border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-muted)",
-              fontSize: 13, cursor: "pointer"
-            }}>로그아웃</button>
+            {user ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+                  <div style={{
+                    width: 56, height: 56, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+                    background: profile.avatarUrl ? "none" : `${CYAN}40`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: CYAN, fontWeight: 800, fontSize: 18
+                  }}>
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : profile.nickname.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-strong)", marginBottom: 3 }}>{profile.nickname}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
+                    <div style={{ fontSize: 12, color: "var(--color-muted)", wordBreak: "break-all" }}>{user?.email}</div>
+                  </div>
+                </div>
+                {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
+                <button type="button" onClick={() => signOut().then(() => navigate("/", { replace: true }))} style={{
+                  width: "100%", padding: "9px 0", borderRadius: 10,
+                  border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-muted)",
+                  fontSize: 13, cursor: "pointer"
+                }}>로그아웃</button>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)", lineHeight: 1.6 }}>
+                  로그인하고 과목·자료·요약·퀴즈 기록을 계정에 저장하세요.
+                </p>
+                <button type="button" onClick={() => openLogin()} style={{
+                  width: "100%", padding: "11px 0", borderRadius: 10,
+                  border: "none", background: PINK, color: "var(--color-on-brand)",
+                  fontSize: 13, fontWeight: 700, cursor: "pointer"
+                }}>로그인</button>
+              </>
+            )}
           </Card>
 
           {/* 앱 설정 */}
@@ -385,7 +412,7 @@ export default function MyPage() {
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)", lineHeight: 1.6 }}>
               과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
             </p>
-            <button type="button" onClick={() => setSettingsDialog("deleteAccount")} style={{
+            <button type="button" onClick={() => { if (!requireAuth("데이터를 관리하려면 로그인이 필요해요")) return; setSettingsDialog("deleteAccount"); }} style={{
               width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-danger) 45%, transparent)",
               background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 13, fontWeight: 700, cursor: "pointer"
             }}>내 앱 데이터 삭제</button>
