@@ -14,6 +14,7 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updateEmail: (newEmail: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -79,6 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth`,
       });
+      if (error) throw error;
+    },
+    // 이메일(=로그인 ID)만 교체한다. user_id(UUID)는 그대로라 과목/자료/요약/퀴즈가 모두 유지된다.
+    updateEmail: async (newEmail) => {
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
       if (error) throw error;
     },
   }), [loading, session]);

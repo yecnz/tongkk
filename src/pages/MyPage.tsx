@@ -19,7 +19,7 @@ type ProfileEditModalProps = {
   onSave: (nickname: string, avatarFile: File | null) => Promise<void>;
   onClose: () => void;
 };
-type SettingsDialog = "notice" | "contact" | "deleteAccount" | null;
+type SettingsDialog = "notice" | "contact" | "deleteAccount" | "changeEmail" | null;
 
 const Toggle = ({ on, onToggle }: ToggleProps) => (
   <button type="button" onClick={onToggle} style={{
@@ -112,19 +112,32 @@ const SettingsModal = ({
   type,
   onClose,
   onDeleteData,
+  currentEmail,
+  onChangeEmail,
 }: {
   type: SettingsDialog;
   onClose: () => void;
   onDeleteData: () => Promise<void>;
+  currentEmail?: string | null;
+  onChangeEmail: (newEmail: string) => Promise<void>;
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   // 전체 데이터 파기는 되돌릴 수 없어, "삭제"를 직접 입력해야 버튼이 활성화된다.
   const [confirmText, setConfirmText] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [emailDone, setEmailDone] = useState(false);
   const deleteReady = confirmText.trim() === "삭제";
+  const trimmedEmail = emailInput.trim();
+  const emailValid =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) &&
+    trimmedEmail.toLowerCase() !== (currentEmail ?? "").toLowerCase();
   if (!type) return null;
 
-  const title = type === "notice" ? "공지사항" : type === "contact" ? "문의하기" : "회원 데이터 삭제";
+  const title = type === "notice" ? "공지사항"
+    : type === "contact" ? "문의하기"
+    : type === "changeEmail" ? "이메일 변경"
+    : "회원 데이터 삭제";
 
   const handleDelete = async () => {
     if (!deleteReady) return;
@@ -134,6 +147,20 @@ const SettingsModal = ({
       await onDeleteData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "데이터 삭제 실패");
+      setLoading(false);
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    if (!emailValid || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      await onChangeEmail(trimmedEmail);
+      setEmailDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "이메일 변경에 실패했어요. 이미 사용 중인 이메일일 수 있어요.");
+    } finally {
       setLoading(false);
     }
   };
@@ -206,6 +233,57 @@ const SettingsModal = ({
             </button>
           </div>
         )}
+
+        {type === "changeEmail" && (
+          <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
+            {emailDone ? (
+              <>
+                <p style={{ margin: "0 0 16px" }}>
+                  이메일을 <strong>{trimmedEmail}</strong>(으)로 변경했어요. 과목·자료·요약·퀴즈 기록은 그대로 유지됩니다.
+                </p>
+                <button type="button" onClick={onClose} style={{
+                  width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
+                  background: CYAN, color: "var(--color-on-brand)", fontWeight: 800, cursor: "pointer"
+                }}>닫기</button>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 8px" }}>
+                  로그인에 쓰는 이메일을 바꿉니다.<br />
+                  <strong>과목·자료·요약·퀴즈 기록은 그대로 유지</strong>됩니다.
+                </p>
+                <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--color-muted)", wordBreak: "break-all" }}>
+                  현재 이메일: {currentEmail || "-"}
+                </p>
+                {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
+                <label style={{ display: "block", marginBottom: 6, fontSize: 12.5, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                  새 이메일
+                </label>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={event => setEmailInput(event.target.value)}
+                  placeholder="new@email.com"
+                  style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+                    fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12,
+                  }}
+                />
+                <button type="button"
+                  onClick={handleChangeEmail}
+                  disabled={loading || !emailValid}
+                  style={{
+                    width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
+                    background: loading || !emailValid ? "#ddd" : CYAN, color: "var(--color-on-brand)",
+                    fontWeight: 800, cursor: loading || !emailValid ? "default" : "pointer"
+                  }}
+                >
+                  {loading ? "변경 중" : "이메일 변경"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -213,7 +291,7 @@ const SettingsModal = ({
 
 export default function MyPage() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateEmail } = useAuth();
   const { requireAuth, openLogin } = useAuthGate();
   const [sidebar, setSidebar] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -305,7 +383,7 @@ export default function MyPage() {
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="마이페이지" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {showEdit && <ProfileEditModal nickname={profile.nickname} avatarUrl={profile.avatarUrl} onSave={handleProfileSave} onClose={() => setShowEdit(false)} />}
-      <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} />
+      <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} currentEmail={user?.email} onChangeEmail={updateEmail} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
@@ -351,6 +429,11 @@ export default function MyPage() {
                   </div>
                 </div>
                 {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
+                <button type="button" onClick={() => { if (!requireAuth("이메일을 변경하려면 로그인이 필요해요")) return; setSettingsDialog("changeEmail"); }} style={{
+                  width: "100%", padding: "9px 0", borderRadius: 10, marginBottom: 8,
+                  border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text)",
+                  fontSize: 13, cursor: "pointer"
+                }}>이메일 변경</button>
                 <button type="button" onClick={() => signOut().then(() => navigate("/", { replace: true }))} style={{
                   width: "100%", padding: "9px 0", borderRadius: 10,
                   border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-muted)",
