@@ -527,9 +527,15 @@ export const AITutorDrawer = ({
         }
       }
 
+      // 새로고침으로 세션을 다시 열면 thread_id가 없어 히스토리 전체를 재전송하는데,
+      // 이미지 전용 메시지는 저장 시 이미지가 빠져(내용·이미지 모두 없음) 백엔드 검증(422)에 걸린다.
+      // 백엔드 규칙(내용 또는 이미지 필수)을 미러링해 보낼 수 없는 메시지는 제외한다.
+      const sendableHistory = nextMessages.filter(
+        m => m.content.trim().length > 0 || (m.images?.length ?? 0) > 0,
+      );
       const response = await sendAgentMessage(
         localThreadId,
-        localThreadId ? [userMessage] : nextMessages,
+        localThreadId ? [userMessage] : sendableHistory,
         localThreadId ? undefined : contextMarkdown,
         localThreadId ? undefined : sourceMarkdown,
         localThreadId ? undefined : sourcePages,

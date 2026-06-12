@@ -6,7 +6,23 @@ export const BACKEND_URL = (
   '/api'
 ).replace(/\/$/, '');
 
-type ApiErrorBody = { detail?: string };
+// FastAPI 에러 본문. HTTPException은 detail이 문자열이지만,
+// 요청 검증 에러(422)는 detail이 [{ loc, msg, type }, ...] 객체 배열로 온다.
+type ValidationErrorItem = { loc?: (string | number)[]; msg?: string; type?: string };
+type ApiErrorBody = { detail?: string | ValidationErrorItem[] };
+
+// detail이 문자열이든 검증 에러 객체 배열이든 사람이 읽을 문자열로 변환한다(없으면 null).
+// 이 변환이 없으면 객체 배열이 그대로 new Error(...)로 넘어가 "[object Object]"가 표시된다.
+function detailToMessage(detail: ApiErrorBody['detail']): string | null {
+  if (typeof detail === 'string') return detail.trim() || null;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map(item => (typeof item?.msg === 'string' ? item.msg : null))
+      .filter((msg): msg is string => Boolean(msg));
+    if (messages.length) return messages.join(' / ');
+  }
+  return null;
+}
 
 const TUNNEL_TIMEOUT_STATUSES = [522, 524, 504];
 
@@ -60,7 +76,8 @@ export async function parseApiError(response: Response): Promise<string> {
 
   try {
     const parsed = JSON.parse(text) as ApiErrorBody;
-    if (parsed.detail) return parsed.detail;
+    const detailMessage = detailToMessage(parsed.detail);
+    if (detailMessage) return detailMessage;
   } catch {
     // Fall through to compact text response.
   }
