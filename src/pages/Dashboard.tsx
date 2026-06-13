@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
+import { useTutorial } from "../TutorialContext";
+import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { useAuthGate } from "../AuthGateContext";
 import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
@@ -578,7 +580,13 @@ export default function Dashboard() {
   const { requireAuth } = useAuthGate();
   const { courses, addCourse, renameCourse, deleteCourse, hasLoadedCourses } = useCourses();
   const { showToast } = useToast();
+  const { ready: readyTutorial } = useTutorial();
   const [sidebar, setSidebar] = useState(false);
+
+  // 강의 목록 로딩이 끝난 뒤에 대시보드 튜토리얼을 띄운다(스켈레톤 위 노출 방지).
+  useEffect(() => {
+    if (hasLoadedCourses) readyTutorial("dashboard");
+  }, [hasLoadedCourses, readyTutorial]);
   const [showNotice, setShowNotice] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const page: PageRouteLabel = "대시보드";
@@ -1171,7 +1179,7 @@ export default function Dashboard() {
       {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-border-soft)" }}>
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
@@ -1214,6 +1222,7 @@ export default function Dashboard() {
           <PaperPlaneIcon />
           <span className="header-btn-label">피드백 보내기</span>
         </button>
+        <TutorialHelpButton tutorialKey="dashboard" />
       </div>
 
       <div className="app-container">

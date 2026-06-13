@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import { AuthGateProvider } from "./AuthGateContext";
 import { CourseProvider } from "./CourseContext";
 import { ToastProvider } from "./ToastContext";
-import { OnboardingGate } from "./components/OnboardingModal";
+import { TutorialProvider } from "./TutorialContext";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
@@ -73,11 +73,12 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <AuthGateProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/*" element={<AppShell />} />
-            </Routes>
-            <OnboardingGate />
+            <TutorialProvider>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/*" element={<AppShell />} />
+              </Routes>
+            </TutorialProvider>
           </AuthGateProvider>
         </BrowserRouter>
       </AuthProvider>

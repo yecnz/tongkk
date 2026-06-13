@@ -225,7 +225,7 @@ const SettingsModal = ({
               disabled={loading || !deleteReady}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                background: loading || !deleteReady ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
+                background: loading || !deleteReady ? "var(--color-muted-surface)" : "var(--color-danger)", color: "var(--color-on-brand)",
                 fontWeight: 800, cursor: loading || !deleteReady ? "default" : "pointer"
               }}
             >
@@ -274,7 +274,7 @@ const SettingsModal = ({
                   disabled={loading || !emailValid}
                   style={{
                     width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                    background: loading || !emailValid ? "#ddd" : CYAN, color: "var(--color-on-brand)",
+                    background: loading || !emailValid ? "var(--color-muted-surface)" : CYAN, color: "var(--color-on-brand)",
                     fontWeight: 800, cursor: loading || !emailValid ? "default" : "pointer"
                   }}
                 >
