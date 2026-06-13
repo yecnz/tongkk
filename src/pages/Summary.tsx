@@ -3265,6 +3265,8 @@ export default function Summary() {
     shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
   );
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
+  // 전체 선택 버튼 하나로 토글: 전부 선택돼 있으면 해제, 아니면 전체 선택.
+  const allMaterialsSelected = materials.length > 0 && selectedMaterials.length === materials.length;
   const selectedMarkdown = combineMaterialsMarkdown(selectedMaterials);
   // 선택 자료에 페이지 마커가 하나도 없으면 '반영할 페이지'가 동작하지 않으므로 입력을 막고 안내한다.
   const selectedHasPageMarkers = selectedMaterials.some(material => hasPageMarkers(material.markdown));
@@ -4598,8 +4600,7 @@ export default function Summary() {
                         강의자료 선택
                       </h4>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 선택</button>
-                        <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 해제</button>
+                        <button type="button" onClick={() => setSelectedMaterialIds(allMaterialsSelected ? [] : materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>{allMaterialsSelected ? "전체 해제" : "전체 선택"}</button>
                         <button
                           type="button"
                           onClick={requestBulkDeleteMaterials}
