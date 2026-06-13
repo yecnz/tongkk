@@ -19,11 +19,7 @@ from config import (
     PROJECT_DIR,
     FRONTEND_ORIGIN,
     ALLOWED_ORIGINS,
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
     GOOGLE_VISION_API_KEY,
-    SUPABASE_PLACEHOLDER_VALUES,
-    ALLOW_NO_AUTH,
     _env_int,
     VISUAL_ANALYSIS_MODE,
     VISUAL_ANALYSIS_MODEL,
@@ -44,7 +40,7 @@ from config import (
     MAX_CHAT_IMAGE_CHARS,
 )
 
-from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
@@ -92,6 +88,7 @@ from llm import (
     _validate_wrong_analysis,
     _run_llm_call,
 )
+from auth import require_api_user
 
 
 app = FastAPI()
@@ -109,42 +106,6 @@ app.add_middleware(
 )
 
 md_converter = MarkItDown()
-
-
-async def require_api_user(authorization: str | None = Header(default=None)):
-    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        if ALLOW_NO_AUTH:
-            return None
-        raise HTTPException(
-            status_code=503,
-            detail="서버 인증 설정(SUPABASE_URL/SUPABASE_ANON_KEY)이 누락되었습니다.",
-        )
-    if SUPABASE_URL in SUPABASE_PLACEHOLDER_VALUES:
-        raise HTTPException(status_code=503, detail="백엔드 Supabase URL이 실제 프로젝트 주소로 설정되지 않았습니다.")
-
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="로그인이 필요한 API입니다.")
-
-    token = authorization.split(" ", 1)[1].strip()
-    if not token:
-        raise HTTPException(status_code=401, detail="인증 토큰이 비어 있습니다.")
-
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(
-                f"{SUPABASE_URL}/auth/v1/user",
-                headers={
-                    "apikey": SUPABASE_ANON_KEY,
-                    "Authorization": f"Bearer {token}",
-                },
-            )
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=503, detail=f"인증 서버 확인 실패: {str(e)}") from e
-
-    if response.status_code >= 400:
-        raise HTTPException(status_code=401, detail="유효하지 않은 로그인입니다.")
-
-    return response.json()
 
 
 MaterialKind = Literal["pdf", "ppt", "img", "file"]
