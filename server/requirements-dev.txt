@@ -1,0 +1,2 @@
+# 테스트 전용 의존성. 운영 requirements.txt와 분리한다.
+pytest>=8.0.0
