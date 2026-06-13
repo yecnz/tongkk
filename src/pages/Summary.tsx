@@ -3230,6 +3230,10 @@ export default function Summary() {
   // templates(템플릿 선택) 화면에서 "돌아가기" 시 돌아갈 화면.
   // 자료 상세에서 진입하면 materialDetail, 그 외에는 upload(과목 자료)로 돌아간다.
   const [templatesBackView, setTemplatesBackView] = useState<SummaryView>("upload");
+  // 자료 상세에서 "돌아가기"가 강의 자료 목록(upload 뷰)으로 가야 하는지.
+  // 목록을 거쳐 들어왔거나(요약 생성·자료 카드 클릭) 과목 안에서 이동한 경우 true,
+  // 대시보드에서 자료로 곧장 진입(딥링크)한 경우 false → 대시보드로 돌아간다.
+  const [materialDetailBackToList, setMaterialDetailBackToList] = useState(false);
   const [pendingTutorQuestion] = useState(
     shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
   );
@@ -3311,6 +3315,9 @@ export default function Summary() {
             pendingMaterialReviewContextRef.current = "";
             pendingMaterialReviewTitleRef.current = "";
             setSearched(true);
+            // 딥링크/대시보드에서 자료로 곧장 진입한 경우 — 목록을 거치지 않았으므로
+            // 돌아가기는 (대시보드 진입이면) 대시보드로 간다.
+            setMaterialDetailBackToList(false);
             setView("materialDetail");
             return;
           }
@@ -3903,6 +3910,8 @@ export default function Summary() {
           if (targetMaterial) {
             setActiveMaterial(targetMaterial);
             setMaterialDetailInitialTab("summary");
+            // 방금 만든 자료의 상세를 보여준 뒤 "돌아가기"는 강의 자료 목록으로.
+            setMaterialDetailBackToList(true);
             setView("materialDetail");
             movedToDetail = true;
           }
@@ -4333,8 +4342,14 @@ export default function Summary() {
           <MaterialDetailView
             material={activeMaterial}
             selectedCourse={selectedCourse}
-            onBack={() => { if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]); else setView("upload"); }}
-            backLabel={fromDashboardRef.current ? "← 대시보드로" : "← 과목 자료로"}
+            onBack={() => {
+              // 목록을 거쳐 들어왔으면 강의 자료 목록(upload 뷰)으로, 대시보드에서
+              // 곧장 진입(딥링크)했으면 대시보드로 돌아간다.
+              if (materialDetailBackToList && selectedCourse) setView("upload");
+              else if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]);
+              else setView("upload");
+            }}
+            backLabel={materialDetailBackToList && selectedCourse ? "← 과목 자료로" : fromDashboardRef.current ? "← 대시보드로" : "← 과목 자료로"}
             onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
             onOpenQuiz={handleOpenMaterialQuiz}
@@ -4523,6 +4538,7 @@ export default function Summary() {
                                       setMaterialDetailTutorQuestion("");
                                       setMaterialDetailReviewContext("");
                                       setMaterialDetailReviewTitle("");
+                                      setMaterialDetailBackToList(true);
                                       setView("materialDetail");
                                     }}
                                     style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
@@ -4630,6 +4646,7 @@ export default function Summary() {
                               setMaterialDetailTutorQuestion("");
                               setMaterialDetailReviewContext("");
                               setMaterialDetailReviewTitle("");
+                              setMaterialDetailBackToList(true);
                               setView("materialDetail");
                             }}
                             title="이 자료의 기존 요약 보기"
@@ -4656,6 +4673,7 @@ export default function Summary() {
                             setMaterialDetailTutorQuestion("");
                             setMaterialDetailReviewContext("");
                             setMaterialDetailReviewTitle("");
+                            setMaterialDetailBackToList(true);
                             setView("materialDetail");
                           }}
                           style={{
