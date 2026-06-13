@@ -37,7 +37,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/common.tsx', 'src/CourseContext.tsx', 'src/AuthContext.tsx', 'src/ToastContext.tsx', 'src/AuthGateContext.tsx', 'src/TutorialContext.tsx'],
+    files: ['src/common.tsx', 'src/CourseContext.tsx', 'src/AuthContext.tsx', 'src/ToastContext.tsx', 'src/AuthGateContext.tsx', 'src/TutorialContext.tsx', 'src/SampleDemoContext.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },

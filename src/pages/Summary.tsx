@@ -12,6 +12,7 @@ import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { summarizeWithTemplateStream } from "../services/summaryStream";
 import { useAuth } from "../AuthContext";
+import { useSampleDemo } from "../SampleDemoContext";
 import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
@@ -3183,6 +3184,7 @@ export default function Summary() {
   // 업로드 화면이 실제로 떠 있을 때만(복원 스켈레톤 중 아님) 자료 요약 튜토리얼을 노출한다.
   // 게스트·과목 미선택은 위에서 대시보드로 리다이렉트되므로 여기 도달하면 안전하다.
   const { ready: readyTutorial } = useTutorial();
+  const { openSampleDemo } = useSampleDemo();
   useEffect(() => {
     if (view === "upload" && !restoringFromUrl) readyTutorial("summary-upload");
   }, [view, restoringFromUrl, readyTutorial]);
@@ -4367,6 +4369,12 @@ export default function Summary() {
                       marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
                       background: "var(--color-card)", fontSize: 13, cursor: "pointer", color: "var(--color-text)"
                     }}>파일 선택</button>
+                    <div style={{ marginTop: 14, fontSize: 12.5, color: "var(--color-muted)" }}>
+                      어떤 결과가 나오는지 궁금하면{" "}
+                      <button type="button" onClick={e => { e.stopPropagation(); openSampleDemo(); }} style={{
+                        background: "none", border: "none", padding: 0, color: PINK, fontWeight: 700, fontSize: 12.5, cursor: "pointer", textDecoration: "underline",
+                      }}>예시로 둘러보기</button>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>

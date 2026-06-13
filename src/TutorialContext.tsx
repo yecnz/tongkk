@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { useAuthGate } from "./AuthGateContext";
+import { useSampleDemo } from "./SampleDemoContext";
 import { hasSeenTutorial, markTutorialSeen } from "./services/tutorialStorage";
 import { ROUTE_TO_TUTORIAL, TUTORIALS } from "./tutorialContent";
 import type { TutorialKey } from "./tutorialContent";
@@ -49,6 +50,7 @@ function pickAutoCandidate(pathname: string, isAuthed: boolean): { key: Tutorial
 export function TutorialProvider({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const { openLogin } = useAuthGate();
+  const { openSampleDemo } = useSampleDemo();
   const { pathname } = useLocation();
 
   const [active, setActive] = useState<ActiveTutorial | null>(null);
@@ -129,8 +131,13 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<TutorialApi>(() => ({ open, maybeShow, ready, close }), [open, maybeShow, ready, close]);
 
-  const primaryAction = active?.key === "welcome"
+  const isWelcome = active?.key === "welcome";
+  const primaryAction = isWelcome
     ? { label: "시작하기", onClick: () => { close(); openLogin("signIn"); } }
+    : undefined;
+  // welcome에서는 글을 읽는 대신 실제 산출물을 미리 보도록 '예시로 둘러보기'를 함께 제공한다.
+  const secondaryAction = isWelcome
+    ? { label: "예시로 둘러보기", onClick: () => { close(); openSampleDemo(); } }
     : undefined;
 
   return (
@@ -141,6 +148,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
           key={`${active.key}-${active.mode}`}
           config={TUTORIALS[active.key]}
           primaryAction={primaryAction}
+          secondaryAction={secondaryAction}
           onClose={close}
         />,
         document.body,

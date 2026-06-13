@@ -5,6 +5,7 @@ import { AuthGateProvider } from "./AuthGateContext";
 import { CourseProvider } from "./CourseContext";
 import { ToastProvider } from "./ToastContext";
 import { TutorialProvider } from "./TutorialContext";
+import { SampleDemoProvider } from "./SampleDemoContext";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
@@ -73,12 +74,14 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <AuthGateProvider>
-            <TutorialProvider>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/*" element={<AppShell />} />
-              </Routes>
-            </TutorialProvider>
+            <SampleDemoProvider>
+              <TutorialProvider>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/*" element={<AppShell />} />
+                </Routes>
+              </TutorialProvider>
+            </SampleDemoProvider>
           </AuthGateProvider>
         </BrowserRouter>
       </AuthProvider>

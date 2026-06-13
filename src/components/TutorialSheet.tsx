@@ -5,15 +5,17 @@ import type { TutorialConfig } from "../tutorialContent";
 // 튜토리얼 표현 컴포넌트. STEP n/N 페이저로 한 장씩 보여준다.
 // 규칙: 흰 배경 + 사방 중립 테두리(왼쪽 색상 띠 금지), 색은 var(--color-*) 토큰만.
 // placement=modal은 중앙 카드(welcome), sheet는 화면을 가리지 않는 우하단 안내 시트(기본).
-type PrimaryAction = { label: string; onClick: () => void };
+type SheetAction = { label: string; onClick: () => void };
 
 export function TutorialSheet({
   config,
   primaryAction,
+  secondaryAction,
   onClose,
 }: {
   config: TutorialConfig;
-  primaryAction?: PrimaryAction;
+  primaryAction?: SheetAction;
+  secondaryAction?: SheetAction;
   onClose: () => void;
 }) {
   const [step, setStep] = useState(0);
@@ -125,6 +127,28 @@ export function TutorialSheet({
           {isLast ? (primaryAction ? primaryAction.label : "완료") : "다음"}
         </button>
       </div>
+
+      {secondaryAction && (
+        <button
+          type="button"
+          onClick={secondaryAction.onClick}
+          style={{
+            display: "block",
+            width: "100%",
+            marginTop: 12,
+            background: "none",
+            border: "none",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--color-muted)",
+            cursor: "pointer",
+            padding: 0,
+            textAlign: "center",
+          }}
+        >
+          {secondaryAction.label}
+        </button>
+      )}
     </div>
   );
 
