@@ -1,4 +1,4 @@
-import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
+import { createTtlCache, readThroughCache, SWR_STALE_TTL_MS } from './cache';
 import { invalidateMaterialsCache } from './materials';
 import { invalidateQuizSetsCache } from './quizSets';
 import { invalidateSummariesCache } from './summaries';
@@ -49,16 +49,7 @@ const fetchCoursesFromServer = async (): Promise<CourseRecord[]> => {
 };
 
 export async function fetchCourses(): Promise<CourseRecord[]> {
-  const cached = coursesCache.get(COURSES_CACHE_KEY);
-  if (cached) return cached;
-
-  const stale = coursesCache.getStale(COURSES_CACHE_KEY);
-  if (stale) {
-    coursesCache.revalidate(COURSES_CACHE_KEY, fetchCoursesFromServer);
-    return stale;
-  }
-
-  return fetchCoursesFromServer();
+  return readThroughCache(coursesCache, COURSES_CACHE_KEY, fetchCoursesFromServer);
 }
 
 export async function createCourse(name: string): Promise<CourseRecord> {

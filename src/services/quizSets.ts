@@ -1,4 +1,4 @@
-import { createTtlCache, SWR_STALE_TTL_MS } from './cache';
+import { createTtlCache, readThroughCache, SWR_STALE_TTL_MS } from './cache';
 import { fetchCourses } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { QuizDifficulty, QuizQuestion, QuizQuestionType } from './gpt';
@@ -65,8 +65,6 @@ export async function loadQuizSetsFromServer(
   options?: { includeQuestions?: boolean },
 ): Promise<SavedQuizSet[]> {
   const cacheKey = `${course}::${options?.includeQuestions ? 'full' : 'light'}`;
-  const cached = quizSetsCache.get(cacheKey);
-  if (cached) return cached;
 
   const fetchList = async (): Promise<SavedQuizSet[]> => {
     const courseId = await getCourseId(course);
@@ -90,14 +88,7 @@ export async function loadQuizSetsFromServer(
     return quizSets;
   };
 
-  // 만료됐지만 stale 윈도우 안이면 일단 보여주고 백그라운드로 갱신한다(SWR).
-  const stale = quizSetsCache.getStale(cacheKey);
-  if (stale) {
-    quizSetsCache.revalidate(cacheKey, fetchList);
-    return stale;
-  }
-
-  return fetchList();
+  return readThroughCache(quizSetsCache, cacheKey, fetchList);
 }
 
 // 대시보드 통계처럼 "개수만" 필요한 곳을 위해, 행 본문을 받지 않고 Supabase count(head 요청)만 조회한다.
@@ -131,13 +122,7 @@ export async function countQuizSetsFromServer(course: string): Promise<number> {
     return total;
   };
 
-  const staleCount = quizSetsCountCache.getStale(cacheKey);
-  if (staleCount !== undefined) {
-    quizSetsCountCache.revalidate(cacheKey, fetchCount);
-    return staleCount;
-  }
-
-  return fetchCount();
+  return readThroughCache(quizSetsCountCache, cacheKey, fetchCount);
 }
 
 export async function saveQuizSetToServer(

@@ -59,3 +59,30 @@ export function createTtlCache<T>(ttlMs: number, staleTtlMs = 0) {
     },
   };
 }
+
+// createTtlCache 항목들이 공유하는 SWR 읽기 패턴. fetcher는 성공 경로에서 직접 cache.set을 한다.
+type SwrCache<T> = {
+  get(key: string): T | undefined;
+  getStale(key: string): T | undefined;
+  revalidate(key: string, fetcher: () => Promise<T>): void;
+};
+
+// 목록/개수 조회의 공통 SWR 흐름을 한 곳에 모은다:
+//   fresh가 있으면 그대로, 없고 stale 윈도우 안이면 stale을 즉시 돌려주고 백그라운드 갱신,
+//   둘 다 없으면 fetcher로 동기 조회. count 캐시는 0이 유효값이라 truthy가 아닌 !== undefined로 판정한다.
+export async function readThroughCache<T>(
+  cache: SwrCache<T>,
+  key: string,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  const fresh = cache.get(key);
+  if (fresh !== undefined) return fresh;
+
+  const stale = cache.getStale(key);
+  if (stale !== undefined) {
+    cache.revalidate(key, fetcher);
+    return stale;
+  }
+
+  return fetcher();
+}
