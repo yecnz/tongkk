@@ -493,10 +493,24 @@ const isCitationLocation = (part: string): boolean =>
 // 페이지가 아닌 위치(slide N 등)는 정렬·압축하지 않고 뒤에 그대로 붙인다.
 // (범위 기호는 '-' — '~'는 마크다운 취소선으로 깨질 수 있어 sanitizeCitationTildes와 통일.)
 const compressLocations = (locs: string[]): string[] => {
-  const pages = [...new Set(
-    locs.map(loc => loc.match(/^p\.(\d+)$/)?.[1]).filter(Boolean).map(n => parseInt(n as string, 10)),
-  )].sort((a, b) => a - b);
-  const others = locs.filter(loc => !/^p\.\d+$/.test(loc));
+  // 단일(p.13)뿐 아니라 이미 범위로 적힌 출처(p.13-14, p.13-p.14, p.13~14)도 풀어서 페이지로 모은다.
+  // 이렇게 해야 같은 범위가 다른 표기로 중복 나열되지 않는다.
+  const pageSet = new Set<number>();
+  const others: string[] = [];
+  for (const loc of locs) {
+    const range = loc.match(/^p\.(\d+)\s*[-~]\s*(?:p\.)?(\d+)$/);
+    const single = loc.match(/^p\.(\d+)$/);
+    if (range) {
+      const a = parseInt(range[1], 10);
+      const b = parseInt(range[2], 10);
+      for (let i = Math.min(a, b); i <= Math.max(a, b); i++) pageSet.add(i);
+    } else if (single) {
+      pageSet.add(parseInt(single[1], 10));
+    } else {
+      others.push(loc);
+    }
+  }
+  const pages = [...pageSet].sort((a, b) => a - b);
   const ranges: string[] = [];
   let start = -1;
   let prev = -1;
