@@ -3746,9 +3746,31 @@ export default function Summary() {
   };
 
   // 자료 삭제 확인 모달 대상과 진행·오류 상태. 요약/퀴즈 삭제 모달과 같은 패턴.
+  // pendingMaterialDelete: 단일 자료 삭제 대상, pendingBulkDelete: 요약 설정 화면에서 선택한 여러 자료 일괄 삭제.
   const [pendingMaterialDelete, setPendingMaterialDelete] = useState<CourseMaterial | null>(null);
+  const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
   const [materialDeleteBusy, setMaterialDeleteBusy] = useState(false);
   const [materialDeleteError, setMaterialDeleteError] = useState("");
+
+  // 서버에서 자료를 지운 뒤 화면 상태(자료 목록·선택·요약 배지·업로드 파일)에서도 함께 치운다.
+  // 단일 삭제와 일괄 삭제가 같은 정리 로직을 공유한다.
+  const purgeDeletedMaterialsFromState = (deletedMaterials: CourseMaterial[]) => {
+    if (deletedMaterials.length === 0) return;
+    const deletedIds = new Set(deletedMaterials.map(item => item.id));
+    const deletedNameKeys = new Set(deletedMaterials.map(item => getFileNameKey(item.name)));
+    setMaterials(prev => prev.filter(item => !deletedIds.has(item.id)));
+    setSelectedMaterialIds(prev => prev.filter(id => !deletedIds.has(id)));
+    // 자료와 함께 지워진 요약을 목록에서도 빼 "요약 N" 배지를 맞춘다.
+    setSummaries(prev => prev.filter(summary => !summary.materialIds?.some(id => deletedIds.has(id))));
+    setFiles(prev => {
+      const nextFiles = prev.filter(file =>
+        !deletedIds.has(getFileMaterialId(file)) &&
+        !deletedNameKeys.has(getFileNameKey(file.name))
+      );
+      filesRef.current = nextFiles;
+      return nextFiles;
+    });
+  };
 
   // × 버튼·자료 상세의 삭제 버튼은 바로 지우지 않고 확인 모달을 연다(Storage 원본까지 지워져 복구 불가).
   const requestDeleteMaterial = (material: CourseMaterial) => {
@@ -3771,18 +3793,7 @@ export default function Summary() {
     try {
       // 자료 본체와 파생 데이터(요약·튜터 대화·원본 파일)를 한 번에 정리한다. 퀴즈는 남긴다.
       await deleteCourseMaterialFromServer(selectedCourse, material.id);
-      setMaterials(prev => prev.filter(item => item.id !== material.id));
-      setSelectedMaterialIds(prev => prev.filter(id => id !== material.id));
-      // 자료와 함께 지워진 요약을 목록에서도 빼 "요약 N" 배지를 맞춘다.
-      setSummaries(prev => prev.filter(summary => !summary.materialIds?.includes(material.id)));
-      setFiles(prev => {
-        const nextFiles = prev.filter(file =>
-          getFileMaterialId(file) !== material.id &&
-          getFileNameKey(file.name) !== getFileNameKey(material.name)
-        );
-        filesRef.current = nextFiles;
-        return nextFiles;
-      });
+      purgeDeletedMaterialsFromState([material]);
       setPendingMaterialDelete(null);
       // 상세 화면에서 지웠다면 더 볼 자료가 없으므로 목록(또는 대시보드 출발이면 대시보드)으로 돌아간다.
       if (view === "materialDetail" && activeMaterial?.id === material.id) {
@@ -3795,6 +3806,56 @@ export default function Summary() {
     } finally {
       setMaterialDeleteBusy(false);
     }
+  };
+
+  // 요약 설정 화면의 "선택 삭제" 버튼 → 선택한 자료를 한 번에 지운다.
+  const requestBulkDeleteMaterials = () => {
+    if (selectedMaterials.length === 0) return;
+    setMaterialDeleteError("");
+    setPendingBulkDelete(true);
+  };
+
+  const closeBulkDeleteMaterials = () => {
+    if (materialDeleteBusy) return; // 삭제 진행 중에는 닫지 않는다.
+    setPendingBulkDelete(false);
+    setMaterialDeleteError("");
+  };
+
+  const confirmBulkDeleteMaterials = async () => {
+    if (!selectedCourse) return;
+    const targets = selectedMaterials; // 모달이 오버레이로 클릭을 막는 동안 선택은 고정된다.
+    if (targets.length === 0) return;
+
+    setMaterialDeleteBusy(true);
+    setMaterialDeleteError("");
+
+    // 순차 삭제: 일부가 실패해도 성공분은 화면에 반영하고, 첫 실패 지점에서 멈춰 남은 선택분을 다시 시도하게 한다.
+    const deleted: CourseMaterial[] = [];
+    let failure: { name: string; message: string } | null = null;
+    for (const material of targets) {
+      try {
+        await deleteCourseMaterialFromServer(selectedCourse, material.id);
+        deleted.push(material);
+      } catch (err) {
+        failure = { name: material.name, message: err instanceof Error ? err.message : "삭제에 실패했습니다." };
+        break;
+      }
+    }
+
+    purgeDeletedMaterialsFromState(deleted);
+    setMaterialDeleteBusy(false);
+
+    if (failure) {
+      setMaterialDeleteError(
+        deleted.length > 0
+          ? `${deleted.length}개를 삭제한 뒤 '${failure.name}'에서 멈췄어요: ${failure.message}`
+          : `'${failure.name}' 삭제에 실패했어요: ${failure.message}`
+      );
+      return; // 모달을 열어둔 채 남은 선택분을 다시 시도하게 한다.
+    }
+
+    setPendingBulkDelete(false);
+    showToast(`자료 ${deleted.length}개를 삭제했어요.`, "info");
   };
 
   const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates") => {
@@ -4539,6 +4600,21 @@ export default function Summary() {
                       <div style={{ display: "flex", gap: 6 }}>
                         <button type="button" onClick={() => setSelectedMaterialIds(materials.map(material => material.id))} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 선택</button>
                         <button type="button" onClick={() => setSelectedMaterialIds([])} style={{ border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800, color: "var(--color-text-secondary)", cursor: "pointer" }}>전체 해제</button>
+                        <button
+                          type="button"
+                          onClick={requestBulkDeleteMaterials}
+                          disabled={selectedMaterials.length === 0}
+                          title={selectedMaterials.length === 0 ? "삭제할 자료를 먼저 선택하세요" : `선택한 자료 ${selectedMaterials.length}개 삭제`}
+                          style={{
+                            border: `1px solid ${selectedMaterials.length === 0 ? BORDER_COLOR : "color-mix(in srgb, var(--color-danger) 38%, transparent)"}`,
+                            background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800,
+                            color: selectedMaterials.length === 0 ? "var(--color-muted)" : "var(--color-danger)",
+                            cursor: selectedMaterials.length === 0 ? "default" : "pointer",
+                            opacity: selectedMaterials.length === 0 ? 0.55 : 1,
+                          }}
+                        >
+                          선택 삭제{selectedMaterials.length > 0 ? ` ${selectedMaterials.length}` : ""}
+                        </button>
                       </div>
                     </div>
                     {materials.map(material => {
@@ -4710,6 +4786,16 @@ export default function Summary() {
           error={materialDeleteError}
           onCancel={closeDeleteMaterial}
           onConfirm={confirmDeleteMaterial}
+        />
+      )}
+      {pendingBulkDelete && (
+        <MaterialDeleteConfirmModal
+          materialCount={selectedMaterials.length}
+          summaryCount={summaries.filter(summary => summary.materialIds?.some(id => selectedMaterialIds.includes(id))).length}
+          busy={materialDeleteBusy}
+          error={materialDeleteError}
+          onCancel={closeBulkDeleteMaterials}
+          onConfirm={confirmBulkDeleteMaterials}
         />
       )}
     </div>
