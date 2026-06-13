@@ -3152,7 +3152,7 @@ export default function Summary() {
 
   // 업로드 화면이 실제로 떠 있을 때만(복원 스켈레톤 중 아님) 자료 요약 튜토리얼을 노출한다.
   // 게스트·과목 미선택은 위에서 대시보드로 리다이렉트되므로 여기 도달하면 안전하다.
-  const { ready: readyTutorial } = useTutorial();
+  const { ready: readyTutorial, maybeShow } = useTutorial();
   const { openSampleDemo } = useSampleDemo();
   useEffect(() => {
     if (view === "upload" && !restoringFromUrl) readyTutorial("summary-upload");
@@ -3204,6 +3204,12 @@ export default function Summary() {
   // 같은 자료·템플릿 요약이 이미 있을 때 "기존 요약 보기 / 새로 생성"을 묻는 모달.
   const [duplicateSummaryPrompt, setDuplicateSummaryPrompt] = useState<SavedSummary | null>(null);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
+  // 요약을 막 완성하면 자료 상세의 '요약' 탭으로 착지한다(handleTemplateSelect). 그 순간
+  // '만든 요약으로 학습하기'(원본·요약·퀴즈 탭) 안내를 1회 노출한다. maybeShow가 열람·인증·중복을
+  // 모두 가드하므로, 단순히 요약 탭으로 진입할 때마다 호출해도 안전하다(이미 봤으면 무시).
+  useEffect(() => {
+    if (view === "materialDetail" && materialDetailInitialTab === "summary") maybeShow("summary-result");
+  }, [view, materialDetailInitialTab, maybeShow]);
   const [activeMaterialTab, setActiveMaterialTab] = useState<MaterialDetailTab>("original");
   const [materialDetailTutorQuestion, setMaterialDetailTutorQuestion] = useState("");
   const [materialDetailReviewContext, setMaterialDetailReviewContext] = useState("");
