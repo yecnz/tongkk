@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useTutorial } from "../TutorialContext";
 import { TutorialHelpButton } from "../components/TutorialHelpButton";
+import { hasPageMarkers } from "../utils/pageMarkers";
 import {
   generateQuiz,
   gradeSubjectiveAnswer,
@@ -269,6 +270,9 @@ export default function Quiz() {
   // 자료 관련
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  // 출제 범위·집중 내용 (요약과 동일한 마커 기반 페이지 선택 + 자유 텍스트).
+  const [quizPageRange, setQuizPageRange] = useState("");
+  const [quizFocusPrompt, setQuizFocusPrompt] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
@@ -758,6 +762,18 @@ export default function Quiz() {
   };
 
   const selectedMaterials = materials.filter(material => selectedMaterialIds.includes(material.id));
+  // 페이지 선택은 '실제로 출제에 보낼' 자료에 페이지 마커가 있을 때만 동작한다.
+  // 자료 출처를 요약으로 고르면(요약엔 마커가 없음) 백엔드가 페이지 필터를 무시하므로,
+  // 출처가 '원본'이면서 그 원본에 마커가 있는 경우에만 입력을 연다.
+  const selectedHasPageMarkers = selectedMaterials.some(
+    material => getMaterialSource(material) === "raw" && hasPageMarkers(material.markdown),
+  );
+  // 원본엔 마커가 있는데 출처를 요약으로 골라 페이지 선택을 못 쓰는 경우를 구분해 안내하기 위함.
+  const selectedRawHasPageMarkers = selectedMaterials.some(material => hasPageMarkers(material.markdown));
+  // 페이지 범위 힌트는 자료가 하나일 때만 명확하므로 그 경우에만 보여준다.
+  const quizPageHint = selectedMaterials.length === 1 && selectedMaterials[0].pages
+    ? `총 ${selectedMaterials[0].pages}p`
+    : "";
 
   const generate = async () => {
     if (!selectedCourse.trim()) return;
@@ -788,7 +804,7 @@ export default function Quiz() {
           ...priorQuestions,
           ...collected.map(quiz => quiz.question),
         ])).slice(0, 80);
-        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions, diagnostic);
+        const generated = await generateQuiz(selectedCourse, count - collected.length, difficulty, markdownToUse, controller.signal, questionType, excludeQuestions, diagnostic, selectedHasPageMarkers ? quizPageRange : "", quizFocusPrompt);
         lastGenerated = generated;
         for (const question of generated) {
           const key = normalizeAnswer(question.question || "");
@@ -1371,6 +1387,37 @@ export default function Quiz() {
                 ))}
               </div>
             </div>
+
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", margin: "20px 0 8px", display: "block" }}>
+              반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
+            </label>
+            {selectedHasPageMarkers ? (
+              <input
+                value={quizPageRange}
+                onChange={e => setQuizPageRange(e.target.value)}
+                placeholder={quizPageHint ? `예: 1-5, 8  (${quizPageHint})` : "예: 1-5, 8"}
+                style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", marginBottom: 16 }}
+              />
+            ) : (
+              <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
+                {selectedMaterials.length === 0
+                  ? "자료를 선택하면 페이지 범위를 지정할 수 있어요."
+                  : selectedRawHasPageMarkers
+                    ? "자료 출처를 '원본'으로 두면 페이지를 고를 수 있어요. (요약은 페이지 정보가 없어요)"
+                    : "선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요."}
+              </div>
+            )}
+
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+              집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
+            </label>
+            <textarea
+              value={quizFocusPrompt}
+              onChange={e => setQuizFocusPrompt(e.target.value)}
+              placeholder="예: 핵심 정의와 비교 위주로 문제 내줘"
+              rows={2}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+            />
           </Card>
 
           {!isExtracting && selectedMaterials.length === 0 && (

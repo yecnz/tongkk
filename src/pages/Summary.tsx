@@ -38,6 +38,7 @@ import {
   type CourseMaterial,
 } from "../services/materials";
 import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmModal";
+import { hasPageMarkers } from "../utils/pageMarkers";
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
@@ -294,10 +295,6 @@ const writeLastSummaryTemplate = (template: SummaryTemplate) => {
   }
 };
 
-// '반영할 페이지'는 변환 시점에 심는 페이지 마커(<!-- p.N -->, <!-- Slide number: N -->)에
-// 의존한다. 마커가 없는(기능 추가 전 변환된) 자료는 페이지 선택이 동작하지 않는다.
-const PAGE_MARKER_PATTERN = /<!--\s*(?:p\.|Slide number:\s*)\d+\s*-->/;
-const hasPageMarkers = (markdown: string) => PAGE_MARKER_PATTERN.test(markdown);
 
 // 기본 선택 자료: 전체가 아니라 가장 최근 업로드 1개. 여러 자료를 한 번에 요약하면
 // 출력 한도 때문에 내용이 줄어들어, 앱 스스로도 한 개씩 요약을 권장한다.
@@ -3230,6 +3227,10 @@ export default function Summary() {
   // templates(템플릿 선택) 화면에서 "돌아가기" 시 돌아갈 화면.
   // 자료 상세에서 진입하면 materialDetail, 그 외에는 upload(과목 자료)로 돌아간다.
   const [templatesBackView, setTemplatesBackView] = useState<SummaryView>("upload");
+  // 자료 상세에서 "돌아가기"가 강의 자료 목록(upload 뷰)으로 가야 하는지.
+  // 목록을 거쳐 들어왔거나(요약 생성·자료 카드 클릭) 과목 안에서 이동한 경우 true,
+  // 대시보드에서 자료로 곧장 진입(딥링크)한 경우 false → 대시보드로 돌아간다.
+  const [materialDetailBackToList, setMaterialDetailBackToList] = useState(false);
   const [pendingTutorQuestion] = useState(
     shouldRestoreLocationView ? locationState?.tutorQuestion || "" : "",
   );
@@ -3311,6 +3312,9 @@ export default function Summary() {
             pendingMaterialReviewContextRef.current = "";
             pendingMaterialReviewTitleRef.current = "";
             setSearched(true);
+            // 딥링크/대시보드에서 자료로 곧장 진입한 경우 — 목록을 거치지 않았으므로
+            // 돌아가기는 (대시보드 진입이면) 대시보드로 간다.
+            setMaterialDetailBackToList(false);
             setView("materialDetail");
             return;
           }
@@ -3903,6 +3907,8 @@ export default function Summary() {
           if (targetMaterial) {
             setActiveMaterial(targetMaterial);
             setMaterialDetailInitialTab("summary");
+            // 방금 만든 자료의 상세를 보여준 뒤 "돌아가기"는 강의 자료 목록으로.
+            setMaterialDetailBackToList(true);
             setView("materialDetail");
             movedToDetail = true;
           }
@@ -4333,8 +4339,14 @@ export default function Summary() {
           <MaterialDetailView
             material={activeMaterial}
             selectedCourse={selectedCourse}
-            onBack={() => { if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]); else setView("upload"); }}
-            backLabel={fromDashboardRef.current ? "← 대시보드로" : "← 과목 자료로"}
+            onBack={() => {
+              // 목록을 거쳐 들어왔으면 강의 자료 목록(upload 뷰)으로, 대시보드에서
+              // 곧장 진입(딥링크)했으면 대시보드로 돌아간다.
+              if (materialDetailBackToList && selectedCourse) setView("upload");
+              else if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]);
+              else setView("upload");
+            }}
+            backLabel={materialDetailBackToList && selectedCourse ? "← 과목 자료로" : fromDashboardRef.current ? "← 대시보드로" : "← 과목 자료로"}
             onGoSummary={() => handleCreateSummaryForMaterial(activeMaterial)}
             onGoQuiz={() => handleCreateQuizForMaterial(activeMaterial)}
             onOpenQuiz={handleOpenMaterialQuiz}
@@ -4523,6 +4535,7 @@ export default function Summary() {
                                       setMaterialDetailTutorQuestion("");
                                       setMaterialDetailReviewContext("");
                                       setMaterialDetailReviewTitle("");
+                                      setMaterialDetailBackToList(true);
                                       setView("materialDetail");
                                     }}
                                     style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 11, fontWeight: 800, cursor: "pointer" }}
@@ -4630,6 +4643,7 @@ export default function Summary() {
                               setMaterialDetailTutorQuestion("");
                               setMaterialDetailReviewContext("");
                               setMaterialDetailReviewTitle("");
+                              setMaterialDetailBackToList(true);
                               setView("materialDetail");
                             }}
                             title="이 자료의 기존 요약 보기"
@@ -4656,6 +4670,7 @@ export default function Summary() {
                             setMaterialDetailTutorQuestion("");
                             setMaterialDetailReviewContext("");
                             setMaterialDetailReviewTitle("");
+                            setMaterialDetailBackToList(true);
                             setView("materialDetail");
                           }}
                           style={{
