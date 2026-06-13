@@ -4678,7 +4678,8 @@ export default function Summary() {
                             e.stopPropagation();
                             setActiveMaterial(material);
                             setSelectedMaterialIds([material.id]);
-                            setMaterialDetailInitialTab("original");
+                            // 학습은 공부 목적이므로 요약이 있으면 요약 탭부터, 없으면 원본 탭으로 연다.
+                            setMaterialDetailInitialTab(materialSummaryCount > 0 ? "summary" : "original");
                             setMaterialDetailTutorQuestion("");
                             setMaterialDetailReviewContext("");
                             setMaterialDetailReviewTitle("");
@@ -4698,6 +4699,36 @@ export default function Summary() {
                           }}
                         >
                           학습
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); requestDeleteMaterial(material); }}
+                          onMouseEnter={e => { e.currentTarget.style.color = "var(--color-danger)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = "var(--color-muted)"; }}
+                          aria-label={`${material.name} 삭제`}
+                          title="자료 삭제"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: 26,
+                            width: 28,
+                            borderRadius: 8,
+                            border: `1px solid ${BORDER_COLOR}`,
+                            background: "var(--color-card)",
+                            color: "var(--color-muted)",
+                            cursor: "pointer",
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M4 7h16" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12" />
+                            <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+                          </svg>
                         </button>
                       </div>
                       );
