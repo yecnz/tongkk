@@ -9,7 +9,6 @@ const toLocalDateKey = (timestamp: number) => {
 };
 
 export type ScorePoint = { date: string; scorePercent: number };
-export type WeakTopicCount = { topic: string; count: number };
 export type CoursePerformance = {
   courseName: string;
   attempts: number;
@@ -177,19 +176,4 @@ export function coursePerformance(attempts: SavedQuizAttemptWithCourse[]): Cours
       };
     })
     .sort((a, b) => b.latestAt - a.latestAt);
-}
-
-export function weakTopicTop5(attempts: SavedQuizAttempt[]): WeakTopicCount[] {
-  const counts = new Map<string, number>();
-  for (const attempt of attempts) {
-    for (const topic of attempt.weakTopics) {
-      const key = normalizeWeakTopic(topic);
-      if (!key) continue;
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-  }
-  return [...counts.entries()]
-    .map(([topic, count]) => ({ topic, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
 }
