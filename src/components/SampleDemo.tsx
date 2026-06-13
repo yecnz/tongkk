@@ -4,11 +4,13 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CARD_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, PINK } from "../common";
+import { MindmapView } from "./MindmapView";
 import {
   SAMPLE_TOPIC,
   SAMPLE_SOURCE_NAME,
   sampleOriginalMarkdown,
   sampleSummaries,
+  sampleMindmap,
   sampleQuiz,
   type SampleSummaryKind,
   type SampleQuizQuestion,
@@ -32,9 +34,9 @@ function nodeText(node: ReactNode): string {
 // 실제 요약 렌더러(Summary.tsx markdownComponents)와 동일한 양식 — 제목 박스, '>' 인용문 카드,
 // 코드블록 구조도, 표를 토큰 색으로 렌더한다(왼쪽 색 띠 없이 사방 중립 테두리).
 const md: Components = {
-  h1: ({ children }) => <h1 style={{ margin: "0 0 16px", paddingBottom: 10, borderBottom: "2px solid var(--color-border-soft)", fontSize: 22, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
-  h2: ({ children }) => <h2 style={{ margin: "24px 0 12px", padding: "9px 12px", borderRadius: 8, background: "var(--color-surface)", fontSize: 18, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
-  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "18px 0 8px", padding: "4px 8px", borderRadius: 6, background: "var(--color-surface)", fontSize: 15, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
+  h1: ({ children }) => <h1 style={{ margin: "0 0 14px", paddingBottom: 9, borderBottom: "2px solid var(--color-border-soft)", fontSize: 19, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
+  h2: ({ children }) => <h2 style={{ margin: "22px 0 10px", padding: "8px 11px", borderRadius: 8, background: "var(--color-surface)", fontSize: 15.5, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "16px 0 7px", padding: "3px 8px", borderRadius: 6, background: "var(--color-surface)", fontSize: 13.5, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
   p: ({ children }) => <p style={{ margin: "0 0 10px", lineHeight: 1.7, color: "var(--color-text)" }}>{children}</p>,
   strong: ({ children }) => <strong style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</strong>,
   em: ({ children }) => <em style={{ color: "var(--color-text)" }}>{children}</em>,
@@ -54,7 +56,7 @@ const md: Components = {
   },
   table: ({ children }) => (
     <div style={{ overflowX: "auto", margin: "10px 0 14px" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>{children}</table>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>{children}</table>
     </div>
   ),
   th: ({ children }) => <th style={{ padding: "8px 10px", background: "var(--color-tint-pink)", color: "var(--color-text-strong)", fontWeight: 800, border: "1px solid color-mix(in srgb, var(--color-pink) 30%, transparent)", textAlign: "left", whiteSpace: "nowrap" }}>{children}</th>,
@@ -133,7 +135,7 @@ function QuizCard({ q, index }: { q: SampleQuizQuestion; index: number }) {
         </div>
       )}
 
-      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "var(--color-muted)" }}>
+      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: "var(--color-muted)" }}>
         <span style={{ fontWeight: 700 }}>해설 </span>
         <span style={{ display: "inline" }}><InlineMarkdown>{q.explanation}</InlineMarkdown></span>
       </p>
@@ -198,7 +200,7 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
         </div>
 
         {/* 본문 */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 22px 8px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 22px 8px", fontSize: 13 }}>
           {tab === "original" && <Markdown>{sampleOriginalMarkdown}</Markdown>}
 
           {tab === "summary" && (
@@ -222,13 +224,15 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
                   );
                 })}
               </div>
-              <Markdown>{summary.markdown}</Markdown>
+              {summaryKind === "MINDMAP"
+                ? <MindmapView data={sampleMindmap} initialExpanded />
+                : <Markdown>{summary.markdown}</Markdown>}
             </>
           )}
 
           {tab === "quiz" && (
             <>
-              <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--color-muted)" }}>
+              <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--color-muted)" }}>
                 자료로 만든 샘플 퀴즈예요. 객관식·OX·단답형·주관식이 섞여 있고, 주관식은 AI가 채점해요.
               </p>
               {sampleQuiz.map((q, i) => <QuizCard key={i} q={q} index={i} />)}

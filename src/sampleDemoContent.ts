@@ -4,6 +4,8 @@
 // 설계 근거: notes/tutorial-redesign-plan.md 부록 A.
 // 수식은 remark-math + rehype-katex가 렌더한다(LaTeX 명령은 \\ 로 이스케이프).
 
+import type { NodeData } from "./components/mindmapData";
+
 export const SAMPLE_TOPIC = "시간 복잡도와 정렬 알고리즘";
 
 export const SAMPLE_SOURCE_NAME = "알고리즘 3주차 강의자료.pdf";
@@ -185,6 +187,28 @@ export const sampleSummaries: { kind: SampleSummaryKind; label: string; markdown
 - **안정 정렬**: 버블, 삽입, 병합`,
   },
 ];
+
+// 마인드맵 예시 — 실제 MINDMAP 템플릿은 JSON 트리를 MindmapView로 렌더한다(중첩 불릿이 아님).
+export const sampleMindmap: NodeData = {
+  label: "정렬 알고리즘",
+  children: [
+    { label: "분류 기준", children: [
+      { label: "비교 기반 vs 비비교", children: [] },
+      { label: "안정 vs 불안정", children: [] },
+      { label: "in-place 여부", children: [] },
+    ] },
+    { label: "단순 정렬 O(n²)", children: [
+      { label: "버블 (안정)", children: [] },
+      { label: "선택 (불안정)", children: [] },
+      { label: "삽입 (안정)", children: [] },
+    ] },
+    { label: "고급 정렬 O(n log n)", children: [
+      { label: "병합 (안정·추가 공간)", children: [] },
+      { label: "퀵 (in-place·최악 n²)", children: [] },
+      { label: "힙 (in-place·불안정)", children: [] },
+    ] },
+  ],
+};
 
 export type SampleQuizQuestion = {
   type: "객관식" | "OX" | "단답형" | "주관식";
