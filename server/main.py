@@ -63,8 +63,11 @@ ALLOW_NO_AUTH = os.getenv("ALLOW_NO_AUTH", "").strip().lower() in {"1", "true", 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # 실제 쓰는 것만 허용: 엔드포인트는 POST·GET(/health)뿐이고 프리플라이트가 OPTIONS를 쓴다.
+    # 프론트가 보내는 요청 헤더는 Authorization·Content-Type뿐(backend.ts getJsonRequestHeaders).
+    # allow_credentials는 미설정(기본 False) 유지 — 쿠키가 아니라 Bearer 토큰 인증이라 불필요.
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 md_converter = MarkItDown()
