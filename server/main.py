@@ -1447,6 +1447,37 @@ def _quiz_system_content(question_type: str, focus_prompt: str | None) -> str:
     return base
 
 
+# 6개 LLM 엔드포인트가 공유하던 try/except 사다리를 한 곳에 모은다(동작 불변).
+# - RuntimeError(키/모델 설정 누락 등) → 500 + 원문 메시지
+# - handle_parse_errors=True(출제·채점·분석 계열): JSONDecodeError → 500 '{label} 파싱 실패',
+#   그 외 ValueError(형식 검증 실패) → 500 '{label} 응답 형식 오류'
+#   (json.JSONDecodeError가 ValueError 하위라 한 절에서 받아 isinstance로 분기)
+# - 그 외 예외, 그리고 파싱 미처리 엔드포인트(summarize·agent)의 파싱/형식 오류 → 502 + 안내문 + 로그
+# log_message는 엔드포인트별 기존 문구를 그대로 받아 로그 표현을 보존한다.
+async def _run_llm_call(
+    call,
+    *,
+    fail_message: str,
+    log_message: str,
+    error_label: str = "",
+    handle_parse_errors: bool = True,
+):
+    try:
+        return await run_in_threadpool(call)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except (json.JSONDecodeError, ValueError) as e:
+        if handle_parse_errors:
+            if isinstance(e, json.JSONDecodeError):
+                raise HTTPException(status_code=500, detail=f"{error_label} 파싱 실패: {str(e)}") from e
+            raise HTTPException(status_code=500, detail=f"{error_label} 응답 형식 오류: {str(e)}") from e
+        logger.exception(log_message)
+        raise HTTPException(status_code=502, detail=fail_message) from e
+    except Exception as e:
+        logger.exception(log_message)
+        raise HTTPException(status_code=502, detail=fail_message) from e
+
+
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
@@ -1468,13 +1499,12 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
         ])
         return {"result": _message_content_to_text(response.content).strip()}
 
-    try:
-        return await run_in_threadpool(_call_llm)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/summarize 실패")
-        raise HTTPException(status_code=502, detail="요약 생성 중 오류가 발생했습니다.") from e
+    return await _run_llm_call(
+        _call_llm,
+        fail_message="요약 생성 중 오류가 발생했습니다.",
+        log_message="/summarize 실패",
+        handle_parse_errors=False,
+    )
 
 
 def _sse_event(payload: dict) -> str:
@@ -1595,13 +1625,12 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
             },
         )
 
-    try:
-        return await run_in_threadpool(run_study_agent, req.model, messages, req.thread_id, source)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/agent 실행 실패")
-        raise HTTPException(status_code=502, detail="AI 튜터 응답 생성 중 오류가 발생했습니다.") from e
+    return await _run_llm_call(
+        lambda: run_study_agent(req.model, messages, req.thread_id, source),
+        fail_message="AI 튜터 응답 생성 중 오류가 발생했습니다.",
+        log_message="/agent 실행 실패",
+        handle_parse_errors=False,
+    )
 
 
 @app.post("/quiz")
@@ -1642,18 +1671,13 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         parsed = _parse_quiz_json(text)
         return _validate_quiz_questions(parsed, req.question_type)
 
-    try:
-        questions = await run_in_threadpool(_call_llm)
-        return {"questions": questions}
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"퀴즈 파싱 실패: {str(e)}") from e
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"퀴즈 응답 형식 오류: {str(e)}") from e
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/quiz 생성 실패")
-        raise HTTPException(status_code=502, detail="퀴즈 생성 중 오류가 발생했습니다.") from e
+    questions = await _run_llm_call(
+        _call_llm,
+        error_label="퀴즈",
+        fail_message="퀴즈 생성 중 오류가 발생했습니다.",
+        log_message="/quiz 생성 실패",
+    )
+    return {"questions": questions}
 
 
 @app.post("/quiz/grade-subjective")
@@ -1701,17 +1725,12 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
             "reference_answer": reference_answer if isinstance(reference_answer, str) and reference_answer.strip() else req.reference_answer,
         }
 
-    try:
-        return await run_in_threadpool(_call_llm)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"주관식 채점 파싱 실패: {str(e)}") from e
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"주관식 채점 응답 형식 오류: {str(e)}") from e
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/quiz/grade-subjective 실패")
-        raise HTTPException(status_code=502, detail="주관식 채점 중 오류가 발생했습니다.") from e
+    return await _run_llm_call(
+        _call_llm,
+        error_label="주관식 채점",
+        fail_message="주관식 채점 중 오류가 발생했습니다.",
+        log_message="/quiz/grade-subjective 실패",
+    )
 
 
 @app.post("/quiz/analyze-wrong")
@@ -1735,17 +1754,12 @@ async def analyze_wrong_answers(req: WrongAnalysisRequest, _user=Depends(require
         parsed = _parse_json_object(_message_content_to_text(response.content))
         return _validate_wrong_analysis(parsed)
 
-    try:
-        return await run_in_threadpool(_call_llm)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"오답 분석 파싱 실패: {str(e)}") from e
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"오답 분석 응답 형식 오류: {str(e)}") from e
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/quiz/analyze-wrong 실패")
-        raise HTTPException(status_code=502, detail="오답 분석 중 오류가 발생했습니다.") from e
+    return await _run_llm_call(
+        _call_llm,
+        error_label="오답 분석",
+        fail_message="오답 분석 중 오류가 발생했습니다.",
+        log_message="/quiz/analyze-wrong 실패",
+    )
 
 
 @app.post("/study-plan")
@@ -1789,17 +1803,12 @@ async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_u
         parsed = _parse_json_object(_message_content_to_text(response.content))
         return _validate_study_plan(parsed)
 
-    try:
-        return await run_in_threadpool(_call_llm)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"학습 계획 파싱 실패: {str(e)}") from e
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=f"학습 계획 응답 형식 오류: {str(e)}") from e
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/study-plan 생성 실패")
-        raise HTTPException(status_code=502, detail="학습 계획 생성 중 오류가 발생했습니다.") from e
+    return await _run_llm_call(
+        _call_llm,
+        error_label="학습 계획",
+        fail_message="학습 계획 생성 중 오류가 발생했습니다.",
+        log_message="/study-plan 생성 실패",
+    )
 
 
 @app.get("/health")
