@@ -307,6 +307,10 @@ class QuizRequest(BaseModel):
     exclude_questions: list[str] = Field(default_factory=list)
     # 학습 전 수준 진단용 퀴즈: 전 범위에서 단원별로 골고루, 기초 개념 위주로 출제.
     diagnostic: bool = False
+    # 사용자가 "1-5, 8"처럼 지정한 출제 페이지. 비우면 전체. (요약과 동일한 마커 기반 필터)
+    pages: str | None = None
+    # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
+    focus_prompt: str | None = None
 
 
 class WrongAnswerItem(BaseModel):
@@ -1427,6 +1431,19 @@ def _summary_system_content(focus_prompt: str | None) -> str:
     return SUMMARY_SYSTEM_PROMPT
 
 
+def _quiz_system_content(question_type: str, focus_prompt: str | None) -> str:
+    base = f"{QUIZ_SYSTEM_PROMPT}\n\n{quiz_format_instruction(question_type)}"
+    if focus_prompt and focus_prompt.strip():
+        return (
+            f"{base}\n\n"
+            "[사용자 집중 요청]\n"
+            f"사용자가 다음 내용에 특히 집중한 문제 출제를 원한다: {focus_prompt.strip()}\n"
+            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 출제하고 "
+            "원문에 없는 내용을 지어내지 마."
+        )
+    return base
+
+
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
@@ -1586,7 +1603,8 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
 
 @app.post("/quiz")
 async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
-    markdown_section = f"\n강의자료:\n{req.markdown}\n" if req.markdown else ""
+    filtered_markdown = _filter_markdown_by_pages(req.markdown, req.pages) if req.markdown else None
+    markdown_section = f"\n강의자료:\n{filtered_markdown}\n" if filtered_markdown else ""
     exclude_section = ""
     excluded = [q.strip() for q in req.exclude_questions if isinstance(q, str) and q.strip()][:80]
     if excluded:
@@ -1614,7 +1632,7 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         llm = build_llm(req.model)
         from langchain_core.messages import HumanMessage, SystemMessage
         response = llm.invoke([
-            SystemMessage(content=f"{QUIZ_SYSTEM_PROMPT}\n\n{quiz_format_instruction(req.question_type)}"),
+            SystemMessage(content=_quiz_system_content(req.question_type, req.focus_prompt)),
             HumanMessage(content=prompt),
         ])
         text = _message_content_to_text(response.content)

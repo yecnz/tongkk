@@ -28,6 +28,8 @@ export async function generateQuiz(
   questionType: QuizQuestionType = '객관식',
   excludeQuestions: string[] = [],
   diagnostic = false,
+  pages?: string,
+  focusPrompt?: string,
 ): Promise<QuizQuestion[]> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90_000);
@@ -39,7 +41,7 @@ export async function generateQuiz(
     const response = await fetch(`${BACKEND_URL}/quiz`, {
       method: 'POST',
       headers: await getJsonRequestHeaders(),
-      body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType, exclude_questions: excludeQuestions, diagnostic }),
+      body: JSON.stringify({ subject, count, difficulty, markdown, question_type: questionType, exclude_questions: excludeQuestions, diagnostic, pages, focus_prompt: focusPrompt }),
       signal: controller.signal,
     });
 

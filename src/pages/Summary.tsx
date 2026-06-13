@@ -38,6 +38,7 @@ import {
   type CourseMaterial,
 } from "../services/materials";
 import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmModal";
+import { hasPageMarkers } from "../utils/pageMarkers";
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
@@ -294,10 +295,6 @@ const writeLastSummaryTemplate = (template: SummaryTemplate) => {
   }
 };
 
-// '반영할 페이지'는 변환 시점에 심는 페이지 마커(<!-- p.N -->, <!-- Slide number: N -->)에
-// 의존한다. 마커가 없는(기능 추가 전 변환된) 자료는 페이지 선택이 동작하지 않는다.
-const PAGE_MARKER_PATTERN = /<!--\s*(?:p\.|Slide number:\s*)\d+\s*-->/;
-const hasPageMarkers = (markdown: string) => PAGE_MARKER_PATTERN.test(markdown);
 
 // 기본 선택 자료: 전체가 아니라 가장 최근 업로드 1개. 여러 자료를 한 번에 요약하면
 // 출력 한도 때문에 내용이 줄어들어, 앱 스스로도 한 개씩 요약을 권장한다.
