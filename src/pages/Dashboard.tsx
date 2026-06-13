@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
+import { useTutorial } from "../TutorialContext";
+import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { useAuthGate } from "../AuthGateContext";
+import { useSampleDemo } from "../SampleDemoContext";
 import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
@@ -578,7 +581,14 @@ export default function Dashboard() {
   const { requireAuth } = useAuthGate();
   const { courses, addCourse, renameCourse, deleteCourse, hasLoadedCourses } = useCourses();
   const { showToast } = useToast();
+  const { ready: readyTutorial } = useTutorial();
+  const { openSampleDemo } = useSampleDemo();
   const [sidebar, setSidebar] = useState(false);
+
+  // 강의 목록 로딩이 끝난 뒤에 대시보드 튜토리얼을 띄운다(스켈레톤 위 노출 방지).
+  useEffect(() => {
+    if (hasLoadedCourses) readyTutorial("dashboard");
+  }, [hasLoadedCourses, readyTutorial]);
   const [showNotice, setShowNotice] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const page: PageRouteLabel = "대시보드";
@@ -1171,7 +1181,7 @@ export default function Dashboard() {
       {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid #f0f0f0" }}>
+      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-border-soft)" }}>
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
@@ -1214,6 +1224,7 @@ export default function Dashboard() {
           <PaperPlaneIcon />
           <span className="header-btn-label">피드백 보내기</span>
         </button>
+        <TutorialHelpButton tutorialKey="dashboard" />
       </div>
 
       <div className="app-container">
@@ -1275,11 +1286,17 @@ export default function Dashboard() {
                 <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.7, color: "var(--color-muted)" }}>
                   강의를 만들고 강의자료를 올려보세요.<br />AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
                 </p>
-                <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
-                  padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
-                  color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
-                  boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
-                }}>+ 강의 추가하기</button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
+                  <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
+                    padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
+                    color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
+                    boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+                  }}>+ 강의 추가하기</button>
+                  <button type="button" onClick={openSampleDemo} style={{
+                    padding: "11px 18px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, background: "transparent",
+                    color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  }}>예시로 둘러보기</button>
+                </div>
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>

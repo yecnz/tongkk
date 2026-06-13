@@ -207,10 +207,12 @@ type MindmapViewProps = {
   printMode?: boolean;
   // 사용자가 끌어 둔 노드 위치를 localStorage에 저장할 키(보통 요약 id). 없으면 세션 메모리에만 유지.
   persistKey?: string;
+  // 처음부터 모두 펼친 상태로 시작한다(예시 데모 등). 기본은 접힌 상태(기존 동작 유지).
+  initialExpanded?: boolean;
 };
 
-export function MindmapView({ data, onNodeFocus, printMode = false, persistKey }: MindmapViewProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(collapsibleIds(data)));
+export function MindmapView({ data, onNodeFocus, printMode = false, persistKey, initialExpanded = false }: MindmapViewProps) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(initialExpanded ? [] : collapsibleIds(data)));
   const [focusId, setFocusId] = useState<string | null>(null);
   const [tf, setTf] = useState({ x: 0, y: 0, k: 1 });
   const [dragging, setDragging] = useState(false);

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import { useAuth } from "../AuthContext";
 import { useAuthGate } from "../AuthGateContext";
+import { useToast } from "../ToastContext";
+import { resetAllTutorials } from "../services/tutorialStorage";
 import {
   deleteOwnAppData,
   loadUserProfile,
@@ -225,7 +227,7 @@ const SettingsModal = ({
               disabled={loading || !deleteReady}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                background: loading || !deleteReady ? "#ddd" : "var(--color-danger)", color: "var(--color-on-brand)",
+                background: loading || !deleteReady ? "var(--color-muted-surface)" : "var(--color-danger)", color: "var(--color-on-brand)",
                 fontWeight: 800, cursor: loading || !deleteReady ? "default" : "pointer"
               }}
             >
@@ -274,7 +276,7 @@ const SettingsModal = ({
                   disabled={loading || !emailValid}
                   style={{
                     width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-                    background: loading || !emailValid ? "#ddd" : CYAN, color: "var(--color-on-brand)",
+                    background: loading || !emailValid ? "var(--color-muted-surface)" : CYAN, color: "var(--color-on-brand)",
                     fontWeight: 800, cursor: loading || !emailValid ? "default" : "pointer"
                   }}
                 >
@@ -293,6 +295,12 @@ export default function MyPage() {
   const navigate = useNavigate();
   const { user, signOut, updateEmail } = useAuth();
   const { requireAuth, openLogin } = useAuthGate();
+  const { showToast } = useToast();
+
+  const handleReopenTutorials = () => {
+    resetAllTutorials();
+    showToast("튜토리얼을 초기화했어요. 각 화면에 다시 들어가면 사용법이 다시 떠요.");
+  };
   const [sidebar, setSidebar] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialog>(null);
@@ -521,6 +529,14 @@ export default function MyPage() {
                   <span style={{ color: "var(--color-muted)", fontSize: 14 }}>›</span>
                 </button>
               ))}
+              <button type="button" className="tongkk-hover-row" onClick={handleReopenTutorials} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "14px 0", border: "none", borderTop: "1px solid var(--color-border-soft)",
+                background: "none", cursor: "pointer", width: "100%", textAlign: "left"
+              }}>
+                <span style={{ fontSize: 14, color: "var(--color-text)" }}>튜토리얼 다시 보기</span>
+                <span style={{ color: "var(--color-muted)", fontSize: 14 }}>›</span>
+              </button>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderTop: "1px solid var(--color-border-soft)" }}>
                 <span style={{ fontSize: 14, color: "var(--color-muted)" }}>앱 버전</span>
                 <span style={{ fontSize: 13, color: "var(--color-muted)" }}>MVP v1.0</span>

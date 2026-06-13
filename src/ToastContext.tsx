@@ -80,7 +80,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   flexShrink: 0,
                   padding: "5px 11px",
                   borderRadius: 8,
-                  border: "1px solid #e5e5e5",
+                  border: "1px solid var(--color-border-soft)",
                   background: "transparent",
                   color: "var(--color-cyan)",
                   fontSize: 13,

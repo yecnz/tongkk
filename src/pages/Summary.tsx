@@ -7,9 +7,12 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
+import { useTutorial } from "../TutorialContext";
+import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
 import { summarizeWithTemplateStream } from "../services/summaryStream";
 import { useAuth } from "../AuthContext";
+import { useSampleDemo } from "../SampleDemoContext";
 import { useToast } from "../ToastContext";
 import { extractMarkdownFromPDF } from "../services/pdfToMarkdown";
 import { getPdfPageCount } from "../services/pdfPageCount";
@@ -3149,6 +3152,14 @@ export default function Summary() {
   const [view, setView] = useState<SummaryView>(restoreFromUrl && urlView ? urlView : "upload");
   // 새로고침(URL 복원) 시 자료를 불러오는 동안 스켈레톤(콘텐츠 뼈대)을 보여준다. 복원이 끝나면 끈다.
   const [restoringFromUrl, setRestoringFromUrl] = useState(restoreFromUrl);
+
+  // 업로드 화면이 실제로 떠 있을 때만(복원 스켈레톤 중 아님) 자료 요약 튜토리얼을 노출한다.
+  // 게스트·과목 미선택은 위에서 대시보드로 리다이렉트되므로 여기 도달하면 안전하다.
+  const { ready: readyTutorial } = useTutorial();
+  const { openSampleDemo } = useSampleDemo();
+  useEffect(() => {
+    if (view === "upload" && !restoringFromUrl) readyTutorial("summary-upload");
+  }, [view, restoringFromUrl, readyTutorial]);
   // 요약 안내 팝업 '다시 보지 않기' 설정은 계정별(Supabase 프로필)로 저장한다.
   // 로드 전에는 true(숨김)로 두어, 불러오기 전에 팝업이 깜빡이지 않게 한다.
   const [hideSummaryNoticePref, setHideSummaryNoticePref] = useState(true);
@@ -4277,6 +4288,7 @@ export default function Summary() {
         </button>
         <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
+        <TutorialHelpButton tutorialKey="summary-upload" style={{ marginLeft: "auto" }} />
       </div>
 
       <div
@@ -4389,6 +4401,12 @@ export default function Summary() {
                       marginTop: 12, padding: "8px 20px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
                       background: "var(--color-card)", fontSize: 13, cursor: "pointer", color: "var(--color-text)"
                     }}>파일 선택</button>
+                    <div style={{ marginTop: 14, fontSize: 12.5, color: "var(--color-muted)" }}>
+                      어떤 결과가 나오는지 궁금하면{" "}
+                      <button type="button" onClick={e => { e.stopPropagation(); openSampleDemo(); }} style={{
+                        background: "none", border: "none", padding: 0, color: PINK, fontWeight: 700, fontSize: 12.5, cursor: "pointer", textDecoration: "underline",
+                      }}>예시로 둘러보기</button>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
