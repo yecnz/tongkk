@@ -667,6 +667,13 @@ export default function Dashboard() {
     setDetailCourse(course);
   };
 
+  // 해당 과목의 자료 업로드 화면으로 바로 이동한다. 대시보드 카드/모달의 자료 추가
+  // 동선이 모두 이 한 곳을 거치게 해, 추후 분해 시 네비게이션 계약을 한 군데서 유지한다.
+  const goUploadForCourse = (course: string) => {
+    if (!requireAuth("강의 자료를 추가하려면 로그인이 필요해요")) return;
+    navigate(pageRoutes["자료 요약"], { state: { selectedCourse: course, fromDashboard: true } });
+  };
+
   // 자료 삭제 등으로 개수가 바뀐 과목의 통계만 다시 받는다(서비스 계층이 캐시를 무효화해 둔 상태).
   const refreshCourseStats = async (course: string) => {
     try {
@@ -1148,7 +1155,7 @@ export default function Dashboard() {
           onAdd={addCourse}
           onAddAndUpload={name => {
             addCourse(name);
-            navigate(pageRoutes["자료 요약"], { state: { selectedCourse: name, fromDashboard: true } });
+            goUploadForCourse(name);
           }}
         />
       )}
@@ -1346,6 +1353,7 @@ export default function Dashboard() {
                           borderRadius: 12, border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
                           boxShadow: "0 12px 28px rgba(0,0,0,0.12)", zIndex: 20,
                         }}>
+                          <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); goUploadForCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>자료 추가</button>
                           <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
                           <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-danger)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
                         </div>
