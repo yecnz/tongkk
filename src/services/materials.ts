@@ -185,17 +185,19 @@ export const loadCourseMaterialsFromServer = async (
           .from('materials')
           .select('id, name, size, type, pages, slides, markdown, file_path, mime_type, updated_at')
           .eq('course_id', courseId)
-          .order('updated_at', { ascending: false })
+          .order('name', { ascending: true })
       : await supabase
           .from('materials')
           .select('id, name, size, type, pages, slides, file_path, mime_type, updated_at')
           .eq('course_id', courseId)
-          .order('updated_at', { ascending: false });
+          .order('name', { ascending: true });
 
     if (error) throw new Error(formatSupabaseError(error));
 
     const materials = (data || [])
-      .map(toCourseMaterial);
+      .map(toCourseMaterial)
+      // 목록은 자료 이름 자연정렬(숫자 인식: 2강 < 10강)로 보여준다. 서버 정렬을 자연정렬로 보정.
+      .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true, sensitivity: 'base' }));
 
     materialsCache.set(cacheKey, materials);
     return materials;
