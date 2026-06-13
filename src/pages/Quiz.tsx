@@ -1,6 +1,8 @@
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import { useTutorial } from "../TutorialContext";
+import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import {
   generateQuiz,
   gradeSubjectiveAnswer,
@@ -239,6 +241,7 @@ export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { maybeShow: maybeShowTutorial } = useTutorial();
   const reviewState = location.state as QuizLocationState;
   const reviewQuestions = reviewState?.reviewQuestions || null;
   const hasReviewQuestions = Boolean(reviewQuestions && reviewQuestions.length > 0);
@@ -255,6 +258,13 @@ export default function Quiz() {
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState<QuizDifficulty>("보통");
   const [questionType, setQuestionType] = useState<QuizQuestionType>("객관식");
+
+  // 설정/풀이 화면에 처음 들어올 때 해당 튜토리얼을 1회 노출(본 적 있으면 자동 생략).
+  // 오답 다시 풀기로 바로 풀이에 들어오면 view가 "quiz"라 설정 안내는 자연히 건너뛴다.
+  useEffect(() => {
+    if (view === "courseDetail") maybeShowTutorial("quiz-setup");
+    else if (view === "quiz") maybeShowTutorial("quiz-solve");
+  }, [view, maybeShowTutorial]);
 
   // 자료 관련
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
@@ -1062,11 +1072,11 @@ export default function Quiz() {
 
   // ── 과목 세부 (자료 + 설정) ──
   if (view === "courseDetail") {
-    const canGenerate = !isExtracting;
+    const canGenerate = !isExtracting && selectedMaterials.length > 0;
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} extra={<TutorialHelpButton tutorialKey="quiz-setup" />} />
         <div className="app-container narrow">
           <button type="button" onClick={handleCourseBack} style={{
             background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
@@ -1167,7 +1177,7 @@ export default function Quiz() {
                 padding: "12px 16px", borderRadius: 10, background: "var(--color-surface)",
                 fontSize: 13, color: "var(--color-muted)", marginBottom: 14
               }}>
-                저장된 자료가 없습니다. PDF·문서·이미지를 업로드하거나 과목명으로만 퀴즈를 생성할 수 있습니다.
+                아직 저장된 자료가 없어요. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
               </div>
             )}
 
@@ -1363,6 +1373,11 @@ export default function Quiz() {
             </div>
           </Card>
 
+          {!isExtracting && selectedMaterials.length === 0 && (
+            <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--color-muted)", textAlign: "center" }}>
+              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있어요." : "반영할 자료를 1개 이상 선택해주세요."}
+            </p>
+          )}
           <button type="button" onClick={generate} disabled={!canGenerate} style={{
             width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
             background: canGenerate ? PINK : "var(--color-border-soft)",

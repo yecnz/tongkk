@@ -3,7 +3,7 @@
 // 마이페이지·AI 튜터는 진입 시 직관적이라 튜토리얼 대상이 아니다(plan: notes/tutorial-redesign-plan.md).
 // 마이크로카피는 한국어·행동 지향, 한 스텝 1~2문장.
 
-export type TutorialKey = "welcome" | "dashboard" | "summary-upload";
+export type TutorialKey = "welcome" | "dashboard" | "summary-upload" | "quiz-setup" | "quiz-solve";
 
 export type TutorialStep = {
   title: string;
@@ -70,6 +70,40 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
       {
         title: "종류를 고르고 생성하기",
         body: "일반 요약·강의 노트·마인드맵·치트시트 중에 골라 '요약 생성하기'를 누르세요. 만드는 동안 다른 화면으로 가도 완료되면 알려드려요.",
+      },
+    ],
+  },
+  // 퀴즈 설정·풀이는 라우트(/quiz)가 게스트·과목 미선택을 대시보드로 리다이렉트하고, 진입 방식(설정/
+  // 오답 다시 풀기)에 따라 시작 뷰가 달라 라우트 자동 트리거 대신 화면(view)별 maybeShow로 띄운다.
+  "quiz-setup": {
+    version: 1,
+    title: "퀴즈 만들기",
+    placement: "sheet",
+    requiresAuth: true,
+    steps: [
+      {
+        title: "자료를 올려 퀴즈를 만들어요",
+        body: "PDF·PPT·이미지·문서를 올리면 그 자료 내용으로 문제를 만들어요. 반영할 자료를 골라야 생성할 수 있어요.",
+      },
+      {
+        title: "시험 모드는 실전처럼",
+        body: "켜면 정답·해설이 바로 안 보이고 제한 시간 안에 전체를 풀어요. 시간 버튼은 모드를 켜야 활성화돼요.",
+      },
+      {
+        title: "AI가 자료를 분석해 문제를 만들어요",
+        body: "'퀴즈 생성하기'를 누르면 AI가 자료를 읽고 문제를 만들어요. 이전에 푼 문제는 자동으로 빼 줘요.",
+      },
+    ],
+  },
+  "quiz-solve": {
+    version: 1,
+    title: "퀴즈 풀이",
+    placement: "sheet",
+    requiresAuth: true,
+    steps: [
+      {
+        title: "풀이 화면 사용법",
+        body: "객관식·OX는 보기를 누르면 바로 채점되고 다시 못 바꿔요. 단답형은 Enter나 '제출', 주관식은 제출하면 AI가 채점해요. 시험 모드는 결과에서 한꺼번에 확인돼요.",
       },
     ],
   },
