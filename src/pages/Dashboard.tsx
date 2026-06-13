@@ -342,7 +342,7 @@ const CourseDetailModal = ({
                     <button
                       type="button"
                       className="tongkk-hover-row"
-                      onClick={() => onOpenMaterial(material)}
+                      onClick={() => onOpenMaterial(material, summaryCount > 0 ? "summary" : "original")}
                       style={{
                         flex: 1,
                         minWidth: 0,
