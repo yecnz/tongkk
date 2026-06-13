@@ -896,48 +896,6 @@ const SummaryContentView = ({ content, template, onNodeFocus, persistKey }: { co
     : <FormattedAiText content={content} template={template} />;
 };
 
-// 요약 평균 소요 시간(초, 고정). 로딩 멘트 전환 속도의 기준이다. 실측이 달라지면 이 값만 고치면 된다.
-const SUMMARY_AVG_SECONDS = 50;
-
-// 요약 생성 로딩 오버레이에서 순환 표시할 멘트. 자유롭게 추가/수정 가능.
-const SUMMARY_LOADING_MESSAGES = [
-  "강의자료를 꼼꼼히 읽고 있어요",
-  "핵심 개념을 골라내는 중...",
-  "시험에 나올 내용을 정리하고 있어요",
-  "거의 다 됐어요, 조금만 기다려 주세요",
-];
-
-// 요약 생성 로딩 오버레이(전체 화면). 멘트를 고정 평균 소요 시간에 맞춰 순환시키고(마지막은 완료까지 유지),
-// templates·upload 어느 화면에서 요약을 시작하든 공통으로 화면 위에 띄운다.
-const SummaryLoadingOverlay = ({ loadingStep }: { loadingStep?: string }) => {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    const stepMs = (SUMMARY_AVG_SECONDS * 1000) / SUMMARY_LOADING_MESSAGES.length;
-    const id = setInterval(() => setIdx(i => Math.min(i + 1, SUMMARY_LOADING_MESSAGES.length - 1)), stepMs);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
-      background: "color-mix(in srgb, var(--color-page) 82%, transparent)",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
-    }}>
-      <div style={{
-        width: 40, height: 40,
-        border: `3px solid ${PINK}`, borderTop: "3px solid transparent",
-        borderRadius: "50%", animation: "spin 0.8s linear infinite"
-      }}/>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); }} @keyframes tk-msg-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); }}`}</style>
-      <p key={idx} style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)", textAlign: "center", animation: "tk-msg-fade 0.5s ease" }}>
-        {SUMMARY_LOADING_MESSAGES[idx]}
-      </p>
-      {loadingStep && (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>{loadingStep}</p>
-      )}
-    </div>
-  );
-};
-
 // 새로고침 복원 중 보여줄 스켈레톤. 자료 상세 화면(헤더·탭·본문)의 뼈대를 회색 박스로 흉내내,
 // 빈 화면 깜빡임 없이 "곧 자료가 뜬다"는 인상을 준다.
 // 펄스 애니메이션·reduced-motion 대응은 공용 .tongkk-skeleton-block(src/index.css)을 따른다.
@@ -4326,9 +4284,6 @@ export default function Summary() {
         // 넓은 뷰(요약 결과·자료 상세)는 기존의 더 촘촘한 여백을 유지한다(인라인이 클래스보다 우선).
         style={view === "summaryResult" || view === "materialDetail" ? { padding: "18px 20px" } : undefined}
       >
-        {/* 요약 생성 중에는 전체 화면 로딩 오버레이를 띄운다.
-            단, 스트리밍 텍스트가 결과 화면에 흐르기 시작하면 오버레이를 걷어 타자기 효과를 보여준다. */}
-        {isSummarizing && !(view === "summaryResult" && summaryText) && <SummaryLoadingOverlay loadingStep={loadingStep} />}
         {view === "templates" && (
           <TemplateSelectView onSelect={handleTemplateSelect} onBack={() => setView(templatesBackView)} pageHint={summaryPageHint} />
         )}
