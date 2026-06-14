@@ -142,6 +142,21 @@ const markdownComponents: Components = {
   td: ({ children }) => <td style={{ padding: "6px 9px", border: "1px solid var(--color-border-soft)", color: "var(--color-text)", lineHeight: 1.55, verticalAlign: "top" }}>{children}</td>,
 };
 
+// 답변 복사: 화면에 렌더된 서식(HTML)을 그대로 넣어 워드·노션 등에선 굵게·제목·목록·코드까지 살리고,
+// 순수 텍스트 앱에는 마크다운 기호가 없는 평문(innerText)을 넣는다. 서식 복사가 막힌 환경은 평문으로 폴백.
+const copyRichText = async (html: string, plain: string) => {
+  try {
+    if (html && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" }),
+      })]);
+      return;
+    }
+  } catch { /* 서식 복사 미지원 → 평문 폴백 */ }
+  await navigator.clipboard.writeText(plain);
+};
+
 const FormattedTutorText = ({ content }: { content: string }) => {
   const cleaned = normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
   if (!cleaned) return null;
@@ -265,6 +280,8 @@ export const AITutorDrawer = ({
   const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(true);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
+  // 답변 복사 후 잠깐 "복사됨"을 보여줄 메시지 인덱스(이 드로어는 토스트를 안 써 로컬 피드백을 쓴다).
+  const [copiedMsgIdx, setCopiedMsgIdx] = useState<number | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [internalExpanded, setInternalExpanded] = useState(false);
@@ -915,6 +932,47 @@ export const AITutorDrawer = ({
                         )}
                         <FormattedTutorText content={mainContent} />
                       </div>
+                      {msg.role === "assistant" && mainContent.trim() && (
+                        <button
+                          type="button"
+                          onClick={async e => {
+                            // 화면 버블(복사 버튼 바로 앞 요소)의 렌더된 서식을 그대로 복사한다. 헤딩·목록·코드·표까지 보존된다.
+                            const bubble = e.currentTarget.previousElementSibling as HTMLElement | null;
+                            try {
+                              await copyRichText(bubble?.innerHTML ?? "", bubble?.innerText ?? mainContent);
+                              setCopiedMsgIdx(i);
+                              window.setTimeout(() => setCopiedMsgIdx(c => (c === i ? null : c)), 1500);
+                            } catch { /* 클립보드 미지원 환경은 무시 */ }
+                          }}
+                          aria-label="답변 복사"
+                          style={{
+                            alignSelf: "flex-start",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "3px 7px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: "transparent",
+                            color: copiedMsgIdx === i ? "var(--color-cyan)" : "var(--color-muted)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {copiedMsgIdx === i ? (
+                            <>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+                              복사됨
+                            </>
+                          ) : (
+                            <>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                              복사
+                            </>
+                          )}
+                        </button>
+                      )}
                       {isLastAssistant && suggestions.length > 0 && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           <span style={{ fontSize: 11, fontWeight: 800, color: "var(--color-muted)", letterSpacing: "0.04em" }}>바로 이어서</span>
