@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { useAuthGate } from "./AuthGateContext";
 import { pageRoutes } from "./common";
@@ -23,17 +23,20 @@ export function SampleDemoProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { openLogin } = useAuthGate();
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
   const openSampleDemo = useCallback(() => setOpen(true), []);
 
-  // '내 자료로 시작하기' — 게스트는 가입을 유도하고, 로그인 사용자는 강의를 추가할 대시보드로 보낸다.
+  // '내 자료로 시작하기' — 게스트는 가입을 유도한다. 자료 요약 화면에서 연 데모면 그 화면(자료 목록)에
+  // 그대로 머물고, 그 외(welcome·대시보드 빈 상태)에서는 강의를 추가할 대시보드로 보낸다.
   const start = useCallback(() => {
     setOpen(false);
-    if (!user) openLogin("signUp");
-    else navigate(pageRoutes["대시보드"]);
-  }, [user, openLogin, navigate]);
+    if (!user) { openLogin("signUp"); return; }
+    if (location.pathname === pageRoutes["자료 요약"]) return;
+    navigate(pageRoutes["대시보드"]);
+  }, [user, openLogin, navigate, location.pathname]);
 
   const api = useMemo<SampleDemoApi>(() => ({ openSampleDemo }), [openSampleDemo]);
 
