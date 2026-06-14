@@ -896,7 +896,7 @@ export const AITutorDrawer = ({
         )}
 
         <div style={{ flex: 1, minHeight: 0, position: "relative", marginBottom: 14 }}>
-          <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 820, margin: "0 auto" }}>
             {!canUseAgent ? (
               <div style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
                 {disabledReason}
@@ -1048,7 +1048,7 @@ export const AITutorDrawer = ({
             e.target.value = "";
           }}
         />
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", width: "100%", maxWidth: 820, margin: "0 auto" }}>
           <button
             type="button"
             onClick={() => imageInputRef.current?.click()}
