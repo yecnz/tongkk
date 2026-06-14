@@ -68,3 +68,6 @@ __pycache__/
 
 # /convert 결과 캐시(EC2 로컬 SQLite, -wal/-shm 동반 파일 포함)
 server/convert_cache.sqlite3*
+
+# pdfjs 렌더링용 cMap·표준폰트 데이터(vite copy-pdfjs-assets가 자동 생성)
+public/pdfjs/

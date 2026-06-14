@@ -40,6 +40,7 @@ import {
 import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmModal";
 import { hasPageMarkers } from "../utils/pageMarkers";
 import { AITutorDrawer } from "../components/AITutorDrawer";
+import { PdfViewer } from "../components/PdfViewer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
@@ -1531,6 +1532,8 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 : "minmax(0, 1fr)",
             gap: isTutorOpen && !isResultExpanded ? 12 : 0,
             alignItems: "stretch",
+            // 확대 시 그리드(=튜터 1칸)가 화면 높이를 채우도록 높이를 명시한다. 자식 튜터의 height:100%가 먹히려면 부모 높이가 필요하다.
+            height: isResultExpanded ? "calc(100vh - 70px)" : undefined,
           }}>
             {!isResultExpanded && (
               <div ref={mindmapPaneRef} style={{
@@ -2372,37 +2375,11 @@ const MaterialDetailView = ({
     }
 
     if (fileUrl && isPdf) {
-      return (
-        <iframe
-          title={material.name}
-          src={`${fileUrl}#toolbar=1&navpanes=0`}
-          style={{
-            width: "100%",
-            height: "100%",
-            minHeight: 0,
-            border: "none",
-            background: "var(--color-surface)",
-            display: "block",
-          }}
-        />
-      );
+      return <PdfViewer url={fileUrl} title={material.name} />;
     }
 
     if (previewPdfUrl) {
-      return (
-        <iframe
-          title={`${material.name} PDF preview`}
-          src={`${previewPdfUrl}#toolbar=1&navpanes=0`}
-          style={{
-            width: "100%",
-            height: "100%",
-            minHeight: 0,
-            border: "none",
-            background: "var(--color-surface)",
-            display: "block",
-          }}
-        />
-      );
+      return <PdfViewer url={previewPdfUrl} title={material.name} />;
     }
 
     // 원본이 없는 이유 구분: 50MB 한도 초과면 그에 맞는 안내, 그 외(원본 저장 기능 추가 전 업로드 등)는 기존 안내.
@@ -2730,7 +2707,7 @@ const MaterialDetailView = ({
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: isSummaryTutorExpanded ? "calc(100vh - 100px)" : SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
+              <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: isSummaryTutorExpanded ? "calc(100vh - 180px)" : SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
                 {showSummaryList && !isSummaryTutorExpanded && (
                   <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (

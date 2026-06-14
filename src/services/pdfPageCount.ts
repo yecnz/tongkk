@@ -1,7 +1,7 @@
-import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
+import { getDocument } from "pdfjs-dist";
+import { initPdfWorker } from "./pdfWorker";
 
-GlobalWorkerOptions.workerSrc = workerSrc;
+initPdfWorker();
 
 export async function getPdfPageCount(file: File): Promise<number | null> {
   try {
