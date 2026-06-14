@@ -4698,12 +4698,16 @@ export default function Summary() {
                     ] as const).map(t => {
                       const active = templatePicked && summaryTemplate === t.key;
                       return (
-                        <button key={t.key} type="button" onClick={() => { if (active) { setTemplatePicked(false); } else { setSummaryTemplate(t.key); setTemplatePicked(true); } }} style={{
+                        <button key={t.key} type="button"
+                          onClick={() => { if (active) { setTemplatePicked(false); } else { setSummaryTemplate(t.key); setTemplatePicked(true); } }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--color-muted-surface)"; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "var(--color-card)"; }}
+                          style={{
                           display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
                           padding: "12px 8px", borderRadius: 10,
                           border: active ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                           background: active ? "var(--color-tint-pink)" : "var(--color-card)",
-                          cursor: "pointer", transition: "background 0.15s, border-color 0.15s",
+                          cursor: "pointer", transition: "background 0.15s",
                         }}>
                           <span style={{ display: "flex", color: active ? PINK : "var(--color-muted)" }}>{summaryTypeIcon(t.key, 20)}</span>
                           <span style={{ fontSize: 14, fontWeight: active ? 800 : 700, color: active ? PINK : "var(--color-text-strong)" }}>{t.name}</span>
