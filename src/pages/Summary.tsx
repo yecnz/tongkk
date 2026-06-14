@@ -1843,8 +1843,12 @@ const useTutorSplit = (initial = 0.62) => {
     }
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // 드래그 종료 핸들러(handleUp)가 최신 비율을 localStorage에 저장할 수 있게 ref로 미러링한다.
+  // 렌더 중 ref 쓰기는 react-hooks/refs 규칙 위반이라 effect로 옮긴다(드래그 중엔 handleMove가 직접 갱신).
   const ratioRef = useRef(ratio);
-  ratioRef.current = ratio;
+  useEffect(() => {
+    ratioRef.current = ratio;
+  }, [ratio]);
 
   const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
