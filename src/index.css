@@ -283,6 +283,17 @@ body.tongkk-sidebar-open #root {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
+/* 템플릿 카드는 평소 무채색 아이콘·화살표, 호버 시에만 종류색(--accent)이 번진다 */
+@media (hover: hover) {
+  .summary-template-card:hover .summary-template-icon {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+  .summary-template-card:hover .summary-template-arrow {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    color: var(--accent);
+  }
+}
 .summary-quizcreate-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
