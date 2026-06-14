@@ -918,7 +918,7 @@ export const AITutorDrawer = ({
                     : { mainContent: msg.content, suggestions: [] };
                   return (
                     <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: isExpanded && msg.role === "assistant" ? "100%" : "88%", display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 14, lineHeight: 1.6 }}>
+                      <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
                         {msg.images && msg.images.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: mainContent ? 8 : 0 }}>
                             {msg.images.map((src, imgIdx) => (
@@ -1081,7 +1081,7 @@ export const AITutorDrawer = ({
             disabled={!canUseAgent || chatLoading || agentLoading}
             placeholder="요약본에 대해 질문하기 (이미지 첨부·붙여넣기 가능)"
             rows={1}
-            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 15, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
+            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
           />
           <button
             type="button"
