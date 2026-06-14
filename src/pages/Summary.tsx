@@ -2002,6 +2002,24 @@ const MaterialDetailView = ({
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
   const [hubLoading, setHubLoading] = useState(false);
   const [hubError, setHubError] = useState("");
+  // 원본(PDF) 탭: PDF 영역을 "화면 가용 높이 + Tongkk 바 높이"만큼 잡는다. 그러면 페이지 스크롤이 딱
+  // Tongkk 바 높이만큼만 생겨서, 위로 스크롤하면 맨 위 Tongkk 바만 사라지고 자료 정보·탭은 남는다.
+  // rect.top은 페이지 스크롤 시 음수가 되므로 scrollY를 더해 문서 기준으로 계산한다.
+  const TONGKK_BAR_HEIGHT = 80;
+  const originalAreaRef = useRef<HTMLDivElement>(null);
+  const [originalAreaHeight, setOriginalAreaHeight] = useState<number>();
+  useEffect(() => {
+    if (activeTab !== "original") return;
+    const update = () => {
+      const el = originalAreaRef.current;
+      if (!el) return;
+      const docTop = el.getBoundingClientRect().top + window.scrollY;
+      setOriginalAreaHeight(Math.max(SPLIT_ROW_MIN_HEIGHT, window.innerHeight - docTop + TONGKK_BAR_HEIGHT));
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [activeTab, material.id]);
   const [activeSummaryId, setActiveSummaryId] = useState<string>("");
   const [tutorPrompt, setTutorPrompt] = useState(initialTutorQuestion);
   const [isOriginalTutorOpen, setIsOriginalTutorOpen] = useState(false);
@@ -2655,13 +2673,13 @@ const MaterialDetailView = ({
 
         <div style={{ overflow: "hidden", borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }}>
         {activeTab === "original" && (
+          <div ref={originalAreaRef} style={{ height: originalAreaHeight ?? SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
           <div
             ref={tutorSplit.containerRef}
             style={{
               display: "flex",
               alignItems: "stretch",
-              height: SPLIT_ROW_HEIGHT,
-              minHeight: SPLIT_ROW_MIN_HEIGHT,
+              height: "100%",
             }}
           >
             {!isOriginalTutorExpanded && (
@@ -2693,6 +2711,7 @@ const MaterialDetailView = ({
                 </div>
               </>
             )}
+          </div>
           </div>
         )}
 
