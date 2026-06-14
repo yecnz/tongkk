@@ -139,14 +139,23 @@ const suggestedTutorQuestions: Record<SummaryTemplate, string[]> = {
 };
 
 const FileIcon = ({ type }: FileIconProps) => {
-  const colors: Record<FileKind, string> = { pdf: "#E74C3C", ppt: "#E67E22", img: "#27AE60", file: "#999" }; // hex-ok: 파일 타입 고정 배지색(흰 글자 대비, 양 모드 공통)
+  // 파일 타입은 라벨(PDF/PPT/IMG)로 구분하고 색은 무채색으로 통일한다.
+  // 색 신호는 선택(핑크)·학습(시안)·삭제(빨강)에만 남기고,
+  // 파일 뱃지는 작은 문서 아이콘으로 밋밋함을 덜어준다.
   const labels: Record<FileKind, string> = { pdf: "PDF", ppt: "PPT", img: "IMG", file: "FILE" };
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      width: 40, height: 28, borderRadius: 6, fontSize: 11, fontWeight: 700,
-      color: "var(--color-on-brand)", background: colors[type] || colors.file
-    }}>{labels[type] || "FILE"}</span>
+      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4,
+      minWidth: 46, height: 28, padding: "0 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+      color: "var(--color-text-secondary)", background: "var(--color-muted-surface)",
+      border: "1px solid var(--color-border-soft)", boxSizing: "border-box",
+    }}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+        <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" />
+      </svg>
+      {labels[type] || "FILE"}
+    </span>
   );
 };
 
@@ -4620,6 +4629,7 @@ export default function Summary() {
                       return (
                       <div
                         key={material.id}
+                        className={isSelected ? undefined : "tongkk-hover-row"}
                         onClick={() => setSelectedMaterialIds(prev =>
                           prev.includes(material.id)
                             ? prev.filter(id => id !== material.id)
@@ -4627,9 +4637,12 @@ export default function Summary() {
                         )}
                         style={{
                           display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
-                          background: isSelected ? "var(--color-tint-pink)" : MUTED_SURFACE,
+                          background: isSelected ? "var(--color-tint-pink)" : "var(--color-card)",
                           border: isSelected ? "1.5px solid color-mix(in srgb, var(--color-pink) 27%, transparent)" : `1px solid ${BORDER_COLOR}`,
+                          // 선택 행은 왼쪽 핑크 바로 또렷하게, 나머지 행은 hover로 생동감을 준다(색은 그대로 두고 위계·깊이로 밋밋함 해소).
+                          boxShadow: isSelected ? "inset 3px 0 0 var(--color-pink)" : "none",
                           borderRadius: 10, marginBottom: 8, cursor: "pointer",
+                          transition: "background 0.15s, border-color 0.15s",
                         }}>
                         <div style={{
                           width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
@@ -4641,7 +4654,7 @@ export default function Summary() {
                           {isSelected && <span style={{ color: "var(--color-on-brand)", fontSize: 10, lineHeight: 1, fontWeight: 800 }}>✓</span>}
                         </div>
                         <FileIcon type={material.type} />
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--color-text-strong)" }}>{material.name}</span>
+                        <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)" }}>{material.name}</span>
                         {materialSummaryCount > 0 && (
                           <button
                             type="button"
@@ -4659,7 +4672,7 @@ export default function Summary() {
                             title="이 자료의 기존 요약 보기"
                             style={{
                               height: 22, padding: "0 9px", borderRadius: 999, border: "none",
-                              background: "var(--color-tint-pink)", color: PINK,
+                              background: "var(--color-muted-surface)", color: "var(--color-text-secondary)",
                               fontSize: 11, fontWeight: 800, cursor: "pointer", flexShrink: 0,
                             }}
                           >
