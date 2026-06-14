@@ -645,8 +645,9 @@ export const AITutorDrawer = ({
         left: layout === "embedded" ? undefined : isExpanded ? "50%" : undefined,
         right: layout === "embedded" ? "auto" : isExpanded ? "auto" : 0,
         width: layout === "embedded" ? "100%" : isExpanded ? "min(1080px, calc(100vw - 48px))" : "min(420px, 100vw)",
-        height: layout === "embedded" ? (embeddedHeight ?? (fill ? "100%" : 1100)) : undefined,
-        minHeight: layout === "embedded" ? (embeddedHeight ?? (fill ? 0 : 1100)) : undefined,
+        // 확대 상태에선 부모가 본문을 숨기고 튜터를 꽉 채우므로 부모 높이를 100% 채운다(고정 1100/embeddedHeight 무시).
+        height: layout === "embedded" ? (isExpanded ? "100%" : (embeddedHeight ?? (fill ? "100%" : 1100))) : undefined,
+        minHeight: layout === "embedded" ? (isExpanded ? 0 : (embeddedHeight ?? (fill ? 0 : 1100))) : undefined,
         zIndex: layout === "embedded" ? "auto" : isExpanded ? 260 : 190,
         border: "1px solid var(--color-border-soft)",
         borderRight: layout === "embedded" ? "1px solid var(--color-border-soft)" : isExpanded ? "1px solid var(--color-border-soft)" : "none",
@@ -917,7 +918,7 @@ export const AITutorDrawer = ({
                     : { mainContent: msg.content, suggestions: [] };
                   return (
                     <div key={`${msg.role}-${i}`} data-msg-role={msg.role} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: isExpanded && msg.role === "assistant" ? "100%" : "88%", display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
+                      <div style={{ padding: "10px 14px", borderRadius: 12, background: msg.role === "user" ? "var(--color-tint-cyan)" : "var(--color-surface)", color: "var(--color-text)", fontSize: 14, lineHeight: 1.6 }}>
                         {msg.images && msg.images.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: mainContent ? 8 : 0 }}>
                             {msg.images.map((src, imgIdx) => (
@@ -1080,7 +1081,7 @@ export const AITutorDrawer = ({
             disabled={!canUseAgent || chatLoading || agentLoading}
             placeholder="요약본에 대해 질문하기 (이미지 첨부·붙여넣기 가능)"
             rows={1}
-            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 13, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
+            style={{ flex: 1, minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 15, lineHeight: `${AGENT_INPUT_LINE_HEIGHT}px`, outline: "none", resize: "none", boxSizing: "border-box", maxHeight: AGENT_INPUT_MAX_HEIGHT, overflowY: "auto", fontFamily: "inherit" }}
           />
           <button
             type="button"
