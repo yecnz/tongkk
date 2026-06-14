@@ -3,7 +3,7 @@
 // 마이페이지·AI 튜터는 진입 시 직관적이라 튜토리얼 대상이 아니다(plan: notes/tutorial-redesign-plan.md).
 // 마이크로카피는 한국어·행동 지향, 한 스텝 1~2문장.
 
-export type TutorialKey = "welcome" | "dashboard" | "summary-upload" | "quiz-setup" | "quiz-solve";
+export type TutorialKey = "welcome" | "dashboard" | "summary-upload" | "summary-result" | "quiz-setup" | "quiz-solve";
 
 export type TutorialStep = {
   title: string;
@@ -70,6 +70,24 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
       {
         title: "종류를 고르고 생성하기",
         body: "일반 요약·강의 노트·마인드맵·치트시트 중에 골라 '요약 생성하기'를 누르세요. 만드는 동안 다른 화면으로 가도 완료되면 알려드려요.",
+      },
+    ],
+  },
+  // 요약을 막 완성해 자료 상세(요약 탭)에 착지한 순간에만 maybeShow로 1회 노출한다.
+  // 라우트 자동 트리거가 아니라 ROUTE_TO_TUTORIAL에는 넣지 않는다(요약 생성 직후에만 의미 있음).
+  "summary-result": {
+    version: 1,
+    title: "만든 요약으로 학습하기",
+    placement: "sheet",
+    requiresAuth: true,
+    steps: [
+      {
+        title: "만든 요약으로 학습해요",
+        body: "위쪽 '원본·요약·퀴즈' 탭으로 같은 자료를 여러 방식으로 살펴봐요. 요약을 읽다가 모르는 부분은 본문을 드래그하면 'AI 튜터에게 묻기'로 바로 질문할 수 있어요.",
+      },
+      {
+        title: "퀴즈로 바로 점검해요",
+        body: "'퀴즈' 탭에서 이 자료로 문제를 만들어 풀면 방금 이해한 내용을 곧장 확인할 수 있어요.",
       },
     ],
   },

@@ -18,6 +18,7 @@ fix-user-email.mjs
 # python
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # editor / OS / tooling
 .claude/
