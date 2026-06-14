@@ -41,7 +41,6 @@ import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmM
 import { hasPageMarkers } from "../utils/pageMarkers";
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
-import { loadUserProfile, updateHideSummaryNotice } from "../services/profile";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -938,28 +937,32 @@ const RestoreSkeleton = () => {
   );
 };
 
+// 요약 종류(4종) 아이콘 — 템플릿 카드와 요약 설정 탭에서 공통으로 쓴다(한 곳만 고치면 둘 다 반영).
+const summaryTypeIcon = (key: SummaryTemplate, size = 20): ReactNode => {
+  const c = {
+    width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+    stroke: "currentColor", strokeWidth: 1.8,
+    strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true,
+  };
+  const icons: Record<SummaryTemplate, ReactNode> = {
+    GENERAL: <svg {...c}><path d="M4 6h16M4 10h16M4 14h10M4 18h7" /></svg>,
+    LECTURE_NOTE: <svg {...c}><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M9 3v18" /></svg>,
+    MINDMAP: <svg {...c}><circle cx="5" cy="12" r="2.2" /><circle cx="18" cy="6" r="2.2" /><circle cx="18" cy="18" r="2.2" /><path d="M7 11l9-4M7 13l9 4" /></svg>,
+    CHEAT_SHEET: <svg {...c}><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></svg>,
+  };
+  return icons[key];
+};
+
 const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewProps) => {
   const [pageRange, setPageRange] = useState("");
   const [focusPrompt, setFocusPrompt] = useState("");
   // 아이콘 색은 브랜드 핑크 하나로 통일한다(색을 여러 개 쓰면 통일감이 없어 촌스러워진다).
   // 카드 구분은 색이 아니라 아이콘 모양이 담당. accent는 아이콘·호버 색(--accent)으로 쓴다.
-  const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string; icon: ReactNode }> = [
-    {
-      key: "GENERAL", name: "일반 요약", desc: "강의 자료 내용을 깔끔하게 정리", accent: PINK,
-      icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h10M4 18h7" /></svg>),
-    },
-    {
-      key: "LECTURE_NOTE", name: "강의 노트", desc: "개념, 흐름, 시험 포인트를 구조화", accent: PINK,
-      icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M9 3v18" /></svg>),
-    },
-    {
-      key: "MINDMAP", name: "마인드맵", desc: "중심 주제와 하위 개념의 관계를 구조화", accent: PINK,
-      icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2.2" /><circle cx="18" cy="6" r="2.2" /><circle cx="18" cy="18" r="2.2" /><path d="M7 11l9-4M7 13l9 4" /></svg>),
-    },
-    {
-      key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 빠르게 보는 암기표", accent: PINK,
-      icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></svg>),
-    },
+  const templates: Array<{ key: SummaryTemplate; name: string; desc: string; accent: string }> = [
+    { key: "GENERAL", name: "일반 요약", desc: "강의 자료 내용을 깔끔하게 정리", accent: PINK },
+    { key: "LECTURE_NOTE", name: "강의 노트", desc: "개념, 흐름, 시험 포인트를 구조화", accent: PINK },
+    { key: "MINDMAP", name: "마인드맵", desc: "중심 주제와 하위 개념의 관계를 구조화", accent: PINK },
+    { key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 빠르게 보는 암기표", accent: PINK },
   ];
 
   return (
@@ -1022,7 +1025,7 @@ const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelectViewPr
                   background: "var(--color-muted-surface)",
                   color: t.accent,
                   marginBottom: 16, transition: "background 0.15s",
-                }}>{t.icon}</div>
+                }}>{summaryTypeIcon(t.key)}</div>
                 <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>{t.name}</h3>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>{t.desc}</p>
               </div>
@@ -3201,33 +3204,6 @@ export default function Summary() {
   useEffect(() => {
     if (view === "upload" && !restoringFromUrl) readyTutorial("summary-upload");
   }, [view, restoringFromUrl, readyTutorial]);
-  // 요약 안내 팝업 '다시 보지 않기' 설정은 계정별(Supabase 프로필)로 저장한다.
-  // 로드 전에는 true(숨김)로 두어, 불러오기 전에 팝업이 깜빡이지 않게 한다.
-  const [hideSummaryNoticePref, setHideSummaryNoticePref] = useState(true);
-
-  useEffect(() => {
-    let ignore = false;
-    loadUserProfile()
-      .then(profile => { if (!ignore) setHideSummaryNoticePref(profile.hideSummaryNotice); })
-      .catch(() => { if (!ignore) setHideSummaryNoticePref(false); });
-    return () => { ignore = true; };
-  }, []);
-
-  // 업로드 화면에 '실제로' 머무를 때만 요약 안내 팝업을 띄운다.
-  // 딥링크 진입 시 비동기 로딩이 끝나기 전까지 view가 잠깐 'upload'였다가
-  // materialDetail/summaryResult 등으로 바뀌는데, 그 transient 동안 팝업이
-  // 깜빡이는 걸 막기 위해 '대기 중인 딥링크 네비게이션'이 없을 때만 띄운다.
-  useEffect(() => {
-    const hasPendingNav =
-      Boolean(pendingMaterialIdRef.current) ||
-      pendingCreateSummaryRef.current ||
-      Boolean(pendingSummaryRef.current);
-    if (view === "upload" && !hasPendingNav && !hideSummaryNoticePref) {
-      setShowMultiSummaryNotice(true);
-    } else {
-      setShowMultiSummaryNotice(false);
-    }
-  }, [view, hideSummaryNoticePref]);
   const [selectedTemplate, setSelectedTemplate] = useState<SummaryTemplate | null>(null);
   const [activeSummaryId, setActiveSummaryId] = useState<string | null>(null);
   const [summaryText, setSummaryText] = useState("");
@@ -3243,6 +3219,8 @@ export default function Summary() {
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   // 요약 진입 화면의 "요약 설정"(퀴즈 설정처럼)에서 고른 값. 하단 "요약 생성하기"가 이 값으로 바로 생성한다.
   const [summaryTemplate, setSummaryTemplate] = useState<SummaryTemplate>(readLastSummaryTemplate);
+  // 요약 종류는 사용자가 직접 고르기 전까지 미선택 상태로 둔다(기본값으로 무심코 생성하는 것 방지).
+  const [templatePicked, setTemplatePicked] = useState(false);
   const [summaryPageRange, setSummaryPageRange] = useState("");
   const [summaryFocusPrompt, setSummaryFocusPrompt] = useState("");
   // 같은 자료·템플릿 요약이 이미 있을 때 "기존 요약 보기 / 새로 생성"을 묻는 모달.
@@ -3263,8 +3241,6 @@ export default function Summary() {
   const [duplicateNotice, setDuplicateNotice] = useState<DuplicateFileNotice | null>(null);
   // 50MB 초과로 원본을 저장하지 못한 파일들을 모아 가운데 모달로 안내.
   const [sizeLimitNotice, setSizeLimitNotice] = useState<{ names: string[] } | null>(null);
-  const [showMultiSummaryNotice, setShowMultiSummaryNotice] = useState(false);
-  const [dontShowMultiSummaryNotice, setDontShowMultiSummaryNotice] = useState(false);
   const [uploadStatuses, setUploadStatuses] = useState<UploadFileStatus[]>([]);
   const [agentThreadId, setAgentThreadId] = useState("");
   const [resultBackView, setResultBackView] = useState<SummaryView>("templates");
@@ -4095,77 +4071,6 @@ export default function Summary() {
         </div>
       )}
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
-      {showMultiSummaryNotice && view === "upload" && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="요약 안내"
-          onClick={() => {
-            if (dontShowMultiSummaryNotice) {
-              setHideSummaryNoticePref(true);
-              updateHideSummaryNotice(true).catch(() => {});
-            }
-            setShowMultiSummaryNotice(false);
-          }}
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: "rgba(0,0,0,0.32)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{
-            width: "min(440px, 100%)", background: "var(--color-card)", borderRadius: 20, padding: "32px 30px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-              <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-yellow)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
-              }}>📝</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>요약 안내</h3>
-            </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "var(--color-text)", wordBreak: "keep-all" }}>
-              출력 토큰이 제한되어 있어, <b style={{ color: "var(--color-text-strong)" }}>여러 개 요약해도</b> <b style={{ color: "var(--color-text-strong)" }}>하나만 </b>생성돼요.
-            </p>
-            <div style={{
-              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "var(--color-page)",
-              fontSize: 13, lineHeight: 1.8, color: "var(--color-text-secondary)", wordBreak: "keep-all",
-              display: "flex", gap: 8, alignItems: "flex-start",
-            }}>
-              <span style={{ flexShrink: 0 }}>💡</span>
-              <span>
-                자료가 많을수록 AI가 내용을 줄여서 요약할 수 있어요.<br />
-                각 자료를 자세히 보고 싶다면 <b style={{ color: PINK }}>한 개씩 선택해서 요약</b>하는 걸 추천해요.
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--color-muted)", cursor: "pointer", userSelect: "none" }}>
-                <input
-                  type="checkbox"
-                  checked={dontShowMultiSummaryNotice}
-                  onChange={e => setDontShowMultiSummaryNotice(e.target.checked)}
-                  style={{ cursor: "pointer" }}
-                />
-                다시 보지 않기
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  if (dontShowMultiSummaryNotice) {
-                    setHideSummaryNoticePref(true);
-                    updateHideSummaryNotice(true).catch(() => {});
-                  }
-                  setShowMultiSummaryNotice(false);
-                }}
-                style={{
-                  padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
-                }}
-              >확인</button>
-            </div>
-          </div>
-        </div>
-      )}
       {sizeLimitNotice && (
         <div
           role="dialog"
@@ -4786,19 +4691,24 @@ export default function Summary() {
                   <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>요약 종류</label>
                   <div className="option-grid-4" style={{ marginBottom: 20 }}>
                     {([
-                      { key: "GENERAL", name: "일반 요약" },
-                      { key: "LECTURE_NOTE", name: "강의 노트" },
-                      { key: "MINDMAP", name: "마인드맵" },
-                      { key: "CHEAT_SHEET", name: "치트시트" },
+                      { key: "GENERAL", name: "일반 요약", desc: "내용을 깔끔하게 정리" },
+                      { key: "LECTURE_NOTE", name: "강의 노트", desc: "개념·흐름·시험 포인트" },
+                      { key: "MINDMAP", name: "마인드맵", desc: "개념 관계를 구조화" },
+                      { key: "CHEAT_SHEET", name: "치트시트", desc: "시험 직전 암기표" },
                     ] as const).map(t => {
-                      const active = summaryTemplate === t.key;
+                      const active = templatePicked && summaryTemplate === t.key;
                       return (
-                        <button key={t.key} type="button" onClick={() => setSummaryTemplate(t.key)} style={{
-                          padding: "10px 0", borderRadius: 10,
+                        <button key={t.key} type="button" onClick={() => { if (active) { setTemplatePicked(false); } else { setSummaryTemplate(t.key); setTemplatePicked(true); } }} style={{
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                          padding: "12px 8px", borderRadius: 10,
                           border: active ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                           background: active ? "var(--color-tint-pink)" : "var(--color-card)",
-                          color: active ? PINK : "var(--color-muted)", fontSize: 14, fontWeight: active ? 800 : 600, cursor: "pointer",
-                        }}>{t.name}</button>
+                          cursor: "pointer", transition: "background 0.15s, border-color 0.15s",
+                        }}>
+                          <span style={{ display: "flex", color: active ? PINK : "var(--color-muted)" }}>{summaryTypeIcon(t.key, 20)}</span>
+                          <span style={{ fontSize: 14, fontWeight: active ? 800 : 700, color: active ? PINK : "var(--color-text-strong)" }}>{t.name}</span>
+                          <span style={{ fontSize: 11.5, lineHeight: 1.4, textAlign: "center", color: "var(--color-text-secondary)" }}>{t.desc}</span>
+                        </button>
                       );
                     })}
                   </div>
@@ -4837,16 +4747,16 @@ export default function Summary() {
               {searched && (
                 <button type="button"
                   onClick={handleGenerateFromSettings}
-                  disabled={!selectedMarkdown || isExtracting || isSummarizing}
+                  disabled={!selectedMarkdown || isExtracting || isSummarizing || !templatePicked}
                   style={{
                     width: "100%", padding: "14px 0", borderRadius: 12, border: "none", marginTop: 16,
-                    background: selectedMarkdown && !isExtracting && !isSummarizing ? PINK : "var(--color-border-soft)",
-                    color: selectedMarkdown && !isExtracting && !isSummarizing ? "var(--color-on-brand)" : "var(--color-muted)",
+                    background: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? PINK : "var(--color-border-soft)",
+                    color: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? "var(--color-on-brand)" : "var(--color-muted)",
                     fontSize: 16, fontWeight: 700,
-                    cursor: selectedMarkdown && !isExtracting && !isSummarizing ? "pointer" : "not-allowed",
+                    cursor: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? "pointer" : "not-allowed",
                   }}
                 >
-                  {isExtracting ? "자료 분석 중..." : isSummarizing ? "요약 생성 중..." : "요약 생성하기"}
+                  {isExtracting ? "자료 분석 중..." : isSummarizing ? "요약 생성 중..." : !templatePicked ? "요약 종류를 선택하세요" : "요약 생성하기"}
                 </button>
               )}
           </div>
