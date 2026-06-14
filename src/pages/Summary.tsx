@@ -42,6 +42,7 @@ import { hasPageMarkers } from "../utils/pageMarkers";
 import { AITutorDrawer } from "../components/AITutorDrawer";
 import { PdfViewer } from "../components/PdfViewer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
+import { fetchMaterialFile } from "../services/materialFileCache";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -2000,6 +2001,8 @@ const MaterialDetailView = ({
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  // 원본 이미지: filePath 기준 캐시로 받은 objectURL(준비 전엔 null → 로딩 표시). 재다운로드 방지용.
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
@@ -2118,7 +2121,9 @@ const MaterialDetailView = ({
     setPreviewPdfUrl(null);
     setPreviewError("");
 
-    if (!fileUrl || !(isPresentation || isDocx)) {
+    // 원본 탭을 실제로 열었을 때만 변환한다. 예전엔 자료에 들어서기만 해도(요약 탭 포함)
+    // 원본 PPT/DOCX를 통째로 받아 변환해 Egress를 크게 낭비했다.
+    if (activeTab !== "original" || !fileUrl || !(isPresentation || isDocx)) {
       setPreviewLoading(false);
       return () => {
         ignore = true;
@@ -2136,7 +2141,7 @@ const MaterialDetailView = ({
     }
 
     setPreviewLoading(true);
-    createPdfPreviewFromUrl(fileUrl, material.name)
+    createPdfPreviewFromUrl(fileUrl, material.name, material.filePath)
       .then(url => {
         // 변환 결과는 페이지 생존 동안 재사용하므로 revoke하지 않고 캐시에 보관한다.
         pptPreviewUrlCache.set(material.id, url);
@@ -2152,7 +2157,32 @@ const MaterialDetailView = ({
     return () => {
       ignore = true;
     };
-  }, [fileUrl, isPresentation, isDocx, material.id, material.name]);
+  }, [activeTab, fileUrl, isPresentation, isDocx, material.id, material.name, material.filePath]);
+
+  // 원본 이미지: 서명 URL은 새로고침마다 토큰이 바뀌어 브라우저 HTTP 캐시가 빗나간다.
+  // filePath 기준 Cache Storage(fetchMaterialFile)로 받아 objectURL로 보여줘 재다운로드(Egress)를 막는다.
+  useEffect(() => {
+    setImageUrl(null);
+    if (activeTab !== "original" || !isImage || !fileUrl) {
+      return;
+    }
+    let revoked = false;
+    let objectUrl: string | null = null;
+    fetchMaterialFile(fileUrl, { cacheKey: material.filePath })
+      .then(blob => {
+        if (revoked) return;
+        objectUrl = URL.createObjectURL(blob);
+        setImageUrl(objectUrl);
+      })
+      .catch(() => {
+        // 캐시·네트워크 모두 실패한 드문 경우만 서명 URL을 직접 쓰게 둔다(로딩 멈춤 방지).
+        if (!revoked) setImageUrl(fileUrl);
+      });
+    return () => {
+      revoked = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [activeTab, isImage, fileUrl, material.filePath]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -2353,7 +2383,16 @@ const MaterialDetailView = ({
       );
     }
 
-    if (fileUrl && isImage) {
+    if (isImage && material.filePath) {
+      // 캐시된 이미지(objectURL)가 준비되기 전까지는 로딩만 보여준다 — 서명 URL로 먼저 한 번
+      // 받아버리는(Egress) 것을 막기 위해 src에 fileUrl을 직접 걸지 않는다.
+      if (!imageUrl) {
+        return (
+          <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
+            원본 이미지를 불러오는 중입니다.
+          </div>
+        );
+      }
       return (
         <div style={{
           height: "100%",
@@ -2366,7 +2405,7 @@ const MaterialDetailView = ({
           boxSizing: "border-box",
         }}>
           <img
-            src={fileUrl}
+            src={imageUrl}
             alt={material.name}
             style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
           />
@@ -2375,7 +2414,7 @@ const MaterialDetailView = ({
     }
 
     if (fileUrl && isPdf) {
-      return <PdfViewer url={fileUrl} title={material.name} />;
+      return <PdfViewer url={fileUrl} cacheKey={material.filePath} title={material.name} />;
     }
 
     if (previewPdfUrl) {
@@ -2707,7 +2746,10 @@ const MaterialDetailView = ({
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", alignItems: "stretch", gap: 14, height: isSummaryTutorExpanded ? "calc(100vh - 180px)" : SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
+              <div style={isSummaryTutorExpanded
+                // 확대 시 위쪽 메뉴까지 덮는 전체 화면 오버레이로 띄워 튜터가 화면을 통째로 쓰게 한다.
+                ? { position: "fixed", inset: 0, zIndex: 250, display: "flex", padding: 16, background: "var(--color-page)", boxSizing: "border-box" }
+                : { display: "flex", alignItems: "stretch", gap: 14, height: SPLIT_ROW_HEIGHT, minHeight: SPLIT_ROW_MIN_HEIGHT }}>
                 {showSummaryList && !isSummaryTutorExpanded && (
                   <div style={{ flex: "0 0 220px", minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                     {summaries.map(summary => (

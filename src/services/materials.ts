@@ -1,4 +1,5 @@
 import { createTtlCache, readThroughCache, SWR_STALE_TTL_MS } from './cache';
+import { evictMaterialFile } from './materialFileCache';
 import { fetchCourses, type CourseRecord } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import { deleteSummariesByMaterialId } from './summaries';
@@ -141,8 +142,9 @@ export const uploadCourseMaterialFile = async (
     });
 
   if (error) throw new Error(formatSupabaseError(error));
-  // 같은 경로에 새 파일이 올라왔으니(upsert) 이전 서명 URL 캐시는 버린다.
+  // 같은 경로에 새 파일이 올라왔으니(upsert) 이전 서명 URL 캐시와 받아둔 원본 파일 캐시를 모두 버린다.
   invalidateSignedUrlCache(filePath);
+  await evictMaterialFile(filePath);
   return {
     ...material,
     filePath,
@@ -275,6 +277,7 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
       .remove([material.file_path]);
     if (removeResult.error) console.warn('자료 원본 파일 삭제 실패(고아 파일):', removeResult.error);
     invalidateSignedUrlCache(material.file_path);
+    await evictMaterialFile(material.file_path);
   }
 };
 

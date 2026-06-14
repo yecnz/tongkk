@@ -8,6 +8,7 @@ import {
   type RenderTask,
 } from "pdfjs-dist";
 import { initPdfWorker } from "../services/pdfWorker";
+import { fetchMaterialFile } from "../services/materialFileCache";
 import { CYAN } from "../common";
 import "./PdfViewer.css";
 
@@ -21,6 +22,9 @@ const PDFJS_FONTS_URL = `${import.meta.env.BASE_URL}pdfjs/standard_fonts/`;
 type PdfViewerProps = {
   url: string;
   title?: string;
+  // 같은 파일이면 항상 동일한 캐시 키(원본 filePath). 서명 URL은 토큰이 매번 바뀌어 캐시 키로 못 쓴다.
+  // 지정 시 Cache Storage에 저장해 새로고침·재방문 때 재다운로드(Egress)를 막는다. blob: 미리보기엔 생략.
+  cacheKey?: string | null;
 };
 
 // 스크롤로 들어오기 직전 페이지까지 미리 그려 빈 화면이 잠깐 보이는 것을 막는다.
@@ -28,7 +32,7 @@ const RENDER_ROOT_MARGIN = "600px 0px";
 // 페이지 크기를 아직 모를 때 쓰는 임시 종횡비(스크롤바 추정용). 측정되면 실제 비율로 대체된다.
 const FALLBACK_RATIO = 1.3;
 
-export function PdfViewer({ url, title }: PdfViewerProps) {
+export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -48,9 +52,8 @@ export function PdfViewer({ url, title }: PdfViewerProps) {
 
     (async () => {
       try {
-        const res = await fetch(url, { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.arrayBuffer();
+        const blob = await fetchMaterialFile(url, { cacheKey, signal: controller.signal });
+        const data = await blob.arrayBuffer();
         if (cancelled) return;
         loaded = await getDocument({
           data,
@@ -76,7 +79,7 @@ export function PdfViewer({ url, title }: PdfViewerProps) {
       controller.abort();
       void loaded?.destroy();
     };
-  }, [url]);
+  }, [url, cacheKey]);
 
   // 컨테이너 폭 추적 → 페이지를 이 폭에 맞춘다(AI 튜터 가로 분할 드래그/창 리사이즈/화면 크기 변경 대응).
   // 드래그 중 과도한 재렌더를 막으려 디바운스한다.

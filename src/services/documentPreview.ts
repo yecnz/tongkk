@@ -1,12 +1,9 @@
 import { BACKEND_URL, fetchWithTunnelRetry, getAuthRequestHeaders, parseApiError } from './backend';
+import { fetchMaterialFile } from './materialFileCache';
 
-export async function createPdfPreviewFromUrl(fileUrl: string, fileName: string): Promise<string> {
-  const sourceResponse = await fetch(fileUrl);
-  if (!sourceResponse.ok) {
-    throw new Error(`원본 파일을 불러오지 못했습니다. (${sourceResponse.status})`);
-  }
-
-  const sourceBlob = await sourceResponse.blob();
+export async function createPdfPreviewFromUrl(fileUrl: string, fileName: string, cacheKey?: string | null): Promise<string> {
+  // 원본(PPT/DOCX) 다운로드를 filePath 기준으로 캐시해, 재방문·새로고침 시 재다운로드(Egress)를 막는다.
+  const sourceBlob = await fetchMaterialFile(fileUrl, { cacheKey });
   const sourceFile = new File([sourceBlob], fileName, {
     type: sourceBlob.type || 'application/octet-stream',
   });
