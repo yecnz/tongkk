@@ -794,6 +794,10 @@ const collapseSingleChildBullets = (markdown: string): string => {
   return out.join("\n");
 };
 
+// 강의 노트에서만 단일 자식 글머리를 병합한다(화면 렌더·전체 복사·PDF에 동일 적용).
+const collapseForLectureNote = (template: SummaryTemplate | undefined, markdown: string): string =>
+  template === "LECTURE_NOTE" ? collapseSingleChildBullets(markdown) : markdown;
+
 const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
 
 // 드래그 앵커를 기준으로 스크롤을 되돌린다.
@@ -901,7 +905,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
   const normalized = markInlineExamPoints(normalizeMarkdownContent(content));
   const hoisted = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
   // 강의 노트의 '핵심 개념'에서 라벨+단일 자식 글머리를 한 줄로 합쳐 글머리 중첩을 줄인다.
-  const collapsed = template === "LECTURE_NOTE" ? collapseSingleChildBullets(hoisted) : hoisted;
+  const collapsed = collapseForLectureNote(template, hoisted);
   const cleaned = simplifySoleFileSources(collapsed);
   if (!cleaned) return null;
 
@@ -1135,7 +1139,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
   const exportContent = template === "MINDMAP"
     ? displayContent
-    : simplifySoleFileSources(hoistSourceToHeadings(normalizeMarkdownContent(displayContent)));
+    : collapseForLectureNote(template, simplifySoleFileSources(hoistSourceToHeadings(normalizeMarkdownContent(displayContent))));
   const exportText = `${templateLabels[template]} 요약\n\n${exportContent}`;
 
   useEffect(() => {
@@ -1629,7 +1633,7 @@ const SummaryActions = ({ template, content, onGoToQuiz }: { template: SummaryTe
   // 복사 텍스트도 화면과 동일하게 정제: 본문 인라인 (출처:...)는 제거하고 헤딩 출처만 남긴다.
   const exportContent = template === "MINDMAP"
     ? content
-    : simplifySoleFileSources(hoistSourceToHeadings(normalizeMarkdownContent(content)));
+    : collapseForLectureNote(template, simplifySoleFileSources(hoistSourceToHeadings(normalizeMarkdownContent(content))));
   const exportText = `${templateLabels[template]} 요약\n\n${exportContent}`;
 
   // 실제 인쇄(→ PDF 저장) 실행. 안내 팝업에서 '계속'을 누르면 호출된다.
