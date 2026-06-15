@@ -761,6 +761,39 @@ const hoistSourceToHeadings = (markdown: string): string => {
   return result.join("\n");
 };
 
+// '핵심 개념'에서 '- **라벨**' 글머리 아래 내용이 딱 하나뿐이면(자식 bullet 1개·손자 없음)
+// '- **라벨**: 내용' 한 줄로 합친다. 라벨과 단일 자식이 글머리 두 개로 갈려 어지러워 보이는 걸 막는다.
+// 자식이 2개 이상이거나 더 깊은 하위가 있으면 그대로 둔다. 코드블록·인용문(>)·번호목록은 매칭되지 않아 안 건드린다.
+const collapseSingleChildBullets = (markdown: string): string => {
+  const LABEL = /^(\s*)([-*])\s+\*\*\s*([^*\n]+?)\s*\*\*\s*[:：]?\s*$/;
+  const CHILD = /^(\s*)([-*])\s+(\S.*)$/;
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let inFence = false;
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^\s*```/.test(line)) { inFence = !inFence; out.push(line); i += 1; continue; }
+    const label = inFence ? null : line.match(LABEL);
+    const child = label ? lines[i + 1]?.match(CHILD) : null;
+    if (label && child && child[1].length > label[1].length) {
+      const after = lines[i + 2];
+      const afterIndent = after ? (after.match(/^\s*/)?.[0].length ?? 0) : 0;
+      // 자식 다음 줄이 형제(같은 깊이)·손자(더 깊은 깊이)면 단일 leaf가 아니라 합치지 않는다.
+      const hasMore = !!after && after.trim() !== "" && afterIndent >= child[1].length;
+      if (!hasMore) {
+        const labelText = label[3].replace(/[:：]\s*$/, "").trim();
+        out.push(`${label[1]}${label[2]} **${labelText}**: ${child[3].trim()}`);
+        i += 2;
+        continue;
+      }
+    }
+    out.push(line);
+    i += 1;
+  }
+  return out.join("\n");
+};
+
 const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
 
 // 드래그 앵커를 기준으로 스크롤을 되돌린다.
@@ -867,7 +900,9 @@ const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (
 const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
   const normalized = markInlineExamPoints(normalizeMarkdownContent(content));
   const hoisted = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
-  const cleaned = simplifySoleFileSources(hoisted);
+  // 강의 노트의 '핵심 개념'에서 라벨+단일 자식 글머리를 한 줄로 합쳐 글머리 중첩을 줄인다.
+  const collapsed = template === "LECTURE_NOTE" ? collapseSingleChildBullets(hoisted) : hoisted;
+  const cleaned = simplifySoleFileSources(collapsed);
   if (!cleaned) return null;
 
   if (template === "CHEAT_SHEET") {
