@@ -14,7 +14,11 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   updateEmail: (newEmail: string) => Promise<void>;
+  // 비밀번호 재설정 메일 링크로 진입한 상태(새 비밀번호 입력 단계). true면 자동 로그인 대신 재설정 폼을 띄운다.
+  recoveryMode: boolean;
+  endRecovery: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -22,6 +26,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // recovery 링크는 implicit 플로우의 해시(#...type=recovery)로 돌아온다. Supabase 클라이언트가
+  // 해시를 처리하며 PASSWORD_RECOVERY 이벤트를 쏘지만, 그 전에 user가 먼저 채워져 대시보드로
+  // 리다이렉트되는 레이스를 막기 위해 초기값을 해시에서 동기적으로 읽어 둔다.
+  const [recoveryMode, setRecoveryMode] = useState(
+    () => typeof window !== "undefined" && window.location.hash.includes("type=recovery"),
+  );
   // 직전 user id. 사용자가 바뀌면(로그아웃 → null 포함) 서비스 메모리 캐시를 전부 비워,
   // stale TTL(30분) 동안 같은 브라우저의 다음 사용자에게 이전 사용자의 과목/자료/요약/퀴즈
   // 목록이 노출되는 것을 막는다. undefined는 '아직 모름'(앱 시작) — 첫 확인은 무효화하지 않는다.
@@ -48,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
       syncCachesWithUser(nextSession);
       setSession(nextSession);
       setLoading(false);
@@ -82,12 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (error) throw error;
     },
+    // recovery 링크로 진입한 사용자가 새 비밀번호를 설정한다. (현재 세션은 recovery 토큰으로 인증됨)
+    updatePassword: async (newPassword) => {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+    },
     // 이메일(=로그인 ID)만 교체한다. user_id(UUID)는 그대로라 과목/자료/요약/퀴즈가 모두 유지된다.
     updateEmail: async (newEmail) => {
       const { error } = await supabase.auth.updateUser({ email: newEmail });
       if (error) throw error;
     },
-  }), [loading, session]);
+    recoveryMode,
+    endRecovery: () => setRecoveryMode(false),
+  }), [loading, session, recoveryMode]);
 
   return (
     <AuthContext.Provider value={value}>
