@@ -798,7 +798,15 @@ const collapseSingleChildBullets = (markdown: string): string => {
 const collapseForLectureNote = (template: SummaryTemplate | undefined, markdown: string): string =>
   template === "LECTURE_NOTE" ? collapseSingleChildBullets(markdown) : markdown;
 
-const normalizeMarkdownContent = (content: string) => normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim());
+// LLM이 출처를 '(출처: ...)' 대신, 입력에 박힌 페이지/슬라이드 마커(<!-- p.N -->, <!-- Slide number: N -->)를
+// 그대로 베껴 출력하는 경우가 있다(본문에 마커가 노출됨). 이를 (출처: p.N)로 정규화해 기존 출처 배지
+// 시스템(SOURCE_PATTERN·hoistSourceToHeadings)에 태운다. 코드블록의 일반 HTML 주석은 패턴이 달라 보존된다.
+const PAGE_MARKER_PATTERN = /<!--\s*(?:p\.\s*(\d+)|Slide number:\s*(\d+))\s*-->/gi;
+const normalizePageMarkers = (markdown: string): string =>
+  markdown.replace(PAGE_MARKER_PATTERN, (_m, page, slide) => `(출처: p.${page ?? slide})`);
+
+const normalizeMarkdownContent = (content: string) =>
+  normalizePageMarkers(normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim()));
 
 // 드래그 앵커를 기준으로 스크롤을 되돌린다.
 // - 본문이 살아 있으면(분할 화면 등) 드래그했던 구절을 처음 보던 화면 위치로 맞춘다.
