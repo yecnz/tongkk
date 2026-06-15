@@ -935,21 +935,18 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
     source = _filter_markdown_by_pages(req.source_markdown, req.pages) if req.source_markdown else ""
     # 원본이 너무 길면 컨텍스트엔 요약만 넣고, 원본은 inspect_original_source 도구로 on-demand 조회하게 한다.
     source_inline_limit = 12000  # 자(char) 기준
+    # 자료 컨텍스트는 대화 메시지로 insert하지 않고 reference_context로 넘긴다. _agent_node가 매 턴
+    # SystemMessage에 1회만 주입하므로, InMemorySaver 이력에 턴마다 중복 누적되지 않는다(토큰·지연 급증 방지).
+    reference_context = ""
     if source and len(source) <= source_inline_limit:
         parts = [f"[원본 강의자료 본문]\n{source}"]
         if req.markdown:
             parts.append(f"[정리된 요약]\n{req.markdown}")
-        messages.insert(
-            0,
-            {
-                "role": "user",
-                "content": (
-                    "다음 자료를 현재 대화의 참고 자료로 사용해. "
-                    "사실과 내용의 근거는 [원본 강의자료 본문]을 우선하고, "
-                    "[정리된 요약]은 구조·정리 참고용으로만 사용해.\n\n"
-                    + "\n\n".join(parts)
-                ),
-            },
+        reference_context = (
+            "다음 자료를 현재 대화의 참고 자료로 사용해. "
+            "사실과 내용의 근거는 [원본 강의자료 본문]을 우선하고, "
+            "[정리된 요약]은 구조·정리 참고용으로만 사용해.\n\n"
+            + "\n\n".join(parts)
         )
     elif req.markdown:
         note = (
@@ -958,16 +955,10 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
             if source
             else ""
         )
-        messages.insert(
-            0,
-            {
-                "role": "user",
-                "content": f"다음 강의자료를 현재 대화의 참고 자료로 사용해.{note}\n\n[정리된 요약]\n{req.markdown}",
-            },
-        )
+        reference_context = f"다음 강의자료를 현재 대화의 참고 자료로 사용해.{note}\n\n[정리된 요약]\n{req.markdown}"
 
     return await _run_llm_call(
-        lambda: run_study_agent(req.model, messages, req.thread_id, source),
+        lambda: run_study_agent(req.model, messages, req.thread_id, source, reference_context),
         fail_message="AI 튜터 응답 생성 중 오류가 발생했습니다.",
         log_message="/agent 실행 실패",
         handle_parse_errors=False,

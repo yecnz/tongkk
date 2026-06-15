@@ -154,6 +154,9 @@ class StudyAgentState(TypedDict):
     model: AgentModel
     # 원본 강의자료 본문. 길어서 컨텍스트에 직접 넣지 않을 때 inspect_original_source 도구가 여기서 읽는다.
     source_markdown: NotRequired[str]
+    # 자료 참고 컨텍스트(원본/요약). add_messages 이력이 아니라 일반 필드라 턴마다 덮어써지며,
+    # _agent_node가 매 턴 SystemMessage에 1회만 합쳐 넣는다(이력 중복 누적 방지).
+    reference_context: NotRequired[str]
 
 
 def build_llm(model: AgentModel, max_tokens: int | None = None, model_name: str | None = None):
@@ -191,7 +194,10 @@ def _build_model(model: AgentModel, max_tokens: int | None = None, model_name: s
 def _agent_node(state: StudyAgentState):
     model = state["model"]
     llm = _build_model(model).bind_tools(TOOLS)
-    messages = [SystemMessage(content=SYSTEM_PROMPT), *state["messages"]]
+    # 자료 컨텍스트는 매 턴 SystemMessage에만 실어, 대화 이력(state["messages"])에는 누적되지 않게 한다.
+    reference = (state.get("reference_context") or "").strip()
+    system_content = f"{SYSTEM_PROMPT}\n\n{reference}" if reference else SYSTEM_PROMPT
+    messages = [SystemMessage(content=system_content), *state["messages"]]
     response = llm.invoke(messages)
     return {"messages": [response], "model": model}
 
@@ -273,6 +279,7 @@ def run_study_agent(
     messages: list[dict[str, str]],
     thread_id: str | None = None,
     source_markdown: str | None = None,
+    reference_context: str | None = None,
 ) -> dict[str, object]:
     current_thread_id = thread_id or str(uuid4())
     state: dict[str, object] = {
@@ -282,6 +289,9 @@ def run_study_agent(
     # 원본은 첫 턴에만 state에 실어둔다(이후 턴엔 빈 값을 넣지 않아 체크포인트에 남은 원본이 유지됨).
     if source_markdown:
         state["source_markdown"] = source_markdown
+    # 자료 컨텍스트는 매 턴 넘어오면 덮어쓴다(일반 필드라 누적되지 않음). _agent_node가 SystemMessage로 주입.
+    if reference_context:
+        state["reference_context"] = reference_context
     config = {
         "configurable": {"thread_id": current_thread_id},
         "recursion_limit": 8,
