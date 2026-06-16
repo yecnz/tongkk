@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { PINK, CYAN, normalizeBoldSpacing, normalizeMathDelimiters } from "../common";
+import { PINK, CYAN, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication } from "../common";
 import { sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   createSummaryChatSession,
@@ -158,7 +158,7 @@ const copyRichText = async (html: string, plain: string) => {
 };
 
 const FormattedTutorText = ({ content }: { content: string }) => {
-  const cleaned = normalizeBoldSpacing(normalizeMathDelimiters(content.replace(/\r\n/g, "\n").trim()));
+  const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(content.replace(/\r\n/g, "\n").trim())));
   if (!cleaned) return null;
 
   return (

@@ -62,6 +62,25 @@ export const normalizeMathDelimiters = (text: string): string => {
   return s.replace(/CODE(\d+)/g, (_m, i) => code[Number(i)]);
 };
 
+// LLM이 곱셈을 KaTeX로 감싸지 않고 별표로 출력하면(예: `5*5*3 + 1 = 76`) react-markdown이
+// 가운데 `*5*`를 이탤릭 강조로 파싱해 별표가 사라지고 `553`처럼 깨져 보인다. 영숫자 사이에
+// 공백 없이 끼어 곱셈 기호로만 쓰인 단일 별표를 `\*`로 이스케이프해 문자 그대로 렌더한다.
+// - 코드(```·``)와 이미 $-구분된 수식($...$, $$...$$)은 placeholder로 떼어내 보호한다(그 안의 *는
+//   손대지 않는다). 그래서 수식 정규화(normalizeMathDelimiters) '뒤'에 돌려야 한다.
+// - 양옆이 영숫자인 단일 *만 매칭하므로 `**굵게**`(별표 인접)나 여닫는 이탤릭(별표 양옆이 공백·
+//   문장부호·한글)은 건드리지 않는다. 캡처 그룹으로 앞 문자를 보존해 lookbehind 없이 처리한다(구버전 Safari 대응).
+// - placeholder는 normalizeMathDelimiters와 같은 사용자 영역 문자(U+E000) sentinel로 감싸 본문과 안 섞이게 한다.
+export const escapeStrayMultiplication = (text: string): string => {
+  const guarded: string[] = [];
+  const S = "";
+  const masked = text.replace(/```[\s\S]*?```|`[^`\n]*`|\$\$[\s\S]*?\$\$|\$[^$\n]+?\$/g, (m) => {
+    guarded.push(m);
+    return `${S}MUL${guarded.length - 1}${S}`;
+  });
+  const escaped = masked.replace(/([0-9A-Za-z])\*(?=[0-9A-Za-z])/g, "$1\\*");
+  return escaped.replace(new RegExp(`${S}MUL(\\d+)${S}`, "g"), (_m, i) => guarded[Number(i)]);
+};
+
 export const pageRoutes = {
   "대시보드": "/",
   "학습 캘린더": "/calendar",
