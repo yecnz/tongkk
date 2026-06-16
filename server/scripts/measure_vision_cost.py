@@ -234,11 +234,14 @@ def _measure_summary(res: DocResult, full_markdown: str, price_in: float, price_
     """
     from langchain_core.messages import HumanMessage, SystemMessage
 
+    focus_checklist, focus_user_tail = main._summary_user_focus_parts(SUMMARY_TEMPLATE, None)
     prompt = main.SUMMARY_USER_PROMPT.format(
         template_label=main.TEMPLATE_LABELS[SUMMARY_TEMPLATE],
         template_instruction=main.TEMPLATE_INSTRUCTIONS[SUMMARY_TEMPLATE],
         citation_rule=main._citation_rule(None),
         markdown=full_markdown,
+        focus_checklist=focus_checklist,
+        focus_user_tail=focus_user_tail,
     )
     system_content = main._summary_system_content(None)
     sink: list[dict] = []

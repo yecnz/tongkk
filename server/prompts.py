@@ -82,7 +82,7 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 7. Markdown만 출력하고, HTML 태그, 색상 지시, 이모지는 사용하지 마.
 8. 형광펜 강조는 기본적으로 사용하지 마. 전체 출력에서 가장 중요한 핵심 내용 5개 이하에만 `==핵심 내용==` 형식으로 표시해.
 9. `==...==`는 반드시 한 문장 또는 짧은 구절에만 사용하고, 제목 전체나 긴 문단에는 사용하지 마.
-10. 수식은 반드시 KaTeX 달러 구분자로 감싸. 인라인 수식은 `$...$`, 별도 줄의 디스플레이 수식은 `$$...$$`를 쓰고, 대괄호 `[ ... ]`·소괄호 `( ... )`·백틱으로 수식을 감싸지 마. LaTeX 명령(\frac, \sigma, \rightarrow 등)은 그대로 둬. 수식이 아닌 파일명·함수명·매우 짧은 핵심 키워드, 수치·단위만 필요할 때 `inline code`로 감싸(형광펜 강조가 아니다).
+10. 수식은 반드시 KaTeX 달러 구분자로 감싸. 인라인 수식은 `$...$`, 별도 줄의 디스플레이 수식은 `$$...$$`를 쓰고, 대괄호 `[ ... ]`·소괄호 `( ... )`·백틱으로 수식을 감싸지 마. LaTeX 명령(\\frac, \\sigma, \\rightarrow 등)은 그대로 둬. 수식이 아닌 파일명·함수명·매우 짧은 핵심 키워드, 수치·단위만 필요할 때 `inline code`로 감싸(형광펜 강조가 아니다).
 11. '>' 인용문은 텍스트 상자가 필요한 경우에만 사용해. 화면에서는 왼쪽 색 선 없이 둥근 박스로 렌더링된다.
 12. 제목별로 카드나 박스를 나누는 형식은 사용하지 마.
 13. 템플릿별 목적을 최우선으로 따르고, 세 템플릿의 출력 스타일이 서로 비슷해지지 않게 해.
@@ -93,11 +93,11 @@ SUMMARY_USER_PROMPT = """업로드한 강의자료를 {template_label} 템플릿
 {markdown}
 
 최종 출력 점검:
-- {template_label} 템플릿 지시와 공통 기준만 따라 작성해.
+{focus_checklist}
 - 일반 요약은 정보 보존형 정리본, 강의 노트는 학습 보조형 노트, 치트시트는 시험 직전 압축 암기표로 작성해.
 - 형광펜 표시(`==...==`)는 5개 이하인지 확인해.
 - 필요한 텍스트 상자는 '>' 인용문으로만 만들고, HTML aside는 쓰지 마.
-- 자료 앞뒤에 붙은 앱 UI 문구, 이전 요약 형식, 예시 제목을 출력에 섞지 마.
+- 자료 앞뒤에 붙은 앱 UI 문구, 이전 요약 형식, 예시 제목을 출력에 섞지 마.{focus_user_tail}
 """
 
 
@@ -128,7 +128,7 @@ QUIZ_USER_PROMPT = """과목: {subject}
 난이도: {difficulty}
 문항 유형: {question_type}
 {markdown_section}{exclude_section}
-위 조건에 맞는 문제 {count}개를 JSON 배열로만 출력해."""
+{focus_quiz_section}위 조건에 맞는 문제 {count}개를 JSON 배열로만 출력해."""
 
 STUDY_PLAN_MODEL = "gpt-5.4-nano"
 
@@ -285,14 +285,58 @@ def _citation_rule(source_names: list[str] | None) -> str:
     return base + scope + "단, 치트시트에는 `(출처: ...)` 같은 출처 표기를 절대 붙이지 마라."
 
 
+def _summary_user_focus_parts(template: str, focus_prompt: str | None) -> tuple[str, str]:
+    """SUMMARY_USER_PROMPT의 {focus_checklist}, {focus_user_tail}을 만든다.
+
+    템플릿(=형식)과 집중 요청(=내용 비중)을 직교 축으로 두고, 집중 요청을 USER 메시지
+    맨 끝(=생성 직전, 강의자료 바로 뒤)에 재진술해 모델이 확실히 반영하게 한다.
+    focus가 없으면 현행 출력과 글자 단위로 완전히 동일하게 유지한다(점검 문구 그대로, tail 없음).
+    """
+    label = TEMPLATE_LABELS[template]
+    if not (focus_prompt and focus_prompt.strip()):
+        return f"- {label} 템플릿 지시와 공통 기준만 따라 작성해.", ""
+    focus = focus_prompt.strip()
+    checklist = f"- {label} 템플릿 지시와 공통 기준을 따르고, 아래 [집중 요청]도 반드시 함께 반영해 작성해."
+    tail = (
+        "\n\n[집중 요청 — 출력에 반드시 반영]\n"
+        f"사용자가 특히 깊게 보고 싶은 내용: {focus}\n"
+        "- 위 강의자료에서 이 요청과 관련된 개념을 더 앞에, 더 자세히, 더 많은 분량으로 다뤄라.\n"
+        "- 사용자가 '~만', '오직', '위주로만'처럼 범위를 한정하면 그 범위를 중심으로 좁히고 무관한 내용은 생략해도 된다. "
+        "한정 표현이 없으면 전체 흐름은 유지하되 관련 낮은 부분은 핵심만 남겨 짧게 압축해라.\n"
+        f"- 형식·문체·구조는 {label} 템플릿 지시를 그대로 지키고, 내용 비중만 이 요청에 맞춰라.\n"
+        "- 강의자료에 근거해서만 쓰고, 자료에 집중 대상이 거의 없으면 억지로 늘리지 말고 있는 만큼만 강조해라."
+    )
+    return checklist, tail
+
+
+def _quiz_user_focus_section(focus_prompt: str | None) -> str:
+    """QUIZ_USER_PROMPT의 {focus_quiz_section}을 만든다(USER 말미 재진술).
+
+    focus가 없으면 빈 문자열을 반환해 현행 출력과 글자 단위로 동일하게 유지한다.
+    """
+    if not (focus_prompt and focus_prompt.strip()):
+        return ""
+    focus = focus_prompt.strip()
+    return (
+        "[집중 요청 — 출제에 반드시 반영]\n"
+        f"사용자가 특히 출제를 원하는 내용: {focus}\n"
+        "- 이 요청과 관련된 개념·정의·공식·비교를 우선 출제하고 가능한 많은 문항을 그 주제에 배분해라.\n"
+        "- 사용자가 '~만/오직'처럼 한정하면 그 범위에서만 출제해라.\n"
+    )
+
+
 def _summary_system_content(focus_prompt: str | None) -> str:
     if focus_prompt and focus_prompt.strip():
         return (
             f"{SUMMARY_SYSTEM_PROMPT}\n\n"
-            "[사용자 집중 요청]\n"
-            f"사용자가 다음 내용에 특히 집중한 요약을 원한다: {focus_prompt.strip()}\n"
-            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 작성하고 "
-            "원문에 없는 내용을 지어내지 마."
+            "[집중 요청 처리 원칙]\n"
+            f"사용자가 특히 깊게 보고 싶은 내용: {focus_prompt.strip()}\n"
+            "템플릿 지시는 출력의 형식·문체·구조(HOW)를 정하고, 사용자의 집중 요청은 그 형식 안에서 "
+            "어떤 내용을 더 다룰지(WHAT)를 정한다. 둘은 충돌하지 않으니 형식은 템플릿대로 지키면서 "
+            "내용 비중만 집중 요청에 맞춰라. 본문 끝의 [집중 요청] 블록을 반드시 반영하되 "
+            "강의자료에 근거해서만 작성해라.\n"
+            "출력이 순수 JSON인 템플릿(마인드맵)에서는 JSON 구조·키를 절대 바꾸지 말고, "
+            "노드 선택·순서·세분화에만 집중 요청을 반영해라."
         )
     return SUMMARY_SYSTEM_PROMPT
 
@@ -302,9 +346,12 @@ def _quiz_system_content(question_type: str, focus_prompt: str | None) -> str:
     if focus_prompt and focus_prompt.strip():
         return (
             f"{base}\n\n"
-            "[사용자 집중 요청]\n"
-            f"사용자가 다음 내용에 특히 집중한 문제 출제를 원한다: {focus_prompt.strip()}\n"
-            "이 요청을 최우선으로 반영하되, 반드시 제공된 강의자료에 근거해서만 출제하고 "
-            "원문에 없는 내용을 지어내지 마."
+            "[집중 요청 처리 원칙]\n"
+            f"사용자가 특히 출제를 원하는 내용: {focus_prompt.strip()}\n"
+            "출력 형식(순수 JSON 배열)과 문항 유형 규칙은 절대 바꾸지 마라. 집중 요청은 "
+            "'어떤 내용을 출제할지'에만 적용한다.\n"
+            "- 집중 요청과 관련된 개념·정의·공식·비교를 우선 출제하고 가능한 많은 문항을 그 주제에 배분해라.\n"
+            "- 사용자가 '~만/오직'처럼 한정하면 그 범위에서만 출제하고, 한정이 없으면 관련 주제를 우선하되 핵심 범위는 유지해라.\n"
+            "- 강의자료에 근거해서만 출제하고, 강의 운영·행정 정보는 집중 요청이라도 출제하지 마라."
         )
     return base

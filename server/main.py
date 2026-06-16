@@ -66,7 +66,9 @@ from prompts import (
     _VISUAL_SYSTEM_PROMPT,
     _citation_rule,
     _summary_system_content,
+    _summary_user_focus_parts,
     _quiz_system_content,
+    _quiz_user_focus_section,
 )
 from schemas import (
     SummarizeRequest,
@@ -876,11 +878,14 @@ async def extract_text_with_google_vision(
 @app.post("/summarize")
 async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
+    focus_checklist, focus_user_tail = _summary_user_focus_parts(req.template, req.focus_prompt)
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
         citation_rule=_citation_rule(req.source_names),
         markdown=markdown,
+        focus_checklist=focus_checklist,
+        focus_user_tail=focus_user_tail,
     )
 
     system_content = _summary_system_content(req.focus_prompt)
@@ -942,11 +947,14 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
     이벤트: {"delta": str} 반복 → {"done": true, "finish_reason": str}. 오류 시 {"error": str}.
     """
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
+    focus_checklist, focus_user_tail = _summary_user_focus_parts(req.template, req.focus_prompt)
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
         template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
         citation_rule=_citation_rule(req.source_names),
         markdown=markdown,
+        focus_checklist=focus_checklist,
+        focus_user_tail=focus_user_tail,
     )
 
     system_content = _summary_system_content(req.focus_prompt)
@@ -1039,6 +1047,7 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         question_type=req.question_type,
         markdown_section=markdown_section,
         exclude_section=exclude_section,
+        focus_quiz_section=_quiz_user_focus_section(req.focus_prompt),
     )
     if req.diagnostic:
         prompt = (
