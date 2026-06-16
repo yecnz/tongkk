@@ -6,7 +6,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing, normalizeMathDelimiters } from "../common";
 import { useTutorial } from "../TutorialContext";
 import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
@@ -806,7 +806,8 @@ const normalizePageMarkers = (markdown: string): string =>
   markdown.replace(PAGE_MARKER_PATTERN, (_m, page, slide) => `(출처: p.${page ?? slide})`);
 
 const normalizeMarkdownContent = (content: string) =>
-  normalizePageMarkers(normalizeBoldSpacing(content.replace(/\r\n/g, "\n").trim()));
+  // 수식 구분자 정규화를 가장 먼저 돌려, 이후 굵게/페이지마커 처리가 이미 $-구분된 텍스트 위에서 동작하게 한다.
+  normalizePageMarkers(normalizeBoldSpacing(normalizeMathDelimiters(content.replace(/\r\n/g, "\n").trim())));
 
 // 드래그 앵커를 기준으로 스크롤을 되돌린다.
 // - 본문이 살아 있으면(분할 화면 등) 드래그했던 구절을 처음 보던 화면 위치로 맞춘다.

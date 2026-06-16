@@ -32,6 +32,36 @@ export const normalizeBoldSpacing = (text: string): string =>
     .replace(/(^|\s)\*\*[^\S\n]+([^*\n\s](?:[^*\n]*[^*\n\s])?)[^\S\n]+\*\*(?=$|\s|[.,!?;:)\]])/g, "$1**$2**")
     .replace(/(\*\*[^*\n]+?[^\s가-힣A-Za-z0-9*])\*\*(?=[가-힣A-Za-z0-9])/g, "$1\u200B**");
 
+// LLM이 수식을 KaTeX가 못 읽는 구분자(\[ \], \( \), 또는 한 줄 전체가 맨 대괄호 [ ... ])로
+// 내보내면 remark-math가 인식하지 못해 raw LaTeX가 그대로 깨져 보인다. remark-math 기본 설정이
+// 인식하는 $$...$$(디스플레이)·$...$(인라인)로 정규화한다. 이미 $-구분자면 어느 패턴에도 걸리지
+// 않아 그대로 둔다(멱등). 다른 정규화(굵게/출처/페이지마커)보다 먼저 돌려, 이후 처리가 이미
+// $-구분된 텍스트 위에서 동작하게 한다.
+export const normalizeMathDelimiters = (text: string): string => {
+  // 0. 코드블록/인라인코드는 placeholder로 떼어내 보호한다(코드 안 대괄호·백슬래시를 건드리지 않음).
+  const code: string[] = [];
+  let s = text.replace(/```[\s\S]*?```|`[^`\n]*`/g, (m) => {
+    code.push(m);
+    return `CODE${code.length - 1}`;
+  });
+
+  // 1. 명시적 LaTeX 구분자: \[ ... \] → $$ ... $$,  \( ... \) → $ ... $ (정상 산문에 거의 안 나타나 무조건 안전)
+  s = s
+    .replace(/\\\[\s*([\s\S]+?)\s*\\\]/g, (_m, body) => `\n$$\n${body.trim()}\n$$\n`)
+    .replace(/\\\(\s*([\s\S]+?)\s*\\\)/g, (_m, body) => `$${body.trim()}$`);
+
+  // 2. [ ... ] 안에 역슬래시(\frac, \sigma, \rightarrow 등 LaTeX 명령 신호)가 있고 바로 뒤가 '('가 아니면(=링크 아님)
+  //    디스플레이 수식으로 본다. 한 줄 전체든 본문 중간(한 줄에 여러 개)이든 매칭하고, 앞뒤 빈 줄을 넣어
+  //    $$ 디스플레이 블록으로 승격한다. 역슬래시 필수라 각주 [^1]·[snake_case]·[참고]·[1]·링크는 건드리지 않는다.
+  s = s.replace(
+    /\[[ \t]*([^[\]\n]*?\\[^[\]\n]*?)[ \t]*\](?!\()/g,
+    (_m, body) => `\n\n$$\n${body.trim()}\n$$\n\n`,
+  );
+
+  // 코드 placeholder 복원
+  return s.replace(/CODE(\d+)/g, (_m, i) => code[Number(i)]);
+};
+
 export const pageRoutes = {
   "대시보드": "/",
   "학습 캘린더": "/calendar",
