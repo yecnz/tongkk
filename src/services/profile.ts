@@ -8,6 +8,8 @@ import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 export type UserProfile = {
   nickname: string;
   avatarUrl: string | null;
+  school: string | null;
+  department: string | null;
   darkMode: boolean;
   notificationsEnabled: boolean;
   hideSummaryNotice: boolean;
@@ -16,12 +18,14 @@ export type UserProfile = {
 type ProfileRow = {
   nickname: string;
   avatar_url: string | null;
+  school: string | null;
+  department: string | null;
   dark_mode: boolean;
   notifications_enabled: boolean;
   hide_summary_notice: boolean;
 };
 
-const PROFILE_COLUMNS = 'nickname, avatar_url, dark_mode, notifications_enabled, hide_summary_notice';
+const PROFILE_COLUMNS = 'nickname, avatar_url, school, department, dark_mode, notifications_enabled, hide_summary_notice';
 
 const defaultNickname = (user: User) =>
   user.user_metadata?.nickname ||
@@ -31,6 +35,8 @@ const defaultNickname = (user: User) =>
 const toProfile = (row: ProfileRow): UserProfile => ({
   nickname: row.nickname,
   avatarUrl: row.avatar_url,
+  school: row.school,
+  department: row.department,
   darkMode: row.dark_mode,
   notificationsEnabled: row.notifications_enabled,
   hideSummaryNotice: row.hide_summary_notice,
@@ -82,6 +88,8 @@ export async function loadUserProfile(): Promise<UserProfile> {
   return saveUserProfile({
     nickname: defaultNickname(user),
     avatarUrl: null,
+    school: null,
+    department: null,
     darkMode: false,
     notificationsEnabled: true,
     hideSummaryNotice: false,
@@ -96,6 +104,8 @@ export async function saveUserProfile(profile: UserProfile): Promise<UserProfile
       id: user.id,
       nickname: profile.nickname,
       avatar_url: profile.avatarUrl,
+      school: profile.school,
+      department: profile.department,
       dark_mode: profile.darkMode,
       notifications_enabled: profile.notificationsEnabled,
       hide_summary_notice: profile.hideSummaryNotice,

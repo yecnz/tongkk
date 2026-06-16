@@ -152,6 +152,8 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   nickname text not null,
   avatar_url text,
+  school text,
+  department text,
   dark_mode boolean not null default false,
   notifications_enabled boolean not null default true,
   hide_summary_notice boolean not null default false,
@@ -163,6 +165,10 @@ create table if not exists public.profiles (
 -- create table if not exists는 기존 테이블에 새 컬럼을 넣지 않으므로 alter로 보강한다.
 alter table public.profiles
 add column if not exists hide_summary_notice boolean not null default false;
+alter table public.profiles
+add column if not exists school text;
+alter table public.profiles
+add column if not exists department text;
 
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)

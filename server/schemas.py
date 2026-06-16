@@ -43,8 +43,8 @@ class SummarizeRequest(BaseModel):
     thread_id: str | None = None
     # 사용자가 "1-5, 8"처럼 지정한 반영 페이지. 비우면 전체.
     pages: str | None = None
-    # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
-    focus_prompt: str | None = None
+    # 사용자가 집중을 원하는 내용. 시스템·유저 프롬프트 양쪽에 반영한다(짧은 지시문이라 상한을 둔다).
+    focus_prompt: str | None = Field(default=None, max_length=1000)
     # 요약에 포함된 자료 이름 목록. 2개 이상이면 출처에 자료명을 함께 적게 한다.
     source_names: list[str] | None = Field(default=None, max_length=50)
 
@@ -82,8 +82,8 @@ class QuizRequest(BaseModel):
     diagnostic: bool = False
     # 사용자가 "1-5, 8"처럼 지정한 출제 페이지. 비우면 전체. (요약과 동일한 마커 기반 필터)
     pages: str | None = None
-    # 사용자가 집중을 원하는 내용. 시스템 프롬프트에 반영한다.
-    focus_prompt: str | None = None
+    # 사용자가 집중을 원하는 내용. 시스템·유저 프롬프트 양쪽에 반영한다(짧은 지시문이라 상한을 둔다).
+    focus_prompt: str | None = Field(default=None, max_length=1000)
 
 
 class WrongAnswerItem(BaseModel):

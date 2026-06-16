@@ -102,10 +102,12 @@ def _validate_quiz_questions(parsed, question_type: str) -> list[dict[str, objec
                 normalized["options"] = ["O", "X"]
             if not isinstance(normalized.get("options"), list) or not normalized["options"]:
                 raise ValueError("객관식/OX 문항에 options가 없습니다.")
-            if not isinstance(normalized.get("answer"), int):
-                raise ValueError("객관식/OX 문항에 answer 인덱스가 없습니다.")
             options = normalized["options"]
-            answer = normalized["answer"]
+            answer = normalized.get("answer")
+            # bool은 int의 하위 타입(isinstance(True, int)==True)이라 그냥 통과한다.
+            # OX 정답이 true/false로 오면 인덱스로 오인돼 채점이 깨지므로 명시적으로 거부한다.
+            if not isinstance(answer, int) or isinstance(answer, bool):
+                raise ValueError("객관식/OX 문항에 answer 인덱스가 없습니다.")
             if answer < 0 or answer >= len(options):
                 raise ValueError("정답 인덱스가 선택지 범위를 벗어났습니다.")
 
