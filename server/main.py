@@ -1040,6 +1040,9 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
             "다른 개념·다른 관점으로 새로운 문제를 만들어라]\n"
             f"{joined}\n"
         )
+    # 진단 퀴즈는 '전 범위 균등 출제'가 목적이라 집중 요청(특히 범위 한정)과 정면 충돌한다.
+    # 진단일 때는 focus를 무력화해 전 범위 진단을 보존한다.
+    effective_focus = None if req.diagnostic else req.focus_prompt
     prompt = QUIZ_USER_PROMPT.format(
         subject=req.subject,
         count=req.count,
@@ -1047,7 +1050,7 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         question_type=req.question_type,
         markdown_section=markdown_section,
         exclude_section=exclude_section,
-        focus_quiz_section=_quiz_user_focus_section(req.focus_prompt),
+        focus_quiz_section=_quiz_user_focus_section(effective_focus),
     )
     if req.diagnostic:
         prompt = (
@@ -1059,7 +1062,7 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
         llm = build_llm(req.model)
         from langchain_core.messages import HumanMessage, SystemMessage
         response = llm.invoke([
-            SystemMessage(content=_quiz_system_content(req.question_type, req.focus_prompt)),
+            SystemMessage(content=_quiz_system_content(req.question_type, effective_focus)),
             HumanMessage(content=prompt),
         ])
         text = _message_content_to_text(response.content)
