@@ -245,33 +245,54 @@ def _parse_page_selection(spec: str) -> set[int]:
 # PDF는 `<!-- p.N -->`, PPT/PPTX(markitdown)는 `<!-- Slide number: N -->` 형식의 마커를 쓴다.
 _PAGE_MARKER_RE = re.compile(r"<!--\s*(?:p\.|Slide number:\s*)(\d+)\s*-->")
 
+# 시각 분석 섹션 제목(고정). PDF는 이 섹션 안에 'PDF N페이지'마다 p.N 마커가 박히지만,
+# PPTX 삽입 이미지는 슬라이드와 1:1이 아니라 마커 없이 본문 맨 뒤에 붙는다.
+_VISUAL_SECTION_HEADING = "# 이미지/손글씨 분석 결과"
+
 
 def _filter_markdown_by_pages(markdown: str, spec: str | None) -> str:
     """`<!-- p.N -->` 마커 기준으로 선택한 페이지 블록만 남긴다.
 
     마커가 없거나(이미지 OCR 등) 선택이 비면 원본을 그대로 돌려준다.
+    페이지 마커가 없는 시각 분석 섹션(PPTX 삽입 이미지 등)은 특정 페이지로 귀속할 수 없으므로,
+    페이지 선택과 무관하게 항상 보존한다(소실·마지막 페이지 오귀속 방지). PDF 시각 섹션은
+    내부에 p.N 마커가 있어 이 분기를 타지 않고 페이지별로 정상 필터된다.
     """
     if not spec or not spec.strip():
         return markdown
     selected = _parse_page_selection(spec)
     if not selected:
         return markdown
-    matches = list(_PAGE_MARKER_RE.finditer(markdown))
+
+    # 시각 분석 섹션 뒤에 페이지 마커가 하나도 없으면(=PPTX처럼 마커가 안 붙은 섹션) 떼어내
+    # 항상 보존한다. 섹션 안에 p.N이 있으면(PDF) 떼지 않고 일반 필터에 맡긴다.
+    trailing_visual = ""
+    body = markdown
+    vhead = markdown.find(_VISUAL_SECTION_HEADING)
+    if vhead != -1 and not _PAGE_MARKER_RE.search(markdown, vhead):
+        trailing_visual = markdown[vhead:].strip()
+        # 본문과 시각 섹션 사이의 '---' 구분자를 함께 제거(빈 구분자 잔류 방지).
+        body = re.sub(r"\n*-{3,}\s*$", "", markdown[:vhead]).rstrip()
+
+    matches = list(_PAGE_MARKER_RE.finditer(body))
     if not matches:
+        # 본문에 페이지 마커가 없으면 페이지 필터가 불가하므로 원본(시각 섹션 포함)을 그대로 둔다.
         return markdown
-    preamble = markdown[: matches[0].start()].strip()
+    preamble = body[: matches[0].start()].strip()
     kept: list[str] = [preamble] if preamble else []
     for idx, match in enumerate(matches):
         page_no = int(match.group(1))
         if page_no not in selected:
             continue
-        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(markdown)
-        block = markdown[match.start():end].strip()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body)
+        block = body[match.start():end].strip()
         if block:
             kept.append(block)
     # 선택한 페이지가 자료에 하나도 없으면 빈 요약을 막기 위해 원본을 쓴다.
     if len(kept) <= (1 if preamble else 0):
         return markdown
+    if trailing_visual:
+        kept.append(trailing_visual)
     return "\n\n".join(kept)
 
 
@@ -531,11 +552,16 @@ def _split_visual_sections(text: str, labels: list[str]) -> list[str] | None:
 
 
 def _is_no_content_section(section: str) -> bool:
-    """제목 줄을 뺀 본문이 '유의미한 학습 내용 없음'뿐인 섹션인지 판별한다."""
+    """제목 줄을 뺀 본문이 '유의미한 학습 내용 없음'뿐인 섹션인지 판별한다.
+
+    모델이 굵게(**)·코드(`)·따옴표·선행 불릿(- )·후행 마침표 같은 장식을 붙여도 인식하도록
+    정규화한 뒤 비교한다(장식 때문에 무의미 섹션이 본문에 남는 것을 막는다).
+    """
     body = "\n".join(
         line for line in section.splitlines() if not line.lstrip().startswith("#")
     ).strip()
-    return body == _NO_CONTENT_SENTINEL
+    normalized = re.sub(r"[*`\"'“”‘’]", "", body).strip().lstrip("-•* ").rstrip(".。 ").strip()
+    return normalized == _NO_CONTENT_SENTINEL
 
 
 def _run_visual_llm(visual_inputs: list[dict[str, str]], shared_context: str = "") -> str:
@@ -629,7 +655,7 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
     if not body_text:
         return ""
 
-    body = "# 이미지/손글씨 분석 결과\n\n" + body_text
+    body = _VISUAL_SECTION_HEADING + "\n\n" + body_text
     # PDF는 페이지별로 렌더링·분석하므로 'PDF N페이지' 섹션마다 페이지 마커를 심어,
     # 페이지 선택 요약이 이미지 슬라이드에도 적용되게 한다. (PPTX 삽입 이미지는 슬라이드 번호와
     # 1:1로 매칭되지 않아, 본문 markitdown의 'Slide number' 마커에만 의존한다.)
@@ -731,7 +757,9 @@ async def convert_document_to_markdown(
             visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
         except Exception:
             logger.exception("이미지/손글씨 분석 실패")
-            visual_markdown = "# 이미지/손글씨 분석 결과\n\n이미지/손글씨 분석을 완료하지 못했습니다."
+            # 실패 안내문을 본문에 합치면 요약·퀴즈에 학습 내용처럼 섞이므로 넣지 않는다.
+            # (visual_failed면 캐시도 건너뛰어 키 복구 후 재분석된다.)
+            visual_markdown = ""
             visual_failed = True
         markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
         markdown = "\n\n---\n\n".join(markdown_parts)
@@ -875,9 +903,21 @@ async def extract_text_with_google_vision(
     return {"text": text}
 
 
-@app.post("/summarize")
-async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
+def _build_summary_messages(req) -> tuple[str, str]:
+    """요약 (system_content, user_prompt)을 만든다.
+
+    MINDMAP은 'JSON만 출력, 공통 기준 무시'(prompts.py)라 요약 공통 기준·최종 점검·출처 규칙·
+    Markdown 지향 시스템 프롬프트를 적용하지 않고 전용 프롬프트로 분기한다. 나머지 세 템플릿
+    (일반 요약·강의 노트·치트시트)만 공통 기준을 받는다.
+    """
     markdown = _filter_markdown_by_pages(req.markdown, req.pages)
+    if req.template == "MINDMAP":
+        system_content = (
+            "너는 강의자료의 핵심 구조를 JSON 마인드맵으로만 출력하는 도구다. "
+            "순수 JSON만 출력하고, 설명·마크다운·코드 블록·후속 멘트를 절대 붙이지 마라."
+        )
+        prompt = f"{TEMPLATE_INSTRUCTIONS['MINDMAP']}\n\n[강의자료]\n{markdown}"
+        return system_content, prompt
     focus_checklist, focus_user_tail = _summary_user_focus_parts(req.template, req.focus_prompt)
     prompt = SUMMARY_USER_PROMPT.format(
         template_label=TEMPLATE_LABELS[req.template],
@@ -887,8 +927,13 @@ async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
         focus_checklist=focus_checklist,
         focus_user_tail=focus_user_tail,
     )
-
     system_content = _summary_system_content(req.focus_prompt)
+    return system_content, prompt
+
+
+@app.post("/summarize")
+async def summarize(req: SummarizeRequest, _user=Depends(require_api_user)):
+    system_content, prompt = _build_summary_messages(req)
 
     def _call_llm():
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -946,18 +991,7 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
     응답이 계속 흐르는 동안은 Cloudflare 터널 응답 대기 제한(~100초)에 걸리지 않는다.
     이벤트: {"delta": str} 반복 → {"done": true, "finish_reason": str}. 오류 시 {"error": str}.
     """
-    markdown = _filter_markdown_by_pages(req.markdown, req.pages)
-    focus_checklist, focus_user_tail = _summary_user_focus_parts(req.template, req.focus_prompt)
-    prompt = SUMMARY_USER_PROMPT.format(
-        template_label=TEMPLATE_LABELS[req.template],
-        template_instruction=TEMPLATE_INSTRUCTIONS[req.template],
-        citation_rule=_citation_rule(req.source_names),
-        markdown=markdown,
-        focus_checklist=focus_checklist,
-        focus_user_tail=focus_user_tail,
-    )
-
-    system_content = _summary_system_content(req.focus_prompt)
+    system_content, prompt = _build_summary_messages(req)
     if req.chunk_index and req.chunk_total and req.chunk_total > 1:
         system_content += _summary_chunk_instructions(req)
 

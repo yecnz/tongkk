@@ -187,3 +187,84 @@ class TestFilterMarkdownByPages:
     def test_unmatched_selection_returns_original(self):
         # 선택 페이지가 자료에 하나도 없으면 빈 요약 방지로 원본을 그대로 쓴다.
         assert main._filter_markdown_by_pages(self.MD, "99") == self.MD
+
+    # --- 마커 없는 시각 분석 섹션(PPTX)은 페이지 선택과 무관하게 항상 보존 ---
+    PPTX_MD = (
+        "<!-- Slide number: 1 -->\n개요\n\n"
+        "<!-- Slide number: 2 -->\nCNN 본문\n\n"
+        "<!-- Slide number: 3 -->\n마무리\n\n---\n\n"
+        "# 이미지/손글씨 분석 결과\n\n## PPTX 삽입 이미지 1\nCNN 도식 해석"
+    )
+
+    def test_pptx_visual_kept_when_last_slide_excluded(self):
+        # 마지막 슬라이드(3)를 빼도 마커 없는 시각 분석이 사라지면 안 된다.
+        out = main._filter_markdown_by_pages(self.PPTX_MD, "1-2")
+        assert "이미지/손글씨 분석 결과" in out
+        assert "CNN 도식 해석" in out
+        assert "마무리" not in out  # 선택 안 한 슬라이드 본문은 빠진다
+
+    def test_pptx_visual_not_misattributed_to_last_slide(self):
+        # 마지막 슬라이드만 선택해도 다른 슬라이드 본문이 딸려오면 안 되고, 시각은 보존된다.
+        out = main._filter_markdown_by_pages(self.PPTX_MD, "3")
+        assert "이미지/손글씨 분석 결과" in out
+        assert "개요" not in out and "CNN 본문" not in out
+        assert "마무리" in out
+
+    def test_pdf_visual_section_filters_per_page(self):
+        # PDF 시각 섹션은 내부에 p.N 마커가 있어 페이지별로 정상 필터된다(회귀 방지).
+        md = (
+            "<!-- p.1 -->\n개요\n\n<!-- p.2 -->\n본문\n\n---\n\n"
+            "# 이미지/손글씨 분석 결과\n\n"
+            "<!-- p.1 -->\n## PDF 1페이지\n표지 그림\n\n"
+            "<!-- p.2 -->\n## PDF 2페이지\nCNN 도식"
+        )
+        out = main._filter_markdown_by_pages(md, "2")
+        assert "CNN 도식" in out       # 2페이지 시각 포함
+        assert "표지 그림" not in out  # 1페이지 시각 제외
+
+
+class TestBuildSummaryMessages:
+    def _req(self, template):
+        import types
+        return types.SimpleNamespace(
+            markdown="# x\n내용", pages=None, template=template,
+            focus_prompt=None, source_names=None,
+        )
+
+    def test_mindmap_excludes_common_criteria(self):
+        # 마인드맵은 'JSON만, 공통 기준 무시'라 요약 공통기준·최종점검이 주입되면 안 된다.
+        system, prompt = main._build_summary_messages(self._req("MINDMAP"))
+        assert "JSON" in prompt
+        assert "1. 반드시 한국어로 작성해" not in prompt
+        assert "최종 출력 점검" not in prompt
+        assert "JSON 마인드맵" in system
+
+    def test_non_mindmap_includes_common_criteria(self):
+        system, prompt = main._build_summary_messages(self._req("LECTURE_NOTE"))
+        assert "[강의자료]" in prompt
+        assert "1. 반드시 한국어로 작성해" in prompt
+
+
+class TestQuizValidationOX:
+    def test_boolean_answer_rejected(self):
+        # bool은 int 하위 타입이라 인덱스로 오인되므로 거부해야 한다.
+        with pytest.raises(ValueError):
+            main._validate_quiz_questions(
+                [{"question": "q", "explanation": "e", "options": ["O", "X"], "answer": True}], "OX")
+
+    def test_int_answer_accepted(self):
+        out = main._validate_quiz_questions(
+            [{"question": "q", "explanation": "e", "options": ["O", "X"], "answer": 0}], "OX")
+        assert out[0]["answer"] == 0
+
+
+class TestNoContentSection:
+    def test_plain_sentinel(self):
+        assert main._is_no_content_section("## 라벨\n유의미한 학습 내용 없음")
+
+    def test_decorated_sentinel(self):
+        # 굵게·불릿·마침표 같은 장식을 붙여도 무의미 섹션으로 인식한다.
+        assert main._is_no_content_section("## 라벨\n- **유의미한 학습 내용 없음.**")
+
+    def test_real_content_preserved(self):
+        assert not main._is_no_content_section("## 라벨\n유의미한 학습 내용 없음이라 보기 어렵고 CNN 설명 있음")
