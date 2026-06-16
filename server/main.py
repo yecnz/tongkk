@@ -4,6 +4,7 @@ import os
 import re
 import base64
 import hashlib
+import posixpath
 import zipfile
 import shutil
 import subprocess
@@ -13,6 +14,7 @@ from datetime import date
 from typing import Literal
 
 import httpx
+from defusedxml.ElementTree import fromstring as _defused_xml_fromstring
 
 from config import (
     SERVER_DIR,
@@ -394,8 +396,80 @@ def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -
     return pages
 
 
+# PPTX 삽입 이미지의 시각 분석 라벨(슬라이드 번호 기준, 단일 동결 표기).
+# extraction(라벨 생성)과 _tag_visual_pptx_slides(태깅 정규식)·테스트가 모두 이 표기 하나만 따른다.
+def _pptx_visual_label(slide_no: int, k: int, m: int) -> str:
+    """단일 이미지 슬라이드: 'PPTX 슬라이드 N 이미지', 다중: 'PPTX 슬라이드 N 이미지 (M개 중 K번째)'.
+
+    - M = 그 슬라이드의 sha256 중복제거 후 이미지 수, K = 슬라이드 내 1-base 순번(rId 순).
+    - 균등추출로 일부가 빠져도 M·K는 슬라이드 전체 기준이라 안정적이다.
+    - 맨숫자형('... 이미지 1')은 단일 라벨의 접두 부분문자열이라 _split_visual_sections 앵커링을
+      깨므로 절대 쓰지 않는다(다중일 때만 괄호 표기를 붙인다).
+    """
+    if m <= 1:
+        return f"PPTX 슬라이드 {slide_no} 이미지"
+    return f"PPTX 슬라이드 {slide_no} 이미지 ({m}개 중 {k}번째)"
+
+
+_PPTX_SLIDE_RELS_RE = re.compile(r"^ppt/slides/_rels/slide(\d+)\.xml\.rels$")
+_RELS_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+
+
+def _pptx_image_mime(suffix: str) -> str:
+    return {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(suffix, "image/png")
+
+
+def _rid_sort_key(rel_id: str) -> tuple[int, str]:
+    """'rId10' > 'rId2'가 되도록 숫자 부분 기준 자연 정렬 키."""
+    match = re.search(r"(\d+)", rel_id)
+    return (int(match.group(1)) if match else 0, rel_id)
+
+
+def _pptx_slide_image_targets(archive: zipfile.ZipFile, rels_name: str) -> list[str]:
+    """slideN.xml.rels에서 내부 image 관계의 미디어 경로(ppt/media/...)를 rId 순서로 돌려준다.
+
+    rels가 깨졌으면 빈 목록을 돌려(해당 슬라이드만 건너뜀) zip 순서 폴백으로 새지 않게 한다.
+    외부 링크(TargetMode=External) 이미지는 바이트가 없으므로 제외한다.
+    """
+    try:
+        root = _defused_xml_fromstring(archive.read(rels_name))
+    except Exception:
+        logger.warning("PPTX rels 파싱 실패: %s", rels_name)
+        return []
+    rels: list[tuple[str, str]] = []
+    for rel in root.findall(f"{_RELS_NS}Relationship"):
+        if not (rel.get("Type") or "").endswith("/image"):
+            continue
+        if (rel.get("TargetMode") or "Internal") != "Internal":
+            continue
+        target = rel.get("Target") or ""
+        # Target은 슬라이드 기준 상대경로('../media/imageX.png'). zip 절대경로로 정규화한다.
+        media_name = posixpath.normpath(posixpath.join("ppt/slides", target))
+        if not media_name.startswith("ppt/media/"):
+            continue  # 경로 이탈·비정상 타깃 방어
+        if Path(media_name).suffix.lower() not in PPTX_IMAGE_EXTENSIONS:
+            continue
+        rels.append((rel.get("Id") or "", media_name))
+    rels.sort(key=lambda r: _rid_sort_key(r[0]))
+    return [media for _, media in rels]
+
+
 def _extract_pptx_images_for_visual_analysis(file_path: str) -> list[dict[str, str]]:
-    images: list[dict[str, str]] = []
+    """PPTX 삽입 이미지를 슬라이드 순서로 모아 시각 분석 입력을 만든다.
+
+    구버전('zip 순서로 앞 N개만 자르기')의 편향을 제거한다:
+    - slideN.xml.rels로 슬라이드↔이미지를 매핑해 슬라이드 1번부터 순서대로 수집(덱 후반 누락 방지).
+    - 같은 바이트(sha256) 이미지는 한 번만 — 반복되는 로고·배경 중복을 제거한다.
+    - 상한을 넘으면 덱 전체에 걸쳐 균등 추출(앞부분만 남기지 않음), 출력은 슬라이드 순서를 유지한다.
+    - 라벨은 슬라이드 번호 기준(_pptx_visual_label). rels가 깨진 슬라이드는 건너뛰고, 어떤
+      슬라이드에서도 이미지를 못 찾을 때만 zip 순서로 폴백한다(폴백은 구식 카운터 라벨).
+    차트·SmartArt·그룹 도형은 image 관계가 아니므로 자동 제외된다(의도된 동작).
+    """
     with zipfile.ZipFile(file_path) as archive:
         total_uncompressed = sum(info.file_size for info in archive.infolist())
         if total_uncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
@@ -403,19 +477,70 @@ def _extract_pptx_images_for_visual_analysis(file_path: str) -> list[dict[str, s
                 f"압축 해제 크기가 너무 큽니다({total_uncompressed // (1024 * 1024)}MB). "
                 "손상되었거나 비정상적인 파일일 수 있습니다."
             )
-        media_names = [
-            name for name in archive.namelist()
-            if name.startswith("ppt/media/")
-            and Path(name).suffix.lower() in PPTX_IMAGE_EXTENSIONS
-        ]
-        for index, name in enumerate(media_names[:VISUAL_ANALYSIS_MAX_ITEMS]):
-            suffix = Path(name).suffix.lower()
-            mime_type = "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
-            images.append({
-                "label": f"PPTX 삽입 이미지 {index + 1}",
-                "data_url": _image_data_url(archive.read(name), mime_type),
+        names = archive.namelist()
+
+        # 1) 슬라이드 순서로 (slide_no, media_name) 수집.
+        slide_rels = sorted(
+            (int(m.group(1)), name)
+            for name in names
+            if (m := _PPTX_SLIDE_RELS_RE.match(name))
+        )
+        collected: list[tuple[int, str]] = []
+        for slide_no, rels_name in slide_rels:
+            for media_name in _pptx_slide_image_targets(archive, rels_name):
+                collected.append((slide_no, media_name))
+
+        # 2) rels 매핑이 통째로 실패했을 때만(구조 비정상) 구버전 동작으로 폴백한다.
+        used_rels = bool(collected)
+        if not collected:
+            collected = [
+                (0, name)
+                for name in sorted(
+                    n for n in names
+                    if n.startswith("ppt/media/")
+                    and Path(n).suffix.lower() in PPTX_IMAGE_EXTENSIONS
+                )
+            ]
+
+        # 3) sha256 중복제거(첫 등장=슬라이드 순서 우선). 슬라이드별 중복제거 후 개수도 센다.
+        seen_sha: set[str] = set()
+        per_slide_count: dict[int, int] = {}
+        unique: list[dict] = []
+        for slide_no, media_name in collected:
+            try:
+                raw = archive.read(media_name)
+            except KeyError:
+                continue
+            sha = hashlib.sha256(raw).hexdigest()
+            if sha in seen_sha:
+                continue
+            seen_sha.add(sha)
+            per_slide_count[slide_no] = per_slide_count.get(slide_no, 0) + 1
+            unique.append({
+                "slide_no": slide_no,
+                "k": per_slide_count[slide_no],
+                "bytes": raw,
+                "mime": _pptx_image_mime(Path(media_name).suffix.lower()),
             })
-    return images
+
+        # 4) 상한 초과 시 덱 전체에 걸쳐 균등 추출. i*n//cap은 n>=cap에서 cap개 distinct를 보장해
+        #    예산을 다 쓴다(step=ceil 방식의 예산 미달을 피한다). 출력은 슬라이드 순서를 유지한다.
+        n = len(unique)
+        cap = VISUAL_ANALYSIS_MAX_ITEMS
+        if n > cap:
+            unique = [unique[i] for i in sorted({i * n // cap for i in range(cap)})]
+
+        images: list[dict[str, str]] = []
+        for position, item in enumerate(unique, start=1):
+            if used_rels:
+                label = _pptx_visual_label(item["slide_no"], item["k"], per_slide_count[item["slide_no"]])
+            else:
+                label = f"PPTX 삽입 이미지 {position}"
+            images.append({
+                "label": label,
+                "data_url": _image_data_url(item["bytes"], item["mime"]),
+            })
+        return images
 
 
 def _should_analyze_visuals(base_markdown: str, suffix: str) -> bool:
@@ -456,11 +581,27 @@ def _tag_visual_pdf_pages(visual_markdown: str) -> str:
     )
 
 
+# PPTX 시각 분석 결과의 'PPTX 슬라이드 N 이미지' 제목 줄 앞에 본문(markitdown)과 같은
+# `<!-- Slide number: N -->` 마커를 심는다. 그래야 페이지 선택 필터·프론트 구간 분할이 시각 분석을
+# 슬라이드 단위로 분배한다(PDF의 _tag_visual_pdf_pages와 같은 역할). 라벨 표기는 _pptx_visual_label과
+# 한 쌍으로 동결돼 있고, 구식 카운터 라벨('PPTX 삽입 이미지 N')은 일부러 매칭하지 않는다.
+# 모델이 라벨을 제목으로 그대로 쓸 때만 매칭되는 best-effort이며, 실패한 제목은 그대로 둔다.
+_VISUAL_PPTX_SLIDE_HEADING_RE = re.compile(r"(?m)^(#{1,6}\s+[^\n]*?PPTX\s*슬라이드\s*(\d+)\s*이미지[^\n]*)$")
+
+
+def _tag_visual_pptx_slides(visual_markdown: str) -> str:
+    return _VISUAL_PPTX_SLIDE_HEADING_RE.sub(
+        lambda m: f"<!-- Slide number: {m.group(2)} -->\n{m.group(1)}", visual_markdown
+    )
+
+
 # 변환 로직(텍스트 추출, _run_visual_llm의 사용자 프롬프트 문자열, 배치 구성 등)을 바꾸면
 # 반드시 수동으로 올릴 것 — 아래 지문은 env 설정과 시스템 프롬프트만 추적한다.
 # v2: PDF 시각 페이지 선택을 시각 풍부도 기준 정렬로 변경 + born-digital 표(find_tables)를
 #     시각 분석 맥락에 주입.
-CONVERT_PIPELINE_VERSION = "2"
+# v3: PPTX 삽입 이미지를 zip 순서 앞 N개 대신 slide-rels 매핑 + sha256 중복제거 + 덱 전체 균등추출로
+#     수집하고 슬라이드 번호 라벨/마커를 붙임(라벨·mime·선택 집합이 모두 바뀌어 캐시 무효화 필요).
+CONVERT_PIPELINE_VERSION = "3"
 
 # 캐시 키에 들어가는 설정 지문. 프롬프트·모델·DPI 등이 바뀌면 키 공간이 통째로 갈려
 # 기존 캐시가 자동 무효화된다(모듈 로드 시 1회 계산).
@@ -649,18 +790,21 @@ def _analyze_document_visuals(file_path: str, suffix: str, base_markdown: str = 
     if not visual_inputs:
         return ""
 
-    # PPTX 삽입 이미지는 슬라이드 번호와 1:1로 매칭되지 않으므로 본문 전체를 공통 맥락으로 준다.
+    # PPTX 삽입 이미지는 슬라이드별로 라벨이 붙지만, 이미지 단독으로는 자기완결적이지 않아
+    # 본문 전체를 공통 맥락으로 함께 준다(per-slide 맥락 + item 캐시 전환은 태깅-캐시 정합 문제가
+    # 있어 후속 과제로 보류). 공통 맥락 모드라 item 캐시는 비활성이다(_run_visual_llm 참고).
     shared_context = base_markdown[:VISUAL_CONTEXT_MAX_CHARS] if (suffix == ".pptx" and base_markdown) else ""
     body_text = _run_visual_llm(visual_inputs, shared_context)
     if not body_text:
         return ""
 
     body = _VISUAL_SECTION_HEADING + "\n\n" + body_text
-    # PDF는 페이지별로 렌더링·분석하므로 'PDF N페이지' 섹션마다 페이지 마커를 심어,
-    # 페이지 선택 요약이 이미지 슬라이드에도 적용되게 한다. (PPTX 삽입 이미지는 슬라이드 번호와
-    # 1:1로 매칭되지 않아, 본문 markitdown의 'Slide number' 마커에만 의존한다.)
+    # 시각 섹션의 'PDF N페이지'/'PPTX 슬라이드 N 이미지' 제목마다 본문과 같은 페이지·슬라이드 마커를
+    # 심어, 페이지 선택 요약과 구간 분할이 시각 분석 결과를 페이지/슬라이드 단위로 분배하게 한다.
     if suffix == ".pdf":
         body = _tag_visual_pdf_pages(body)
+    elif suffix == ".pptx":
+        body = _tag_visual_pptx_slides(body)
     return body
 
 
