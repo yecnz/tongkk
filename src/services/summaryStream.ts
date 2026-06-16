@@ -85,6 +85,44 @@ function detectSectionLabel(blockText: string): string | null {
   return null;
 }
 
+// 서버 _VISUAL_SECTION_HEADING과 동일. 시각 분석 섹션 제목(고정).
+const VISUAL_SECTION_HEADING = '# 이미지/손글씨 분석 결과';
+
+/**
+ * 마커 없는 trailing 시각 분석 섹션(구버전 PPTX)을 본문에서 분리한다. 서버 _filter_markdown_by_pages와
+ * 같은 규칙으로, 페이지 선택·구간 분할과 무관하게 항상 보존하기 위함이다.
+ * - 시각 섹션 시작(vhead) '이후'에 페이지 마커가 하나라도 있으면(신버전 PPTX·PDF) 분리하지 않고
+ *   일반 블록 분배에 맡긴다(슬라이드/페이지 단위로 분배됨).
+ * - ★마커 검색은 반드시 vhead부터 한다. 본문(markitdown)에는 항상 '<!-- Slide number: N -->'가 있어,
+ *   문자열 처음부터 검색하면 모든 PPTX가 '마커 있음'으로 오판돼 구버전 시각 섹션이 영영 안 떨어진다.
+ * - 마커가 없으면 시각 섹션을 떼고, 본문 끝의 '---' 구분자도 함께 제거한다.
+ */
+function detachTrailingVisual(markdown: string): { body: string; visual: string | null } {
+  const vhead = markdown.indexOf(VISUAL_SECTION_HEADING);
+  if (vhead === -1) return { body: markdown, visual: null };
+  // String.match(글로벌 정규식)은 lastIndex를 쓰지 않으므로 이후 matchAll과 간섭하지 않는다.
+  if (markdown.slice(vhead).match(PAGE_MARKER_RE) !== null) return { body: markdown, visual: null };
+  const visual = markdown.slice(vhead).trim();
+  const body = markdown.slice(0, vhead).replace(/\n*-{3,}\s*$/, '').trimEnd();
+  return { body, visual };
+}
+
+/**
+ * 자료를 요약 구간으로 나눈다. 마커 없는 trailing 시각 섹션은 떼어 별도 마지막 구간으로 보존하고,
+ * 본문은 splitBodyIntoChunks가 페이지/섹션 단위로 나눈다.
+ */
+export function splitMarkdownIntoChunks(markdown: string, pagesSpec?: string): SummaryChunk[] {
+  const { body, visual } = detachTrailingVisual(markdown);
+  const chunks = body.trim() ? splitBodyIntoChunks(body, pagesSpec) : [];
+  if (visual) {
+    // 시각 섹션이 크면 문단 기준으로 더 쪼개 한 구간이 과도하게 커지지 않게 한다(둘째 조각부터 이어짐).
+    splitByParagraphs(visual).forEach((part, idx) => {
+      chunks.push({ markdown: part, isContinuation: idx > 0 });
+    });
+  }
+  return chunks.length > 0 ? chunks : [{ markdown, isContinuation: false }];
+}
+
 /**
  * 페이지 마커로 블록을 만든 뒤, 절 제목이 바뀌는 지점(섹션)으로 묶어 구간을 만든다.
  * - 섹션 경계에서만 잘라 한 섹션이 두 구간에 걸쳐 제목이 중복되는 것을 막는다.
@@ -92,7 +130,7 @@ function detectSectionLabel(blockText: string): string | null {
  * - 절 제목이 안 잡히는 자료는 섹션이 하나로 묶여, 페이지를 목표 글자수로 채우는 기존 동작과 같아진다.
  * - 마커가 없으면 문단 기준 폴백.
  */
-export function splitMarkdownIntoChunks(markdown: string, pagesSpec?: string): SummaryChunk[] {
+function splitBodyIntoChunks(markdown: string, pagesSpec?: string): SummaryChunk[] {
   const matches = [...markdown.matchAll(PAGE_MARKER_RE)];
 
   if (matches.length === 0) {
