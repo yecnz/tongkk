@@ -23,6 +23,9 @@ export default defineConfig({
     __BUILD_ID__: JSON.stringify(buildId),
   },
   plugins: [react(), tailwindcss(), emitVersionJson()],
+  // pdf.worker.mjs가 import.meta·동적 import를 쓰므로 커스텀 워커(pdfWorkerEntry)를 ?worker로 번들할 때
+  // ES 모듈 포맷이 필요하다. 기본 IIFE면 해당 워커 번들이 깨진다(src/services/pdfWorker.ts 참고).
+  worker: { format: 'es' },
   server: {
     allowedHosts: ['.trycloudflare.com'],
     proxy: {
