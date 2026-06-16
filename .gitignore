@@ -71,3 +71,6 @@ server/convert_cache.sqlite3*
 
 # pdfjs 렌더링용 cMap·표준폰트 데이터(vite copy-pdfjs-assets가 자동 생성)
 public/pdfjs/
+
+# 비전 비용 계측용 샘플 강의자료(저작권 가능성 — 절대 커밋하지 않는다)
+server/sample_docs/
