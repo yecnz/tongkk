@@ -273,12 +273,49 @@ def _filter_markdown_by_pages(markdown: str, spec: str | None) -> str:
     return "\n\n".join(kept)
 
 
-def _pdf_page_has_image(page) -> bool:
-    page_dict = page.get_text("dict")
-    for block in page_dict.get("blocks", []):
-        if block.get("type") == 1:
-            return True
-    return False
+def _pdf_page_image_coverage(page) -> float:
+    """페이지에서 이미지(래스터) 블록이 차지하는 면적 비율(0~1)을 돌려준다.
+
+    시각 풍부도 정렬용. coverage > 0이면 이미지가 있다는 뜻이라 기존
+    '이미지 존재' 판정도 겸한다(전용 헬퍼를 따로 두지 않는다).
+    """
+    rect = page.rect
+    page_area = float(rect.width * rect.height)
+    if page_area <= 0:
+        return 0.0
+    image_area = 0.0
+    for block in page.get_text("dict").get("blocks", []):
+        if block.get("type") != 1:
+            continue
+        bbox = block.get("bbox")
+        if bbox and len(bbox) == 4:
+            image_area += max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
+    return min(1.0, image_area / page_area)
+
+
+# 한 페이지에서 시각 분석 맥락으로 함께 넘길 자동 추출 표의 최대 개수.
+_MAX_PAGE_TABLES = 4
+
+
+def _extract_page_tables_markdown(page) -> str:
+    """born-digital 표를 PyMuPDF find_tables()로 추출해 Markdown 표 문자열로 돌려준다.
+
+    표는 텍스트 레이어(get_text)에서 행·열 구조가 뭉개지므로, 구조가 보존된 표를
+    시각 분석 맥락에 함께 실어 표 오독을 줄인다. 표가 없거나 추출에 실패하면 빈 문자열.
+    """
+    try:
+        finder = page.find_tables()
+    except Exception:
+        return ""
+    parts: list[str] = []
+    for table in list(getattr(finder, "tables", []))[:_MAX_PAGE_TABLES]:
+        try:
+            md = (table.to_markdown() or "").strip()
+        except Exception:
+            continue
+        if md:
+            parts.append(md)
+    return "\n\n".join(parts)
 
 
 def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -> list[dict[str, str]]:
@@ -287,33 +324,48 @@ def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -
     except ImportError as e:
         raise RuntimeError("PDF 이미지 분석을 위해 PyMuPDF가 필요합니다.") from e
 
-    pages: list[dict[str, str]] = []
     scale = PDF_VISUAL_RENDER_DPI / 72
     matrix = fitz.Matrix(scale, scale)
 
+    pages: list[dict[str, str]] = []
     with fitz.open(file_path) as doc:
-        selected_indexes: list[int] = []
+        # 1) 분석 후보 선정: 텍스트가 적거나(제목·도식 슬라이드) 이미지가 있는 페이지.
+        #    각 후보의 시각 풍부도(이미지 면적 비율)를 함께 기록한다.
+        candidates: list[tuple[int, float]] = []
         for index in range(len(doc)):
             page = doc.load_page(index)
+            coverage = _pdf_page_image_coverage(page)
             if force:
-                selected_indexes.append(index)
-            else:
-                page_text_len = _text_length(page.get_text("text") or "")
-                if page_text_len < PDF_VISUAL_TEXT_PAGE_CHARS or _pdf_page_has_image(page):
-                    selected_indexes.append(index)
-            if len(selected_indexes) >= VISUAL_ANALYSIS_MAX_ITEMS:
-                break
+                candidates.append((index, coverage))
+                continue
+            page_text_len = _text_length(page.get_text("text") or "")
+            if page_text_len < PDF_VISUAL_TEXT_PAGE_CHARS or coverage > 0:
+                candidates.append((index, coverage))
 
+        # 2) 후보가 상한을 넘으면 문서 순서로 앞쪽만 자르지 말고, 시각 풍부도가 높은
+        #    페이지부터 상한만큼 고른다(같은 예산으로 그림이 많은 페이지를 더 읽기 위함).
+        #    sorted는 안정 정렬이라 풍부도가 같으면(예: 0) 페이지 순서가 유지된다.
+        #    최종 선택은 출력·페이지 마커 정합을 위해 페이지 번호 오름차순으로 되돌린다.
+        if len(candidates) > VISUAL_ANALYSIS_MAX_ITEMS:
+            candidates = sorted(candidates, key=lambda c: c[1], reverse=True)[:VISUAL_ANALYSIS_MAX_ITEMS]
+        selected_indexes = sorted(index for index, _ in candidates)
+
+        # 3) 선택 페이지를 렌더링하고, 같은 페이지의 텍스트 레이어와 구조가 보존된 표를
+        #    맥락으로 함께 싣는다(작은 글씨 오독·표 행열 붕괴 완화).
         for index in selected_indexes:
             page = doc.load_page(index)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-            # 같은 페이지의 텍스트 레이어를 맥락으로 함께 전달해, 작은 글씨 오독을 줄이고
-            # 이미지가 본문 어느 개념과 연결되는지 모델이 해석할 수 있게 한다.
             page_text = (page.get_text("text") or "").strip()
+            context_parts: list[str] = []
+            if page_text:
+                context_parts.append(page_text[:VISUAL_CONTEXT_MAX_CHARS])
+            table_md = _extract_page_tables_markdown(page)
+            if table_md:
+                context_parts.append(f"[페이지 표(자동 추출)]\n{table_md}")
             pages.append({
                 "label": f"PDF {index + 1}페이지",
                 "data_url": _image_data_url(pixmap.tobytes("png")),
-                "context": page_text[:VISUAL_CONTEXT_MAX_CHARS],
+                "context": "\n\n".join(context_parts),
             })
 
     return pages
@@ -383,7 +435,9 @@ def _tag_visual_pdf_pages(visual_markdown: str) -> str:
 
 # 변환 로직(텍스트 추출, _run_visual_llm의 사용자 프롬프트 문자열, 배치 구성 등)을 바꾸면
 # 반드시 수동으로 올릴 것 — 아래 지문은 env 설정과 시스템 프롬프트만 추적한다.
-CONVERT_PIPELINE_VERSION = "1"
+# v2: PDF 시각 페이지 선택을 시각 풍부도 기준 정렬로 변경 + born-digital 표(find_tables)를
+#     시각 분석 맥락에 주입.
+CONVERT_PIPELINE_VERSION = "2"
 
 # 캐시 키에 들어가는 설정 지문. 프롬프트·모델·DPI 등이 바뀌면 키 공간이 통째로 갈려
 # 기존 캐시가 자동 무효화된다(모듈 로드 시 1회 계산).
