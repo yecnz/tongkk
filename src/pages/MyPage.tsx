@@ -18,7 +18,9 @@ type ToggleProps = { on: boolean; onToggle: () => void };
 type ProfileEditModalProps = {
   nickname: string;
   avatarUrl: string | null;
-  onSave: (nickname: string, avatarFile: File | null) => Promise<void>;
+  school: string | null;
+  department: string | null;
+  onSave: (nickname: string, school: string | null, department: string | null, avatarFile: File | null) => Promise<void>;
   onClose: () => void;
 };
 type SettingsDialog = "notice" | "contact" | "deleteAccount" | "changeEmail" | null;
@@ -37,8 +39,10 @@ const Toggle = ({ on, onToggle }: ToggleProps) => (
   </button>
 );
 
-const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditModalProps) => {
+const ProfileEditModal = ({ nickname, avatarUrl, school, department, onSave, onClose }: ProfileEditModalProps) => {
   const [name, setName] = useState(nickname);
+  const [schoolInput, setSchoolInput] = useState(school ?? "");
+  const [departmentInput, setDepartmentInput] = useState(department ?? "");
   const [preview, setPreview] = useState<string | null>(avatarUrl);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -59,7 +63,7 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
     setSaving(true);
     setError("");
     try {
-      await onSave(name.trim() || nickname, avatarFile);
+      await onSave(name.trim() || nickname, schoolInput.trim() || null, departmentInput.trim() || null, avatarFile);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "프로필 저장 실패");
@@ -94,6 +98,16 @@ const ProfileEditModal = ({ nickname, avatarUrl, onSave, onClose }: ProfileEditM
         </div>
         <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 6, display: "block" }}>닉네임</label>
         <input value={name} onChange={event => setName(event.target.value)} placeholder="닉네임 입력" style={{
+          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12
+        }} />
+        <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 6, display: "block" }}>학교</label>
+        <input value={schoolInput} onChange={event => setSchoolInput(event.target.value)} placeholder="학교 (선택)" style={{
+          width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
+          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12
+        }} />
+        <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 6, display: "block" }}>학과</label>
+        <input value={departmentInput} onChange={event => setDepartmentInput(event.target.value)} placeholder="학과 (선택)" style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12
         }} />
@@ -307,6 +321,8 @@ export default function MyPage() {
   const [profile, setProfile] = useState<UserProfile>({
     nickname: user?.email?.split("@")[0] || "학생",
     avatarUrl: null,
+    school: null,
+    department: null,
     darkMode: false,
     notificationsEnabled: true,
     hideSummaryNotice: false,
@@ -376,9 +392,9 @@ export default function MyPage() {
     }
   };
 
-  const handleProfileSave = async (nickname: string, avatarFile: File | null) => {
+  const handleProfileSave = async (nickname: string, school: string | null, department: string | null, avatarFile: File | null) => {
     const avatarUrl = avatarFile ? await uploadAvatar(avatarFile) : profile.avatarUrl;
-    await updateProfile({ ...profile, nickname, avatarUrl });
+    await updateProfile({ ...profile, nickname, school, department, avatarUrl });
   };
 
   const handleDeleteData = async () => {
@@ -390,7 +406,7 @@ export default function MyPage() {
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active="마이페이지" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
-      {showEdit && <ProfileEditModal nickname={profile.nickname} avatarUrl={profile.avatarUrl} onSave={handleProfileSave} onClose={() => setShowEdit(false)} />}
+      {showEdit && <ProfileEditModal nickname={profile.nickname} avatarUrl={profile.avatarUrl} school={profile.school} department={profile.department} onSave={handleProfileSave} onClose={() => setShowEdit(false)} />}
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} currentEmail={user?.email} onChangeEmail={updateEmail} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
@@ -432,7 +448,9 @@ export default function MyPage() {
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text-strong)", marginBottom: 3 }}>{profile.nickname}</div>
-                    <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 2 }}>제주대학교 / 컴퓨터공학과</div>
+                    {[profile.school, profile.department].filter(Boolean).join(" / ") && (
+                      <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 2 }}>{[profile.school, profile.department].filter(Boolean).join(" / ")}</div>
+                    )}
                     <div style={{ fontSize: 12, color: "var(--color-muted)", wordBreak: "break-all" }}>{user?.email}</div>
                   </div>
                 </div>
