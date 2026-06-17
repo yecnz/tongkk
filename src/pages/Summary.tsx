@@ -831,7 +831,7 @@ const restoreScrollToAnchor = (anchor: DragAnchor) => {
 
 // 요약 본문을 감싸 드래그 선택 시 "AI 튜터에게 묻기" 플로팅 버튼을 띄운다.
 // 버튼 클릭 시 선택 텍스트를 onAsk로 넘긴다.
-const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (text: string, anchor: DragAnchor | null) => void }) => {
+const SelectionAskButton = ({ children, onAsk, onAskSimple }: { children: ReactNode; onAsk: (text: string, anchor: DragAnchor | null) => void; onAskSimple?: (text: string, anchor: DragAnchor | null) => void }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [selection, setSelection] = useState<{ text: string; top: number; left: number } | null>(null);
 
@@ -864,50 +864,68 @@ const SelectionAskButton = ({ children, onAsk }: { children: ReactNode; onAsk: (
     return () => document.removeEventListener("mousedown", clear);
   }, []);
 
+  // 선택 영역의 화면상 위치를 기록해 두고(튜터가 열리며 칸 폭이 줄어드는 reflow가 일어난다),
+  // 핸들러를 부른 뒤 같은 위치가 유지되도록 스크롤을 보정한다. '묻기'·'쉬운 설명' 버튼 공용.
+  const runAsk = (handler: (text: string, anchor: DragAnchor | null) => void) => {
+    if (!selection) return;
+    const sel = window.getSelection();
+    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+    const anchorTop = range ? range.getBoundingClientRect().top : null;
+    handler(selection.text, range && anchorTop != null ? { range, top: anchorTop, scrollY: window.scrollY } : null);
+    setSelection(null);
+    sel?.removeAllRanges();
+    if (range && anchorTop != null) {
+      requestAnimationFrame(() => {
+        const delta = range.getBoundingClientRect().top - anchorTop;
+        if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+      });
+    }
+  };
+
   return (
     <div ref={wrapRef} style={{ position: "relative" }} onMouseUp={captureSelection}>
       {children}
       {selection && (
-        <button
-          type="button"
+        // 드래그 선택 시 '묻기'와 '쉬운 설명 보기' 두 칸을 나란히 띄운다(이슈 #66).
+        <div
           onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
           onMouseUp={e => e.stopPropagation()}
-          onClick={() => {
-            // 튜터가 열리면 요약 칸 폭이 줄어드는 reflow가 일어난다.
-            // 선택 영역의 화면상 위치를 기록해 두고, reflow 후 같은 위치를 유지하도록 스크롤을 보정한다.
-            const sel = window.getSelection();
-            const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
-            const anchorTop = range ? range.getBoundingClientRect().top : null;
-            onAsk(selection.text, range && anchorTop != null ? { range, top: anchorTop, scrollY: window.scrollY } : null);
-            setSelection(null);
-            sel?.removeAllRanges();
-            if (range && anchorTop != null) {
-              requestAnimationFrame(() => {
-                const delta = range.getBoundingClientRect().top - anchorTop;
-                if (Math.abs(delta) > 1) window.scrollBy(0, delta);
-              });
-            }
-          }}
           style={{
             position: "absolute",
             top: selection.top,
             left: selection.left,
             transform: "translate(-50%, calc(-100% - 8px))",
             zIndex: 50,
-            padding: "7px 12px",
-            borderRadius: 999,
-            border: "none",
-            background: PINK,
-            color: "var(--color-on-brand)",
-            fontSize: 12,
-            fontWeight: 800,
+            display: "flex",
+            gap: 6,
             whiteSpace: "nowrap",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
-            cursor: "pointer",
           }}
         >
-          AI 튜터에게 묻기
-        </button>
+          <button
+            type="button"
+            onClick={() => runAsk(onAsk)}
+            style={{
+              padding: "7px 12px", borderRadius: 999, border: "none",
+              background: PINK, color: "var(--color-on-brand)", fontSize: 12, fontWeight: 800,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.18)", cursor: "pointer",
+            }}
+          >
+            AI 튜터에게 묻기
+          </button>
+          {onAskSimple && (
+            <button
+              type="button"
+              onClick={() => runAsk(onAskSimple)}
+              style={{
+                padding: "7px 12px", borderRadius: 999, border: "1px solid var(--color-border)",
+                background: "var(--color-card)", color: PINK, fontSize: 12, fontWeight: 800,
+                boxShadow: "0 4px 14px rgba(0,0,0,0.18)", cursor: "pointer",
+              }}
+            >
+              쉬운 설명 보기
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -929,7 +947,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
         columnGap: 34,
         columnRule: "1px solid var(--color-border-soft)",
       }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={cheatSheetMarkdownComponents}>
+        <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={cheatSheetMarkdownComponents}>
           {cleaned}
         </ReactMarkdown>
       </div>
@@ -937,7 +955,7 @@ const FormattedAiText = ({ content, template }: { content: string; template?: Su
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
       {cleaned}
     </ReactMarkdown>
   );
@@ -1135,6 +1153,9 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
   // 본문 드래그 선택: "다음 내용을 설명해줘" 접두사를 붙인다.
   const askTutorWithSelection = (text: string, anchor: DragAnchor | null) =>
     askTutorWithQuestion(`다음 내용을 설명해줘:\n${text}`, anchor);
+  // '쉬운 설명 보기': 더 쉬운 말로 풀어달라는 접두사를 붙인다(이슈 #66).
+  const askTutorSimpleWithSelection = (text: string, anchor: DragAnchor | null) =>
+    askTutorWithQuestion(`이 내용을 쉽게 설명해줘. :\n${text}`, anchor);
 
   // 튜터를 닫으면 그리드가 2열→1열로 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
   const handleTutorOpenChange = (next: boolean) => {
@@ -1598,7 +1619,7 @@ const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realCont
                 {mindmapData ? (
                   <MindmapView key={displayContent} data={mindmapData} onNodeFocus={(label, pathLabels) => askTutorWithQuestion(buildMindmapQuestion(label, pathLabels), null)} persistKey={summaryId ?? undefined} />
                 ) : (
-                  <SelectionAskButton onAsk={askTutorWithSelection}>
+                  <SelectionAskButton onAsk={askTutorWithSelection} onAskSimple={askTutorSimpleWithSelection}>
                     <FormattedAiText content={displayContent} template={template} />
                   </SelectionAskButton>
                 )}
@@ -2107,6 +2128,9 @@ const MaterialDetailView = ({
   // 본문 드래그 선택: "다음 내용을 설명해줘" 접두사를 붙인다.
   const askSummaryTutorWithSelection = (text: string, anchor: DragAnchor | null) =>
     askSummaryTutorWithQuestion(`다음 내용을 설명해줘:\n${text}`, anchor);
+  // '쉬운 설명 보기': 더 쉬운 말로 풀어달라는 접두사를 붙인다(이슈 #66).
+  const askSummaryTutorSimpleWithSelection = (text: string, anchor: DragAnchor | null) =>
+    askSummaryTutorWithQuestion(`이 내용을 쉽게 설명해줘. :\n${text}`, anchor);
 
   // 튜터를 닫으면 그리드가 reflow된다. 드래그했던 구절을 처음 보던 화면 위치로 되돌린다.
   const handleSummaryTutorOpenChange = (next: boolean) => {
@@ -2417,7 +2441,7 @@ const MaterialDetailView = ({
           overflowY: "auto",
           boxSizing: "border-box",
         }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }]]} components={markdownComponents}>
             {material.markdown || "표시할 내용이 없습니다."}
           </ReactMarkdown>
         </div>
@@ -2878,7 +2902,7 @@ const MaterialDetailView = ({
                           <h3 style={{ margin: "0 0 6px", fontSize: 18, color: "var(--color-text-strong)" }}>{templateLabels[activeSummary.template]}</h3>
                           <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted)" }}>{formatHubDate(activeSummary.createdAt)}</p>
                         </div>
-                        <SelectionAskButton onAsk={askSummaryTutorWithSelection}>
+                        <SelectionAskButton onAsk={askSummaryTutorWithSelection} onAskSimple={askSummaryTutorSimpleWithSelection}>
                           <SummaryContentView content={activeSummary.content} template={activeSummary.template} onNodeFocus={(label, pathLabels) => askSummaryTutorWithQuestion(buildMindmapQuestion(label, pathLabels), null)} persistKey={activeSummary.id} />
                         </SelectionAskButton>
                       </div>

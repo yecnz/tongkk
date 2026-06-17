@@ -64,7 +64,7 @@ const md: Components = {
 };
 
 const Markdown = ({ children }: { children: string }) => (
-  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={md}>
+  <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={md}>
     {children}
   </ReactMarkdown>
 );
@@ -73,7 +73,7 @@ const Markdown = ({ children }: { children: string }) => (
 // 같은 잘못된 중첩을 막는다(수식·굵게만 필요하므로 블록 요소는 등장하지 않는다).
 const inlineMd: Components = { ...md, p: ({ children }) => <span>{children}</span> };
 const InlineMarkdown = ({ children }: { children: string }) => (
-  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={inlineMd}>
+  <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={inlineMd}>
     {children}
   </ReactMarkdown>
 );
