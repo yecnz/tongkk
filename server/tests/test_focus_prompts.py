@@ -160,6 +160,14 @@ class TestQuizFormatSafety:
         system = prompts._quiz_system_content("객관식", SAMPLE_FOCUS)
         assert "출력 형식(순수 JSON 배열)과 문항 유형 규칙은 절대 바꾸지 마라" in system
 
+    def test_focus_not_leaked_into_question(self):
+        # 집중 요청 문구가 문제 지문에 그대로 새어 나오지 않도록, 비노출 지시를 SYSTEM·USER 양쪽에 고정한다.
+        section = prompts._quiz_user_focus_section(SAMPLE_FOCUS)
+        system = prompts._quiz_system_content("객관식", SAMPLE_FOCUS)
+        for text in (section, system):
+            assert "문제 지문·선택지·해설에 절대 드러내지" in text
+            assert "집중 요청을 모르는 사람도" in text
+
 
 # ---------------------------------------------------------------------------
 # 7) MINDMAP JSON 안전
