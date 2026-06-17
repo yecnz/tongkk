@@ -242,7 +242,7 @@ export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { maybeShow: maybeShowTutorial } = useTutorial();
+  const { maybeShow: maybeShowTutorial, activeKey: activeTutorialKey } = useTutorial();
   const reviewState = location.state as QuizLocationState;
   const reviewQuestions = reviewState?.reviewQuestions || null;
   const hasReviewQuestions = Boolean(reviewQuestions && reviewQuestions.length > 0);
@@ -293,6 +293,8 @@ export default function Quiz() {
   const courseDetailFromRouteRef = useRef(false);
   // 대시보드 온보딩에서 넘어온 진단 퀴즈 모드. 다음 생성 1회에만 적용한다.
   const diagnosticPendingRef = useRef(false);
+  // 풀이 화면 전역 키 입력(←/→ 이동·Enter 정답 공개) 핸들러. 매 렌더에서 최신 상태로 갱신해 stale closure를 피한다.
+  const quizKeyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   const [openedQuizTitle, setOpenedQuizTitle] = useState(
     hasReviewQuestions ? (reviewState?.reviewTitle || "오답 다시 풀기") : "",
   );
@@ -902,10 +904,10 @@ export default function Quiz() {
     }
   };
 
-  // 활성 풀이: 미응답 상태로 다음으로 넘어가면 한 번 경고하고, 확인하면 이동한다.
+  // 활성 풀이: 미응답이어도 자유롭게 다음으로 넘어간다. 건너뛴(미응답) 문항은 상단 문항 네비게이터로
+  // 한눈에 보이고, 마지막 '결과 보기'에서 다시 한 번 안내하므로 매 이동마다 확인창을 띄우지 않는다.
   const goNextActive = () => {
     if (current >= quizzes.length - 1) return;
-    if (answers[current] === undefined && !window.confirm("정답을 선택하지 않았습니다.\n그래도 다음 문제로 이동할까요?")) return;
     goToQuestion(current + 1);
   };
 
@@ -987,6 +989,15 @@ export default function Quiz() {
 
     return () => window.clearInterval(timer);
   }, [view, examMode, remainingSeconds]);
+
+  // 풀이 화면에서 키보드 이동을 전역으로 듣는다(포커스가 본문 어디에 있든 ←/→ 이동이 동작하도록).
+  // 캡처 단계로 듣고, 실제 분기는 매 렌더에서 갱신되는 ref 함수가 처리한다.
+  useEffect(() => {
+    if (view !== "quiz") return;
+    const onKeyDown = (e: KeyboardEvent) => quizKeyHandlerRef.current(e);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [view]);
 
   useEffect(() => {
     if (view !== "result" || quizzes.length === 0 || !selectedCourse) return;
@@ -1834,6 +1845,37 @@ export default function Quiz() {
   }
   // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
   const currentCorrect = isQuestionCorrect(q, current, selected);
+  // 풀이 화면 키보드 조작(전역 리스너가 이 ref를 호출):
+  //  - ←/→ : 이전/다음 문항 이동. 입력 칸 안에서는 커서 이동을 위해 가로채지 않는다.
+  //  - Enter: 현재 문항의 정답 화면만 펼치고, 절대 다음 문항으로 넘어가지 않는다(포커스된 '다음'·'제출' 버튼의 기본 Enter 동작까지 차단).
+  quizKeyHandlerRef.current = (e: KeyboardEvent) => {
+    if (e.isComposing) return; // 한글 조합 중 키 입력은 무시한다.
+    if (sidebar || activeTutorialKey) return; // 사이드바·튜토리얼 안내가 떠 있으면 뒤쪽 퀴즈를 건드리지 않는다.
+    const el = e.target as HTMLElement | null;
+    const tag = el?.tagName;
+    const inEditable = tag === "INPUT" || tag === "TEXTAREA";
+    if (e.key === "ArrowRight") {
+      if (inEditable) return; // 입력 중에는 커서 이동을 막지 않는다.
+      e.preventDefault();
+      if (reviewMode) goToQuestion(current + 1); else goNextActive();
+      return;
+    }
+    if (e.key === "ArrowLeft") {
+      if (inEditable) return;
+      e.preventDefault();
+      goToQuestion(current - 1);
+      return;
+    }
+    if (e.key !== "Enter") return;
+    if (reviewMode) return; // 복습 화면의 Enter는 기존 동작을 유지한다.
+    if (tag === "TEXTAREA") return; // 주관식 답안의 줄바꿈(Enter)은 막지 않는다.
+    if (el?.closest?.(".tongkk-quiz-option") || el?.closest?.(".tongkk-quiz-nav")) return; // 객관식 보기 선택·문항 네비게이터 Enter는 살린다.
+    e.preventDefault();
+    if (selected !== undefined) { setShowExplanation(!examMode); return; } // 이미 답했으면 해설을 펼친다(시험 모드는 제외).
+    if (isShortAnswer) { submitShortAnswer(); return; } // 단답형은 제출하며 정답을 공개한다.
+    if (isSubjective) { void submitSubjectiveAnswer(); return; } // 주관식 제출 버튼 Enter 대응.
+    // 객관식 미응답: 다음 이동만 막고, 정답은 보기를 골라야 공개된다.
+  };
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
@@ -1851,6 +1893,35 @@ export default function Quiz() {
       <div style={{ height: 3, background: "var(--color-border-soft)" }}>
         <div style={{ height: 3, background: PINK, width: `${((current + 1) / quizzes.length) * 100}%`, transition: "width 0.3s" }}/>
       </div>
+      {!reviewMode && quizzes.length > 1 && (
+        <div style={{ maxWidth: 700, margin: "18px auto 0", padding: "0 24px", display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+          {quizzes.map((_, i) => {
+            const answered = answers[i] !== undefined;
+            const isCurrent = i === current;
+            return (
+              <button
+                key={i}
+                type="button"
+                className="tongkk-quiz-nav"
+                onClick={() => goToQuestion(i)}
+                aria-label={`${i + 1}번 문제, ${answered ? "응답함" : "미응답"}${isCurrent ? ", 현재 문제" : ""}`}
+                aria-current={isCurrent ? "step" : undefined}
+                title={`${i + 1}번 · ${answered ? "응답함" : "미응답"}`}
+                style={{
+                  width: 32, height: 32, borderRadius: 9, fontSize: 12.5, fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                  border: isCurrent ? `2px solid ${PINK}` : `1.5px solid ${answered ? "var(--color-muted)" : "var(--color-border-soft)"}`,
+                  background: answered ? "var(--color-muted-surface)" : "var(--color-card)",
+                  color: isCurrent ? PINK : answered ? "var(--color-text-strong)" : "var(--color-muted)",
+                  transition: "all 0.15s",
+                }}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div style={{ padding: 24, maxWidth: 700, margin: "30px auto", display: "flex", alignItems: "center", gap: 4 }}>
         <button
           type="button"
@@ -1945,7 +2016,6 @@ export default function Quiz() {
                   <input
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") submitShortAnswer(); }}
                     disabled={reviewMode || selected !== undefined}
                     placeholder="정답을 입력하세요"
                     style={{
@@ -1970,11 +2040,17 @@ export default function Quiz() {
               {isShortAnswer && (reviewMode || (selected !== undefined && !examMode)) && (
                 <div style={{
                   marginTop: 12, padding: "12px 16px", borderRadius: 12,
-                  background: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
-                  color: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? CYAN : PINK,
-                  fontSize: 13, fontWeight: 700
+                  background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
+                  color: currentCorrect ? CYAN : PINK,
+                  fontSize: 13, fontWeight: 700, lineHeight: 1.5,
+                  display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                 }}>
-                  정답: {q.answerText}
+                  <span style={{
+                    flexShrink: 0, padding: "2px 9px", borderRadius: 999,
+                    background: currentCorrect ? CYAN : PINK, color: "var(--color-on-brand)",
+                    fontSize: 11, fontWeight: 850,
+                  }}>{currentCorrect ? "정답" : "오답"}</span>
+                  <span>정답: {q.answerText}</span>
                 </div>
               )}
               {isSubjective && subjectiveGrade && (reviewMode || (selected !== undefined && !examMode)) && (

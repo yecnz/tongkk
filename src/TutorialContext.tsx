@@ -24,6 +24,8 @@ type TutorialApi = {
   /** 라우트 화면이 데이터 준비 완료를 알리는 신호(push). 무장된 후보면 그때 노출. */
   ready: (key: TutorialKey) => void;
   close: () => void;
+  /** 현재 떠 있는 안내 시트의 키(없으면 null). 화면 위 키 입력 가드 등에 쓴다. */
+  activeKey: TutorialKey | null;
 };
 
 const TutorialCtx = createContext<TutorialApi | null>(null);
@@ -129,7 +131,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     return clearTimer;
   }, [pathname, user, loading, close, clearTimer, showAuto]);
 
-  const api = useMemo<TutorialApi>(() => ({ open, maybeShow, ready, close }), [open, maybeShow, ready, close]);
+  const api = useMemo<TutorialApi>(() => ({ open, maybeShow, ready, close, activeKey: active?.key ?? null }), [open, maybeShow, ready, close, active]);
 
   const isWelcome = active?.key === "welcome";
   const primaryAction = isWelcome
