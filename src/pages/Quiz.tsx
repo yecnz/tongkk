@@ -28,6 +28,7 @@ import {
   type SavedQuizAttempt,
 } from "../services/quizAttempts";
 import { inferWeakTopicFromQuestion } from "../services/statsHelpers";
+import { isShortAnswerCorrect } from "../services/answerMatch";
 import {
   getFileMaterialId,
   loadCourseMaterialsFromServer,
@@ -952,7 +953,7 @@ export default function Quiz() {
       return subjectiveGrades[index]?.isCorrect || false;
     }
     if (type === "단답형") {
-      return typeof answerValue === "string" && typeof quiz.answerText === "string" && normalizeAnswer(answerValue) === normalizeAnswer(quiz.answerText);
+      return typeof answerValue === "string" && typeof quiz.answerText === "string" && isShortAnswerCorrect(answerValue, quiz.answerText);
     }
     return typeof answerValue === "number" && quiz.answer === answerValue;
   }, [questionType, subjectiveGrades]);
@@ -1970,8 +1971,8 @@ export default function Quiz() {
               {isShortAnswer && (reviewMode || (selected !== undefined && !examMode)) && (
                 <div style={{
                   marginTop: 12, padding: "12px 16px", borderRadius: 12,
-                  background: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
-                  color: normalizeAnswer(String(selected)) === normalizeAnswer(q.answerText || "") ? CYAN : PINK,
+                  background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
+                  color: currentCorrect ? CYAN : PINK,
                   fontSize: 13, fontWeight: 700
                 }}>
                   정답: {q.answerText}
