@@ -1987,7 +1987,17 @@ export default function Quiz() {
               <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인하세요</span>
             </div>
           )}
-          <span style={{ fontSize: 12, fontWeight: 600, color: CYAN, marginBottom: 10, display: "block" }}>Q{current + 1}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: CYAN }}>Q{current + 1}</span>
+            {/* 답한 직후(비-시험 모드) 모든 유형에 공통으로 정답/오답을 한눈에 보여주는 작은 배지. 복습 화면은 위에 별도 배지가 있으므로 제외. */}
+            {!reviewMode && selected !== undefined && !examMode && (
+              <span style={{
+                flexShrink: 0, padding: "2px 9px", borderRadius: 999,
+                background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
+                color: currentCorrect ? CYAN : PINK, fontSize: 11, fontWeight: 850,
+              }}>{currentCorrect ? "정답" : "오답"}</span>
+            )}
+          </div>
           <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}><QuizText>{q.question}</QuizText></h3>
           {reviewMode ? (
             <div style={{ display: "grid", gap: 10 }}>
