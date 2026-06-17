@@ -293,19 +293,36 @@ const CourseDetailModal = ({
             <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
           </div>
-          <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="강의 상세 닫기" style={{
-            width: 32,
-            height: 32,
-            borderRadius: 9,
-            border: "none",
-            background: "var(--color-surface)",
-            color: "var(--color-muted)",
-            cursor: "pointer",
-            fontSize: 18,
-            lineHeight: "32px",
-            padding: 0,
-            flexShrink: 0,
-          }}>×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {/* 자료 목록에서 바로 강의 자료를 추가(요약 생성 화면으로 이동)할 수 있게 닫기 버튼 왼쪽에 둔다(이슈 #65). */}
+            <button type="button" className="tongkk-hover-dim" onClick={onGoSummary} aria-label="강의 자료 추가" style={{
+              height: 32,
+              padding: "0 14px",
+              borderRadius: 9,
+              border: "none",
+              background: PINK,
+              color: "var(--color-on-brand)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 800,
+              lineHeight: "32px",
+              whiteSpace: "nowrap",
+              boxShadow: "0 6px 16px rgba(240,112,174,0.22)",
+            }}>+ 자료 추가</button>
+            <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="강의 상세 닫기" style={{
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              border: "none",
+              background: "var(--color-surface)",
+              color: "var(--color-muted)",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: "32px",
+              padding: 0,
+              flexShrink: 0,
+            }}>×</button>
+          </div>
         </div>
 
         {error && (
