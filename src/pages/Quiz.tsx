@@ -324,8 +324,6 @@ export default function Quiz() {
   const courseDetailFromRouteRef = useRef(false);
   // 대시보드 온보딩에서 넘어온 진단 퀴즈 모드. 다음 생성 1회에만 적용한다.
   const diagnosticPendingRef = useRef(false);
-  // 풀이 화면 전역 키 입력(←/→ 이동·Enter 정답 공개) 핸들러. 매 렌더에서 최신 상태로 갱신해 stale closure를 피한다.
-  const quizKeyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   const [openedQuizTitle, setOpenedQuizTitle] = useState(
     hasReviewQuestions ? (reviewState?.reviewTitle || "오답 다시 풀기") : "",
   );
@@ -935,10 +933,11 @@ export default function Quiz() {
     }
   };
 
-  // 활성 풀이: 미응답이어도 자유롭게 다음으로 넘어간다. 건너뛴(미응답) 문항은 상단 문항 네비게이터로
-  // 한눈에 보이고, 마지막 '결과 보기'에서 다시 한 번 안내하므로 매 이동마다 확인창을 띄우지 않는다.
+  // 활성 풀이: 미응답 상태로 다음으로 넘어가려 하면 한 번 경고하고, 확인하면 이동한다.
+  // (다음 버튼·→ 방향키·단답형 Enter 이동 모두 이 경로를 거치므로, 안 푼 채 건너뛰면 항상 경고가 뜬다.)
   const goNextActive = () => {
     if (current >= quizzes.length - 1) return;
+    if (answers[current] === undefined && !window.confirm("정답을 선택하지 않았습니다.\n그래도 다음 문제로 이동할까요?")) return;
     goToQuestion(current + 1);
   };
 
@@ -1023,14 +1022,16 @@ export default function Quiz() {
 
 
   // 키보드로 문항 이동(이슈 #61): 방향키(←/→)로 이전·다음 문제, 스페이스·엔터로 다음(마지막
-  // 문항이면 제출). 단답형 input·주관식 textarea에 포커스가 있는 동안에는 가로채지 않아
-  // 타이핑과 기존 Enter 제출(단답형 input의 onKeyDown)을 방해하지 않는다. 제출하면 입력칸이
-  // disabled로 풀려 포커스를 잃으므로 곧바로 방향키로 넘어갈 수 있다. 시간 종료(timedOut) 후나
-  // 풀이 화면이 아닐 때는 동작하지 않고, 복습 모드에서는 이동만 허용한다.
+  // 문항이면 제출). 단답형 입력칸에서 Enter는 (아직 제출 전이고 입력이 있으면) 먼저 제출해 정답을
+  // 공개하고, 제출 뒤 입력칸이 disabled로 풀려 포커스를 잃은 다음 Enter부터 다음 문항으로 넘어간다.
+  // 주관식 textarea·입력 중에는 가로채지 않아 타이핑/줄바꿈을 보존한다. 미응답 상태로 앞으로
+  // 넘어가면 goNextActive가 경고창을 띄운다. 시간 종료(timedOut)·풀이 화면이 아닐 때·사이드바나
+  // 튜토리얼 안내가 떠 있을 때는 동작하지 않고, 복습 모드에서는 이동만 허용한다.
   useEffect(() => {
     if (view !== "quiz" || timedOut) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.isComposing) return; // 한글 등 IME 조합 중에는 무시
+      if (sidebar || activeTutorialKey) return; // 사이드바·튜토리얼 안내가 떠 있으면 뒤쪽 퀴즈를 건드리지 않는다.
       const el = document.activeElement as HTMLElement | null;
       const tag = el?.tagName;
       const typing = tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable === true;
@@ -1043,10 +1044,18 @@ export default function Quiz() {
       if (e.key === "ArrowRight") {
         if (typing) return;
         e.preventDefault();
-        goToQuestion(current + 1);
+        if (reviewMode) goToQuestion(current + 1); else goNextActive(); // 미응답이면 goNextActive가 경고
         return;
       }
       if (reviewMode) return; // 복습 모드는 이동만(선택·제출 없음)
+      // 단답형 입력칸에서 Enter: 아직 제출 전이고 입력이 있으면 먼저 제출(정답 공개). 다음 Enter부터 이동.
+      if (e.key === "Enter" && tag === "INPUT"
+          && (quizzes[current]?.type || questionType) === "단답형"
+          && answers[current] === undefined && shortAnswerInput.trim()) {
+        e.preventDefault();
+        submitShortAnswer();
+        return;
+      }
       if (e.key === "Enter" || e.key === " ") {
         // 입력칸·버튼·링크에 포커스가 있으면 그 요소의 기본 동작(타이핑·클릭)에 맡긴다.
         if (typing || tag === "BUTTON" || tag === "A") return;
@@ -1057,7 +1066,7 @@ export default function Quiz() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [view, timedOut, reviewMode, current, quizzes, goToQuestion, goNextActive, submitQuiz]);
+  }, [view, timedOut, reviewMode, current, quizzes, questionType, answers, shortAnswerInput, goToQuestion, goNextActive, submitQuiz, submitShortAnswer, sidebar, activeTutorialKey]);
 
   useEffect(() => {
     if (view !== "result" || quizzes.length === 0 || !selectedCourse) return;
@@ -1905,37 +1914,6 @@ export default function Quiz() {
   }
   // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
   const currentCorrect = isQuestionCorrect(q, current, selected);
-  // 풀이 화면 키보드 조작(전역 리스너가 이 ref를 호출):
-  //  - ←/→ : 이전/다음 문항 이동. 입력 칸 안에서는 커서 이동을 위해 가로채지 않는다.
-  //  - Enter: 현재 문항의 정답 화면만 펼치고, 절대 다음 문항으로 넘어가지 않는다(포커스된 '다음'·'제출' 버튼의 기본 Enter 동작까지 차단).
-  quizKeyHandlerRef.current = (e: KeyboardEvent) => {
-    if (e.isComposing) return; // 한글 조합 중 키 입력은 무시한다.
-    if (sidebar || activeTutorialKey) return; // 사이드바·튜토리얼 안내가 떠 있으면 뒤쪽 퀴즈를 건드리지 않는다.
-    const el = e.target as HTMLElement | null;
-    const tag = el?.tagName;
-    const inEditable = tag === "INPUT" || tag === "TEXTAREA";
-    if (e.key === "ArrowRight") {
-      if (inEditable) return; // 입력 중에는 커서 이동을 막지 않는다.
-      e.preventDefault();
-      if (reviewMode) goToQuestion(current + 1); else goNextActive();
-      return;
-    }
-    if (e.key === "ArrowLeft") {
-      if (inEditable) return;
-      e.preventDefault();
-      goToQuestion(current - 1);
-      return;
-    }
-    if (e.key !== "Enter") return;
-    if (reviewMode) return; // 복습 화면의 Enter는 기존 동작을 유지한다.
-    if (tag === "TEXTAREA") return; // 주관식 답안의 줄바꿈(Enter)은 막지 않는다.
-    if (el?.closest?.(".tongkk-quiz-option") || el?.closest?.(".tongkk-quiz-nav")) return; // 객관식 보기 선택·문항 네비게이터 Enter는 살린다.
-    e.preventDefault();
-    if (selected !== undefined) { setShowExplanation(!examMode); return; } // 이미 답했으면 해설을 펼친다(시험 모드는 제외).
-    if (isShortAnswer) { submitShortAnswer(); return; } // 단답형은 제출하며 정답을 공개한다.
-    if (isSubjective) { void submitSubjectiveAnswer(); return; } // 주관식 제출 버튼 Enter 대응.
-    // 객관식 미응답: 다음 이동만 막고, 정답은 보기를 골라야 공개된다.
-  };
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
