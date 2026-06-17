@@ -1,6 +1,10 @@
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
-import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication, type PageRouteLabel } from "../common";
 import { useTutorial } from "../TutorialContext";
 import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { hasPageMarkers } from "../utils/pageMarkers";
@@ -58,6 +62,32 @@ const sourceLabels: Record<string, string> = {
   LECTURE_NOTE: "강의 노트",
   MINDMAP: "마인드맵",
   CHEAT_SHEET: "치트시트",
+};
+
+// LLM이 만든 문제·보기·해설에는 수식($...$ / $$...$$)·굵게·곱셈 별표가 섞여 있어, 평문으로
+// 그대로 출력하면 KaTeX가 깨지거나 별표가 강조로 먹혀 사라진다(이슈 #62). 요약·AI 튜터와
+// 똑같은 정규화 체인 + remark-math/rehype-katex로 렌더한다. 제목·보기·해설 한 줄 안에
+// 인라인으로 들어가야 하므로 p를 블록이 아닌 흐름(fragment)으로 펼친다.
+// (사용자가 직접 입력한 답안에는 적용하지 않는다 — LLM이 생성한 텍스트에만 쓴다.)
+const quizMarkdownComponents: Components = {
+  p: ({ children }) => <>{children}</>,
+  code: ({ children, className }) => (
+    <code className={className} style={{ padding: className ? 0 : "1px 5px", borderRadius: 5, background: className ? "transparent" : "var(--color-surface)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
+      {children}
+    </code>
+  ),
+};
+
+const QuizText = ({ children }: { children?: string | null }) => {
+  const text = (children ?? "").replace(/\r\n/g, "\n").trim();
+  if (!text) return null;
+  // 단일 '~'(예: 'p.8~p.9')를 취소선으로 오인하지 않도록 singleTilde:false.
+  const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(text)));
+  return (
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={quizMarkdownComponents}>
+      {cleaned}
+    </ReactMarkdown>
+  );
 };
 
 // 풀이 중 새로고침·이탈로 답안이 날아가지 않도록 진행 상태를 세션에 스냅샷한다.
@@ -989,6 +1019,43 @@ export default function Quiz() {
     return () => window.clearInterval(timer);
   }, [view, examMode, remainingSeconds]);
 
+  // 키보드로 문항 이동(이슈 #61): 방향키(←/→)로 이전·다음 문제, 스페이스·엔터로 다음(마지막
+  // 문항이면 제출). 단답형 input·주관식 textarea에 포커스가 있는 동안에는 가로채지 않아
+  // 타이핑과 기존 Enter 제출(단답형 input의 onKeyDown)을 방해하지 않는다. 제출하면 입력칸이
+  // disabled로 풀려 포커스를 잃으므로 곧바로 방향키로 넘어갈 수 있다. 시간 종료(timedOut) 후나
+  // 풀이 화면이 아닐 때는 동작하지 않고, 복습 모드에서는 이동만 허용한다.
+  useEffect(() => {
+    if (view !== "quiz" || timedOut) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing) return; // 한글 등 IME 조합 중에는 무시
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName;
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable === true;
+      if (e.key === "ArrowLeft") {
+        if (typing) return; // 입력 중에는 커서 이동을 보존
+        e.preventDefault();
+        goToQuestion(current - 1);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        if (typing) return;
+        e.preventDefault();
+        goToQuestion(current + 1);
+        return;
+      }
+      if (reviewMode) return; // 복습 모드는 이동만(선택·제출 없음)
+      if (e.key === "Enter" || e.key === " ") {
+        // 입력칸·버튼·링크에 포커스가 있으면 그 요소의 기본 동작(타이핑·클릭)에 맡긴다.
+        if (typing || tag === "BUTTON" || tag === "A") return;
+        e.preventDefault();
+        if (current >= quizzes.length - 1) submitQuiz();
+        else goNextActive();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [view, timedOut, reviewMode, current, quizzes, goToQuestion, goNextActive, submitQuiz]);
+
   useEffect(() => {
     if (view !== "result" || quizzes.length === 0 || !selectedCourse) return;
     if (reviewAttempt) return;
@@ -1880,17 +1947,17 @@ export default function Quiz() {
             </div>
           )}
           <span style={{ fontSize: 12, fontWeight: 600, color: CYAN, marginBottom: 10, display: "block" }}>Q{current + 1}</span>
-          <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}>{q.question}</h3>
+          <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}><QuizText>{q.question}</QuizText></h3>
           {reviewMode ? (
             <div style={{ display: "grid", gap: 10 }}>
               {isShortAnswer || isSubjective ? (
                 <div style={{ display: "grid", gap: 8, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                   <span>내 답: <span style={{ padding: "3px 10px", borderRadius: 8, background: "var(--color-muted-surface)", color: "var(--color-text)", fontWeight: 700 }}>{typeof selected === "string" && selected.trim() ? selected : "미응답"}</span></span>
                   {!currentCorrect && (
-                    <span>정답: <strong style={{ color: PINK }}>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</strong></span>
+                    <span>정답: <strong style={{ color: PINK }}><QuizText>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</QuizText></strong></span>
                   )}
                   {isSubjective && subjectiveGrade && (
-                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · {subjectiveGrade.feedback}</span>
+                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · <QuizText>{subjectiveGrade.feedback}</QuizText></span>
                   )}
                 </div>
               ) : (
@@ -1906,7 +1973,7 @@ export default function Quiz() {
                     }}>
                       <span style={{ minWidth: 0, fontSize: 14, color: showCorrect ? PINK : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word" }}>
                         <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
-                        {opt}
+                        <QuizText>{opt}</QuizText>
                       </span>
                       {(isMyChoice || showCorrect) && (
                         <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? PINK : "var(--color-text-secondary)" }}>
@@ -1975,7 +2042,7 @@ export default function Quiz() {
                   color: currentCorrect ? CYAN : PINK,
                   fontSize: 13, fontWeight: 700
                 }}>
-                  정답: {q.answerText}
+                  정답: <QuizText>{q.answerText}</QuizText>
                 </div>
               )}
               {isSubjective && subjectiveGrade && (reviewMode || (selected !== undefined && !examMode)) && (
@@ -1988,9 +2055,9 @@ export default function Quiz() {
                   fontSize: 13,
                   lineHeight: 1.6,
                 }}>
-                  <strong>{subjectiveGrade.score}점</strong> · {subjectiveGrade.feedback}
+                  <strong>{subjectiveGrade.score}점</strong> · <QuizText>{subjectiveGrade.feedback}</QuizText>
                   <div style={{ marginTop: 8, color: "var(--color-text)" }}>
-                    모범답안: {subjectiveGrade.referenceAnswer}
+                    모범답안: <QuizText>{subjectiveGrade.referenceAnswer}</QuizText>
                   </div>
                 </div>
               )}
@@ -2013,7 +2080,7 @@ export default function Quiz() {
                     fontWeight: isSelected || (revealAnswer && isCorrect) ? 600 : 400, transition: "all 0.2s"
                   }}>
                     <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
-                    {opt}
+                    <QuizText>{opt}</QuizText>
                     {revealAnswer && isCorrect && <span style={{ float: "right" }}>O</span>}
                     {revealAnswer && isSelected && !isCorrect && <span style={{ float: "right" }}>X</span>}
                   </button>
@@ -2024,11 +2091,11 @@ export default function Quiz() {
           {showExplanation && (
             reviewMode ? (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                <strong style={{ color: "var(--color-text)" }}>해설</strong> {q.explanation}
+                <strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText>{q.explanation}</QuizText>
               </div>
             ) : (
               <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
-                <strong style={{ color: CYAN }}>해설:</strong> {q.explanation}
+                <strong style={{ color: CYAN }}>해설:</strong> <QuizText>{q.explanation}</QuizText>
               </div>
             )
           )}
