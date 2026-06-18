@@ -299,15 +299,14 @@ const CourseDetailModal = ({
               height: 32,
               padding: "0 14px",
               borderRadius: 9,
-              border: "none",
-              background: PINK,
-              color: "var(--color-on-brand)",
+              border: "1px solid var(--color-border-soft)",
+              background: "var(--color-card)",
+              color: "var(--color-text)",
               cursor: "pointer",
               fontSize: 14,
-              fontWeight: 800,
+              fontWeight: 600,
               lineHeight: "32px",
               whiteSpace: "nowrap",
-              boxShadow: "0 6px 16px rgba(240,112,174,0.22)",
             }}>+ 자료 추가</button>
             <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="강의 상세 닫기" style={{
               width: 32,
@@ -337,9 +336,8 @@ const CourseDetailModal = ({
               <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
               {!loading && (
                 <button type="button" onClick={onGoSummary} style={{
-                  padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
-                  color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
-                  boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
+                  padding: "11px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
+                  color: "var(--color-text)", fontSize: 14, fontWeight: 600, cursor: "pointer",
                 }}>+ 자료 추가하기</button>
               )}
             </div>
