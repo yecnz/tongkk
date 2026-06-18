@@ -384,8 +384,8 @@ const CourseDetailModal = ({
                         </span>
                       </span>
                       <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
-                        <span style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)" }}>요약 {summaryCount}</span>
-                        <span style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)" }}>퀴즈 {quizCount}</span>
+                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "summary"); }} style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)", cursor: "pointer" }}>요약 {summaryCount}</span>
+                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "quiz"); }} style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)", cursor: "pointer" }}>퀴즈 {quizCount}</span>
                       </span>
                     </button>
                     <button
