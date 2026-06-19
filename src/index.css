@@ -180,7 +180,10 @@ body.tongkk-sidebar-open #root {
 .tongkk-hover-fade,
 .tongkk-icon-btn,
 .tongkk-quiz-option,
-.tongkk-dropzone {
+.tongkk-dropzone,
+.tongkk-hover-tint,
+.tongkk-hover-tint-cyan,
+.tongkk-hover-danger {
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease,
     color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
@@ -217,6 +220,27 @@ body.tongkk-sidebar-open #root {
   .tongkk-icon-btn.accent:hover {
     background: var(--color-tint-cyan) !important;
   }
+  /* 무채 버튼(요약 툴바 등) — 평소 무채, 올리면 분홍 틴트.
+     색은 앱의 다른 분홍 활성 상태(탭·사이드바)와 동일하게 tint-pink + 밝은 PINK로 통일. */
+  .tongkk-hover-tint:hover {
+    background: var(--color-tint-pink) !important;
+    border-color: color-mix(in srgb, var(--color-pink) 33%, transparent) !important;
+    color: var(--color-pink) !important;
+  }
+  /* 청록 버전 — 퀴즈 계열 무채 버튼(분석 리포트 등). 쨍한 솔리드 대신 연한 청록 틴트 */
+  .tongkk-hover-tint-cyan:hover {
+    background: var(--color-tint-cyan) !important;
+    border-color: color-mix(in srgb, var(--color-cyan) 33%, transparent) !important;
+    color: var(--color-cyan) !important;
+  }
+  /* 삭제 버튼 — 평소 빨강 글자, 올리면 옅은 빨강 틴트로 위험 신호 강조 */
+  .tongkk-hover-danger:hover {
+    background: var(--color-tint-pink) !important;
+    border-color: color-mix(in srgb, var(--color-danger) 35%, transparent) !important;
+    color: var(--color-danger) !important;
+  }
+  /* 자료 행의 '요약 N · 퀴즈 N' — 클릭 시 해당 탭으로 이동. hover 밑줄로 클릭 가능 신호 */
+  .tongkk-count-link:hover { text-decoration: underline; }
   .tongkk-quiz-option:hover {
     background: var(--color-muted-surface) !important;
     border-color: var(--color-border) !important;
