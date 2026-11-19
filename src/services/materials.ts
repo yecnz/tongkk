@@ -20,7 +20,7 @@ export type CourseMaterial = {
   updatedAt: number;
 };
 
-const MATERIAL_STORAGE_BUCKET = 'course-materials';
+export const MATERIAL_STORAGE_BUCKET = 'course-materials';
 
 // 자료 목록은 화면 이동마다 다시 받지만 업로드/삭제 때만 바뀐다 → fresh 30초 + stale 30분(SWR).
 // variant로 본문(markdown) 포함 여부를 구분해, 가벼운 캐시를 본문 필요한 화면에 잘못 주지 않게 한다.
