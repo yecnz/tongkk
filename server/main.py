@@ -1169,7 +1169,7 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
 
 
 @app.post("/agent")
-async def agent(req: AgentRequest, _user=Depends(require_api_user)):
+async def agent(req: AgentRequest, user=Depends(require_api_user)):
     messages = [message.model_dump() for message in req.messages]
     # 요약에 쓰인 페이지 범위(pages)가 있으면 원본도 같은 범위로 좁힌다(마커 기준; 없으면 전체).
     source = _filter_markdown_by_pages(req.source_markdown, req.pages) if req.source_markdown else ""
@@ -1198,7 +1198,9 @@ async def agent(req: AgentRequest, _user=Depends(require_api_user)):
         reference_context = f"다음 강의자료를 현재 대화의 참고 자료로 사용해.{note}\n\n[정리된 요약]\n{req.markdown}"
 
     return await _run_llm_call(
-        lambda: run_study_agent(req.model, messages, req.thread_id, source, reference_context),
+        lambda: run_study_agent(
+            req.model, messages, req.thread_id, source, reference_context, user_id=(user or {}).get("id")
+        ),
         fail_message="AI 튜터 응답 생성 중 오류가 발생했습니다.",
         log_message="/agent 실행 실패",
         handle_parse_errors=False,

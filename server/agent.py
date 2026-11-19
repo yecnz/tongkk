@@ -281,8 +281,11 @@ def run_study_agent(
     thread_id: str | None = None,
     source_markdown: str | None = None,
     reference_context: str | None = None,
+    user_id: str | None = None,
 ) -> dict[str, object]:
     current_thread_id = thread_id or str(uuid4())
+    # 체크포인트 키에 인증된 사용자 ID를 묶는다. 남의 thread_id를 알아도 다른 키라 그 대화 상태에 접근 불가.
+    checkpoint_key = f"{user_id or 'anonymous'}:{current_thread_id}"
     state: dict[str, object] = {
         "model": model,
         "messages": [_to_langchain_message(message) for message in messages],
@@ -294,7 +297,7 @@ def run_study_agent(
     if reference_context:
         state["reference_context"] = reference_context
     config = {
-        "configurable": {"thread_id": current_thread_id},
+        "configurable": {"thread_id": checkpoint_key},
         "recursion_limit": 8,
     }
     result = GRAPH.invoke(state, config)
