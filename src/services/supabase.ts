@@ -55,3 +55,39 @@ export const getSupabaseAuthHeader = async (): Promise<Record<string, string>> =
   const token = data.session?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
+
+// Storage는 폴더 개념이 없어 prefix 아래를 재귀로 훑어야 실제 파일 경로가 나온다.
+// (metadata가 있으면 파일, 없으면 하위 폴더)
+const listStorageFilePaths = async (bucket: string, prefix: string): Promise<string[]> => {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .list(prefix);
+
+  if (error) throw new Error(formatSupabaseError(error));
+
+  const paths: string[] = [];
+  for (const item of data || []) {
+    const itemPath = `${prefix}/${item.name}`;
+    if (item.metadata) {
+      paths.push(itemPath);
+      continue;
+    }
+
+    paths.push(...await listStorageFilePaths(bucket, itemPath));
+  }
+
+  return paths;
+};
+
+// prefix(예: `${userId}` 또는 `${userId}/${courseId}`) 아래 원본 파일을 모두 지운다.
+// DB row를 cascade로 지우면 파일을 가리킬 경로가 사라지므로, 그 전후로 반드시 함께 호출한다.
+export const deleteStoragePrefix = async (bucket: string, prefix: string): Promise<void> => {
+  const paths = await listStorageFilePaths(bucket, prefix);
+  if (paths.length === 0) return;
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .remove(paths);
+
+  if (error) throw new Error(formatSupabaseError(error));
+};

@@ -1,8 +1,8 @@
 import { createTtlCache, readThroughCache, SWR_STALE_TTL_MS } from './cache';
-import { invalidateMaterialsCache } from './materials';
+import { invalidateMaterialsCache, MATERIAL_STORAGE_BUCKET } from './materials';
 import { invalidateQuizSetsCache } from './quizSets';
 import { invalidateSummariesCache } from './summaries';
-import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
+import { deleteStoragePrefix, formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 
 export type CourseRecord = {
   id: string;
@@ -79,6 +79,7 @@ export async function updateCourse(courseId: string, name: string): Promise<Cour
 }
 
 export async function removeCourse(courseId: string): Promise<void> {
+  const user = await requireSupabaseUser();
   const { error } = await supabase
     .from('courses')
     .delete()
@@ -86,6 +87,15 @@ export async function removeCourse(courseId: string): Promise<void> {
 
   if (error) throw new Error(formatSupabaseError(error));
   invalidateCoursesCache();
+
+  // materials가 cascade로 함께 지워져 file_path를 아는 곳이 사라지므로, 과목 폴더를 통째로 비운다.
+  // 자료 개별 삭제와 같은 순서(DB 먼저 → Storage 마지막)이고, 실패해도 사용자에겐 삭제가 끝난
+  // 상태이므로 오류를 올리지 않는다(고아 파일만 남는다).
+  try {
+    await deleteStoragePrefix(MATERIAL_STORAGE_BUCKET, `${user.id}/${courseId}`);
+  } catch (storageError) {
+    console.warn('과목 자료 원본 파일 삭제 실패(고아 파일):', storageError);
+  }
   // 과목 삭제 시 서버에서 자료/요약/퀴즈가 함께 삭제되므로(cascade) 관련 캐시도 비운다.
   // courseId만 알고 캐시는 과목명 기준이라, 드문 작업인 만큼 해당 캐시를 전체 비운다.
   invalidateMaterialsCache();

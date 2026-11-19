@@ -1,9 +1,9 @@
 import type { User } from '@supabase/supabase-js';
 import { invalidateCoursesCache } from './courses';
-import { invalidateMaterialsCache } from './materials';
+import { invalidateMaterialsCache, MATERIAL_STORAGE_BUCKET } from './materials';
 import { invalidateQuizSetsCache } from './quizSets';
 import { invalidateSummariesCache } from './summaries';
-import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
+import { deleteStoragePrefix, formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 
 export type UserProfile = {
   nickname: string;
@@ -41,38 +41,6 @@ const toProfile = (row: ProfileRow): UserProfile => ({
   notificationsEnabled: row.notifications_enabled,
   hideSummaryNotice: row.hide_summary_notice,
 });
-
-const listStorageFilePaths = async (bucket: string, prefix: string): Promise<string[]> => {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .list(prefix);
-
-  if (error) throw new Error(formatSupabaseError(error));
-
-  const paths: string[] = [];
-  for (const item of data || []) {
-    const itemPath = `${prefix}/${item.name}`;
-    if (item.metadata) {
-      paths.push(itemPath);
-      continue;
-    }
-
-    paths.push(...await listStorageFilePaths(bucket, itemPath));
-  }
-
-  return paths;
-};
-
-const deleteStoragePrefix = async (bucket: string, prefix: string): Promise<void> => {
-  const paths = await listStorageFilePaths(bucket, prefix);
-  if (paths.length === 0) return;
-
-  const { error } = await supabase.storage
-    .from(bucket)
-    .remove(paths);
-
-  if (error) throw new Error(formatSupabaseError(error));
-};
 
 export async function loadUserProfile(): Promise<UserProfile> {
   const user = await requireSupabaseUser();
@@ -154,7 +122,7 @@ export async function uploadAvatar(file: File): Promise<string> {
 export async function deleteOwnAppData(): Promise<void> {
   const user = await requireSupabaseUser();
   await deleteStoragePrefix('avatars', user.id);
-  await deleteStoragePrefix('course-materials', user.id);
+  await deleteStoragePrefix(MATERIAL_STORAGE_BUCKET, user.id);
 
   const deletes = [
     () => supabase.from('dashboard_state').delete().eq('user_id', user.id),
