@@ -63,7 +63,7 @@ class SummarizeStreamRequest(SummarizeRequest):
 class AgentRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_MESSAGES)
     model: Literal["GPT", "Gemini"] = "GPT"
-    thread_id: str | None = None
+    thread_id: str | None = Field(default=None, max_length=64)
     markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
     source_markdown: str | None = Field(default=None, max_length=MAX_MARKDOWN_CHARS)
     pages: str | None = None
