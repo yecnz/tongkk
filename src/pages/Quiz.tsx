@@ -33,6 +33,7 @@ import {
 } from "../services/quizAttempts";
 import { inferWeakTopicFromQuestion } from "../services/statsHelpers";
 import { isShortAnswerCorrect } from "../services/answerMatch";
+import { saveResumePoint } from "../services/dashboardState";
 import {
   getFileMaterialId,
   loadCourseMaterialsFromServer,
@@ -575,6 +576,20 @@ export default function Quiz() {
     clearQuizDraft();
     setResumableDraft(null);
   }, [view]);
+
+  // 대시보드 "이어서 하기"용. 과목 화면으로 돌아오면 같은 탭에서는 "이어서 풀기"로 이어진다.
+  // ponytail: 풀이 진행(문항·답)은 sessionStorage 초안에만 있어 다른 기기에선 과목 화면까지만 복귀.
+  useEffect(() => {
+    if (!user || !selectedCourse || reviewMode || reviewActiveRef.current) return;
+    if (view !== "quiz" && view !== "result") return;
+    saveResumePoint({
+      route: "/quiz",
+      course: selectedCourse,
+      title: openedQuizTitle || selectedCourse,
+      activity: view === "quiz" ? "퀴즈 푸는 중" : "퀴즈 결과 보는 중",
+      state: { course: selectedCourse, fromDashboard: true },
+    });
+  }, [user, view, selectedCourse, reviewMode, openedQuizTitle]);
 
   // 과목 설정 화면의 "이어서 풀기" — 스냅샷 상태를 그대로 복원해 풀이 화면으로 진입한다.
   const resumeDraft = () => {

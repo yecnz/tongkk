@@ -9,7 +9,7 @@ import { useAuthGate } from "../AuthGateContext";
 import { useSampleDemo } from "../SampleDemoContext";
 import { useToast } from "../ToastContext";
 import type { PageRouteLabel } from "../common";
-import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
+import { loadDashboardState, saveDashboardState, type ResumePoint } from "../services/dashboardState";
 import { loadCourseMaterialsFromServer, countCourseMaterialsFromServer, deleteCourseMaterialFromServer, type CourseMaterial } from "../services/materials";
 import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmModal";
 import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
@@ -742,6 +742,19 @@ export default function Dashboard() {
     saveDashboardState("plans", plans).catch(console.warn);
   }, [dashboardStateLoaded, plans]);
 
+  const [resumePoint, setResumePoint] = useState<ResumePoint | null>(null);
+  useEffect(() => {
+    let ignore = false;
+    if (!user) {
+      setResumePoint(null);
+      return () => { ignore = true; };
+    }
+    loadDashboardState<ResumePoint | null>("resume", null)
+      .then(next => { if (!ignore) setResumePoint(next); })
+      .catch(error => console.warn("이어서 하기 불러오기 실패", error));
+    return () => { ignore = true; };
+  }, [user]);
+
   useEffect(() => {
     let ignore = false;
     if (!user) {
@@ -1257,6 +1270,20 @@ export default function Dashboard() {
           <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
             {startHint}
           </p>
+          {resumePoint && courses.includes(resumePoint.course) && (
+            <button
+              type="button"
+              onClick={() => navigate(resumePoint.route, { state: resumePoint.state })}
+              className="mt-4 flex w-full items-center justify-between gap-3 rounded-[14px] border border-cyan bg-cyan px-5 py-4 text-left cursor-pointer hover:opacity-90"
+            >
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs font-bold text-white/80">이어서 하기 · {resumePoint.course}</span>
+                <span className="truncate text-base font-extrabold text-white">{resumePoint.title}</span>
+                <span className="text-xs font-semibold text-white/80">{resumePoint.activity}</span>
+              </span>
+              <span aria-hidden className="shrink-0 text-xl font-extrabold text-white">→</span>
+            </button>
+          )}
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
