@@ -43,6 +43,7 @@ import { AITutorDrawer } from "../components/AITutorDrawer";
 import { PdfViewer } from "../components/PdfViewer";
 import { createPdfPreviewFromUrl } from "../services/documentPreview";
 import { fetchMaterialFile } from "../services/materialFileCache";
+import { saveResumePoint } from "../services/dashboardState";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
@@ -3570,6 +3571,29 @@ export default function Summary() {
     // searchParams/setSearchParams는 비교·갱신용이며 stable하므로 의존성에서 제외한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, selectedCourse, activeMaterial?.id, activeMaterialTab, activeSummaryId, selectedTemplate, selectedMaterialIds]);
+
+  // 대시보드 "이어서 하기"용으로 마지막에 보던 자료·요약을 저장한다(같은 값이면 저장 생략).
+  useEffect(() => {
+    if (!user || !selectedCourse) return;
+    if (view === "materialDetail" && activeMaterial) {
+      const tabLabel = { original: "자료 보는 중", summary: "요약 보는 중", quiz: "퀴즈 기록 보는 중" }[activeMaterialTab];
+      saveResumePoint({
+        route: "/summary",
+        course: selectedCourse,
+        title: activeMaterial.name,
+        activity: tabLabel,
+        state: { selectedCourse, fromDashboard: true, viewMaterial: true, materialId: activeMaterial.id, materialDetailTab: activeMaterialTab },
+      });
+    } else if (view === "summaryResult" && activeSummaryId && selectedTemplate) {
+      saveResumePoint({
+        route: "/summary",
+        course: selectedCourse,
+        title: activeMaterial?.name || selectedCourse,
+        activity: `${templateLabels[selectedTemplate]} 요약 보는 중`,
+        state: { selectedCourse, fromDashboard: true, openSummary: true, summaryId: activeSummaryId, summaryTemplate: selectedTemplate, materialIds: selectedMaterialIds },
+      });
+    }
+  }, [user, view, selectedCourse, activeMaterial, activeMaterialTab, activeSummaryId, selectedTemplate, selectedMaterialIds]);
 
   const updateUploadStatus = (file: File, nextStatus: Omit<UploadFileStatus, "id" | "name" | "file">) => {
     setUploadStatuses(prev => upsertUploadStatus(prev, {

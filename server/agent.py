@@ -1,4 +1,6 @@
 import os
+import threading
+from collections import OrderedDict
 from typing import Annotated, Literal
 from uuid import uuid4
 
@@ -210,7 +212,24 @@ def _build_graph():
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", END: END})
     builder.add_edge("tools", "agent")
-    return builder.compile(checkpointer=InMemorySaver())
+    return builder.compile(checkpointer=CHECKPOINTER)
+
+
+# ponytail: 프로세스 메모리 LRU라 서버 재시작 시 대화 맥락이 끊김. 다중 인스턴스 배포 시 SQLite/Postgres 체크포인터로 교체.
+CHECKPOINTER = InMemorySaver()
+MAX_THREADS = _env_int("AGENT_MAX_THREADS", 500)
+_recent_threads: OrderedDict[str, None] = OrderedDict()
+_threads_lock = threading.Lock()
+
+
+def _touch_thread(key: str) -> None:
+    """최근 사용 대화로 표시하고, 상한을 넘으면 가장 오래된 대화의 체크포인트를 지운다."""
+    with _threads_lock:
+        _recent_threads[key] = None
+        _recent_threads.move_to_end(key)
+        while len(_recent_threads) > MAX_THREADS:
+            oldest, _ = _recent_threads.popitem(last=False)
+            CHECKPOINTER.delete_thread(oldest)
 
 
 GRAPH = _build_graph()
@@ -300,6 +319,7 @@ def run_study_agent(
         "configurable": {"thread_id": checkpoint_key},
         "recursion_limit": 8,
     }
+    _touch_thread(checkpoint_key)
     result = GRAPH.invoke(state, config)
     result_messages = result["messages"]
     return {

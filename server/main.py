@@ -1258,6 +1258,9 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
     return {"questions": questions}
 
 
+SUBJECTIVE_PASS_SCORE = 70
+
+
 @app.post("/quiz/grade-subjective")
 async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(require_api_user)):
     markdown_section = f"\n[강의자료]\n{req.markdown}\n" if req.markdown else ""
@@ -1274,12 +1277,12 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
 {markdown_section}
 출력은 순수 JSON 객체만 사용해.
 형식:
-{{"score": 0부터 100까지 정수, "is_correct": true 또는 false, "feedback": "학생에게 줄 짧은 피드백", "reference_answer": "보완된 모범답안"}}
+{{"score": 0부터 100까지 정수, "feedback": "학생에게 줄 짧은 피드백", "reference_answer": "보완된 모범답안"}}
 
 채점 기준:
 - 핵심 개념이 맞으면 표현이 달라도 인정한다.
 - 자료와 모범답안에 없는 사실을 학생 답안의 정답 근거로 추가하지 않는다.
-- 70점 이상이면 is_correct를 true로 둔다.
+- 70점 이상은 정답, 미만은 오답으로 처리되니 점수만 정확히 매긴다.
 - feedback은 부족한 부분과 다음 복습 포인트를 2문장 이내로 알려준다."""
 
     def _call_llm():
@@ -1293,12 +1296,12 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
         raw_score = parsed.get("score", 0)
         score = raw_score if isinstance(raw_score, (int, float)) and not isinstance(raw_score, bool) else 0
         score = max(0, min(100, int(round(score))))
-        raw_is_correct = parsed.get("is_correct")
         feedback = parsed.get("feedback")
         reference_answer = parsed.get("reference_answer")
         return {
             "score": score,
-            "is_correct": raw_is_correct if isinstance(raw_is_correct, bool) else score >= 70,
+            # 정답 판정은 점수에서만 도출해 점수와 어긋나지 않게 한다(#93).
+            "is_correct": score >= SUBJECTIVE_PASS_SCORE,
             "feedback": feedback if isinstance(feedback, str) and feedback.strip() else "채점 결과를 확인했습니다.",
             "reference_answer": reference_answer if isinstance(reference_answer, str) and reference_answer.strip() else req.reference_answer,
         }
