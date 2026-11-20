@@ -135,7 +135,6 @@ export async function gradeSubjectiveAnswer(
 
     const data = await response.json() as {
       score?: unknown;
-      is_correct?: unknown;
       feedback?: unknown;
       reference_answer?: unknown;
     };
@@ -145,7 +144,7 @@ export async function gradeSubjectiveAnswer(
 
     return {
       score,
-      isCorrect: typeof data.is_correct === 'boolean' ? data.is_correct : score >= 70,
+      isCorrect: score >= 70, // 서버와 같은 기준. 점수와 판정이 어긋나지 않게 점수에서만 도출
       feedback: typeof data.feedback === 'string' ? data.feedback : '채점 결과를 확인했습니다.',
       referenceAnswer: typeof data.reference_answer === 'string' ? data.reference_answer : referenceAnswer,
     };
