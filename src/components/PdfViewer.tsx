@@ -4,6 +4,7 @@ import {
   getDocument,
   setLayerDimensions,
   TextLayer,
+  type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
   type RenderTask,
 } from "pdfjs-dist";
@@ -45,6 +46,7 @@ export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
     let cancelled = false;
     const controller = new AbortController();
     let loaded: PDFDocumentProxy | null = null;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
 
     setStatus("loading");
     setErrorMsg("");
@@ -55,16 +57,14 @@ export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
         const blob = await fetchMaterialFile(url, { cacheKey, signal: controller.signal });
         const data = await blob.arrayBuffer();
         if (cancelled) return;
-        loaded = await getDocument({
+        loadingTask = getDocument({
           data,
           cMapUrl: PDFJS_CMAP_URL,
           cMapPacked: true,
           standardFontDataUrl: PDFJS_FONTS_URL,
-        }).promise;
-        if (cancelled) {
-          void loaded.destroy();
-          return;
-        }
+        });
+        loaded = await loadingTask.promise;
+        if (cancelled) return;
         setPdf(loaded);
         setStatus("ready");
       } catch (err) {
@@ -77,7 +77,7 @@ export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
     return () => {
       cancelled = true;
       controller.abort();
-      void loaded?.destroy();
+      void loadingTask?.destroy();
     };
   }, [url, cacheKey]);
 

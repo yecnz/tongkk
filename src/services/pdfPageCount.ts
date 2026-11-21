@@ -12,7 +12,7 @@ export async function getPdfPageCount(file: File): Promise<number | null> {
     try {
       return pdf.numPages;
     } finally {
-      await pdf.destroy();
+      await loadingTask.destroy();
     }
   } catch {
     return null;
