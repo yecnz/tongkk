@@ -14,6 +14,8 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import InjectedState, ToolNode, tools_condition
 from typing_extensions import NotRequired, TypedDict
 
+from llm import _strip_foreign_script
+
 
 AgentModel = Literal["GPT", "Gemini"]
 
@@ -288,7 +290,7 @@ def _messages_for_client(messages: list[BaseMessage]) -> list[dict[str, str]]:
 def _latest_answer(messages: list[BaseMessage]) -> str:
     for message in reversed(messages):
         if isinstance(message, AIMessage):
-            content = _content_to_text(message.content).strip()
+            content = _strip_foreign_script(_content_to_text(message.content)).strip()
             if content:
                 return content
     raise RuntimeError("Agent가 빈 응답을 반환했습니다.")

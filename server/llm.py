@@ -5,6 +5,7 @@ main.py에서 분리(Stage 6a). LLM 출력(JSON 문자열)을 안전하게 파�
 logging.getLogger("tongkk")은 이름이 같으면 동일 로거 인스턴스라 main과 같은 로거를 쓴다.
 """
 import json
+import re
 import logging
 
 from fastapi import HTTPException
@@ -15,9 +16,24 @@ from prompts import STUDY_PLAN_MODEL
 logger = logging.getLogger("tongkk")
 
 
+# LLM이 한국어 문장 중간에 아랍어 등 엉뚱한 문자를 섞는 경우가 있다(#60, 예: "고객 ذهن속에").
+# 강의자료에 거의 나오지 않는 문자권만 지운다. 한자·그리스 문자(수식)·키릴 문자는 정상 자료에 나올 수 있어 남긴다.
+# ponytail: 문자권 블랙리스트, 해당 언어 강의를 지원하게 되면 과목 언어 설정으로 끄기.
+_FOREIGN_SCRIPT_RE = re.compile(
+    "[\u0590-\u05FF"  # 히브리어
+    "\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF"  # 아랍어
+    "\u0900-\u097F"  # 데바나가리
+    "\u0E00-\u0E7F]+"  # 태국어
+)
+
+
+def _strip_foreign_script(text: str) -> str:
+    return _FOREIGN_SCRIPT_RE.sub("", text)
+
+
 def _message_content_to_text(content) -> str:
     if isinstance(content, str):
-        return content
+        return _strip_foreign_script(content)
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
@@ -25,8 +41,8 @@ def _message_content_to_text(content) -> str:
                 parts.append(item["text"])
             elif isinstance(item, str):
                 parts.append(item)
-        return "\n".join(parts)
-    return str(content)
+        return _strip_foreign_script("\n".join(parts))
+    return _strip_foreign_script(str(content))
 
 
 def _strip_markdown_code_fence(text: str) -> str:

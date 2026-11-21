@@ -268,3 +268,16 @@ class TestNoContentSection:
 
     def test_real_content_preserved(self):
         assert not main._is_no_content_section("## 라벨\n유의미한 학습 내용 없음이라 보기 어렵고 CNN 설명 있음")
+
+
+class TestStripForeignScript:
+    def test_removes_arabic_in_korean_sentence(self):
+        # #60 실제 사례
+        assert main._message_content_to_text("고객 ذهن속에 심는 과정") == "고객 속에 심는 과정"
+
+    def test_keeps_korean_english_hanja_greek_math(self):
+        text = "포지셔닝(Positioning) 漢字 $\\alpha + β$ 는 옳다."
+        assert main._message_content_to_text(text) == text
+
+    def test_list_content(self):
+        assert main._message_content_to_text([{"text": "가ไทย나"}]) == "가나"
