@@ -12,3 +12,8 @@ def test_oldest_thread_evicted(monkeypatch):
 
     assert deleted == ["b"]  # a는 다시 사용돼 최신, b가 가장 오래됨
     assert list(agent._recent_threads) == ["a", "c"]
+
+
+def test_thread_exists_only_with_checkpoint():
+    # 서버 재시작 직후처럼 체크포인트가 없으면 False → /agent가 409로 히스토리 재전송을 요구한다.
+    assert not agent.thread_exists("u1", "missing-thread")

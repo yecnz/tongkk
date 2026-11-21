@@ -217,7 +217,7 @@ def _build_graph():
     return builder.compile(checkpointer=CHECKPOINTER)
 
 
-# ponytail: 프로세스 메모리 LRU라 서버 재시작 시 대화 맥락이 끊김. 다중 인스턴스 배포 시 SQLite/Postgres 체크포인터로 교체.
+# ponytail: 프로세스 메모리 LRU라 서버 재시작 시 체크포인트가 사라짐(/agent가 409로 알리면 프론트가 히스토리 재전송). 다중 인스턴스 배포 시 SQLite/Postgres 체크포인터로 교체.
 CHECKPOINTER = InMemorySaver()
 MAX_THREADS = _env_int("AGENT_MAX_THREADS", 500)
 _recent_threads: OrderedDict[str, None] = OrderedDict()
@@ -232,6 +232,12 @@ def _touch_thread(key: str) -> None:
         while len(_recent_threads) > MAX_THREADS:
             oldest, _ = _recent_threads.popitem(last=False)
             CHECKPOINTER.delete_thread(oldest)
+
+
+def thread_exists(user_id: str | None, thread_id: str) -> bool:
+    """서버 재시작·LRU 삭제로 체크포인트가 사라졌는지 확인한다(사라졌으면 프론트가 히스토리를 재전송해야 함)."""
+    key = f"{user_id or 'anonymous'}:{thread_id}"
+    return CHECKPOINTER.get_tuple({"configurable": {"thread_id": key}}) is not None
 
 
 GRAPH = _build_graph()

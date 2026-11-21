@@ -22,6 +22,9 @@ type AgentApiResponse = {
   messages?: AgentMessage[];
 };
 
+// 서버 재시작 등으로 백엔드의 대화 상태가 사라졌을 때(409). 호출부가 전체 히스토리로 다시 보내야 한다.
+export class AgentThreadExpiredError extends Error {}
+
 export async function sendAgentMessage(
   threadId: string,
   messages: AgentMessage[],
@@ -40,6 +43,9 @@ export async function sendAgentMessage(
       signal: controller.signal,
     });
 
+    if (response.status === 409 && threadId) {
+      throw new AgentThreadExpiredError('thread_expired');
+    }
     if (!response.ok) {
       throw new Error(await parseApiError(response));
     }
