@@ -5,6 +5,7 @@ import { invalidateMaterialsCache } from "./services/materials";
 import { invalidateQuizSetsCache } from "./services/quizSets";
 import { invalidateSummariesCache } from "./services/summaries";
 import { supabase } from "./services/supabase";
+import { BACKEND_URL, parseApiError } from "./services/backend";
 
 type AuthContextValue = {
   user: User | null;
@@ -76,7 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     loading,
     signIn: async (email, password) => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const response = await fetch(`${BACKEND_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) throw new Error(await parseApiError(response));
+      const tokens = await response.json() as { access_token?: string; refresh_token?: string };
+      if (!tokens.access_token || !tokens.refresh_token) {
+        throw new Error("로그인 토큰을 받지 못했습니다.");
+      }
+      const { error } = await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      });
       if (error) throw error;
     },
     signUp: async (email, password) => {

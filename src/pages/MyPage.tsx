@@ -93,7 +93,7 @@ const ProfileEditModal = ({ nickname, avatarUrl, school, department, onSave, onC
               borderRadius: "50%", background: PINK, display: "flex", alignItems: "center", justifyContent: "center",
               border: "2px solid var(--color-on-brand)", color: "var(--color-on-brand)", fontSize: 13
             }}>✎</div>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
+            <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.gif" onChange={handleFile} style={{ display: "none" }} />
           </div>
         </div>
         <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 6, display: "block" }}>닉네임</label>

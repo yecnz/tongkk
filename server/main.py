@@ -1,9 +1,11 @@
 import json
+import io
 import logging
 import os
 import re
 import base64
 import hashlib
+import sqlite3
 import posixpath
 import zipfile
 import shutil
@@ -21,6 +23,11 @@ from config import (
     PROJECT_DIR,
     FRONTEND_ORIGIN,
     ALLOWED_ORIGINS,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    SUPABASE_PLACEHOLDER_VALUES,
+    LOGIN_MAX_FAILURES,
+    LOGIN_LOCK_SECONDS,
     GOOGLE_VISION_API_KEY,
     _env_int,
     VISUAL_ANALYSIS_MODE,
@@ -45,7 +52,7 @@ from config import (
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 
@@ -73,6 +80,7 @@ from prompts import (
     _quiz_user_focus_section,
 )
 from schemas import (
+    LoginRequest,
     SummarizeRequest,
     SummarizeStreamRequest,
     AgentRequest,
@@ -93,6 +101,7 @@ from llm import (
     _run_llm_call,
 )
 from auth import require_api_user
+import login_attempts
 
 
 app = FastAPI()
@@ -109,6 +118,78 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+
+@app.post("/auth/login")
+async def login_with_password(payload: LoginRequest):
+    """앱 로그인 경로에서 계정별 실패를 5회로 제한한 뒤 Supabase Auth에 위임한다."""
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise HTTPException(status_code=503, detail="서버 인증 설정이 누락되었습니다.")
+    if SUPABASE_URL in SUPABASE_PLACEHOLDER_VALUES:
+        raise HTTPException(status_code=503, detail="백엔드 Supabase URL이 실제 프로젝트 주소로 설정되지 않았습니다.")
+
+    key = login_attempts.account_key(payload.email)
+    try:
+        retry_after = await run_in_threadpool(login_attempts.retry_after_seconds, key)
+    except sqlite3.Error as exc:
+        logger.exception("로그인 실패 제한 DB 조회 실패")
+        raise HTTPException(status_code=503, detail="로그인 보안 확인에 실패했습니다. 잠시 후 다시 시도해주세요.") from exc
+    if retry_after > 0:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": f"로그인 실패가 {LOGIN_MAX_FAILURES}회 누적되었습니다. {max(1, (retry_after + 59) // 60)}분 후 다시 시도해주세요."},
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(
+                f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+                headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
+                json={"email": payload.email.strip(), "password": payload.password},
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="인증 서버에 연결할 수 없습니다.") from exc
+
+    if response.status_code == 200:
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=502, detail="인증 서버 응답을 읽을 수 없습니다.") from exc
+        access_token = data.get("access_token") if isinstance(data, dict) else None
+        refresh_token = data.get("refresh_token") if isinstance(data, dict) else None
+        if not isinstance(access_token, str) or not isinstance(refresh_token, str):
+            raise HTTPException(status_code=502, detail="인증 서버가 로그인 토큰을 반환하지 않았습니다.")
+        try:
+            await run_in_threadpool(login_attempts.clear_failures, key)
+        except sqlite3.Error as exc:
+            logger.exception("로그인 실패 제한 DB 초기화 실패")
+            raise HTTPException(status_code=503, detail="로그인 보안 상태 초기화에 실패했습니다.") from exc
+        return JSONResponse(
+            content={
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    if response.status_code in {400, 401}:
+        try:
+            retry_after = await run_in_threadpool(login_attempts.record_failure, key)
+        except sqlite3.Error as exc:
+            logger.exception("로그인 실패 제한 DB 기록 실패")
+            raise HTTPException(status_code=503, detail="로그인 보안 기록에 실패했습니다.") from exc
+        if retry_after > 0:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": f"로그인에 {LOGIN_MAX_FAILURES}회 실패해 {max(1, LOGIN_LOCK_SECONDS // 60)}분 동안 잠겼습니다."},
+                headers={"Retry-After": str(retry_after)},
+            )
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+
+    if response.status_code == 429:
+        raise HTTPException(status_code=429, detail="로그인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.")
+    raise HTTPException(status_code=502, detail="인증 서버 응답을 처리할 수 없습니다.")
+
 md_converter = MarkItDown()
 
 
@@ -124,6 +205,81 @@ MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_DOCUMENT_BYTES = _env_int("MAX_DOCUMENT_BYTES", 100 * 1024 * 1024)
 # zip 기반 파일(PPTX 등)의 압축 해제 총량 상한(zip bomb 방어).
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = _env_int("MAX_ARCHIVE_UNCOMPRESSED_BYTES", 200 * 1024 * 1024)
+MAX_ARCHIVE_FILES = _env_int("MAX_ARCHIVE_FILES", 10_000)
+MAX_IMAGE_PIXELS = _env_int("MAX_IMAGE_PIXELS", 40_000_000)
+
+_IMAGE_FORMAT_BY_EXTENSION = {
+    ".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP",
+    ".gif": "GIF", ".bmp": "BMP", ".tif": "TIFF", ".tiff": "TIFF",
+}
+_OLE_COMPOUND_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
+
+
+async def _read_upload_limited(file: UploadFile, limit: int, detail: str) -> bytes:
+    """상한+1바이트까지만 읽어 대용량 요청을 메모리에 전부 올리지 않는다."""
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail=detail)
+    if not data:
+        raise HTTPException(status_code=400, detail="업로드한 파일이 비어 있습니다.")
+    return data
+
+
+def _validate_archive(file_bytes: bytes, suffix: str) -> None:
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            infos = archive.infolist()
+            if len(infos) > MAX_ARCHIVE_FILES:
+                raise HTTPException(status_code=413, detail="압축 문서의 내부 파일 수가 너무 많습니다.")
+            if sum(info.file_size for info in infos) > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+                raise HTTPException(status_code=413, detail="압축 해제된 문서 크기가 허용 한도를 초과합니다.")
+            if any(
+                info.filename.startswith(("/", "\\"))
+                or ".." in info.filename.replace("\\", "/").split("/")
+                for info in infos
+            ):
+                raise HTTPException(status_code=400, detail="압축 문서에 안전하지 않은 경로가 포함되어 있습니다.")
+            names = {info.filename for info in infos}
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise HTTPException(status_code=400, detail="파일 확장자와 실제 문서 형식이 일치하지 않습니다.") from exc
+
+    required = "ppt/presentation.xml" if suffix == ".pptx" else "word/document.xml"
+    if required not in names or "[Content_Types].xml" not in names:
+        raise HTTPException(status_code=400, detail="파일 확장자와 실제 문서 형식이 일치하지 않습니다.")
+
+
+def _validate_upload_content(file_bytes: bytes, suffix: str) -> None:
+    """파일명/MIME 선언이 아니라 실제 시그니처와 컨테이너 구조를 검사한다."""
+    if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+        from PIL import Image, UnidentifiedImageError
+
+        try:
+            with Image.open(io.BytesIO(file_bytes)) as image:
+                actual_format = image.format
+                if image.width * image.height > MAX_IMAGE_PIXELS:
+                    raise HTTPException(status_code=413, detail="이미지 해상도가 허용 한도를 초과합니다.")
+                image.verify()
+        except Image.DecompressionBombError as exc:
+            raise HTTPException(status_code=413, detail="이미지 해상도가 허용 한도를 초과합니다.") from exc
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="유효한 이미지 파일이 아닙니다.") from exc
+        if actual_format != _IMAGE_FORMAT_BY_EXTENSION[suffix]:
+            raise HTTPException(status_code=400, detail="파일 확장자와 실제 이미지 형식이 일치하지 않습니다.")
+        return
+
+    if suffix == ".pdf":
+        if b"%PDF-" not in file_bytes[:1024]:
+            raise HTTPException(status_code=400, detail="파일 확장자와 실제 PDF 형식이 일치하지 않습니다.")
+        return
+    if suffix == ".ppt":
+        if not file_bytes.startswith(_OLE_COMPOUND_SIGNATURE):
+            raise HTTPException(status_code=400, detail="파일 확장자와 실제 PPT 형식이 일치하지 않습니다.")
+        return
+    if suffix in {".pptx", ".docx"}:
+        _validate_archive(file_bytes, suffix)
+        return
+
+    raise HTTPException(status_code=400, detail="지원하지 않는 파일 형식입니다.")
 
 
 def _find_office_binary() -> str | None:
@@ -839,15 +995,19 @@ async def convert_document_to_markdown(
     if suffix not in SUPPORTED_CONVERT_EXTENSIONS:
         raise HTTPException(status_code=400, detail="PDF, PPT/PPTX, DOCX, 이미지 파일만 지원합니다.")
 
-    file_bytes = await file.read()
     if suffix in SUPPORTED_IMAGE_EXTENSIONS:
-        if len(file_bytes) > MAX_OCR_IMAGE_BYTES:
-            raise HTTPException(status_code=413, detail="이미지 파일은 10MB 이하만 OCR할 수 있습니다.")
-    elif len(file_bytes) > MAX_DOCUMENT_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"문서 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 변환할 수 있습니다.",
+        file_bytes = await _read_upload_limited(
+            file,
+            MAX_OCR_IMAGE_BYTES,
+            "이미지 파일은 10MB 이하만 OCR할 수 있습니다.",
         )
+    else:
+        file_bytes = await _read_upload_limited(
+            file,
+            MAX_DOCUMENT_BYTES,
+            f"문서 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 변환할 수 있습니다.",
+        )
+    _validate_upload_content(file_bytes, suffix)
 
     # 전역(사용자 무관) 캐시: 같은 수업 수강생들이 바이트 동일 강의자료를 올리는 구조라
     # 해시 캐시 적중률이 높다. SQLite I/O는 threadpool로 감싸 이벤트 루프를 막지 않는다.
@@ -930,14 +1090,12 @@ async def convert_document_to_pdf_preview(
     if suffix not in SUPPORTED_PREVIEW_EXTENSIONS:
         raise HTTPException(status_code=400, detail="PDF, PPT/PPTX, DOCX 파일만 미리보기를 지원합니다.")
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="미리보기 파일이 비어 있습니다.")
-    if len(file_bytes) > MAX_DOCUMENT_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"미리보기 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 지원합니다.",
-        )
+    file_bytes = await _read_upload_limited(
+        file,
+        MAX_DOCUMENT_BYTES,
+        f"미리보기 파일은 {MAX_DOCUMENT_BYTES // (1024 * 1024)}MB 이하만 지원합니다.",
+    )
+    _validate_upload_content(file_bytes, suffix)
 
     if suffix == ".pdf":
         return Response(
@@ -992,11 +1150,15 @@ async def extract_text_with_google_vision(
     if content_type not in SUPPORTED_OCR_MIME_TYPES:
         raise HTTPException(status_code=400, detail="이미지 OCR은 JPG, PNG, WEBP, GIF, BMP, TIFF 파일만 지원합니다.")
 
-    image_bytes = await file.read()
-    if not image_bytes:
-        raise HTTPException(status_code=400, detail="이미지 파일이 비어 있습니다.")
-    if len(image_bytes) > MAX_OCR_IMAGE_BYTES:
-        raise HTTPException(status_code=413, detail="이미지 파일은 10MB 이하만 OCR할 수 있습니다.")
+    image_bytes = await _read_upload_limited(
+        file,
+        MAX_OCR_IMAGE_BYTES,
+        "이미지 파일은 10MB 이하만 OCR할 수 있습니다.",
+    )
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in SUPPORTED_IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="지원하지 않는 이미지 확장자입니다.")
+    _validate_upload_content(image_bytes, suffix)
 
     payload = {
         "requests": [

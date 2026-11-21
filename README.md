@@ -138,6 +138,9 @@ npm run dev
 | --- | --- | --- |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS 허용 프론트엔드 주소 |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | — | 호출자 로그인 토큰 검증용 (둘 다 비우면 인증 비활성화) |
+| `LOGIN_MAX_FAILURES` | `5` | 계정별 연속 로그인 실패 허용 횟수 |
+| `LOGIN_LOCK_SECONDS` | `900` | 실패 한도 도달 후 로그인 잠금 시간(초) |
+| `LOGIN_ATTEMPTS_DB_PATH` | `server/login_attempts.sqlite3` | 로그인 실패 상태 SQLite 경로(운영에서는 영속 볼륨 권장) |
 | `OPENAI_API_KEY` | — | GPT 요약/튜터/퀴즈/채점/학습 계획 |
 | `OPENAI_MODEL` | `gpt-5.4-mini` | OpenAI 모델명 |
 | `OPENAI_MAX_TOKENS` | `8192` | OpenAI 출력 토큰 한도 |
@@ -145,6 +148,7 @@ npm run dev
 | `GEMINI_MODEL` | `gemini-3.1-flash-lite-preview` | Gemini 모델명 |
 | `GEMINI_MAX_OUTPUT_TOKENS` | `8192` | Gemini 출력 토큰 한도 |
 | `GOOGLE_VISION_API_KEY` | — | `/vision/ocr` 이미지 OCR |
+| `MAX_IMAGE_PIXELS` | `40000000` | 업로드 이미지 최대 픽셀 수(압축 폭탄 방어) |
 | `SUMMARY_MAX_TOKENS` | `32768` | 요약 출력 토큰 한도(장문 자료 대응) |
 | `VISUAL_ANALYSIS_MODE` | `auto` | `auto`/`always`/`off` — 자료 이미지 비전 분석 여부 |
 | `VISUAL_ANALYSIS_MODEL` | `GPT` | 비전 분석에 쓸 모델(`GPT`/`Gemini`) |
@@ -159,11 +163,14 @@ npm run dev
 
 ## API 엔드포인트
 
-`/health`를 제외한 모든 엔드포인트는 Supabase 로그인 토큰(`Authorization: Bearer`)을 요구합니다.
+`/health`와 `/auth/login`을 제외한 모든 엔드포인트는 Supabase 로그인 토큰(`Authorization: Bearer`)을 요구합니다.
+
+> `/auth/login`은 계정별 실패를 서버에서 기록해 기본 5회 실패 시 15분간 잠급니다. Supabase의 공개 Auth API 자체도 보호하도록 운영 프로젝트의 **Authentication → Rate Limits**와 CAPTCHA를 함께 설정해야 합니다.
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/health` | 서버 상태 확인 |
+| `POST` | `/auth/login` | 비밀번호 로그인(실패 횟수 제한 후 Supabase Auth 위임) |
 | `POST` | `/convert` | PDF·PPT/PPTX·이미지 → Markdown (텍스트 추출 + 비전 분석/OCR) |
 | `POST` | `/preview/pdf` | PDF·PPT/PPTX → PDF 미리보기 바이트(PPT는 LibreOffice 변환) |
 | `POST` | `/vision/ocr` | 이미지 → Google Vision 텍스트 |
