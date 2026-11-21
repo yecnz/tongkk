@@ -20,6 +20,7 @@ import {
   deleteSummaryById,
   loadSummariesFromServer,
   saveSummaryToServer,
+  sameSummaryOptions,
   type SavedSummary,
 } from "../services/summaries";
 import { deleteQuizSetById, loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
@@ -4044,8 +4045,10 @@ export default function Summary() {
             createdAt: Date.now(),
             materialIds: generatedMaterialIds,
             materialNames: selectedMaterialNames,
+            pageRange: opts?.pageRange,
+            focusPrompt: opts?.focusPrompt,
           };
-          // 같은 자료·템플릿 조합이면 서버가 기존 요약을 덮어쓴다(upsert) — 생성 전 확인 모달에서 안내한다.
+          // 같은 자료·템플릿·페이지 범위·추가 지시면 서버가 기존 요약을 덮어쓴다(upsert) — 생성 전 확인 모달에서 안내한다.
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
           setActiveSummaryId(persistedSummary.id || null);
           persistedId = persistedSummary.id;
@@ -4108,19 +4111,19 @@ export default function Summary() {
     }
   };
 
-  // 설정 화면 하단 "요약 생성하기". 같은 자료·템플릿 요약이 이미 있으면 서버가 덮어쓰므로,
-  // 생성 전에 "기존 요약 보기 / 새로 생성"을 먼저 묻는다.
+  // 설정 화면 하단 "요약 생성하기". 같은 자료·템플릿·페이지 범위·추가 지시 요약이 이미 있으면
+  // 서버가 덮어쓰므로, 생성 전에 "기존 요약 보기 / 새로 생성"을 먼저 묻는다.
+  const settingsSummaryOptions = { pageRange: selectedHasPageMarkers ? summaryPageRange : "", focusPrompt: summaryFocusPrompt };
   const startSummaryFromSettings = () => {
-    void handleTemplateSelect(
-      summaryTemplate,
-      { pageRange: selectedHasPageMarkers ? summaryPageRange : "", focusPrompt: summaryFocusPrompt },
-      "upload",
-    );
+    void handleTemplateSelect(summaryTemplate, settingsSummaryOptions, "upload");
   };
 
   const handleGenerateFromSettings = () => {
     const existing = summaries
-      .filter(item => item.template === summaryTemplate && sameMaterialIds(item.materialIds, selectedMaterialIds))
+      .filter(item =>
+        item.template === summaryTemplate
+        && sameMaterialIds(item.materialIds, selectedMaterialIds)
+        && sameSummaryOptions(item, settingsSummaryOptions))
       .sort((a, b) => b.createdAt - a.createdAt)[0];
     if (existing?.content) {
       setDuplicateSummaryPrompt(existing);
@@ -4264,7 +4267,7 @@ export default function Summary() {
               이미 만든 요약이 있어요
             </h3>
             <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "var(--color-text)", wordBreak: "keep-all" }}>
-              같은 자료의 <b style={{ color: "var(--color-text-strong)" }}>{templateLabels[duplicateSummaryPrompt.template]}</b> 요약을{" "}
+              같은 자료·같은 설정의 <b style={{ color: "var(--color-text-strong)" }}>{templateLabels[duplicateSummaryPrompt.template]}</b> 요약을{" "}
               {formatHubDate(duplicateSummaryPrompt.createdAt)}에 만들었어요.
               새로 생성하면 <b style={{ color: "var(--color-text-strong)" }}>기존 요약을 덮어쓰게 돼요</b>.
             </p>

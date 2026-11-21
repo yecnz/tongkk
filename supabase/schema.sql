@@ -33,10 +33,28 @@ create table if not exists public.summaries (
   template text not null check (template in ('GENERAL', 'LECTURE_NOTE', 'MINDMAP', 'CHEAT_SHEET')),
   content text not null,
   material_ids text[] not null default '{}',
+  page_range text not null default '',
+  focus_prompt text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (course_id, template, material_ids)
+  constraint summaries_dedup_key unique (course_id, template, material_ids, page_range, focus_prompt)
 );
+
+-- 페이지 범위·추가 지시가 다르면 다른 요약으로 본다(#92). 기존 DB 마이그레이션.
+alter table public.summaries
+add column if not exists page_range text not null default '';
+
+alter table public.summaries
+add column if not exists focus_prompt text not null default '';
+
+alter table public.summaries
+drop constraint if exists summaries_course_id_template_material_ids_key;
+
+alter table public.summaries
+drop constraint if exists summaries_dedup_key;
+
+alter table public.summaries
+add constraint summaries_dedup_key unique (course_id, template, material_ids, page_range, focus_prompt);
 
 alter table public.materials
 add column if not exists file_path text;
