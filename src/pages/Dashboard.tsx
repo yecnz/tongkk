@@ -15,6 +15,7 @@ import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmM
 import { loadSummariesFromServer, countSummariesFromServer, type SavedSummary } from "../services/summaries";
 import { loadQuizSetsFromServer, countQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
+import { buildBriefing } from "../services/briefing";
 import { generateStudyPlan, type StudyPlanMode, type StudyPlanGoal, type StudyPlanFamiliarity } from "../services/studyPlan";
 import {
   isPaceSprint,
@@ -1135,6 +1136,14 @@ export default function Dashboard() {
       : stepView.dday
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
+  const briefing = buildBriefing({
+    ddays: sortedDdays.map(dday => ({ subj: dday.subj, type: dday.type, daysLeft: getDaysLeft(dday.date) })),
+    paces: [...activePaceViews]
+      .sort((a, b) => statusRank[a.status] - statusRank[b.status] || a.daysLeft - b.daysLeft)
+      .map(view => ({ course: view.plan.course, status: view.status, progress: view.progress, todayTarget: view.todayTarget, unitLabel: view.unitLabel })),
+    scores: Object.fromEntries(Object.entries(courseQuizAttempts).map(([course, attempts]) => [course, attempts.map(attempt => attempt.scorePercent)])),
+    todayPlansLeft: todayPlanEntries.filter(({ plan }) => !plan.done).length,
+  });
   // "자료 복습하기" 대상 과목: 추천 과목 → 요약 있는 과목 → 자료 있는 과목 순.
   // (페이스 플랜이 없어도 복습 동선이 끊기지 않게 한다.)
   const reviewCourse = recommendedCourse
@@ -1268,8 +1277,21 @@ export default function Dashboard() {
             공부 시작하기
           </h2>
           <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
-            {startHint}
+            {!stepView && briefing.length > 0 ? "오늘 챙길 것을 모아봤어요." : startHint}
           </p>
+          {briefing.length > 0 && (
+            <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0" aria-label="오늘의 브리핑">
+              {briefing.map(item => (
+                <li key={item.title} className="flex items-start gap-2.5 rounded-xl bg-white px-4 py-3 dark:bg-slate-900">
+                  <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.urgent ? "bg-pink" : "bg-cyan"}`} />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-extrabold text-text-strong">{item.title}</span>
+                    <span className="text-xs font-semibold text-muted">{item.reason}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           {resumePoint && courses.includes(resumePoint.course) && (
             <button
               type="button"
