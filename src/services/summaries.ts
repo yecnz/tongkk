@@ -10,6 +10,8 @@ export type SavedSummary = {
   createdAt: number;
   materialIds?: string[];
   materialNames?: string[];
+  pageRange?: string;
+  focusPrompt?: string;
 };
 
 type SummaryRow = {
@@ -17,6 +19,8 @@ type SummaryRow = {
   template: SummaryTemplate;
   content?: string | null;
   material_ids: string[] | null;
+  page_range?: string | null;
+  focus_prompt?: string | null;
   created_at: string;
 };
 
@@ -26,7 +30,16 @@ const toSavedSummary = (row: SummaryRow): SavedSummary => ({
   content: row.content || '',
   createdAt: new Date(row.created_at).getTime(),
   materialIds: row.material_ids || [],
+  pageRange: row.page_range || '',
+  focusPrompt: row.focus_prompt || '',
 });
+
+// 페이지 범위·추가 지시까지 같아야 같은 요약으로 본다(#92). 공백 차이는 같은 조건으로 취급.
+export const sameSummaryOptions = (
+  a: { pageRange?: string; focusPrompt?: string },
+  b: { pageRange?: string; focusPrompt?: string },
+) => (a.pageRange || '').trim() === (b.pageRange || '').trim()
+  && (a.focusPrompt || '').trim() === (b.focusPrompt || '').trim();
 
 const getCourseId = async (course: string) => {
   const courses = await fetchCourses();
@@ -62,12 +75,12 @@ export async function loadSummariesFromServer(
     const { data, error } = options?.includeContent
       ? await supabase
           .from('summaries')
-          .select('id, template, content, material_ids, created_at')
+          .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
           .eq('course_id', courseId)
           .order('created_at', { ascending: false })
       : await supabase
           .from('summaries')
-          .select('id, template, material_ids, created_at')
+          .select('id, template, material_ids, page_range, focus_prompt, created_at')
           .eq('course_id', courseId)
           .order('created_at', { ascending: false });
 
@@ -161,13 +174,17 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
 
   const user = await requireSupabaseUser();
   const materialIds = summary.materialIds || [];
+  const pageRange = (summary.pageRange || '').trim();
+  const focusPrompt = (summary.focusPrompt || '').trim();
 
-  // Find existing summary with same template + material_ids (array upsert not supported in PG unique constraints)
+  // Find existing summary with same template + material_ids + page_range + focus_prompt (array upsert not supported in PG unique constraints)
   const { data: existing, error: fetchError } = await supabase
     .from('summaries')
-    .select('id, template, content, material_ids, created_at')
+    .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
     .eq('course_id', courseId)
-    .eq('template', summary.template);
+    .eq('template', summary.template)
+    .eq('page_range', pageRange)
+    .eq('focus_prompt', focusPrompt);
 
   if (fetchError) throw new Error(formatSupabaseError(fetchError));
 
@@ -178,7 +195,7 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
       .from('summaries')
       .update({ content: summary.content })
       .eq('id', match.id)
-      .select('id, template, content, material_ids, created_at')
+      .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
       .single();
     if (error) throw new Error(formatSupabaseError(error));
     invalidateSummariesCache(course);
@@ -193,8 +210,10 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
       template: summary.template,
       content: summary.content,
       material_ids: materialIds,
+      page_range: pageRange,
+      focus_prompt: focusPrompt,
     })
-    .select('id, template, content, material_ids, created_at')
+    .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));
