@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication } from "../common";
-import { sendAgentMessage, type AgentMessage } from "../services/agent";
+import { AgentThreadExpiredError, sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   createSummaryChatSession,
   createSummaryChatTitle,
@@ -551,13 +551,14 @@ export const AITutorDrawer = ({
       const sendableHistory = nextMessages.filter(
         m => m.content.trim().length > 0 || (m.images?.length ?? 0) > 0,
       );
-      const response = await sendAgentMessage(
-        localThreadId,
-        localThreadId ? [userMessage] : sendableHistory,
-        localThreadId ? undefined : contextMarkdown,
-        localThreadId ? undefined : sourceMarkdown,
-        localThreadId ? undefined : sourcePages,
-      );
+      const sendFullHistory = () => sendAgentMessage("", sendableHistory, contextMarkdown, sourceMarkdown, sourcePages);
+      const response = localThreadId
+        ? await sendAgentMessage(localThreadId, [userMessage]).catch(err => {
+          // 서버 재시작으로 대화 상태가 사라졌으면 자료와 지금까지의 대화를 다시 보내 이어간다.
+          if (err instanceof AgentThreadExpiredError) return sendFullHistory();
+          throw err;
+        })
+        : await sendFullHistory();
       const assistantMessage: AgentMessage = { role: "assistant", content: response.result };
       setLocalThreadId(response.threadId);
       setAgentMessages(prev => [...prev, assistantMessage]);

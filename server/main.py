@@ -49,7 +49,7 @@ from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import HumanMessage, SystemMessage
 from markitdown import MarkItDown
 
-from agent import run_study_agent, build_llm, build_openai_llm
+from agent import run_study_agent, build_llm, build_openai_llm, thread_exists
 
 import convert_cache
 from prompts import (
@@ -1170,6 +1170,10 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
 
 @app.post("/agent")
 async def agent(req: AgentRequest, user=Depends(require_api_user)):
+    # 이어지는 대화인데 체크포인트가 없으면(서버 재시작 등) 새 메시지만으로 답하면 자료·이전 대화를 모두 잃는다.
+    # 409로 알려 프론트가 전체 히스토리와 자료를 다시 보내게 한다.
+    if req.thread_id and not thread_exists((user or {}).get("id"), req.thread_id):
+        raise HTTPException(status_code=409, detail="thread_expired")
     messages = [message.model_dump() for message in req.messages]
     # 요약에 쓰인 페이지 범위(pages)가 있으면 원본도 같은 범위로 좁힌다(마커 기준; 없으면 전체).
     source = _filter_markdown_by_pages(req.source_markdown, req.pages) if req.source_markdown else ""
