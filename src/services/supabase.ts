@@ -58,15 +58,23 @@ export const getSupabaseAuthHeader = async (): Promise<Record<string, string>> =
 
 // Storage는 폴더 개념이 없어 prefix 아래를 재귀로 훑어야 실제 파일 경로가 나온다.
 // (metadata가 있으면 파일, 없으면 하위 폴더)
-const listStorageFilePaths = async (bucket: string, prefix: string): Promise<string[]> => {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .list(prefix);
+// list()는 한 번에 최대 limit개만 돌려주므로(기본 100) 다 받을 때까지 offset을 넘긴다.
+const STORAGE_LIST_PAGE = 1000;
 
-  if (error) throw new Error(formatSupabaseError(error));
+const listStorageFilePaths = async (bucket: string, prefix: string): Promise<string[]> => {
+  const items = [];
+  for (let offset = 0; ; offset += STORAGE_LIST_PAGE) {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .list(prefix, { limit: STORAGE_LIST_PAGE, offset });
+
+    if (error) throw new Error(formatSupabaseError(error));
+    items.push(...(data || []));
+    if (!data || data.length < STORAGE_LIST_PAGE) break;
+  }
 
   const paths: string[] = [];
-  for (const item of data || []) {
+  for (const item of items) {
     const itemPath = `${prefix}/${item.name}`;
     if (item.metadata) {
       paths.push(itemPath);
