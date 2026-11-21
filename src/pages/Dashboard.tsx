@@ -1388,6 +1388,8 @@ export default function Dashboard() {
                       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCourseDetail(course); } }}
                       style={{
                         minHeight: 120, padding: 20, cursor: "pointer", position: "relative",
+                        // hover 시 transform이 쌓임 맥락을 만들어 메뉴 zIndex가 카드 안에 갇힌다 → 메뉴가 열린 카드 자체를 위로 올려 아래 카드에 가리지 않게.
+                        zIndex: openCourseMenu === course ? 30 : undefined,
                         display: "flex", flexDirection: "column", justifyContent: "space-between",
                         transition: "transform 0.15s ease, box-shadow 0.15s ease",
                       }}
