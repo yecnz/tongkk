@@ -42,6 +42,28 @@ export const invalidateSignedUrlCache = (filePath?: string) => signedUrlCache.in
 // 원본 파일 저장 한도(Supabase Free 플랜 업로드 한도 ≈ 50MB). Pro로 글로벌 한도를 올리면 이 값도 함께 조정.
 export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
 
+const MATERIAL_MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: 'application/pdf',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+  md: 'text/markdown',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+};
+
+const getMaterialMimeType = (fileName: string): string | null => {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+  return MATERIAL_MIME_BY_EXTENSION[extension] || null;
+};
+
 export const getFileMaterialId = (file: Pick<File, "name" | "size">) => `${file.name}:${file.size}`;
 
 // 여러 자료 합본에는 `<!-- 자료: 이름 -->` 표식을 함께 넣는다. 본문에 흔한 `# 제목` 헤딩과 달리
@@ -126,6 +148,8 @@ export const uploadCourseMaterialFile = async (
   if (file.size > MAX_ORIGINAL_FILE_BYTES) {
     throw new Error(`원본 파일이 ${(file.size / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 초과해 원본은 저장하지 못했어요.`);
   }
+  const contentType = getMaterialMimeType(file.name);
+  if (!contentType) throw new Error('지원하지 않는 파일 형식입니다.');
   const courseId = (await findCourseRecord(course))?.id;
   if (!courseId) throw new Error('과목을 찾을 수 없습니다.');
 
@@ -137,7 +161,7 @@ export const uploadCourseMaterialFile = async (
     .from(MATERIAL_STORAGE_BUCKET)
     .upload(filePath, file, {
       cacheControl: '3600',
-      contentType: file.type || 'application/octet-stream',
+      contentType,
       upsert: true,
     });
 
@@ -148,7 +172,7 @@ export const uploadCourseMaterialFile = async (
   return {
     ...material,
     filePath,
-    mimeType: file.type || 'application/octet-stream',
+    mimeType: contentType,
   };
 };
 

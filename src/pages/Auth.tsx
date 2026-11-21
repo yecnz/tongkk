@@ -32,8 +32,8 @@ export default function Auth() {
 
   const handleRecoverySubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (newPassword.length < 6) {
-      setRecoveryError("비밀번호는 6자 이상이어야 해요.");
+    if (newPassword.length < 8) {
+      setRecoveryError("비밀번호는 8자 이상이어야 해요.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -114,9 +114,9 @@ export default function Auth() {
                 onChange={event => setNewPassword(event.target.value)}
                 onFocus={() => setPwFocus(true)}
                 onBlur={() => setPwFocus(false)}
-                placeholder="6자 이상 입력하세요"
+                placeholder="8자 이상 입력하세요"
                 autoComplete="new-password"
-                minLength={6}
+                minLength={8}
                 required
                 style={{ ...recoveryInputStyle(pwFocus), marginBottom: 14 }}
               />
@@ -132,7 +132,7 @@ export default function Auth() {
                 onBlur={() => setConfirmFocus(false)}
                 placeholder="다시 한 번 입력하세요"
                 autoComplete="new-password"
-                minLength={6}
+                minLength={8}
                 required
                 style={{ ...recoveryInputStyle(confirmFocus), marginBottom: 20 }}
               />

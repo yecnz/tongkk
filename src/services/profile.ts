@@ -26,6 +26,28 @@ type ProfileRow = {
 };
 
 const PROFILE_COLUMNS = 'nickname, avatar_url, school, department, dark_mode, notifications_enabled, hide_summary_notice';
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+const validateAvatar = async (file: File): Promise<{ extension: string; contentType: string }> => {
+  if (file.size <= 0) throw new Error('비어 있는 이미지는 업로드할 수 없습니다.');
+  if (file.size > MAX_AVATAR_BYTES) throw new Error('프로필 이미지는 5MB 이하만 업로드할 수 있습니다.');
+
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const ascii = String.fromCharCode(...header);
+  if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) {
+    return { extension: 'jpg', contentType: 'image/jpeg' };
+  }
+  if (header.length >= 8 && header.slice(0, 8).every((byte, index) => byte === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index])) {
+    return { extension: 'png', contentType: 'image/png' };
+  }
+  if (ascii.startsWith('RIFF') && ascii.slice(8, 12) === 'WEBP') {
+    return { extension: 'webp', contentType: 'image/webp' };
+  }
+  if (ascii.startsWith('GIF87a') || ascii.startsWith('GIF89a')) {
+    return { extension: 'gif', contentType: 'image/gif' };
+  }
+  throw new Error('JPG, PNG, WEBP, GIF 이미지 파일만 업로드할 수 있습니다.');
+};
 
 const defaultNickname = (user: User) =>
   user.user_metadata?.nickname ||
@@ -100,13 +122,13 @@ export async function updateHideSummaryNotice(hide: boolean): Promise<void> {
 
 export async function uploadAvatar(file: File): Promise<string> {
   const user = await requireSupabaseUser();
-  const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
+  const { extension, contentType } = await validateAvatar(file);
   const path = `${user.id}/avatar.${extension}`;
   const { error } = await supabase.storage
     .from('avatars')
     .upload(path, file, {
       cacheControl: '3600',
-      contentType: file.type || 'image/png',
+      contentType,
       upsert: true,
     });
 

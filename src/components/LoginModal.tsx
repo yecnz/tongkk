@@ -54,6 +54,10 @@ export default function LoginModal({ onClose, initialMode = "signIn", subtitle }
       setError("이메일 형식이 올바르지 않아요. 예: name@example.com");
       return;
     }
+    if (mode === "signUp" && password.length < 8) {
+      setError("비밀번호는 8자 이상이어야 해요.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
@@ -167,7 +171,7 @@ export default function LoginModal({ onClose, initialMode = "signIn", subtitle }
             onBlur={() => setPasswordFocus(false)}
             placeholder="비밀번호를 입력하세요"
             autoComplete={mode === "signIn" ? "current-password" : "new-password"}
-            minLength={6}
+            minLength={mode === "signUp" ? 8 : 1}
             required
             style={inputStyle(passwordFocus)}
           />

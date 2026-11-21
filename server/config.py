@@ -44,6 +44,15 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+# 로그인 실패 제한. 이메일 원문 대신 해시만 LOGIN_ATTEMPTS_DB_PATH에 저장한다.
+LOGIN_MAX_FAILURES = max(1, _env_int("LOGIN_MAX_FAILURES", 5))
+LOGIN_LOCK_SECONDS = max(60, _env_int("LOGIN_LOCK_SECONDS", 15 * 60))
+LOGIN_ATTEMPTS_DB_PATH = os.getenv(
+    "LOGIN_ATTEMPTS_DB_PATH",
+    str(SERVER_DIR / "login_attempts.sqlite3"),
+)
+
+
 VISUAL_ANALYSIS_MODE = os.getenv("VISUAL_ANALYSIS_MODE", "auto").lower()
 # 시각 분석에 쓸 모델. 기본은 그래프·도표 해석 가성비가 좋은 Gemini 2.5 Flash.
 VISUAL_ANALYSIS_MODEL = os.getenv("VISUAL_ANALYSIS_MODEL", "Gemini")
