@@ -1,5 +1,6 @@
 import { BACKEND_URL, fetchWithTunnelRetry, getJsonRequestHeaders, parseApiError } from './backend';
 import type { SummaryTemplate } from './gpt';
+import { cleanSummary } from './summaryValidator';
 
 // 서버 _PAGE_MARKER_RE와 동일: PDF는 `<!-- p.N -->`, PPT/PPTX는 `<!-- Slide number: N -->`.
 const PAGE_MARKER_RE = /<!--\s*(?:p\.|Slide number:\s*)(\d+)\s*-->/g;
@@ -443,5 +444,5 @@ export async function summarizeWithTemplateStream(
   if (!completed.trim()) {
     throw new Error('요약 결과를 받지 못했습니다. 다시 시도해주세요.');
   }
-  return completed;
+  return cleanSummary(completed);
 }
