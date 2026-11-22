@@ -18,6 +18,8 @@ import LearningSession from "./pages/LearningSession";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
 import UpdatePrompt from "./UpdatePrompt";
+import { RESET_PASSWORD_PATH } from "./services/authFlow";
+import AuthCallbackBoundary from "./components/AuthCallbackBoundary";
 
 function AppShell() {
   const { user, loading } = useAuth();
@@ -79,10 +81,13 @@ function App() {
           <AuthGateProvider>
             <SampleDemoProvider>
               <TutorialProvider>
-                <Routes>
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/*" element={<AppShell />} />
-                </Routes>
+                <AuthCallbackBoundary>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path={RESET_PASSWORD_PATH} element={<Auth />} />
+                    <Route path="/*" element={<AppShell />} />
+                  </Routes>
+                </AuthCallbackBoundary>
               </TutorialProvider>
             </SampleDemoProvider>
           </AuthGateProvider>

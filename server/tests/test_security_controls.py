@@ -72,7 +72,7 @@ def test_login_endpoint_locks_on_fifth_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(
         main.httpx,
         "AsyncClient",
-        lambda **_kwargs: _AuthClient(_AuthResponse(400)),
+        lambda **_kwargs: _AuthClient(_AuthResponse(400, {"code": "invalid_credentials"})),
     )
     client = TestClient(main.app)
 

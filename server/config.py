@@ -27,6 +27,9 @@ ALLOWED_ORIGINS = [
 ]
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
+# request.client의 IP는 Uvicorn이 신뢰한 프록시에서만 복원되어야 한다.
+LOGIN_FORWARD_CLIENT_IP = os.getenv("LOGIN_FORWARD_CLIENT_IP", "false").strip().lower() in {"1", "true", "yes", "on"}
 GOOGLE_VISION_API_KEY = os.getenv("GOOGLE_VISION_API_KEY", "")
 SUPABASE_PLACEHOLDER_VALUES = {
     "https://your-project.supabase.co",
