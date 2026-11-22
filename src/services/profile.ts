@@ -4,6 +4,7 @@ import { invalidateMaterialsCache, MATERIAL_STORAGE_BUCKET } from './materials';
 import { invalidateQuizSetsCache } from './quizSets';
 import { invalidateSummariesCache } from './summaries';
 import { deleteStoragePrefix, formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
+import { clearLearningDrafts } from './learningSessions';
 
 export type UserProfile = {
   nickname: string;
@@ -163,6 +164,7 @@ export async function deleteOwnAppData(): Promise<void> {
   }
 
   // 계정 데이터 전체 삭제 후 낡은 캐시가 남지 않도록 모두 비운다.
+  clearLearningDrafts(user.id);
   invalidateCoursesCache();
   invalidateMaterialsCache();
   invalidateSummariesCache();

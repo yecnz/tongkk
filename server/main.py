@@ -106,15 +106,19 @@ import login_attempts
 
 app = FastAPI()
 
+from learning_sessions.router import router as learning_sessions_router
+
+app.include_router(learning_sessions_router)
+
 logger = logging.getLogger("tongkk")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    # 실제 쓰는 것만 허용: 엔드포인트는 POST·GET(/health)뿐이고 프리플라이트가 OPTIONS를 쓴다.
+    # 학습 세션의 초안 저장에 PATCH를 사용한다.
     # 프론트가 보내는 요청 헤더는 Authorization·Content-Type뿐(backend.ts getJsonRequestHeaders).
     # allow_credentials는 미설정(기본 False) 유지 — 쿠키가 아니라 Bearer 토큰 인증이라 불필요.
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "GET", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

@@ -95,6 +95,8 @@ tongkk/
 Supabase 대시보드 → **SQL Editor**에서 [`supabase/schema.sql`](supabase/schema.sql)을 실행합니다.
 테이블, RLS 정책, 그리고 스토리지 버킷(`avatars` 공개 / `course-materials` 비공개)이 생성됩니다.
 
+이미 운영 중인 DB에는 전체 초기 스키마 대신 새 마이그레이션 [`202611220001_learning_sessions.sql`](supabase/migrations/202611220001_learning_sessions.sql)을 한 번 적용합니다. 기존 `courses`·`materials` 구조를 기준으로 신규 세션 테이블 5개와 서버 전용 함수를 추가합니다.
+
 ### 2. 백엔드 (FastAPI)
 
 ```bash
@@ -120,6 +122,22 @@ npm run dev
 
 기본 주소는 `http://localhost:5173`입니다.
 
+### 학습 세션
+
+자료 상세의 **직접 설명하며 학습하기**, 대시보드의 **기억에서 꺼내는 학습**, 또는 `/learn`에서 시작합니다. 자료 하나에서 기본 2개 개념을 선택해 회상 → 근거 피드백 → 원문·힌트 → 객관식 기초 확인 → 결과 순서로 진행하며, `/learn/:sessionId`에서 저장된 학습을 재개합니다.
+
+서버에 `SUPABASE_SECRET_KEY`(또는 구형 `SUPABASE_SERVICE_ROLE_KEY`)를 설정하고 위 마이그레이션을 적용해야 합니다. 키가 없으면 세션 API는 설정 안내와 503을 반환합니다. 서버 키를 `VITE_` 변수나 브라우저에 넣지 않습니다. 원문은 사용자 JWT/RLS로 읽고, 신규 세션 데이터는 서버 전용 RPC로 저장합니다. Supabase의 `service_role`에는 기존 `courses`·`materials` 조회 및 행 잠금에 필요한 권한도 있어야 합니다.
+
+준비와 자기 설명 평가에는 OpenAI를 사용합니다. `LEARNING_SESSION_MODEL`로 모델을 지정하며, 미설정 시 `OPENAI_MODEL`을 사용합니다. 기본 2개 개념은 정상 3회, 실패 복구 포함 최대 4회의 모델 요청을 허용합니다. 힌트·확인 채점은 추가 모델 호출 없이 처리합니다. 실제 원문·모델의 내용 품질은 파일럿에서 별도 검토해야 합니다.
+
+```bash
+npm run test:learning-db             # 임시 메모리 PostgreSQL: 권한·원자성·삭제 검사
+cd server
+.venv/bin/python -m pytest -q         # 모델·DB 어댑터를 대체한 서버 테스트 포함
+```
+
+AI 작업 상태와 실행 lease는 DB에 저장하지만 실행 자체는 FastAPI 프로세스에서 수행합니다. 서버가 재시작되면 만료된 작업을 화면에서 명시적으로 재시도합니다. 영속 큐에 의한 자동 재개는 제공하지 않습니다. `LEARNING_SESSION_ENABLED=false`로 새 세션 시작을 중단해도 기존 기록 조회·진행은 유지됩니다.
+
 ## 환경 변수
 
 ### 프론트엔드 (`.env.local`)
@@ -138,6 +156,9 @@ npm run dev
 | --- | --- | --- |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS 허용 프론트엔드 주소 |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | — | 호출자 로그인 토큰 검증용 (둘 다 비우면 인증 비활성화) |
+| `SUPABASE_SECRET_KEY` | — | 학습 세션 DB 저장용 서버 키. 구형 `SUPABASE_SERVICE_ROLE_KEY`도 지원 |
+| `LEARNING_SESSION_MODEL` | `OPENAI_MODEL` | 학습 세션 준비·자기 설명 평가 모델 |
+| `LEARNING_SESSION_ENABLED` | `true` | `false`이면 새 세션 생성 중단 |
 | `LOGIN_MAX_FAILURES` | `5` | 계정별 연속 로그인 실패 허용 횟수 |
 | `LOGIN_LOCK_SECONDS` | `900` | 실패 한도 도달 후 로그인 잠금 시간(초) |
 | `LOGIN_ATTEMPTS_DB_PATH` | `server/login_attempts.sqlite3` | 로그인 실패 상태 SQLite 경로(운영에서는 영속 볼륨 권장) |

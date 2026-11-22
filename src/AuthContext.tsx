@@ -6,6 +6,7 @@ import { invalidateQuizSetsCache } from "./services/quizSets";
 import { invalidateSummariesCache } from "./services/summaries";
 import { supabase } from "./services/supabase";
 import { BACKEND_URL, parseApiError } from "./services/backend";
+import { clearLearningDrafts } from "./services/learningSessions";
 
 type AuthContextValue = {
   user: User | null;
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const syncCachesWithUser = (nextSession: Session | null) => {
       const nextUserId = nextSession?.user?.id ?? null;
       if (lastUserIdRef.current !== undefined && lastUserIdRef.current !== nextUserId) {
+        if (lastUserIdRef.current) clearLearningDrafts(lastUserIdRef.current);
         invalidateCoursesCache();
         invalidateMaterialsCache();
         invalidateSummariesCache();
