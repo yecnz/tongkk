@@ -1,3 +1,4 @@
+from usage import UsageCallback
 import os
 import threading
 from collections import OrderedDict
@@ -178,6 +179,8 @@ def build_openai_llm(model_name: str, max_tokens: int | None = None):
         temperature=0.3,
         max_tokens=max_tokens or _env_int("OPENAI_MAX_TOKENS", 8192),
         api_key=api_key,
+        callbacks=[UsageCallback(model_name)],
+        max_retries=0,
     )
 
 
@@ -193,6 +196,8 @@ def _build_model(model: AgentModel, max_tokens: int | None = None, model_name: s
         temperature=0.3,
         max_output_tokens=max_tokens or _env_int("GEMINI_MAX_OUTPUT_TOKENS", 8192),
         google_api_key=api_key,
+        callbacks=[UsageCallback(model_name or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview"))],
+        max_retries=0,
     )
 
 

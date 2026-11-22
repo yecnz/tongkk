@@ -47,4 +47,7 @@ async def require_api_user(authorization: str | None = Header(default=None)):
     if response.status_code >= 400:
         raise HTTPException(status_code=401, detail="유효하지 않은 로그인입니다.")
 
-    return response.json()
+    user = response.json()
+    from usage import identify
+    identify(user.get('id'))
+    return user

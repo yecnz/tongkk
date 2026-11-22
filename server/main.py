@@ -1,6 +1,7 @@
 import json
 import io
 import logging
+import sqlite3
 import os
 import re
 import base64
@@ -108,6 +109,8 @@ import login_security
 
 
 app = FastAPI()
+from usage import UsageMiddleware
+app.add_middleware(UsageMiddleware)
 
 from learning_sessions.router import router as learning_sessions_router
 
@@ -1589,3 +1592,14 @@ async def generate_study_plan(req: StudyPlanRequest, _user=Depends(require_api_u
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get('/usage')
+async def ai_usage(user=Depends(require_api_user)):
+    if not user or not user.get('id'):
+        raise HTTPException(status_code=401, detail='로그인 후 확인해주세요.')
+    from usage import summary
+    try:
+        return {'days':30,'groups':await run_in_threadpool(summary,user['id'])}
+    except (OSError, sqlite3.Error):
+        raise HTTPException(status_code=503,detail='사용량 기록을 불러오지 못했어요.') from None

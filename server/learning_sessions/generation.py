@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 from pydantic import Field
 
 from llm import _parse_json_object
+from usage import track_generation
 from .schemas import CheckQuestion, Concept, CriterionFeedback, PackContent, RecallFeedback
 
 # A new preparation key prevents older verbose packs from being reused for new sessions.
@@ -126,6 +127,7 @@ class Generator:
         except (ValueError, IndexError):
             raise GenerationError(metrics) from None
 
+    @track_generation
     async def prepare(self, pack):
         raw, metrics = await self._call(
             "학생이 기억에서 꺼내 자기 말로 설명할 핵심 개념을 요청 수 이하로 선정하라. "
@@ -148,6 +150,7 @@ class Generator:
         except ValueError:
             raise GenerationError(metrics) from None
 
+    @track_generation
     async def evaluate(self, pack, concept, answer):
         raw, metrics = await self._call(
             "자기 설명을 기준별 met/missing/contradicted/uncertain으로 평가하라. "
