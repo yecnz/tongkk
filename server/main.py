@@ -58,6 +58,8 @@ from markitdown import MarkItDown
 
 from agent import run_study_agent, build_llm, build_openai_llm, thread_exists
 
+from grading import SUBJECTIVE_PASS_SCORE, normalize_subjective_score
+
 import convert_cache
 from prompts import (
     TEMPLATE_LABELS,
@@ -1449,7 +1451,6 @@ async def generate_quiz(req: QuizRequest, _user=Depends(require_api_user)):
     return {"questions": questions}
 
 
-SUBJECTIVE_PASS_SCORE = 70
 
 
 @app.post("/quiz/grade-subjective")
@@ -1484,9 +1485,7 @@ async def grade_subjective_answer(req: SubjectiveGradeRequest, _user=Depends(req
             HumanMessage(content=prompt),
         ])
         parsed = _parse_json_object(_message_content_to_text(response.content))
-        raw_score = parsed.get("score", 0)
-        score = raw_score if isinstance(raw_score, (int, float)) and not isinstance(raw_score, bool) else 0
-        score = max(0, min(100, int(round(score))))
+        score = normalize_subjective_score(parsed.get("score"))
         feedback = parsed.get("feedback")
         reference_answer = parsed.get("reference_answer")
         return {

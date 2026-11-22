@@ -1,3 +1,4 @@
+import { normalizeSubjectiveScore, SUBJECTIVE_PASS_SCORE } from './subjectiveGrading';
 import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type QuizQuestion = {
@@ -138,13 +139,11 @@ export async function gradeSubjectiveAnswer(
       feedback?: unknown;
       reference_answer?: unknown;
     };
-    const score = typeof data.score === 'number'
-      ? Math.max(0, Math.min(100, Math.round(data.score)))
-      : 0;
+    const score = normalizeSubjectiveScore(data.score);
 
     return {
       score,
-      isCorrect: score >= 70, // 서버와 같은 기준. 점수와 판정이 어긋나지 않게 점수에서만 도출
+      isCorrect: score >= SUBJECTIVE_PASS_SCORE, // 서버와 같은 기준. 점수와 판정이 어긋나지 않게 점수에서만 도출
       feedback: typeof data.feedback === 'string' ? data.feedback : '채점 결과를 확인했습니다.',
       referenceAnswer: typeof data.reference_answer === 'string' ? data.reference_answer : referenceAnswer,
     };
