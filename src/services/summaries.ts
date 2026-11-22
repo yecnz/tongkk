@@ -1,3 +1,4 @@
+import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 import { createTtlCache, readThroughCache, SWR_STALE_TTL_MS } from './cache';
 import { fetchCourses } from './courses';
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
@@ -12,6 +13,10 @@ export type SavedSummary = {
   materialNames?: string[];
   pageRange?: string;
   focusPrompt?: string;
+  sourceHash?: string;
+  requestKey?: string;
+  generationConfig?: Record<string, unknown>;
+  generationId?: string;
 };
 
 type SummaryRow = {
@@ -22,6 +27,10 @@ type SummaryRow = {
   page_range?: string | null;
   focus_prompt?: string | null;
   created_at: string;
+  source_hash?: string | null;
+  request_key?: string | null;
+  generation_config?: Record<string, unknown> | null;
+  generation_id?: string | null;
 };
 
 const toSavedSummary = (row: SummaryRow): SavedSummary => ({
@@ -32,6 +41,8 @@ const toSavedSummary = (row: SummaryRow): SavedSummary => ({
   materialIds: row.material_ids || [],
   pageRange: row.page_range || '',
   focusPrompt: row.focus_prompt || '',
+  sourceHash: row.source_hash || undefined, requestKey: row.request_key || undefined,
+  generationConfig: row.generation_config || undefined, generationId: row.generation_id || undefined,
 });
 
 // 페이지 범위·추가 지시까지 같아야 같은 요약으로 본다(#92). 공백 차이는 같은 조건으로 취급.
@@ -75,12 +86,12 @@ export async function loadSummariesFromServer(
     const { data, error } = options?.includeContent
       ? await supabase
           .from('summaries')
-          .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
+          .select('id, template, content, material_ids, page_range, focus_prompt, source_hash, request_key, generation_config, generation_id, created_at')
           .eq('course_id', courseId)
           .order('created_at', { ascending: false })
       : await supabase
           .from('summaries')
-          .select('id, template, material_ids, page_range, focus_prompt, created_at')
+          .select('id, template, material_ids, page_range, focus_prompt, source_hash, request_key, generation_config, generation_id, created_at')
           .eq('course_id', courseId)
           .order('created_at', { ascending: false });
 
@@ -162,11 +173,17 @@ export async function deleteSummaryById(course: string, id: string): Promise<voi
   invalidateSummariesCache(course);
 }
 
-const sortedIds = (ids: string[]) => [...ids].sort();
-const sameIds = (a: string[], b: string[]) => {
-  const sa = sortedIds(a), sb = sortedIds(b);
-  return sa.length === sb.length && sa.every((id, i) => id === sb[i]);
-};
+export type SummaryIdentity = { source_hash: string; request_key: string; generation_config: Record<string, unknown> };
+export async function prepareSummaryIdentity(course: string, markdown: string, materials: { id: string; name: string }[], template: SummaryTemplate,
+  options: { pageRange?: string; focusPrompt?: string } = {}): Promise<SummaryIdentity> {
+  const courseId = await getCourseId(course);
+  if (!courseId) throw new Error('과목을 찾을 수 없어요.');
+  const response = await fetch(`${BACKEND_URL}/summaries/prepare`, { method: 'POST', headers: await getJsonRequestHeaders(),
+    body: JSON.stringify({ course_id: courseId, markdown, materials: materials.map(({ id, name }) => ({ id, name })), template,
+      pages: options.pageRange || '', focus_prompt: options.focusPrompt || '' }) });
+  if (!response.ok) throw new Error(await parseApiError(response));
+  return response.json();
+}
 
 export async function saveSummaryToServer(course: string, summary: SavedSummary): Promise<SavedSummary> {
   const courseId = await getCourseId(course);
@@ -177,34 +194,9 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
   const pageRange = (summary.pageRange || '').trim();
   const focusPrompt = (summary.focusPrompt || '').trim();
 
-  // Find existing summary with same template + material_ids + page_range + focus_prompt (array upsert not supported in PG unique constraints)
-  const { data: existing, error: fetchError } = await supabase
-    .from('summaries')
-    .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
-    .eq('course_id', courseId)
-    .eq('template', summary.template)
-    .eq('page_range', pageRange)
-    .eq('focus_prompt', focusPrompt);
-
-  if (fetchError) throw new Error(formatSupabaseError(fetchError));
-
-  const match = (existing || []).find(row => sameIds(row.material_ids || [], materialIds));
-
-  if (match) {
-    const { data, error } = await supabase
-      .from('summaries')
-      .update({ content: summary.content })
-      .eq('id', match.id)
-      .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
-      .single();
-    if (error) throw new Error(formatSupabaseError(error));
-    invalidateSummariesCache(course);
-    return { ...toSavedSummary(data), materialNames: summary.materialNames || [] };
-  }
-
   const { data, error } = await supabase
     .from('summaries')
-    .insert({
+    .upsert({
       course_id: courseId,
       user_id: user.id,
       template: summary.template,
@@ -212,8 +204,10 @@ export async function saveSummaryToServer(course: string, summary: SavedSummary)
       material_ids: materialIds,
       page_range: pageRange,
       focus_prompt: focusPrompt,
-    })
-    .select('id, template, content, material_ids, page_range, focus_prompt, created_at')
+      source_hash: summary.sourceHash, request_key: summary.requestKey, generation_config: summary.generationConfig,
+      generation_id: summary.generationId || crypto.randomUUID(),
+    }, { onConflict: 'user_id,generation_id' })
+    .select('id, template, content, material_ids, page_range, focus_prompt, source_hash, request_key, generation_config, generation_id, created_at')
     .single();
 
   if (error) throw new Error(formatSupabaseError(error));

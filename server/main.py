@@ -112,6 +112,8 @@ app = FastAPI()
 from learning_sessions.router import router as learning_sessions_router
 
 app.include_router(learning_sessions_router)
+from summary_identity import router as summary_identity_router
+app.include_router(summary_identity_router)
 
 logger = logging.getLogger("tongkk")
 

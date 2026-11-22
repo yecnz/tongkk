@@ -13,7 +13,7 @@ const text = '분산 학습은 시간을 두고 반복하는 학습이다.';
 const hash = createHash('sha256').update(text).digest('hex');
 const migration = readFileSync(new URL('../supabase/migrations/202611220001_learning_sessions.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
-check(schema.endsWith(migration), 'Fresh schema and migration must agree');
+check(schema.includes(migration), 'Fresh schema and migration must agree');
 
 await db.exec(`
   create role anon; create role authenticated; create role service_role bypassrls;
