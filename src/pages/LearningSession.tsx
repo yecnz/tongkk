@@ -12,6 +12,7 @@ import { learningRequest, removeLocalDraft, type LearningSession as Session, typ
 import { useLearningSession } from '../features/learningSession/useLearningSession';
 import RecallInput from '../features/learningSession/RecallInput';
 import LearningResume from '../features/learningSession/LearningResume';
+import LearningSelect from '../features/learningSession/LearningSelect';
 import '../features/learningSession/LearningSession.css';
 
 function Markdown({ text }: { text: string }) {
@@ -22,7 +23,7 @@ function Markdown({ text }: { text: string }) {
 
 function Frame({ children }: { children: ReactNode }) {
   return <div className="learning-page"><header className="learning-header">
-    <Link to="/" style={{ fontWeight: 800, color: 'var(--color-pink)', textDecoration: 'none', fontSize: 22 }}>Tongkk</Link>
+    <Link to="/" style={{ fontWeight: 700, color: 'var(--color-pink)', textDecoration: 'none', fontSize: 20 }}>Tongkk</Link>
     <span>학습 세션</span><Link to="/summary" style={{ marginLeft: 'auto', color: 'inherit' }}>자료 보기</Link>
   </header><main className="learning-main">{children}</main></div>;
 }
@@ -77,6 +78,7 @@ function Start() {
   }, [courseId, material]);
 
   const chars = scopes ? scopes.units.filter(u => selected.includes(u.id)).reduce((sum, u) => sum + u.chars, 0) + Math.max(0, selected.length - 1) * 2 : 0;
+  const settingsDisabled = busy || Boolean(pending.current);
   async function start() {
     if (!courseId || !scopes) return;
     setBusy(true); setError('');
@@ -98,43 +100,67 @@ function Start() {
   }
 
   return <>
-    <p className="learning-muted">약 15분 · 회상 → 보완 → 기초 확인</p>
+    <p className="learning-eyebrow">학습 세션 · 목표 {minutes}분</p>
     <h1>읽은 내용을 직접 설명해볼까요?</h1>
-    <p>먼저 기억에서 꺼낸 뒤 원문·힌트로 보완해요. 처음 배우는 내용은 짧은 설명부터 시작합니다.</p>
-    <section className="learning-card">
-      <div className="learning-row">
-        <label>과목 <select aria-label="과목" value={course} disabled={busy || Boolean(pending.current)} onChange={e => { setCourse(e.target.value); setMaterial(''); }}>
-          <option value="">과목 선택</option>{courses.map(c => <option key={c.id}>{c.name}</option>)}
-        </select></label>
-        <label>자료 <select aria-label="자료" value={material} disabled={busy || !course || Boolean(pending.current)} onChange={e => setMaterial(e.target.value)}>
-          <option value="">자료 선택</option>{materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select></label>
+    <p className="learning-intro">기억에서 꺼내고, 부족한 부분을 보완한 뒤 문제로 확인해요.</p>
+    <section className="learning-card learning-setup" aria-label="학습 설정">
+      <h2>학습 자료</h2>
+      <div className="learning-fields">
+        <LearningSelect label="과목" value={course} placeholder="과목 선택" options={courses.map(c => ({ value: c.name, label: c.name }))}
+          disabled={settingsDisabled || !courses.length} onChange={value => { setCourse(value); setMaterial(''); }} />
+        <LearningSelect key={course} label="자료" value={material} placeholder="자료 선택" options={materials.map(m => ({ value: m.id, label: m.name }))}
+          disabled={settingsDisabled || !course || !materials.length} onChange={setMaterial} />
       </div>
-      {loading && <p role="status">학습 범위를 불러오는 중…</p>}
+      {loading && <p className="learning-caption" role="status">학습 범위를 불러오는 중…</p>}
       {scopes && <>
-        <h2 style={{ marginTop: 24 }}>학습할 범위</h2>
-        <p className="learning-muted">선택한 원문 {chars.toLocaleString()} / {scopes.max_chars.toLocaleString()}자</p>
-        <fieldset className="learning-scope" disabled={busy || Boolean(pending.current)}><legend>페이지 또는 원문 구간 선택</legend>
+        <p className="learning-caption">선택한 원문 {chars.toLocaleString()} / {scopes.max_chars.toLocaleString()}자</p>
+        <fieldset className="learning-scope" disabled={settingsDisabled}><legend>학습할 페이지 또는 원문 구간</legend>
           {scopes.units.map(unit => <label key={unit.id}><input type="checkbox" checked={selected.includes(unit.id)} onChange={e =>
             setSelected(previous => e.target.checked ? [...previous, unit.id] : previous.filter(id => id !== unit.id))} />
             <span>{unit.label} <small className="learning-muted">· {unit.chars.toLocaleString()}자</small></span></label>)}
         </fieldset>
         {chars > scopes.max_chars && <p role="alert">한 번에 학습할 범위를 줄여주세요.</p>}
       </>}
-      <div className="learning-row">
-        <label>시작 방식 <select aria-label="시작 방식" value={familiarity} disabled={busy || Boolean(pending.current)} onChange={e => setFamiliarity(e.target.value)}>
-          <option value="attended">수업 후 회상</option><option value="new">처음 배우기</option>
-        </select></label>
-        <label>목표 시간 <select aria-label="목표 시간" value={minutes} disabled={busy || Boolean(pending.current)} onChange={e => setMinutes(Number(e.target.value))}>
-          {[10, 15, 20, 30].map(n => <option key={n} value={n}>{n}분</option>)}</select></label>
-        <label>개념 수 <select aria-label="개념 수" value={count} disabled={busy || Boolean(pending.current)} onChange={e => setCount(Number(e.target.value))}>
-          {[1, 2, 3].map(n => <option key={n} value={n}>{n}개</option>)}</select></label>
+      <fieldset className="learning-setting-group" disabled={settingsDisabled}>
+        <legend>시작 방식</legend>
+        <div className="learning-mode-options">
+          {[{ value: 'attended', label: '수업 후 회상', description: '자료를 보지 않고 먼저 설명해요' },
+            { value: 'new', label: '처음 배우기', description: '짧은 설명을 읽고 직접 설명해요' }].map(mode =>
+            <label key={mode.value} className="learning-choice learning-mode-choice">
+              <input type="radio" name="learning-mode" value={mode.value} aria-label={mode.label}
+                checked={familiarity === mode.value} onChange={() => setFamiliarity(mode.value)} />
+              <span><strong>{mode.label}</strong><small>{mode.description}</small></span>
+            </label>)}
+        </div>
+      </fieldset>
+      <div className="learning-setting-grid">
+        <fieldset className="learning-setting-group" disabled={settingsDisabled}>
+          <legend>목표 시간</legend>
+          <div className="learning-choice-options">{[10, 15, 20, 30].map(n =>
+            <label key={n} className="learning-choice">
+              <input type="radio" name="learning-minutes" value={n} checked={minutes === n} onChange={() => setMinutes(n)} />{n}분
+            </label>)}</div>
+        </fieldset>
+        <fieldset className="learning-setting-group" disabled={settingsDisabled}>
+          <legend>개념 수</legend>
+          <div className="learning-choice-options">{[1, 2, 3].map(n =>
+            <label key={n} className="learning-choice">
+              <input type="radio" name="learning-count" value={n} checked={count === n} onChange={() => setCount(n)} />{n}개
+            </label>)}</div>
+        </fieldset>
       </div>
-      <p className="learning-muted">시간은 분량을 정하는 참고값이에요. 시간이 지나도 강제로 종료하지 않아요.</p>
+      <p className="learning-caption">목표 시간은 분량을 정하는 기준이에요. 시간이 지나도 학습은 계속할 수 있어요.</p>
+      <div className="learning-flow" aria-label="학습 순서">
+        {familiarity === 'new' ? '짧은 설명 → 직접 설명 → 보완 → 기초 확인' : '기억에서 설명 → 보완 → 기초 확인'}
+      </div>
       {error && <div className="learning-notice learning-error" role="alert">{error}</div>}
-      <button type="button" className="primary" disabled={busy || loading || !scopes || !selected.length || chars > scopes.max_chars} onClick={() => { void start(); }}>
-        {busy ? '학습을 여는 중…' : pending.current ? '같은 요청 다시 확인' : '학습 시작'}
-      </button>
+      {!error && !scopes && !loading && <p className="learning-caption">과목과 자료를 선택하면 학습할 범위를 확인할 수 있어요.</p>}
+      <div className="learning-start-actions">
+        <button type="button" className="primary" disabled={busy || loading || !scopes || !selected.length || chars > scopes.max_chars} onClick={() => { void start(); }}>
+          {busy ? '학습을 여는 중…' : pending.current ? '이전 요청 결과 확인' : '학습 시작'}
+        </button>
+        <span className="learning-caption">목표 {minutes}분 · {count}개 개념</span>
+      </div>
     </section><LearningResume />
   </>;
 }

@@ -48,9 +48,10 @@ export async function learningRequest<T>(path: string, method = 'GET', body?: un
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = data?.detail;
-    throw new LearningApiError(typeof detail?.message === 'string' ? detail.message :
+    const code = typeof detail?.error_code === 'string' ? detail.error_code : 'REQUEST_FAILED';
+    throw new LearningApiError(code === 'SETUP_REQUIRED' ? '학습 세션을 아직 사용할 수 없어요. 관리자에게 문의해주세요.' : typeof detail?.message === 'string' ? detail.message :
       (typeof detail === 'string' ? detail : Array.isArray(detail) ? '입력한 내용과 학습 범위를 확인해주세요.' : '학습 기록을 불러오지 못했습니다.'),
-    response.status, typeof detail?.error_code === 'string' ? detail.error_code : 'REQUEST_FAILED');
+    response.status, code);
   }
   return data as T;
 }
