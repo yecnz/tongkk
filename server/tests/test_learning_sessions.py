@@ -407,3 +407,20 @@ def test_failed_preparation_can_restart_after_abandoning():
         assert fresh["pack"]["id"] == b["pack"]["id"] and fresh["session"]["id"] != b["session"]["id"]
         assert fresh["session"]["status"] == "preparing" and op
     asyncio.run(scenario())
+
+
+def test_skip_is_distinguished_from_unattempted_items_in_results():
+    async def scenario():
+        service, b = await ready(2)
+        b, _ = await service.command(USER, b["session"]["id"], "actions", cmd(b, Action, action="skip"))
+        assert b["session"]["status"] == "active"
+        b, _ = await service.command(USER, b["session"]["id"], "actions", cmd(b, Action, action="finish"))
+        view = SessionView.model_validate(public_view(b)).model_dump()
+        assert view["result"][0]["skipped"] is True
+        assert view["result"][1]["skipped"] is False
+        assert all(item["recall"] == "ungraded" for item in view["result"])
+        # Completed records saved before skip metadata existed still deserialize.
+        for item in b["session"]["result"]:
+            item.pop("skipped", None)
+        assert all(not item["skipped"] for item in SessionView.model_validate(public_view(b)).model_dump()["result"])
+    asyncio.run(scenario())

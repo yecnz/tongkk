@@ -156,6 +156,7 @@ class ResultItem(BaseModel):
     prior_instruction: bool
     repeated: bool
     reported: bool
+    skipped: bool = False
 
 
 class SessionView(BaseModel):

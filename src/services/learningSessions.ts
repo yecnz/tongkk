@@ -12,7 +12,7 @@ export type Feedback = { criteria: {
 export type SessionResult = {
   title: string; recall: 'sufficient' | 'needs_review' | 'uncertain' | 'ungraded' | 'self_report';
   check: 'correct' | 'incorrect' | 'ungraded'; assisted: boolean; prior_instruction: boolean;
-  repeated: boolean; reported: boolean;
+  repeated: boolean; reported: boolean; skipped?: boolean;
 };
 export type LearningSession = {
   id: string; course_id: string; material_id: string; material_name: string;

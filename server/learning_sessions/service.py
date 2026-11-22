@@ -66,7 +66,7 @@ def results(bundle):
                        "assisted": bool(data.get("help")),
                        "prior_instruction": data.get("prior_instruction", False) or bool(check),
                        "repeated": bundle["session"].get("repeated", False),
-                       "reported": bool(data.get("report"))})
+                       "reported": bool(data.get("report")), "skipped": bool(data.get("skipped"))})
     return output
 
 
@@ -373,6 +373,8 @@ class Service:
             elif req.action == "advance" and item["phase"] in {"recall_feedback", "repair"}:
                 item["phase"] = "check_answering"
             elif req.action in {"advance", "skip"}:
+                if req.action == "skip":
+                    data["skipped"] = True
                 item["phase"] = "done"
                 following = next((i for i in bundle["items"] if i["position"] == item["position"] + 1), None)
                 if following:
