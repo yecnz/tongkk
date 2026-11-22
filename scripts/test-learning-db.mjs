@@ -30,6 +30,7 @@ await db.query('insert into materials values ($1,$2,$3,$4)', [course, 'lecture:1
 await db.exec(migration);
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230002_learning_history.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230003_learning_concepts.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230004_review_cards.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -64,6 +65,19 @@ await db.query("update learning_sessions set status='completed' where id=$1",[st
 const repeatedConcept = await write(bundle(), -1);
 const repeatedId = (await db.query('select learning_session_concepts($1,$2) as data',[user,repeatedConcept.session.id])).rows[0].data[0].id;
 check(repeatedId === conceptRows[0].id, 'Same concept in another session retains its identity');
+const reviewCard=(await db.query('select review_seed($1,$2,$3) as data',[user,stored.session.id,stored.items[0].id])).rows[0].data;
+const duplicateCard=(await db.query('select review_seed($1,$2,$3) as data',[user,stored.session.id,stored.items[0].id])).rows[0].data;
+check(reviewCard.id === duplicateCard.id,'Seeding review cards is idempotent');
+check((await db.query('select review_list($1,false,30) as data',[other])).rows[0].data.length===0,'Other owner cannot list review cards');
+const attemptId=randomUUID();
+await db.query('select review_claim($1,$2,$3,$4,false)',[user,reviewCard.id,attemptId,'답변']);
+await db.exec('savepoint busy_review');
+await rejects(()=>db.query('select review_claim($1,$2,$3,$4,false)',[user,reviewCard.id,randomUUID(),'동시 답변']),/LS_BUSY/);
+await db.exec('rollback to savepoint busy_review');
+await db.query("select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,3,true)",[user,reviewCard.id,attemptId,JSON.stringify({criteria:[]}),JSON.stringify({})]);
+await db.query("select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,3,true)",[user,reviewCard.id,attemptId,JSON.stringify({criteria:[]}),JSON.stringify({})]);
+const reviewed=(await db.query('select review_context($1,$2) as data',[user,reviewCard.id])).rows[0].data;
+check(reviewed.card.successful_reviews===1,'Repeated completion does not advance a schedule twice');
 const changedText = text + '수정';
 await db.query('update materials set markdown=$1 where course_id=$2 and id=$3',[changedText,course,'lecture:100']);
 const changedConcept = bundle(); changedConcept.pack.source_hash=createHash('sha256').update(changedText).digest('hex');
