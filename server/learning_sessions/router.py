@@ -60,6 +60,12 @@ async def history_detail(session_id: UUID, auth=Depends(session_user), service=D
     return history_view(await service.repo.load(auth[0], str(session_id)))
 
 
+@router.get('/{session_id}/concepts')
+async def concepts(session_id: UUID, auth=Depends(session_user), service=Depends(get_service)):
+    await service.repo.load(auth[0], str(session_id))
+    return {'concepts': await service.repo._rpc('learning_session_concepts', {'p_user': auth[0], 'p_session': str(session_id)})}
+
+
 @router.get("/{session_id}", response_model=SessionView)
 async def read(session_id: UUID, auth=Depends(session_user), service=Depends(get_service)):
     return public_view(await service.repo.load(auth[0], str(session_id)))
