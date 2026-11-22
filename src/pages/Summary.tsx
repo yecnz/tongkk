@@ -10,6 +10,7 @@ import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, S
 import { useTutorial } from "../TutorialContext";
 import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { summarizeWithTemplate, type SummaryTemplate } from "../services/gpt";
+import { resolveSummaryRequest } from '../services/summaryGeneration';
 import { summarizeWithTemplateStream } from "../services/summaryStream";
 import { useAuth } from "../AuthContext";
 import { useSampleDemo } from "../SampleDemoContext";
@@ -20,7 +21,6 @@ import {
   deleteSummaryById,
   loadSummariesFromServer,
   saveSummaryToServer,
-  sameSummaryOptions,
   type SavedSummary,
 } from "../services/summaries";
 import { deleteQuizSetById, loadQuizSetsFromServer, type SavedQuizSet } from "../services/quizSets";
@@ -3331,6 +3331,8 @@ export default function Summary() {
   const [summaryPageRange, setSummaryPageRange] = useState("");
   const [summaryFocusPrompt, setSummaryFocusPrompt] = useState("");
   // 같은 자료·템플릿 요약이 이미 있을 때 "기존 요약 보기 / 새로 생성"을 묻는 모달.
+  const summaryCommandRef = useRef(false);
+  const pendingSummarySave = useRef<{ course: string; summary: SavedSummary } | null>(null);
   const [duplicateSummaryPrompt, setDuplicateSummaryPrompt] = useState<SavedSummary | null>(null);
   const [materialDetailInitialTab, setMaterialDetailInitialTab] = useState<MaterialDetailTab>("original");
   // 요약을 막 완성하면 자료 상세의 '요약' 탭으로 착지한다(handleTemplateSelect). 그 순간
@@ -3989,7 +3991,8 @@ export default function Summary() {
     showToast(`자료 ${deleted.length}개를 삭제했어요.`, "info");
   };
 
-  const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates") => {
+  const handleTemplateSelect = async (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }, backView: SummaryView = "templates", force = false) => {
+    if (summaryCommandRef.current) return;
     // 실패 시 "같은 설정으로 다시 시도"가 마지막 생성 인자를 그대로 재사용한다.
     lastSummaryArgsRef.current = { template, opts, backView };
     writeLastSummaryTemplate(template);
@@ -3998,7 +4001,8 @@ export default function Summary() {
     setSummaryError("");
 
     if (selectedMarkdown) {
-      // "요약 새로 생성"은 같은 자료여도 항상 새로 만든다(중복 허용). 기존 요약을 재사용하지 않는다.
+      summaryCommandRef.current = true;
+      pendingSummarySave.current = null;
       setIsSummarizing(true);
       setSummaryText("");
       setActiveSummaryId(null);
@@ -4010,6 +4014,9 @@ export default function Summary() {
       const generatedMaterialIds = [...selectedMaterialIds];
       const startTime = Date.now();
       try {
+        const { identity, existing } = await resolveSummaryRequest(selectedCourse, selectedMarkdown, selectedMaterials, template, opts, force);
+        if (existing) { setDuplicateSummaryPrompt(existing); return; }
+        const generationId = crypto.randomUUID();
         // 요약 성공 시 자료 상세로 이동했는지 표시. 이동하지 못하면 결과 화면으로 폴백한다.
         let movedToDetail = false;
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 작성 중...`);
@@ -4052,9 +4059,12 @@ export default function Summary() {
             materialNames: selectedMaterialNames,
             pageRange: opts?.pageRange,
             focusPrompt: opts?.focusPrompt,
+            sourceHash: identity.source_hash, requestKey: identity.request_key,
+            generationConfig: identity.generation_config, generationId,
           };
-          // 같은 자료·템플릿·페이지 범위·추가 지시면 서버가 기존 요약을 덮어쓴다(upsert) — 생성 전 확인 모달에서 안내한다.
+          pendingSummarySave.current = { course: selectedCourse, summary: savedSummary };
           const persistedSummary = await saveSummaryToServer(selectedCourse, savedSummary);
+          pendingSummarySave.current = null;
           setActiveSummaryId(persistedSummary.id || null);
           persistedId = persistedSummary.id;
           persistedAt = persistedSummary.createdAt;
@@ -4097,7 +4107,8 @@ export default function Summary() {
           setView("summaryResult");
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "요약 실패";
+        const message = pendingSummarySave.current ? '요약은 완성됐지만 저장하지 못했어요. 다시 시도하면 저장만 재시도해요.'
+          : err instanceof Error ? err.message : "요약 실패";
         setSummaryError(message);
         setElapsedTime(((Date.now() - startTime) / 1000).toFixed(1));
         if (!isMountedRef.current) {
@@ -4106,6 +4117,7 @@ export default function Summary() {
           setView("summaryResult"); // 실패 시에만 에러·재시도를 결과 화면에서 보여준다.
         }
       } finally {
+        summaryCommandRef.current = false;
         setIsSummarizing(false);
         setLoadingStep("");
       }
@@ -4116,32 +4128,32 @@ export default function Summary() {
     }
   };
 
-  // 설정 화면 하단 "요약 생성하기". 같은 자료·템플릿·페이지 범위·추가 지시 요약이 이미 있으면
-  // 서버가 덮어쓰므로, 생성 전에 "기존 요약 보기 / 새로 생성"을 먼저 묻는다.
   const settingsSummaryOptions = { pageRange: selectedHasPageMarkers ? summaryPageRange : "", focusPrompt: summaryFocusPrompt };
-  const startSummaryFromSettings = () => {
-    void handleTemplateSelect(summaryTemplate, settingsSummaryOptions, "upload");
+  const startSummaryFromSettings = (force = false) => {
+    void handleTemplateSelect(summaryTemplate, settingsSummaryOptions, "upload", force);
   };
+  const handleGenerateFromSettings = () => startSummaryFromSettings();
 
-  const handleGenerateFromSettings = () => {
-    const existing = summaries
-      .filter(item =>
-        item.template === summaryTemplate
-        && sameMaterialIds(item.materialIds, selectedMaterialIds)
-        && sameSummaryOptions(item, settingsSummaryOptions))
-      .sort((a, b) => b.createdAt - a.createdAt)[0];
-    if (existing?.content) {
-      setDuplicateSummaryPrompt(existing);
-      return;
-    }
-    startSummaryFromSettings();
+  const retrySummarySave = async () => {
+    const pending = pendingSummarySave.current;
+    if (!pending || summaryCommandRef.current) return;
+    summaryCommandRef.current = true; setIsSummarizing(true); setSummaryError('');
+    try {
+      const saved = await saveSummaryToServer(pending.course, pending.summary);
+      pendingSummarySave.current = null;
+      setActiveSummaryId(saved.id || null);
+      setSummaries(previous => [saved, ...previous.filter(item => item.id !== saved.id)]);
+    } catch { setSummaryError('요약을 저장하지 못했어요. 다시 시도해주세요.'); }
+    finally { summaryCommandRef.current = false; setIsSummarizing(false); }
   };
 
   const openExistingSummary = (summary: SavedSummary) => {
     setSelectedTemplate(summary.template);
     setActiveSummaryId(summary.id || null);
     setSummaryText(summary.content);
-    setSummaryPages("");
+    setSummaryPages(summary.pageRange || "");
+    setSummaryPageRange(summary.pageRange || "");
+    setSummaryFocusPrompt(summary.focusPrompt || "");
     setIsSummarizing(false);
     setSummaryError("");
     setElapsedTime(null);
@@ -4274,14 +4286,14 @@ export default function Summary() {
             <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "var(--color-text)", wordBreak: "keep-all" }}>
               같은 자료·같은 설정의 <b style={{ color: "var(--color-text-strong)" }}>{templateLabels[duplicateSummaryPrompt.template]}</b> 요약을{" "}
               {formatHubDate(duplicateSummaryPrompt.createdAt)}에 만들었어요.
-              새로 생성하면 <b style={{ color: "var(--color-text-strong)" }}>기존 요약을 덮어쓰게 돼요</b>.
+              새로 생성하면 <b style={{ color: "var(--color-text-strong)" }}>이전 요약도 그대로 보관돼요</b>.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
                 type="button"
                 onClick={() => {
                   setDuplicateSummaryPrompt(null);
-                  startSummaryFromSettings();
+                  startSummaryFromSettings(true);
                 }}
                 style={{
                   padding: "9px 16px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
@@ -4416,8 +4428,9 @@ export default function Summary() {
             initialTutorQuestion={pendingTutorQuestion}
             onGoToQuiz={selectedCourse ? handleGoToQuiz : undefined}
             onRetry={lastSummaryArgsRef.current ? () => {
+              if (pendingSummarySave.current) { void retrySummarySave(); return; }
               const args = lastSummaryArgsRef.current;
-              if (args) void handleTemplateSelect(args.template, args.opts, args.backView);
+              if (args) void handleTemplateSelect(args.template, args.opts, args.backView, true);
             } : undefined}
           />
         )}

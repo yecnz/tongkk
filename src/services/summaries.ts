@@ -185,9 +185,22 @@ export async function prepareSummaryIdentity(course: string, markdown: string, m
   return response.json();
 }
 
+export async function findReusableSummary(course: string, requestKey: string): Promise<SavedSummary | null> {
+  const courseId = await getCourseId(course);
+  const user = await requireSupabaseUser();
+  if (!courseId) throw new Error('과목을 찾을 수 없어요.');
+  const { data, error } = await supabase.from('summaries')
+    .select('id, template, content, material_ids, page_range, focus_prompt, source_hash, request_key, generation_config, generation_id, created_at')
+    .eq('user_id', user.id).eq('course_id', courseId).eq('request_key', requestKey)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(formatSupabaseError(error));
+  return data?.content?.trim() ? toSavedSummary(data) : null;
+}
+
 export async function saveSummaryToServer(course: string, summary: SavedSummary): Promise<SavedSummary> {
   const courseId = await getCourseId(course);
-  if (!courseId) return summary;
+  if (!courseId) throw new Error('과목을 찾을 수 없어요.');
+  if (!summary.content.trim()) throw new Error('빈 요약은 저장할 수 없어요.');
 
   const user = await requireSupabaseUser();
   const materialIds = summary.materialIds || [];
