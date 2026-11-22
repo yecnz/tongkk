@@ -36,9 +36,27 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: pip install --require-hashes -r requirements-dev.txt
       - name: Backend tests (pytest)
         run: python -m pytest -q
 
       - name: Offline quality regression
         run: python scripts/evaluate_quality.py
+
+  backend-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t tongkk-backend -f server/Dockerfile server
+      - name: Verify document tools
+        run: docker run --rm tongkk-backend sh -c 'libreoffice --version && tesseract --list-langs && ffmpeg -version && python -c "import main, fitz, markitdown"'
+      - name: Health smoke test
+        run: |
+          docker run -d --name tongkk-health -p 127.0.0.1:8000:8000 tongkk-backend
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs tongkk-health
+          exit 1
