@@ -15,6 +15,7 @@
     "audit": "npm audit --audit-level=high",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "test": "vitest run",
+    "test:learning-db": "node scripts/test-learning-db.mjs",
     "test:watch": "vitest",
     "preview": "vite preview"
   },
@@ -33,6 +34,7 @@
     "remark-math": "^6.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.17",
     "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.3.5",
     "@types/react": "^19.2.14",
@@ -43,6 +45,7 @@
     "eslint-plugin-react-hooks": "7.0.1",
     "eslint-plugin-react-refresh": "^0.5.8",
     "globals": "^17.14.0",
+    "jsdom": "27.4.0",
     "tailwindcss": "^4.3.5",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.73.0",

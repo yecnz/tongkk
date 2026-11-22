@@ -5,20 +5,25 @@ import { invalidateMaterialsCache } from "./services/materials";
 import { invalidateQuizSetsCache } from "./services/quizSets";
 import { invalidateSummariesCache } from "./services/summaries";
 import { supabase } from "./services/supabase";
-import { BACKEND_URL, parseApiError } from "./services/backend";
+import { BACKEND_URL } from "./services/backend";
+import { clearLearningDrafts } from "./services/learningSessions";
+import { AuthActionError, authErrorMessage, authResponseError, cleanAuthCallbackUrl, readAuthCallback } from "./services/authFlow";
+import { sendAuthEmail, startEmailCooldown } from "./services/authEmails";
 
 type AuthContextValue = {
   user: User | null;
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
   updateEmail: (newEmail: string) => Promise<void>;
   // 비밀번호 재설정 메일 링크로 진입한 상태(새 비밀번호 입력 단계). true면 자동 로그인 대신 재설정 폼을 띄운다.
   recoveryMode: boolean;
+  authCallbackError: string | null;
   endRecovery: () => void;
 };
 
@@ -27,12 +32,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  // recovery 링크는 implicit 플로우의 해시(#...type=recovery)로 돌아온다. Supabase 클라이언트가
-  // 해시를 처리하며 PASSWORD_RECOVERY 이벤트를 쏘지만, 그 전에 user가 먼저 채워져 대시보드로
-  // 리다이렉트되는 레이스를 막기 위해 초기값을 해시에서 동기적으로 읽어 둔다.
-  const [recoveryMode, setRecoveryMode] = useState(
-    () => typeof window !== "undefined" && window.location.hash.includes("type=recovery"),
-  );
+  // SDK가 URL을 소비하기 전에 읽는다. 복구 링크를 일반 로그인으로 오인하지 않는다.
+  const [callback] = useState(() => readAuthCallback(window.location.href));
+  const [recoveryMode, setRecoveryMode] = useState(callback.isRecovery);
+  const [authCallbackError, setAuthCallbackError] = useState<string | null>(callback.error);
   // 직전 user id. 사용자가 바뀌면(로그아웃 → null 포함) 서비스 메모리 캐시를 전부 비워,
   // stale TTL(30분) 동안 같은 브라우저의 다음 사용자에게 이전 사용자의 과목/자료/요약/퀴즈
   // 목록이 노출되는 것을 막는다. undefined는 '아직 모름'(앱 시작) — 첫 확인은 무효화하지 않는다.
@@ -40,10 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let initializing = true;
 
     const syncCachesWithUser = (nextSession: Session | null) => {
       const nextUserId = nextSession?.user?.id ?? null;
       if (lastUserIdRef.current !== undefined && lastUserIdRef.current !== nextUserId) {
+        if (lastUserIdRef.current) clearLearningDrafts(lastUserIdRef.current);
         invalidateCoursesCache();
         invalidateMaterialsCache();
         invalidateSummariesCache();
@@ -52,25 +57,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastUserIdRef.current = nextUserId;
     };
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      syncCachesWithUser(data.session);
-      setSession(data.session);
-      setLoading(false);
-    });
-
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
+      if (!mounted) return;
+      if (event === "PASSWORD_RECOVERY") {
+        setRecoveryMode(true);
+        setAuthCallbackError(null);
+      }
+      if (event === "SIGNED_OUT") setRecoveryMode(false);
       syncCachesWithUser(nextSession);
       setSession(nextSession);
-      setLoading(false);
+      if (!initializing) setLoading(false);
     });
+
+    void (async () => {
+      try {
+        const { error: callbackError } = await supabase.auth.initialize();
+        const { data, error } = await supabase.auth.getSession();
+        if (!mounted) return;
+        syncCachesWithUser(data.session);
+        setSession(data.session);
+        if (callback.error || callbackError) {
+          setAuthCallbackError(callback.error || authErrorMessage(callbackError, '인증 링크를 확인할 수 없습니다. 새 메일을 요청해주세요.'));
+          setRecoveryMode(false);
+        } else if (error) {
+          setAuthCallbackError(authErrorMessage(error, '로그인 상태를 확인하지 못했습니다. 다시 로그인해주세요.'));
+          setRecoveryMode(false);
+        } else if (callback.isRecovery && !data.session) {
+          setAuthCallbackError('재설정 세션이 만료되었습니다. 새 메일을 요청해주세요.');
+          setRecoveryMode(false);
+        }
+        if (callback.hasCallback) window.history.replaceState(window.history.state, '',
+          cleanAuthCallbackUrl(window.location.href, Boolean(callback.error || callbackError || callback.isRecovery && !data.session)));
+      } catch {
+        if (mounted) {
+          setAuthCallbackError('로그인 상태를 확인하지 못했습니다. 다시 시도해주세요.');
+          setRecoveryMode(false);
+        }
+      } finally {
+        initializing = false;
+        if (mounted) setLoading(false);
+      }
+    })();
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [callback]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user: session?.user || null,
@@ -82,31 +115,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      if (!response.ok) throw new Error(await parseApiError(response));
-      const tokens = await response.json() as { access_token?: string; refresh_token?: string };
-      if (!tokens.access_token || !tokens.refresh_token) {
-        throw new Error("로그인 토큰을 받지 못했습니다.");
+      if (!response.ok) throw await authResponseError(response);
+      const tokens = await response.json().catch(() => null) as { access_token?: string; refresh_token?: string } | null;
+      if (!tokens?.access_token || !tokens?.refresh_token) {
+        throw new AuthActionError('', 'invalid_auth_response');
       }
       const { error } = await supabase.auth.setSession({
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
       });
       if (error) throw error;
+      setAuthCallbackError(null);
+      setRecoveryMode(false);
     },
     signUp: async (email, password) => {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password,
+        options: { emailRedirectTo: `${window.location.origin}/auth` } });
       if (error) throw error;
+      setAuthCallbackError(null);
+      if (!data.session) startEmailCooldown('signup', email);
+      return { needsEmailConfirmation: !data.session };
     },
     signOut: async () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-    resetPassword: async (email) => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
-      if (error) throw error;
-    },
+    resetPassword: email => sendAuthEmail('reset', email),
+    resendConfirmation: email => sendAuthEmail('signup', email),
     // recovery 링크로 진입한 사용자가 새 비밀번호를 설정한다. (현재 세션은 recovery 토큰으로 인증됨)
     updatePassword: async (newPassword) => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -118,8 +153,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
     },
     recoveryMode,
-    endRecovery: () => setRecoveryMode(false),
-  }), [loading, session, recoveryMode]);
+    authCallbackError,
+    endRecovery: () => {
+      window.history.replaceState(window.history.state, '', cleanAuthCallbackUrl(window.location.href));
+      setRecoveryMode(false); setAuthCallbackError(null);
+    },
+  }), [loading, session, recoveryMode, authCallbackError]);
 
   return (
     <AuthContext.Provider value={value}>

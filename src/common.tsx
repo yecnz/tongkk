@@ -84,6 +84,7 @@ export const escapeStrayMultiplication = (text: string): string => {
 export const pageRoutes = {
   "대시보드": "/",
   "학습 캘린더": "/calendar",
+  "학습 세션": "/learn",
   "자료 요약": "/summary",
   "퀴즈 생성": "/quiz",
   "오답 노트": "/review",

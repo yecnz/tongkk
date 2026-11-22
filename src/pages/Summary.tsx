@@ -2054,6 +2054,7 @@ const MaterialDetailView = ({
   onTabChange,
   onRequestDelete,
 }: MaterialDetailViewProps) => {
+  const learningNavigate = useNavigate();
   const [activeTab, setActiveTab] = useState<MaterialDetailTab>(initialTab);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
@@ -2543,6 +2544,10 @@ const MaterialDetailView = ({
       <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>{backLabel}</button>
+      <button type="button" onClick={() => learningNavigate(`/learn?${new URLSearchParams({ course: selectedCourse, material: material.id })}`)} style={{
+        marginLeft: 16, marginBottom: 20, padding: "8px 12px", borderRadius: 10,
+        border: "none", background: "var(--color-tint-pink)", color: "var(--color-pink-deep)", cursor: "pointer", fontSize: 13, fontWeight: 600,
+      }}>직접 설명하며 학습하기 →</button>
       <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{
           flexShrink: 0,
@@ -4572,8 +4577,8 @@ export default function Summary() {
                         const isFailed = status.state === "failed";
                         const isDone = status.state === "done";
                         const isDuplicate = status.state === "duplicate";
-                        const tone = isFailed ? "var(--color-danger)" : isDone ? "var(--color-success)" : isDuplicate ? "var(--color-amber-deep)" : status.state === "previewing" ? CYAN : PINK;
-                        const background = isFailed ? "var(--color-tint-pink)" : isDone ? "var(--color-tint-green)" : isDuplicate ? "var(--color-tint-yellow)" : "var(--color-tint-pink)";
+                        const tone = isFailed ? "var(--color-danger)" : isDone ? CYAN : isDuplicate ? "var(--color-amber-deep)" : status.state === "previewing" ? CYAN : PINK;
+                        const background = isFailed ? "var(--color-tint-pink)" : isDone ? "var(--color-tint-cyan)" : isDuplicate ? "var(--color-tint-yellow)" : "var(--color-tint-pink)";
                         const linkedMaterial = status.materialId ? materials.find(material => material.id === status.materialId) : null;
 
                         return (
@@ -4654,8 +4659,8 @@ export default function Summary() {
 
                 {materials.length > 0 && (
                   <div style={{
-                    padding: "12px 16px", borderRadius: 10, background: "var(--color-tint-pink)",
-                    fontSize: 13, color: PINK, marginBottom: 14, fontWeight: 800,
+                    padding: "4px 0", fontSize: 13, color: "var(--color-text-secondary)",
+                    marginBottom: 14, fontWeight: 500,
                   }}>
                     저장된 강의자료 {materials.length}개 중 {selectedMaterials.length}개가 요약에 반영됩니다
                   </div>
@@ -4699,11 +4704,9 @@ export default function Summary() {
                             : [...prev, material.id]
                         )}
                         style={{
-                          display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px",
-                          background: isSelected ? "var(--color-tint-pink)" : "var(--color-card)",
-                          border: isSelected ? "1.5px solid color-mix(in srgb, var(--color-pink) 27%, transparent)" : `1px solid ${BORDER_COLOR}`,
-                          // 선택 행은 왼쪽 핑크 바로 또렷하게, 나머지 행은 hover로 생동감을 준다(색은 그대로 두고 위계·깊이로 밋밋함 해소).
-                          boxShadow: isSelected ? "inset 3px 0 0 var(--color-pink)" : "none",
+                          display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                          background: isSelected ? "var(--color-muted-surface)" : "var(--color-card)",
+                          border: "1px solid var(--color-border-soft)",
                           borderRadius: 10, marginBottom: 8, cursor: "pointer",
                           transition: "background 0.15s, border-color 0.15s",
                         }}>
@@ -4717,7 +4720,7 @@ export default function Summary() {
                           {isSelected && <span style={{ color: "var(--color-on-brand)", fontSize: 10, lineHeight: 1, fontWeight: 800 }}>✓</span>}
                         </div>
                         <FileIcon type={material.type} />
-                        <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)" }}>{material.name}</span>
+                        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontSize: 14, fontWeight: 600, color: "var(--color-text-strong)" }}>{material.name}</span>
                         {materialSummaryCount > 0 && (
                           <button
                             type="button"

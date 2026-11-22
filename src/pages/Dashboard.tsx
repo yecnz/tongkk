@@ -43,6 +43,7 @@ import {
   type PlanAction,
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
+import LearningResume from "../features/learningSession/LearningResume";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void; onAddAndUpload: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -1272,6 +1273,7 @@ export default function Dashboard() {
       </div>
 
       <div className="app-container">
+        <LearningResume key={user?.id || 'guest'} />
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
           <h2 className="m-0 text-xl font-extrabold leading-7 text-text-strong">
             공부 시작하기

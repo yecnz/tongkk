@@ -49,7 +49,7 @@ from config import (
     MAX_CHAT_IMAGE_CHARS,
 )
 
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -102,25 +102,30 @@ from llm import (
 )
 from auth import require_api_user
 import login_attempts
+import login_security
 
 
 app = FastAPI()
+
+from learning_sessions.router import router as learning_sessions_router
+
+app.include_router(learning_sessions_router)
 
 logger = logging.getLogger("tongkk")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    # 실제 쓰는 것만 허용: 엔드포인트는 POST·GET(/health)뿐이고 프리플라이트가 OPTIONS를 쓴다.
+    # 학습 세션의 초안 저장에 PATCH를 사용한다.
     # 프론트가 보내는 요청 헤더는 Authorization·Content-Type뿐(backend.ts getJsonRequestHeaders).
     # allow_credentials는 미설정(기본 False) 유지 — 쿠키가 아니라 Bearer 토큰 인증이라 불필요.
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["POST", "GET", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
 
 @app.post("/auth/login")
-async def login_with_password(payload: LoginRequest):
+async def login_with_password(payload: LoginRequest, request: Request):
     """앱 로그인 경로에서 계정별 실패를 5회로 제한한 뒤 Supabase Auth에 위임한다."""
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         raise HTTPException(status_code=503, detail="서버 인증 설정이 누락되었습니다.")
@@ -136,15 +141,16 @@ async def login_with_password(payload: LoginRequest):
     if retry_after > 0:
         return JSONResponse(
             status_code=429,
-            content={"detail": f"로그인 실패가 {LOGIN_MAX_FAILURES}회 누적되었습니다. {max(1, (retry_after + 59) // 60)}분 후 다시 시도해주세요."},
+            content={"detail": f"로그인 실패가 {LOGIN_MAX_FAILURES}회 누적되었습니다. {max(1, (retry_after + 59) // 60)}분 후 다시 시도해주세요.", "error_code": "account_locked"},
             headers={"Retry-After": str(retry_after)},
         )
 
+    auth_headers = login_security.upstream_headers(request)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(
                 f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
-                headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
+                headers=auth_headers,
                 json={"email": payload.email.strip(), "password": payload.password},
             )
     except httpx.HTTPError as exc:
@@ -172,7 +178,19 @@ async def login_with_password(payload: LoginRequest):
             headers={"Cache-Control": "no-store"},
         )
 
-    if response.status_code in {400, 401}:
+    try:
+        error_body = response.json()
+    except ValueError:
+        error_body = {}
+    if not isinstance(error_body, dict):
+        error_body = {}
+    error_code = error_body.get("code") or error_body.get("error_code")
+    # 구형 Auth의 invalid_grant 중에서도 자격 증명 오류만 횟수에 포함한다.
+    invalid_credentials = error_code == "invalid_credentials" or (
+        not error_code and error_body.get("error") == "invalid_grant"
+        and error_body.get("error_description") == "Invalid login credentials"
+    )
+    if response.status_code in {400, 401} and invalid_credentials:
         try:
             retry_after = await run_in_threadpool(login_attempts.record_failure, key)
         except sqlite3.Error as exc:
@@ -181,13 +199,20 @@ async def login_with_password(payload: LoginRequest):
         if retry_after > 0:
             return JSONResponse(
                 status_code=429,
-                content={"detail": f"로그인에 {LOGIN_MAX_FAILURES}회 실패해 {max(1, LOGIN_LOCK_SECONDS // 60)}분 동안 잠겼습니다."},
+                content={"detail": f"로그인에 {LOGIN_MAX_FAILURES}회 실패해 {max(1, LOGIN_LOCK_SECONDS // 60)}분 동안 잠겼습니다.", "error_code": "account_locked"},
                 headers={"Retry-After": str(retry_after)},
             )
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+        return JSONResponse(status_code=401, content={"detail": "이메일 또는 비밀번호가 올바르지 않습니다.", "error_code": "invalid_credentials"})
+
+    if error_code == "email_not_confirmed":
+        return JSONResponse(status_code=403, content={"detail": "이메일 인증을 완료해주세요. 인증 메일을 다시 받을 수 있습니다.", "error_code": "email_not_confirmed"})
+    if error_code == "user_banned":
+        return JSONResponse(status_code=403, content={"detail": "이 계정은 현재 로그인할 수 없습니다. 관리자에게 문의해주세요.", "error_code": "user_banned"})
 
     if response.status_code == 429:
-        raise HTTPException(status_code=429, detail="로그인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.")
+        raise HTTPException(status_code=429, detail="로그인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", headers={"Retry-After": "60"})
+    if response.status_code in {400, 401, 403, 422}:
+        raise HTTPException(status_code=400, detail="로그인 요청을 처리하지 못했습니다. 계정 상태를 확인하거나 잠시 후 다시 시도해주세요.")
     raise HTTPException(status_code=502, detail="인증 서버 응답을 처리할 수 없습니다.")
 
 md_converter = MarkItDown()

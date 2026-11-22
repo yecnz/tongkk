@@ -14,9 +14,12 @@ import ReviewNotes from "./pages/ReviewNotes";
 import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
+import LearningSession from "./pages/LearningSession";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
 import UpdatePrompt from "./UpdatePrompt";
+import { RESET_PASSWORD_PATH } from "./services/authFlow";
+import AuthCallbackBoundary from "./components/AuthCallbackBoundary";
 
 function AppShell() {
   const { user, loading } = useAuth();
@@ -59,6 +62,8 @@ function AppShell() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/summary" element={<Summary />} />
         <Route path="/quiz" element={<Quiz />} />
+        <Route path="/learn" element={<LearningSession />} />
+        <Route path="/learn/:sessionId" element={<LearningSession />} />
         <Route path="/review" element={<ReviewNotes />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/mypage" element={<MyPage />} />
@@ -76,10 +81,13 @@ function App() {
           <AuthGateProvider>
             <SampleDemoProvider>
               <TutorialProvider>
-                <Routes>
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/*" element={<AppShell />} />
-                </Routes>
+                <AuthCallbackBoundary>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path={RESET_PASSWORD_PATH} element={<Auth />} />
+                    <Route path="/*" element={<AppShell />} />
+                  </Routes>
+                </AuthCallbackBoundary>
               </TutorialProvider>
             </SampleDemoProvider>
           </AuthGateProvider>
