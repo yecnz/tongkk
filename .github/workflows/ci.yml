@@ -39,3 +39,6 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Backend tests (pytest)
         run: python -m pytest -q
+
+      - name: Offline quality regression
+        run: python scripts/evaluate_quality.py

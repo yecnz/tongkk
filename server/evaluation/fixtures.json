@@ -1,0 +1,29 @@
+{
+  "version": "quality-v1",
+  "origin": "manually-authored synthetic regression fixtures; not measured student performance",
+  "summary": [
+    {"id":"summary-grounded","pages":[1,2],"text":"# 분산 학습\n\n시간 간격을 두고 반복한다. [p.1]","expected":[]},
+    {"id":"summary-repeat","pages":[1],"text":"시간 간격을 두고 반복한다.\n\n시간 간격을 두고 반복한다.","expected":["REPEATED_PARAGRAPH"]},
+    {"id":"summary-unknown-page","pages":[1],"text":"설명 [p.9]","expected":["UNKNOWN_PAGE"]},
+    {"id":"summary-format","pages":[1],"text":"```python\nprint(1)","expected":["UNCLOSED_FENCE"]},
+    {"id":"summary-empty","pages":[1],"text":" ","expected":["EMPTY"]}
+  ],
+  "quiz": [
+    {"id":"quiz-basic","difficulty":"basic","type":"객관식","output":[{"question":"분산 학습 방법은?","options":["시간을 두고 반복","한 번에 전부"],"answer":0,"explanation":"시간 간격을 둔다."}],"reference_answer":0,"expected_valid":true,"expected_key_correct":true},
+    {"id":"quiz-transfer-wrong-key","difficulty":"transfer","type":"객관식","output":[{"question":"시험까지 7일일 때 분산 학습은?","options":["첫날 전부","매일 나누기"],"answer":0,"explanation":"매일 나누어 반복한다."}],"reference_answer":1,"expected_valid":true,"expected_key_correct":false},
+    {"id":"quiz-out-of-range","difficulty":"basic","type":"객관식","output":[{"question":"방법은?","options":["반복","몰아서"],"answer":4,"explanation":"시간 간격"}],"reference_answer":0,"expected_valid":false,"expected_key_correct":false},
+    {"id":"quiz-boolean-key","difficulty":"basic","type":"OX","output":[{"question":"분산은 몰아서 학습한다.","answer":false,"explanation":"간격을 둔다."}],"reference_answer":1,"expected_valid":false,"expected_key_correct":false}
+  ],
+  "grading": [
+    {"id":"grade-repeat-stable","scores":[80,80.2,79.9],"expected_scores":[80,80,80],"expected_pass":[true,true,true]},
+    {"id":"grade-boundary-instability","scores":[69.4,69.5,70.2],"expected_scores":[69,70,70],"expected_pass":[false,true,true]},
+    {"id":"grade-invalid","scores":[null,true,"80"],"expected_scores":[null,null,null],"expected_pass":[null,null,null]}
+  ],
+  "feedback": [
+    {"id":"source-clean","source":"분산 학습은 시간을 두고 반복한다.","quote":"시간을 두고 반복한다.","answer":"간격을 두고 반복해요.","student_quote":"간격을 두고 반복","status":"met","expected_valid":true},
+    {"id":"source-ocr-noise","source":"분산 학습은 시갼을 두고 반복한다.","quote":"시간을 두고 반복한다.","answer":"간격을 두고 반복해요.","student_quote":"간격을 두고 반복","status":"met","expected_valid":false},
+    {"id":"source-ocr-exact","source":"분산 학습은 시갼을 두고 반복한다.","quote":"시갼을 두고 반복한다.","answer":"간격을 두고 반복해요.","student_quote":"간격을 두고 반복","status":"met","expected_valid":true},
+    {"id":"student-invented-quote","source":"시간을 두고 반복한다.","quote":"시간을 두고 반복한다.","answer":"모르겠어요.","student_quote":"간격을 두고 반복","status":"met","expected_valid":false},
+    {"id":"uncertain-evidence","source":"시간을 두고 반복한다.","quote":"시간을 두고 반복한다.","answer":"잘 모르겠어요.","student_quote":"","status":"uncertain","expected_valid":true}
+  ]
+}
