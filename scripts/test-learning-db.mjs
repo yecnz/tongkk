@@ -31,6 +31,7 @@ await db.exec(migration);
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230002_learning_history.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230003_learning_concepts.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230004_review_cards.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230005_review_submission.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -39,7 +40,7 @@ function bundle() {
     pack: { id: packId, user_id: user, course_id: course, material_id: 'lecture:100', material_name: '자료',
       preparation_key: randomUUID(), source_hash: hash, selected_scope: { type: 'all' }, source_snapshot: text,
       source_units: [{ id: 'u0', text, start: 0, end: text.length }], concept_count: 1,
-      content_version: 'test-v1', content: { concepts: [{ title: '비공개 정답' }] }, status: 'ready' },
+      content_version: 'test-v1', content: { concepts: [{ title: '비공개 정답', question: '설명하세요', check: { question: '문제', options: ['정답','오답'], answer_index: 0, explanation: '근거' } }] }, status: 'ready' },
     session: { id: sessionId, user_id: user, course_id: course, pack_id: packId, status: 'active', familiarity: 'attended',
       target_minutes: 15, current_item_id: itemId, revision: 0, version: 0, calls: 0, repeated: false,
       result: [], created_at: new Date().toISOString(), completed_at: null },
@@ -69,15 +70,27 @@ const reviewCard=(await db.query('select review_seed($1,$2,$3) as data',[user,st
 const duplicateCard=(await db.query('select review_seed($1,$2,$3) as data',[user,stored.session.id,stored.items[0].id])).rows[0].data;
 check(reviewCard.id === duplicateCard.id,'Seeding review cards is idempotent');
 check((await db.query('select review_list($1,false,30) as data',[other])).rows[0].data.length===0,'Other owner cannot list review cards');
+await db.query("update review_cards set due_at=now()-interval '1 day' where id=$1",[reviewCard.id]);
 const attemptId=randomUUID();
-await db.query('select review_claim($1,$2,$3,$4,false)',[user,reviewCard.id,attemptId,'답변']);
+const claim=(await db.query('select review_start($1,$2,$3,$4,false) as data',[user,reviewCard.id,attemptId,'답변'])).rows[0].data;
+check(claim.claimed===true,'First request reserves one evaluation');
+check((await db.query('select review_start($1,$2,$3,$4,false) as data',[user,reviewCard.id,attemptId,'답변'])).rows[0].data.claimed===false,'Duplicate request does not reserve another AI call');
 await db.exec('savepoint busy_review');
-await rejects(()=>db.query('select review_claim($1,$2,$3,$4,false)',[user,reviewCard.id,randomUUID(),'동시 답변']),/LS_BUSY/);
+await rejects(()=>db.query('select review_start($1,$2,$3,$4,false)',[user,reviewCard.id,randomUUID(),'동시 답변']),/LS_BUSY/);
 await db.exec('rollback to savepoint busy_review');
-await db.query("select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,3,true)",[user,reviewCard.id,attemptId,JSON.stringify({criteria:[]}),JSON.stringify({})]);
-await db.query("select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,3,true)",[user,reviewCard.id,attemptId,JSON.stringify({criteria:[]}),JSON.stringify({})]);
-const reviewed=(await db.query('select review_context($1,$2) as data',[user,reviewCard.id])).rows[0].data;
+const feedback=JSON.stringify({criteria:[{status:'met'}]});
+await db.query('select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,null,false)',[user,reviewCard.id,attemptId,feedback,'{}']);
+await db.query('select review_check($1,$2,$3,0,3,true)',[user,reviewCard.id,attemptId]);
+await db.query('select review_check($1,$2,$3,0,3,true)',[user,reviewCard.id,attemptId]);
+let reviewed=(await db.query('select review_context($1,$2) as data',[user,reviewCard.id])).rows[0].data;
 check(reviewed.card.successful_reviews===1,'Repeated completion does not advance a schedule twice');
+const earlyId=randomUUID();
+await db.query('select review_start($1,$2,$3,$4,false)',[user,reviewCard.id,earlyId,'이른 연습']);
+await db.query('select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,null,false)',[user,reviewCard.id,earlyId,feedback,'{}']);
+await db.query('select review_check($1,$2,$3,0,7,true)',[user,reviewCard.id,earlyId]);
+reviewed=(await db.query('select review_context($1,$2) as data',[user,reviewCard.id])).rows[0].data;
+check(reviewed.card.successful_reviews===1,'Early practice cannot inflate retained performance');
+check((await db.query('select review_context($1,$2) as data',[other,reviewCard.id])).rows[0].data===null,'Review detail is owner scoped');
 const changedText = text + '수정';
 await db.query('update materials set markdown=$1 where course_id=$2 and id=$3',[changedText,course,'lecture:100']);
 const changedConcept = bundle(); changedConcept.pack.source_hash=createHash('sha256').update(changedText).digest('hex');

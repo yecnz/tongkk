@@ -1,3 +1,4 @@
+import { reviewRequest } from '../../services/reviews';
 import { useState } from 'react';
 import { Card } from '../../common';
 import { learningRequest, type LearningHistoryItem, type SessionSummary } from '../../services/learningSessions';
@@ -7,6 +8,7 @@ import LearningLink from './LearningLink';
 
 export default function LearningHistory({ sessionId }: { sessionId?: string }) {
   const [data, setData] = useState<{ items?: LearningHistoryItem[]; sessions?: SessionSummary[] } | null>(null);
+  const [cards, setCards] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function load() {
@@ -30,6 +32,13 @@ export default function LearningHistory({ sessionId }: { sessionId?: string }) {
       {item.check && <><h3>확인 문제</h3><Markdown text={item.check.question} />
         {item.check_result && <><p>내 선택: {item.check.options[item.check_result.selected]}</p><p>정답: {item.check.options[item.check_result.answer_index]}</p><Markdown text={item.check_result.explanation} /></>}</>}
       {Object.entries(item.help).filter(([, text]) => text).map(([kind, text]) => <details key={kind}><summary>{({ source: '원문', hint1: '첫 힌트', hint2: '추가 힌트', reference: '모범 설명' } as Record<string, string>)[kind] || '사용한 도움'}</summary><Markdown text={text!} /></details>)}
+      {sessionId && (cards[item.id] ? <LearningLink to={`/learn/review/${cards[item.id]}`} className="learning-button">복습 시작 →</LearningLink>
+        : <button type="button" disabled={busy} onClick={() => {
+          setBusy(true); setError('');
+          void reviewRequest<{ id: string }>('', 'POST', { session_id: sessionId, item_id: item.id })
+            .then(card => setCards(previous => ({ ...previous, [item.id]: card.id })))
+            .catch(e => setError(e instanceof Error ? e.message : '복습을 추가하지 못했어요.')).finally(() => setBusy(false));
+        }}>복습에 추가</button>)}
     </details>)}
   </Card>;
 }
