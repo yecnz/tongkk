@@ -11,6 +11,7 @@ vi.mock('../../services/learningSessions', async importOriginal => ({
   ...await importOriginal<typeof import('../../services/learningSessions')>(), learningRequest: request,
 }));
 vi.mock('./LearningResume', () => ({ default: () => null }));
+vi.mock('./ReviewOverview', () => ({ default: () => null }));
 import LearningSession from '../../pages/LearningSession';
 import { LearningApiError } from '../../services/learningSessions';
 let root: Root;

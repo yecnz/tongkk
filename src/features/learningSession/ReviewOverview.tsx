@@ -9,19 +9,20 @@ type Stats = { completed_sessions: number; initial_checks: number; initial_corre
   changed_cards: number; retention_checks: number; retention_correct: number };
 export default function ReviewOverview({ variant = 'dashboard' }: { variant?: 'dashboard' | 'all' | 'stats' }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const [data, setData] = useState<{ cards: ReviewCard[]; stats: Stats; fetchedAt: number } | null>(null);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let active = true;
     setData(null); setError('');
     Promise.all([variant === 'stats' ? Promise.resolve({ cards: [] }) : reviewRequest<{ cards: ReviewCard[] }>(`?due_only=${variant !== 'all'}`),
       reviewRequest<Stats>('/stats')]).then(([cards, stats]) => { if (active) setData({ ...cards, stats, fetchedAt: Date.now() }); })
       .catch(() => { if (active) setError('복습 기록을 불러오지 못했어요.'); });
     return () => { active = false; };
-  }, [user, retry, variant]);
-  if (!user) return null;
+  }, [userId, retry, variant]);
+  if (!userId) return null;
   const ratio = (correct: number, total: number) => total ? `${correct}/${total}회` : '아직 기록 없음';
   return <Card className="learning-resume" role="region" aria-label="복습 현황">
     <div className="learning-resume-heading"><div><h2>{variant === 'stats' ? '학습과 기억 유지' : variant === 'all' ? '내 복습 목록' : '오늘 복습'}</h2>

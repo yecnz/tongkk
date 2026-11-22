@@ -8,11 +8,12 @@ type Group = { feature: string; model: string; calls: number; failures: number; 
 const labels: Record<string,string> = {summary:'요약',quiz:'퀴즈',grading:'채점',wrong_analysis:'오답 분석',planning:'학습 계획',tutor:'튜터',document_vision:'문서 분석',learning_prepare:'학습 준비',learning_grade:'학습 평가',review_grade:'복습 평가'};
 export default function UsageOverview() {
   const { user } = useAuth();
+  const userId = user?.id;
   const [groups,setGroups] = useState<Group[] | null>(null);
   const [error,setError] = useState('');
   const [retry,setRetry] = useState(0);
   useEffect(()=>{
-    if (!user) return;
+    if (!userId) return;
     const controller=new AbortController();
     setGroups(null);setError('');
     (async()=>{
@@ -21,8 +22,8 @@ export default function UsageOverview() {
       const data=await response.json();if(!controller.signal.aborted)setGroups(data.groups);
     })().catch(()=>{if(!controller.signal.aborted)setError('사용량을 불러오지 못했어요.');});
     return ()=>controller.abort();
-  },[user,retry]);
-  if(!user)return null;
+  },[userId,retry]);
+  if(!userId)return null;
   return <Card className="learning-resume"><h2>AI 사용량 · 최근 30일</h2>
     <p className="learning-resume-message">서버 호출 기준이에요. 토큰이나 단가가 확인되지 않은 비용은 계산에서 제외해요. 실제 청구액과 다를 수 있어요.</p>
     {error?<div role="alert" className="learning-resume-error">{error}<button type="button" onClick={()=>setRetry(v=>v+1)}>다시 불러오기</button></div>:!groups?<p role="status">불러오는 중…</p>:groups.length===0?<p>기록이 없어요.</p>:

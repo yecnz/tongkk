@@ -1,7 +1,6 @@
 import json
 import io
 import logging
-import sqlite3
 import os
 import re
 import base64
@@ -62,6 +61,7 @@ from agent import run_study_agent, build_llm, build_openai_llm, thread_exists
 from grading import SUBJECTIVE_PASS_SCORE, normalize_subjective_score
 
 import convert_cache
+from conversion_jobs import run_conversion, cache_hit
 from prompts import (
     TEMPLATE_LABELS,
     TEMPLATE_INSTRUCTIONS,
@@ -1048,71 +1048,75 @@ async def convert_document_to_markdown(
     cache_key = _file_cache_key(file_bytes, suffix)
     cached_markdown = await run_in_threadpool(convert_cache.get_markdown, cache_key)
     if cached_markdown is not None:
+        cache_hit("markdown", suffix)
         return {"markdown": cached_markdown}
 
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
+    async def work():
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
 
-    try:
-        if suffix in SUPPORTED_IMAGE_EXTENSIONS:
-            # 1순위: 시각 분석 모델로 이미지를 읽고 해석한다(텍스트가 없는 그래프·도식도 처리).
-            analysis = ""
-            analysis_failed = False
-            try:
-                analysis = await run_in_threadpool(_analyze_uploaded_image, tmp_path)
-            except Exception:
-                logger.exception("업로드 이미지 시각 분석 실패")
-                analysis_failed = True
-            if analysis:
-                markdown = f"# 이미지 분석 결과\n\n{analysis}"
-                await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
+        try:
+            if suffix in SUPPORTED_IMAGE_EXTENSIONS:
+                # 1순위: 시각 분석 모델로 이미지를 읽고 해석한다(텍스트가 없는 그래프·도식도 처리).
+                analysis = ""
+                analysis_failed = False
+                try:
+                    analysis = await run_in_threadpool(_analyze_uploaded_image, tmp_path)
+                except Exception:
+                    logger.exception("업로드 이미지 시각 분석 실패")
+                    analysis_failed = True
+                if analysis:
+                    markdown = f"# 이미지 분석 결과\n\n{analysis}"
+                    await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
+                    return {"markdown": markdown}
+                # 폴백: 시각 분석 키가 없거나 결과가 비면 기존 Tesseract OCR로 글자만 추출한다.
+                text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
+                markdown = f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."
+                # 키 부재(열화)·분석 예외(일시 장애)로 폴백된 OCR-only 결과는 저장하지 않는다 —
+                # 키/장애 복구 후에도 TTL 동안 굳는 것을 막는다. 키가 있고 분석이 정상 수행됐다면
+                # '로고 → 유의미 없음 → OCR 폴백'도 유효한 결과이므로 저장한다(빈 결과는 제외).
+                if text and not analysis_failed and _visual_llm_ready():
+                    await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
                 return {"markdown": markdown}
-            # 폴백: 시각 분석 키가 없거나 결과가 비면 기존 Tesseract OCR로 글자만 추출한다.
-            text = await run_in_threadpool(_extract_image_text_with_tesseract, tmp_path)
-            markdown = f"# 이미지 OCR 결과\n\n{text}" if text else "# 이미지 OCR 결과\n\n인식된 텍스트가 없습니다."
-            # 키 부재(열화)·분석 예외(일시 장애)로 폴백된 OCR-only 결과는 저장하지 않는다 —
-            # 키/장애 복구 후에도 TTL 동안 굳는 것을 막는다. 키가 있고 분석이 정상 수행됐다면
-            # '로고 → 유의미 없음 → OCR 폴백'도 유효한 결과이므로 저장한다(빈 결과는 제외).
-            if text and not analysis_failed and _visual_llm_ready():
-                await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
-            return {"markdown": markdown}
 
-        # 1단계: 텍스트 레이어 추출 (PDF는 페이지 마커 포함)
-        if suffix == ".pdf":
-            pdf_markdown = await run_in_threadpool(_extract_pdf_markdown_with_page_markers, tmp_path)
-            if pdf_markdown:
-                base_markdown = pdf_markdown
+            # 1단계: 텍스트 레이어 추출 (PDF는 페이지 마커 포함)
+            if suffix == ".pdf":
+                pdf_markdown = await run_in_threadpool(_extract_pdf_markdown_with_page_markers, tmp_path)
+                if pdf_markdown:
+                    base_markdown = pdf_markdown
+                else:
+                    result = await run_in_threadpool(md_converter.convert, tmp_path)
+                    base_markdown = (result.text_content or "").strip()
             else:
                 result = await run_in_threadpool(md_converter.convert, tmp_path)
                 base_markdown = (result.text_content or "").strip()
-        else:
-            result = await run_in_threadpool(md_converter.convert, tmp_path)
-            base_markdown = (result.text_content or "").strip()
-        visual_markdown = ""
-        visual_failed = False
-        try:
-            visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
-        except Exception:
-            logger.exception("이미지/손글씨 분석 실패")
-            # 실패 안내문을 본문에 합치면 요약·퀴즈에 학습 내용처럼 섞이므로 넣지 않는다.
-            # (visual_failed면 캐시도 건너뛰어 키 복구 후 재분석된다.)
             visual_markdown = ""
-            visual_failed = True
-        markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
-        markdown = "\n\n---\n\n".join(markdown_parts)
-        # 시각 분석이 예외로 플레이스홀더가 됐거나, 분석이 필요한 자료인데 API 키 부재로
-        # 조용히 빠진 열화 결과는 저장하지 않는다(키 복구 후에도 TTL 동안 굳는 것 차단).
-        # 그 외(분석 완료·분석 대상 없음·모드 off)는 저장한다.
-        degraded = _should_analyze_visuals(base_markdown, suffix) and not _visual_llm_ready()
-        if not visual_failed and not degraded:
-            await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
-        return {"markdown": markdown}
-    except Exception as e:
-        logger.exception("/convert 처리 실패")
-        raise HTTPException(status_code=500, detail="문서 변환 중 오류가 발생했습니다.") from e
-    finally:
-        os.unlink(tmp_path)
+            visual_failed = False
+            try:
+                visual_markdown = await run_in_threadpool(_analyze_document_visuals, tmp_path, suffix, base_markdown)
+            except Exception:
+                logger.exception("이미지/손글씨 분석 실패")
+                # 실패 안내문을 본문에 합치면 요약·퀴즈에 학습 내용처럼 섞이므로 넣지 않는다.
+                # (visual_failed면 캐시도 건너뛰어 키 복구 후 재분석된다.)
+                visual_markdown = ""
+                visual_failed = True
+            markdown_parts = [part for part in [base_markdown, visual_markdown.strip()] if part]
+            markdown = "\n\n---\n\n".join(markdown_parts)
+            # 시각 분석이 예외로 플레이스홀더가 됐거나, 분석이 필요한 자료인데 API 키 부재로
+            # 조용히 빠진 열화 결과는 저장하지 않는다(키 복구 후에도 TTL 동안 굳는 것 차단).
+            # 그 외(분석 완료·분석 대상 없음·모드 off)는 저장한다.
+            degraded = _should_analyze_visuals(base_markdown, suffix) and not _visual_llm_ready()
+            if not visual_failed and not degraded:
+                await run_in_threadpool(convert_cache.set_markdown, cache_key, markdown)
+            return {"markdown": markdown}
+        except Exception as e:
+            logger.exception("/convert 처리 실패")
+            raise HTTPException(status_code=500, detail="문서 변환 중 오류가 발생했습니다.") from e
+        finally:
+            os.unlink(tmp_path)
+
+    return await run_conversion("markdown", suffix, work)
 
 
 @app.post("/preview/pdf")
@@ -1142,34 +1146,38 @@ async def convert_document_to_pdf_preview(
     preview_key = _preview_cache_key(file_bytes, suffix)
     cached_pdf = await run_in_threadpool(convert_cache.get_preview, preview_key)
     if cached_pdf is not None:
+        cache_hit("preview", suffix)
         return Response(
             content=cached_pdf,
             media_type="application/pdf",
             headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
         )
 
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
+    async def work():
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
 
-    try:
-        pdf_bytes = await run_in_threadpool(_convert_presentation_to_pdf, tmp_path)
-        await run_in_threadpool(convert_cache.set_preview, preview_key, pdf_bytes)
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
-        )
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("/preview/pdf 변환 실패")
-        raise HTTPException(status_code=502, detail="미리보기 변환 중 오류가 발생했습니다.") from e
-    finally:
         try:
-            os.unlink(tmp_path)
-        except FileNotFoundError:
-            pass
+            pdf_bytes = await run_in_threadpool(_convert_presentation_to_pdf, tmp_path)
+            await run_in_threadpool(convert_cache.set_preview, preview_key, pdf_bytes)
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
+            )
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        except Exception as e:
+            logger.exception("/preview/pdf 변환 실패")
+            raise HTTPException(status_code=502, detail="미리보기 변환 중 오류가 발생했습니다.") from e
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
+
+    return await run_conversion("preview", suffix, work)
 
 
 @app.post("/vision/ocr")
