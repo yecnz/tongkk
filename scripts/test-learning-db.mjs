@@ -32,6 +32,7 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230002_learning
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230003_learning_concepts.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230004_review_cards.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230005_review_submission.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230006_review_stats.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -90,6 +91,10 @@ await db.query('select review_finish($1,$2,$3,$4::jsonb,$5::jsonb,null,null,fals
 await db.query('select review_check($1,$2,$3,0,7,true)',[user,reviewCard.id,earlyId]);
 reviewed=(await db.query('select review_context($1,$2) as data',[user,reviewCard.id])).rows[0].data;
 check(reviewed.card.successful_reviews===1,'Early practice cannot inflate retained performance');
+const stats=(await db.query('select review_stats($1) as data',[user])).rows[0].data;
+check(stats.retention_checks===1 && stats.retention_correct===1,'Only delayed independent completed checks count as retention');
+check(stats.completed_sessions===1 && stats.due_cards===0,'Completed learning and due review counts are separate');
+check((await db.query('select review_stats($1) as data',[other])).rows[0].data.retention_checks===0,'Statistics are owner scoped');
 check((await db.query('select review_context($1,$2) as data',[other,reviewCard.id])).rows[0].data===null,'Review detail is owner scoped');
 const changedText = text + '수정';
 await db.query('update materials set markdown=$1 where course_id=$2 and id=$3',[changedText,course,'lecture:100']);

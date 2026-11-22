@@ -1,3 +1,4 @@
+import ReviewOverview from "../features/learningSession/ReviewOverview";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
@@ -1273,7 +1274,7 @@ export default function Dashboard() {
       </div>
 
       <div className="app-container">
-        <LearningResume key={user?.id || 'guest'} />
+        <LearningResume key={user?.id || 'guest'} /><ReviewOverview key={`review-${user?.id || 'guest'}`} />
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
           <h2 className="m-0 text-xl font-extrabold leading-7 text-text-strong">
             공부 시작하기

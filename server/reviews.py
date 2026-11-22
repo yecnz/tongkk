@@ -95,6 +95,11 @@ async def run_review(repo,user,card,attempt):
                                     'p_metrics':metrics,'p_error':error,'p_interval':None,'p_success':False})
 
 
+@router.get('/stats')
+async def stats(auth=Depends(session_user),repo=Depends(get_repository)):
+    return await repo._rpc('review_stats',{'p_user':auth[0]})
+
+
 @router.get('/{card_id}')
 async def read(card_id: UUID,auth=Depends(session_user),repo=Depends(get_repository)):
     return review_view(await context(repo,auth[0],str(card_id)))
