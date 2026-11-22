@@ -95,14 +95,14 @@ export default function LearningSetup() {
 
   return <>
     <div className="learning-page-title">
-      <p className="learning-eyebrow">기억하고 · 설명하고 · 확인하기</p>
+      <p className="learning-eyebrow">기억 · 설명 · 확인</p>
       <h1>학습 세션</h1>
-      <p className="learning-intro">오늘 배운 내용을 직접 설명하고, 부족한 부분을 확인해보세요.</p>
+      <p className="learning-intro">자료를 고르고 학습을 시작하세요.</p>
     </div>
     <div className="learning-grid learning-setup" aria-label="학습 설정">
       <Card className="learning-card" role="region" aria-labelledby="learning-material-title">
-        <div className="learning-section-heading"><div><h2 id="learning-material-title">어떤 내용을 학습할까요?</h2>
-          <p className="learning-caption">과목과 자료를 선택한 뒤 학습할 범위를 정해주세요.</p></div><span className="learning-badge">자료 선택</span></div>
+        <div className="learning-section-heading"><div><h2 id="learning-material-title">학습 자료</h2>
+          <p className="learning-caption">과목·자료와 범위를 선택하세요.</p></div><span className="learning-badge">자료 선택</span></div>
         <div className="learning-fields">
           <LearningSelect label="과목" value={course} placeholder="과목 선택" options={courses.map(c => ({ value: c.name, label: c.name }))}
             disabled={settingsDisabled || coursesLoading || !courses.length} onChange={value => { setCourse(value); setMaterial(''); setError(''); }} />
@@ -128,7 +128,7 @@ export default function LearningSetup() {
           {!selected.length && <p className="learning-caption">학습할 구간을 하나 이상 선택해주세요.</p>}
         </>}
         {!scopes && !loading && courses.length > 0 && (!course || materials.length > 0) && <div className="learning-empty"><span className="learning-empty-symbol" aria-hidden="true">↗</span>
-          <p>자료를 선택하면 학습할 페이지와 원문 구간이 여기에 표시돼요.</p></div>}
+          <p>자료를 선택하면 학습 범위가 표시돼요.</p></div>}
       </Card>
       <Card className="learning-card learning-settings" role="region" aria-labelledby="learning-settings-title">
         <h2 id="learning-settings-title">이번 학습 설정</h2>
@@ -154,7 +154,7 @@ export default function LearningSetup() {
           <div className="learning-choice-options">{[1, 2, 3].map(n => <label key={n} className="learning-choice">
             <input type="radio" name="learning-count" value={n} checked={count === n} onChange={() => setCount(n)} />{n}개</label>)}</div>
         </fieldset>
-        <p className="learning-caption">목표 시간은 이번 학습의 시간 목표예요. 분량은 선택한 개념 수를 기준으로 준비해요.</p>
+        <p className="learning-caption">분량은 개념 수로 정해요. 목표 시간이 지나도 계속할 수 있어요.</p>
         <div className="learning-flow" aria-label="학습 순서">{familiarity === 'new' ? '짧은 설명 → 직접 설명 → 보완 → 기초 확인' : '기억에서 설명 → 보완 → 기초 확인'}</div>
         <div className="learning-setup-summary"><span>{selected.length}개 구간 선택</span><strong>목표 {minutes}분 · 최대 {count}개 개념</strong></div>
         {error && <div className="learning-notice learning-error" role="alert">{error}</div>}

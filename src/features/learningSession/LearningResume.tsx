@@ -24,7 +24,7 @@ export default function LearningResume({ variant = 'dashboard' }: { variant?: 'd
   if (!user) return null;
   return <Card className="learning-resume" role="region" aria-label="진행 중인 학습">
     <div className="learning-resume-heading"><div><h2>{variant === 'page' ? '이어서 학습하기' : '기억에서 꺼내는 학습'}</h2>
-      <p>직접 설명하고 부족한 부분을 확인해보세요.</p></div>
+      <p>설명하고, 문제로 확인해요.</p></div>
       {variant === 'dashboard' && <Link to="/learn" className="learning-resume-start">학습 시작 →</Link>}
     </div>
     {loading ? <p className="learning-resume-message" role="status">진행 중인 학습을 불러오는 중…</p> : error ? <div className="learning-resume-error" role="alert">{error}

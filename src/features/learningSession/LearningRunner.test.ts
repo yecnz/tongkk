@@ -57,34 +57,34 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 it('runs preparation, recall, feedback, hints, check, next concept and results', async () => {
   const preparing = state(); preparing.status = 'preparing'; preparing.current = null; preparing.allowed_actions = ['abandon'];
   preparing.operation = { id: 'op', kind: 'prepare', status: 'running', retryable: false, error_code: null }; await render(preparing);
-  expect(container.textContent).toContain('원문에서 질문과 확인 문제를 준비'); expect(container.querySelector('textarea')).toBeNull();
+  expect(container.textContent).toContain('개념 준비 중'); expect(container.querySelector('textarea')).toBeNull();
   next(state()); await poll(); expect(button('설명 제출').disabled).toBe(true); await type('내 설명입니다.');
   const evaluating = state('recall_evaluating'); evaluating.allowed_actions = standard; evaluating.current!.draft = '내 설명입니다.';
   evaluating.operation = { id: 'eval', kind: 'evaluate', status: 'running', retryable: false, error_code: null };
   next(evaluating); await click('설명 제출');
   expect(request.mock.calls.at(-1)?.[2]).toMatchObject({ kind: 'recall', answer: '내 설명입니다.' });
-  expect(container.textContent).toContain('설명과 원문 근거를 비교');
+  expect(container.textContent).toContain('설명 평가 중');
   const feedback = state('recall_feedback'); feedback.current!.draft = '내 설명입니다.';
   feedback.current!.feedback = { criteria: [{ criterion_id: 'criterion', status: 'missing', student_quote: '', reason: '원인 설명이 빠졌어요.', source_refs: [{ unit_id: 'u0', quote: '원문 근거' }] }] };
-  next(feedback); await poll(); expect(container.textContent).toContain('설명에 빠진 부분');
+  next(feedback); await poll(); expect(container.textContent).toContain('빠짐');
   await openHelp(); expect(container.textContent).not.toContain('모범 설명');
   const help = structuredClone(response); help.current!.help.hint1 = '첫 단계 힌트입니다.'; next(help); await click('첫 힌트');
   expect(container.textContent).toContain('첫 단계 힌트입니다.'); expect(button('다음 힌트').disabled).toBe(false);
   const hint2 = structuredClone(response); hint2.current!.help.hint2 = '두 번째 힌트입니다.'; next(hint2); await click('다음 힌트');
   expect(button('모범 설명').disabled).toBe(false);
   const check = state('check_answering'); check.current!.check = { question: '표현을 바꾼 문제', options: ['보기 하나', '보기 둘'] };
-  next(check); await click('확인 문제 풀기 →'); expect(container.textContent).not.toContain('설명에 빠진 부분'); expect(button('답안 제출').disabled).toBe(true);
+  next(check); await click('확인 문제 풀기 →'); expect(container.textContent).not.toContain('빠짐'); expect(button('답안 제출').disabled).toBe(true);
   await act(async () => (container.querySelector('input[name="check"][value="1"]') as HTMLInputElement).click());
   const checked = structuredClone(response); checked.current!.phase = 'check_feedback'; checked.allowed_actions = [...standard, 'advance', 'help'];
   checked.current!.check_result = { selected: 1, answer_index: 1, correct: true, explanation: '정답 해설입니다.' }; next(checked); await click('답안 제출');
-  expect(container.textContent).toContain('이번 확인 문제를 맞혔어요');
+  expect(container.textContent).toContain('정답이에요.');
   const second = state(); second.current!.id = 'item-2'; second.current!.title = '개념 둘'; second.current!.position = 1; second.completed_count = 1;
   next(second); await click('다음 개념 →'); expect(container.textContent).toContain('개념 둘'); expect(button('설명 제출').disabled).toBe(true);
   const complete = state(); complete.status = 'completed'; complete.current = null; complete.completed_count = 2; complete.allowed_actions = [];
   complete.result = [{ title: '개념 하나', recall: 'needs_review', check: 'correct', assisted: true, prior_instruction: true, repeated: false, reported: false },
     { title: '개념 둘', recall: 'ungraded', check: 'ungraded', assisted: false, prior_instruction: false, repeated: false, reported: false, skipped: true }];
-  next(complete); await click('이 개념 건너뛰기'); expect(container.textContent).toContain('이번 학습에서 확인한 내용');
-  expect(container.textContent).toContain('도움 사용 기록 있음'); expect(container.textContent).toContain('건너뜀'); expect(container.querySelector('textarea')).toBeNull();
+  next(complete); await click('이 개념 건너뛰기'); expect(container.textContent).toContain('학습 결과');
+  expect(container.textContent).toContain('도움 사용'); expect(container.textContent).toContain('건너뜀'); expect(container.querySelector('textarea')).toBeNull();
 });
 
 it('separates first reading from recall, remembers it on reload, and hides it in the check', async () => {
@@ -111,10 +111,10 @@ it('pauses and resumes at the saved answer screen', async () => {
 
 it('lets a failed evaluation use reference and self check without claiming AI grading', async () => {
   const failed = state('recall_feedback'); failed.current!.evaluation_error = true; failed.allowed_actions.push('self_check'); await render(failed);
-  expect(container.textContent).toContain('오답으로 처리하지 않았습니다'); await openHelp();
+  expect(container.textContent).toContain('오답으로 처리하지 않았어요'); await openHelp();
   const reference = structuredClone(response); reference.current!.help.reference = '모범 설명 본문'; next(reference); await click('모범 설명');
   const self = structuredClone(response); self.current!.phase = 'repair'; self.current!.self_check = 'needs_review'; next(self); await click('추가 확인이 필요해요');
-  expect(container.textContent).toContain('AI 평가와 구분해'); expect(request.mock.calls.at(-1)?.[2]).toMatchObject({ action: 'self_check', self_check: 'needs_review' });
+  expect(container.textContent).toContain('AI 평가와 별도로'); expect(request.mock.calls.at(-1)?.[2]).toMatchObject({ action: 'self_check', self_check: 'needs_review' });
 });
 
 it('retries failed preparation and ambiguous commands without losing the request identity', async () => {
@@ -142,4 +142,47 @@ it('shows a distinct result action for the final concept and focuses each new st
   last.current!.check_result = { selected: 0, answer_index: 0, correct: true, explanation: '맞아요' }; await render(last);
   expect(button('결과 보기 →').disabled).toBe(false); expect(document.activeElement).toBe(container.querySelector('h1'));
   expect(container.querySelector('[aria-current="step"]')?.textContent).toContain('기초 확인');
+});
+
+
+it('uses the current stage as the title and shows the correct option once', async () => {
+  const checked = state('check_feedback');
+  checked.current!.check = { question: '어떤 단원인가요?', options: ['판다스 데이터 처리', '데이터베이스 설치'] };
+  checked.current!.check_result = { selected: 0, answer_index: 0, correct: true, explanation: '목차의 시간 인덱스·그룹화·결측값 처리가 근거예요.' };
+  await render(checked);
+  expect(container.querySelector('h1')?.textContent).toBe('기초 확인');
+  expect(container.textContent).not.toContain('내 속도에 맞춰');
+  expect(container.textContent).toContain('정답이에요.');
+  expect(container.textContent?.match(/판다스 데이터 처리/g)).toHaveLength(1);
+  expect(container.querySelector('.learning-option.is-correct')?.textContent).toContain('판다스 데이터 처리정답');
+  expect(container.querySelector('.learning-explanation')).toBeNull();
+});
+
+it('marks an incorrect choice separately and preserves old long explanations behind a disclosure', async () => {
+  const checked = state('check_feedback');
+  checked.current!.check = { question: '어떤 단원인가요?', options: ['판다스 데이터 처리', '데이터베이스 설치'] };
+  const long = '자세한 근거와 조건을 설명하는 이전 해설입니다. '.repeat(10);
+  checked.current!.check_result = { selected: 1, answer_index: 0, correct: false, explanation: long };
+  await render(checked);
+  expect(container.textContent).toContain('다시 확인해요.');
+  expect(container.querySelector('.learning-option.is-correct')?.textContent).toContain('판다스 데이터 처리');
+  expect(container.querySelector('.learning-option.is-incorrect')?.textContent).toContain('데이터베이스 설치내 선택');
+  const disclosure = container.querySelector('.learning-explanation') as HTMLDetailsElement;
+  expect(disclosure.open).toBe(false);
+  await act(async () => disclosure.querySelector('summary')!.click());
+  expect(disclosure.open).toBe(true);
+  expect(disclosure.querySelector('p')?.textContent).toBe(long.trim());
+});
+
+it('keeps feedback evidence collapsed and preserves exact student and source quotes', async () => {
+  const feedback = state('recall_feedback');
+  feedback.current!.feedback = { criteria: [{ criterion_id: 'c1', status: 'contradicted', student_quote: '내가 쓴 원래 문장',
+    reason: '시간 간격을 두는 방식으로 수정해주세요.', source_refs: [{ unit_id: 'u0', quote: '원문의 조건과 수식 t > 0' }] }] };
+  await render(feedback);
+  expect(container.textContent).toContain('수정 필요');
+  const evidence = container.querySelector('.learning-feedback-evidence') as HTMLDetailsElement;
+  expect(evidence.open).toBe(false);
+  await act(async () => evidence.querySelector('summary')!.click());
+  expect(evidence.open).toBe(true);
+  expect(evidence.textContent).toContain('내가 쓴 원래 문장'); expect(evidence.textContent).toContain('원문의 조건과 수식 t > 0');
 });

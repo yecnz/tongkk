@@ -3,7 +3,7 @@ import type { LearningSession } from '../../services/learningSessions';
 
 export default function LearningProgress({ session, stage, reading }: { session: LearningSession; stage: string; reading: boolean }) {
   const finished = ['completed', 'abandoned'].includes(session.status);
-  const steps = reading || session.current?.introduction ? ['먼저 읽기', '직접 설명', '피드백·보완', '기초 확인'] : ['직접 설명', '피드백·보완', '기초 확인'];
+  const steps = reading || session.current?.introduction ? ['먼저 읽기', '직접 설명', '설명 확인', '기초 확인'] : ['직접 설명', '설명 확인', '기초 확인'];
   const phase = session.current?.phase || '';
   const current = reading ? 0 : phase.startsWith('check') ? steps.length - 1 : ['repair', 'recall_feedback'].includes(phase) ? steps.length - 2 : steps.length - 3;
   return <Card className="learning-card learning-progress" role="region" aria-label="학습 진행 상태">

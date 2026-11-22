@@ -191,3 +191,9 @@
   .learning-state { padding: 36px 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .learning-loading-dot { animation: none; } }
+
+.learning-option-text { flex: 1; min-width: 0; }
+.learning-check .learning-option.is-correct { border-color: var(--color-cyan); background: var(--color-tint-cyan); }
+.learning-check .learning-option.is-incorrect { border-color: var(--color-pink); background: var(--color-tint-pink); }
+.learning-check .is-correct input { accent-color: var(--color-cyan); }
+.learning-explanation, .learning-feedback-evidence { margin-top: 12px; }

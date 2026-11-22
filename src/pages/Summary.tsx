@@ -2545,8 +2545,8 @@ const MaterialDetailView = ({
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>{backLabel}</button>
       <button type="button" onClick={() => learningNavigate(`/learn?${new URLSearchParams({ course: selectedCourse, material: material.id })}`)} style={{
-        marginLeft: 16, marginBottom: 20, padding: "9px 16px", borderRadius: 10,
-        border: `1px solid ${PINK}`, background: "var(--color-tint-pink)", color: PINK, cursor: "pointer", fontWeight: 700,
+        marginLeft: 16, marginBottom: 20, padding: "8px 12px", borderRadius: 10,
+        border: "none", background: "var(--color-tint-pink)", color: "var(--color-pink-deep)", cursor: "pointer", fontSize: 13, fontWeight: 600,
       }}>직접 설명하며 학습하기 →</button>
       <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{

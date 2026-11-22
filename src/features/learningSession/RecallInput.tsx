@@ -96,11 +96,11 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
         <button type="button" onClick={() => { setConflict(false); edit(latest.current); }}>현재 초안 사용</button>
       </div>
     </div>}
-    <label htmlFor="recall-answer"><p>자료를 보지 않고 기억나는 내용을 설명해보세요. 짧은 문장이나 글머리표도 괜찮아요.</p></label>
+    <label htmlFor="recall-answer"><p>자료를 보지 않고 핵심을 설명해주세요.</p></label>
     <textarea id="recall-answer" value={text} maxLength={4000} disabled={busy || disabled}
       onChange={event => edit(event.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
     <p className="learning-muted" aria-live="polite" style={{ fontSize: 13 }}>
-      {text.length.toLocaleString()} / 4,000자 · {saveError || (saving ? '서버에 저장 중…' : text === item.draft ? '서버 저장됨' : '이 기기에 임시 저장됨')}
+      {text.length.toLocaleString()} / 4,000자 · {saveError || (saving ? '저장 중…' : text === item.draft ? '저장됨' : '임시 저장됨')}
     </p>
     <button type="button" className="primary" disabled={busy || disabled || composing || conflict || !text.trim()} onClick={() => { void submit(); }}>설명 제출</button>
   </>;

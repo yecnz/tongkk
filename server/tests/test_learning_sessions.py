@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from auth import require_api_user
-from learning_sessions.generation import validate_feedback, validate_pack
+from learning_sessions.generation import Generator, GenerationError, validate_feedback, validate_pack
 from learning_sessions.repository import Repository, WriteConflict
 from learning_sessions.router import get_service, router
 from learning_sessions.schemas import Action, Answer, Command, CreateSession, Draft, Help, Report, Scope, SessionView
@@ -423,4 +423,67 @@ def test_skip_is_distinguished_from_unattempted_items_in_results():
         for item in b["session"]["result"]:
             item.pop("skipped", None)
         assert all(not item["skipped"] for item in SessionView.model_validate(public_view(b)).model_dump()["result"])
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("explanation", ["가" * 161, "   ", "같은 근거입니다.\n\n같은 근거입니다."])
+def test_generated_check_rejects_verbose_or_empty_explanations_without_truncation(explanation):
+    source_units = units(TEXT)
+    raw = pack_content(source_units, 1)
+    raw["concepts"][0]["check"]["explanation"] = explanation
+    with pytest.raises(ValueError):
+        validate_pack(raw, source_units, 1)
+    assert raw["concepts"][0]["check"]["explanation"] == explanation
+
+
+@pytest.mark.parametrize("reason", ["가" * 161, "   ", "같은 판단입니다.\n\n같은 판단입니다."])
+def test_generated_feedback_rejects_verbose_or_empty_reasons_without_truncation(reason):
+    source_units = units(TEXT)
+    concept = pack_content(source_units, 1)["concepts"][0]
+    raw = {"criteria": [{"criterion_id": "c1", "status": "missing", "student_quote": "",
+                         "reason": reason, "source_refs": concept["source_refs"]}]}
+    with pytest.raises(ValueError):
+        validate_feedback(raw, concept, source_units, "학생 답변")
+    assert raw["criteria"][0]["reason"] == reason
+
+
+def test_concise_feedback_preserves_long_exact_quotes_and_saved_feedback():
+    async def scenario():
+        service, b = await ready(1)
+        item = b["items"][0]
+        answer = "시간을 두고 반복해요. " * 20
+        quoted_source = TEXT * 4
+        source_units = [{"id": "source", "text": quoted_source}]
+        concept = pack_content(units(TEXT), 1)["concepts"][0]
+        refs = [{"unit_id": "source", "quote": quoted_source}]
+        feedback = {"criteria": [{"criterion_id": "c1", "status": "met", "student_quote": answer,
+                                  "reason": "시간 간격을 정확히 설명했어요.", "source_refs": refs}]}
+        assert validate_feedback(feedback, concept, source_units, answer) == feedback
+        # Historical long feedback must still load through the public response schema.
+        item["phase"] = "recall_feedback"
+        old = copy.deepcopy(feedback)
+        old["criteria"][0]["reason"] = "이전에 저장된 상세 설명입니다. " * 20
+        item["data"]["feedback"] = old
+        view = SessionView.model_validate(public_view(b)).model_dump()
+        assert view["current"]["feedback"] == old
+    asyncio.run(scenario())
+
+
+def test_generator_applies_compact_output_schema_and_keeps_validation_failures_retryable(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    async def scenario():
+        source_units = units(TEXT)
+        raw = pack_content(source_units, 1)
+        fake_call = AsyncMock(return_value=(raw, {"model_id": "fake"}))
+        generator = Generator()
+        monkeypatch.setattr(generator, "_call", fake_call)
+        result, metrics = await generator.prepare({"concept_count": 1, "source_units": source_units})
+        assert result == raw and metrics == {"model_id": "fake"}
+        schema = fake_call.call_args.args[2]
+        assert schema["$defs"]["ConciseCheckQuestion"]["properties"]["explanation"]["maxLength"] == 160
+        raw["concepts"][0]["check"]["explanation"] = "가" * 161
+        with pytest.raises(GenerationError) as error:
+            await generator.prepare({"concept_count": 1, "source_units": source_units})
+        assert error.value.metrics == {"model_id": "fake"}
     asyncio.run(scenario())
