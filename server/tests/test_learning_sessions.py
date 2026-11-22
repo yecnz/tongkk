@@ -487,3 +487,19 @@ def test_generator_applies_compact_output_schema_and_keeps_validation_failures_r
             await generator.prepare({"concept_count": 1, "source_units": source_units})
         assert error.value.metrics == {"model_id": "fake"}
     asyncio.run(scenario())
+
+
+def test_history_is_owner_scoped_and_does_not_disclose_unseen_questions():
+    from learning_sessions.service import history_view
+    async def scenario():
+        service, b = await ready(2)
+        with pytest.raises(HTTPException):
+            history_view(b)
+        b, _ = await service.command(USER,b['session']['id'],'actions',cmd(b,Action,action='skip'))
+        b, _ = await service.command(USER,b['session']['id'],'actions',cmd(b,Action,action='finish'))
+        history = history_view(b)
+        assert all(item['question'] is None and item['check'] is None for item in history['items'])
+        assert 'criteria' not in history['items'][0]
+        with pytest.raises(HTTPException):
+            await service.repo.load(OTHER,b['session']['id'])
+    asyncio.run(scenario())

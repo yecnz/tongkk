@@ -82,3 +82,6 @@ class Repository:
         return await self._rpc("learning_session_write", {
             "p_user": user, "p_bundle": bundle, "p_expected_version": expected_version,
         })
+
+    async def history(self, user, limit):
+        return await self._rpc("learning_session_history", {"p_user": user, "p_limit": limit})

@@ -28,6 +28,7 @@ await db.query('insert into auth.users values ($1),($2)', [user, other]);
 await db.query('insert into courses values ($1,$2)', [course, user]);
 await db.query('insert into materials values ($1,$2,$3,$4)', [course, 'lecture:100', user, text]);
 await db.exec(migration);
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230002_learning_history.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {

@@ -5,8 +5,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Response
 from auth import require_api_user
 from .errors import fail
 from .schemas import (Action, Answer, Command, CreateSession, Draft, Help, OperationView,
-                      Report, ScopesView, SessionList, SessionView)
-from .service import Service, public_view
+                      Report, ScopesView, SessionList, SessionView, SessionHistory)
+from .service import Service, public_view, history_view
 
 router = APIRouter(prefix="/learning-sessions", tags=["learning-sessions"])
 
@@ -48,6 +48,16 @@ async def create(request: CreateSession, tasks: BackgroundTasks, response: Respo
                  auth=Depends(session_user), service=Depends(get_service)):
     bundle, operation = await service.create(*auth, request)
     return finish(bundle, operation, auth[0], tasks, response, service)
+
+
+@router.get('/history', response_model=SessionList)
+async def history_list(limit: int = Query(default=30, ge=1, le=30), auth=Depends(session_user), service=Depends(get_service)):
+    return {'sessions': await service.repo.history(auth[0], limit)}
+
+
+@router.get('/{session_id}/history', response_model=SessionHistory)
+async def history_detail(session_id: UUID, auth=Depends(session_user), service=Depends(get_service)):
+    return history_view(await service.repo.load(auth[0], str(session_id)))
 
 
 @router.get("/{session_id}", response_model=SessionView)

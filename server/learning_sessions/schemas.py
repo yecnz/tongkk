@@ -200,3 +200,20 @@ class SessionSummary(BaseModel):
 
 class SessionList(BaseModel):
     sessions: list[SessionSummary]
+
+
+class HistoryItem(BaseModel):
+    id: str
+    title: str
+    position: int
+    question: str | None = None
+    answer: str | None = None
+    feedback: RecallFeedback | None = None
+    help: PublicHelp
+    check: PublicCheck | None = None
+    check_result: PublicCheckResult | None = None
+    skipped: bool = False
+
+
+class SessionHistory(BaseModel):
+    items: list[HistoryItem]

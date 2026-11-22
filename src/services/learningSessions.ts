@@ -86,3 +86,9 @@ export function clearLearningDrafts(user: string) {
     Object.keys(localStorage).filter(key => key.startsWith(prefix)).forEach(key => localStorage.removeItem(key));
   } catch { /* Private mode may disable storage. Server records remain authoritative. */ }
 }
+
+export type LearningHistoryItem = {
+  id: string; title: string; position: number; question: string | null; answer: string | null;
+  feedback: Feedback | null; help: Record<string, string | null>; check: NonNullable<LearningSession['current']>['check'];
+  check_result: NonNullable<LearningSession['current']>['check_result']; skipped: boolean;
+};

@@ -1,3 +1,4 @@
+import LearningHistory from './LearningHistory';
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../../common';
 import { fetchCourses } from '../../services/courses';
@@ -143,7 +144,7 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
             onHelp={type => { void command('help', { item_id: item.id, help_type: type }).catch(() => undefined); }} onSelfCheck={value => { void act('self_check', { self_check: value }); }} />}
         </aside>
       </div>}
-    {ended && <LearningResults results={session.result} />}
+    {ended && <><LearningResults results={session.result} /><LearningHistory sessionId={id} /></>}
     {!ended && <details className="learning-session-menu"><summary>학습 관리</summary><div className="learning-row">
       {permits('pause') && <button type="button" disabled={blocked} onClick={() => { void act('pause'); }}>저장하고 잠시 중단</button>}
       {permits('finish') && <button type="button" disabled={blocked} onClick={() => { void act('finish'); }}>여기까지 학습 마치기</button>}

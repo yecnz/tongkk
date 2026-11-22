@@ -139,6 +139,23 @@ def public_view(bundle):
             "result": session.get("result") or (results(bundle) if session["status"] in {"completed", "abandoned"} else [])}
 
 
+def history_view(bundle):
+    if bundle['session']['status'] not in {'completed', 'abandoned'}:
+        fail('NOT_COMPLETED', '완료한 학습에서 기록을 확인해주세요.')
+    records = []
+    for item in bundle['items']:
+        concept, data = concept_for(bundle, item), item['data']
+        recall = next((a for a in bundle['attempts'] if a['item_id'] == item['id'] and a['kind'] == 'recall'), None)
+        check = next((a for a in bundle['attempts'] if a['item_id'] == item['id'] and a['kind'] == 'check'), None)
+        records.append({'id': item['id'], 'title': concept['title'], 'position': item['position'],
+                        'question': concept['question'] if recall else None,
+                        'answer': recall['answer'] if recall else data.get('draft') or None,
+                        'feedback': data.get('feedback'), 'help': data.get('help', {}),
+                        'check': {'question': concept['check']['question'], 'options': concept['check']['options']} if check else None,
+                        'check_result': data.get('check_result') if check else None, 'skipped': bool(data.get('skipped'))})
+    return {'items': records}
+
+
 class Service:
     def __init__(self, repository=None, generator=None):
         self.repo = repository or Repository()

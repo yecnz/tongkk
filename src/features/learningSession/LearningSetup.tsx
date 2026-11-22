@@ -1,3 +1,4 @@
+import LearningHistory from './LearningHistory';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../common';
@@ -162,6 +163,6 @@ export default function LearningSetup() {
           {busy ? '학습을 여는 중…' : pending.current ? '이전 요청 결과 확인' : '학습 시작'}</button>
       </Card>
     </div>
-    <LearningResume variant="page" />
+    <LearningResume variant="page" /><LearningHistory />
   </>;
 }
