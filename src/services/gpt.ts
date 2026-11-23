@@ -2,6 +2,8 @@ import { normalizeSubjectiveScore, SUBJECTIVE_PASS_SCORE } from './subjectiveGra
 import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
 
 export type QuizQuestion = {
+  id?: string;
+  version?: number;
   type?: QuizQuestionType;
   question: string;
   options?: string[];
@@ -89,7 +91,7 @@ export async function generateQuiz(
       }
     }
 
-    return data.questions as QuizQuestion[];
+    return (data.questions as QuizQuestion[]).map(question => ({ ...question, id: crypto.randomUUID(), version: 1 }));
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       if (signal?.aborted) {

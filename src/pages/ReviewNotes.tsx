@@ -8,9 +8,13 @@ import { loadQuizSetsFromServer } from "../services/quizSets";
 import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer } from "../services/wrongAnswerAnalyses";
 import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type WrongAnswerAnalysis, type WrongAnalysisItem } from "../services/gpt";
 
+import QuizIssueLink from '../features/review/QuizIssueLink';
+
 const ALL = "전체";
 
 type WrongEntry = {
+  attemptId: string;
+  questionIndex: number;
   courseName: string;
   quizSetId: string | null;
   question: string;
@@ -65,12 +69,13 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
     const seen = new Set<string>();
     const result: WrongEntry[] = [];
     for (const attempt of attempts) {
-      for (const answer of attempt.answers) {
+      for (const [questionIndex, answer] of attempt.answers.entries()) {
         if (answer.isCorrect) continue;
         const key = `${attempt.courseName}␟${answer.question}`;
         if (seen.has(key)) continue;
         seen.add(key);
         result.push({
+          attemptId: attempt.id, questionIndex,
           courseName: attempt.courseName,
           quizSetId: attempt.quizSetId,
           question: answer.question,
@@ -309,6 +314,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
                         <span>내 답: <strong style={{ color: PINK }}>{entry.studentAnswer ?? "미응답"}</strong></span>
                         <span>정답: <strong style={{ color: CYAN }}>{entry.correctAnswer ?? "정답 정보 없음"}</strong></span>
                         <span>해설: {entry.feedback || entry.explanation}</span>
+                        <QuizIssueLink attemptId={entry.attemptId} questionIndex={entry.questionIndex} />
                       </div>
                     </Card>
                   ))}

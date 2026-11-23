@@ -3,6 +3,8 @@ import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 import type { QuizDifficulty, QuizQuestionType } from './gpt';
 
 export type QuizAttemptAnswer = {
+  questionId?: string;
+  questionVersion?: number;
   question: string;
   type: QuizQuestionType;
   studentAnswer: number | string | null;

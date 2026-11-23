@@ -1105,6 +1105,8 @@ export default function Quiz() {
 
       return {
         question: quiz.question,
+        questionId: quiz.id,
+        questionVersion: quiz.version,
         type,
         studentAnswer,
         correctAnswer,

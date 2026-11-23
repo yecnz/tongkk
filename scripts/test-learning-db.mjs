@@ -27,12 +27,14 @@ await db.exec(`
 await db.query('insert into auth.users values ($1),($2)', [user, other]);
 await db.query('insert into courses values ($1,$2)', [course, user]);
 await db.query('insert into materials values ($1,$2,$3,$4)', [course, 'lecture:100', user, text]);
+await db.exec('create table quiz_attempts(id uuid primary key,user_id uuid,course_id uuid,answers jsonb)');
 await db.exec(migration);
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230002_learning_history.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230003_learning_concepts.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230004_review_cards.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230005_review_submission.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230006_review_stats.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230007_learning_issues.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -127,6 +129,27 @@ const duplicateAnswer = structuredClone(stored);
 duplicateAnswer.attempts.push({ ...stored.attempts[0], id: randomUUID() });
 await rejects(() => write(duplicateAnswer, 2), /duplicate key/);
 
+// Evidence is captured atomically by the existing attempt write transaction.
+await db.query("update learning_session_attempts set status='graded', result=$1::jsonb where id=$2", [JSON.stringify({criteria:[{status:'missing'}]}),stored.attempts[0].id]);
+let issues=(await db.query('select learning_issue_list($1,30,0) as data',[user])).rows[0].data;
+check(issues.total===1,'A missing criterion creates one concept issue');
+await db.query("update learning_session_attempts set status=status where id=$1",[stored.attempts[0].id]);
+check(Number((await db.query('select count(*) from learning_evidence')).rows[0].count)===1,'Repeated save cannot duplicate evidence');
+check((await db.query('select learning_issue_list($1,30,0) as data',[other])).rows[0].data.total===0,'Issue lists are owner scoped');
+const issue=issues.issues[0], issueKey=randomUUID();
+await db.query('select learning_issue_action($1,$2,$3,$4,$5)',[user,issue.id,issue.revision,issueKey,'start']);
+await db.query('select learning_issue_action($1,$2,$3,$4,$5)',[user,issue.id,issue.revision,issueKey,'start']);
+check((await db.query('select learning_issue_detail($1,$2) as data',[user,issue.id])).rows[0].data.issue.revision===1,'Action replay changes status only once');
+await rejects(()=>db.query('select learning_issue_action($1,$2,$3,$4,$5)',[user,issue.id,0,randomUUID(),'close']),/LS_CONFLICT/);
+check((await db.query('select learning_issue_detail($1,$2) as data',[other,issue.id])).rows[0].data===null,'Issue detail hides other owner data');
+
+const quizAttemptId=randomUUID();
+await db.exec('reset role');
+await db.query('insert into quiz_attempts values($1,$2,$3,$4::jsonb)',[quizAttemptId,user,course,JSON.stringify([{studentAnswer:'내 답',isCorrect:false}])]);
+await db.exec('set role service_role');
+const linked=(await db.query('select learning_issue_from_quiz($1,$2,0,$3) as data',[user,quizAttemptId,conceptRows[0].id])).rows[0].data;
+check(linked.evidence.some(e=>e.source_kind==='quiz' && e.outcome==='uncertain' && e.answer==='내 답'),'Legacy quiz mapping preserves uncertain evidence and student answer');
+await rejects(()=>db.query('select learning_issue_from_quiz($1,$2,0,$3)',[other,quizAttemptId,conceptRows[0].id]),/LS_NOT_FOUND/);
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -159,7 +182,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -173,7 +196,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -186,7 +209,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

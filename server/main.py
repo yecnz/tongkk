@@ -119,6 +119,8 @@ from summary_identity import router as summary_identity_router
 app.include_router(summary_identity_router)
 from reviews import router as reviews_router
 app.include_router(reviews_router)
+from learning_issues import router as issues_router
+app.include_router(issues_router)
 
 logger = logging.getLogger("tongkk")
 
