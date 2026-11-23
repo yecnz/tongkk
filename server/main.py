@@ -125,6 +125,8 @@ from explanation_revisions import router as revisions_router
 app.include_router(revisions_router)
 from workflow import router as workflow_router
 app.include_router(workflow_router)
+from learning_mate import router as mate_router
+app.include_router(mate_router)
 
 logger = logging.getLogger("tongkk")
 
@@ -1380,6 +1382,9 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
 
 @app.post("/agent")
 async def agent(req: AgentRequest, user=Depends(require_api_user)):
+    from learning_mate import ensure_help_allowed
+    if user and user.get("id"):
+        await ensure_help_allowed(user["id"])
     # 이어지는 대화인데 체크포인트가 없으면(서버 재시작 등) 새 메시지만으로 답하면 자료·이전 대화를 모두 잃는다.
     # 409로 알려 프론트가 전체 히스토리와 자료를 다시 보내게 한다.
     if req.thread_id and not thread_exists((user or {}).get("id"), req.thread_id):

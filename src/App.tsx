@@ -15,6 +15,8 @@ import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import LearningSession from "./pages/LearningSession";
+import LearningContextProvider from "./features/learningMate/LearningContextProvider";
+import LearningMateHost from "./features/learningMate/LearningMateHost";
 import ExplanationRevision from "./features/review/ExplanationRevision";
 import ReviewPractice from "./features/learningSession/ReviewPractice";
 import { loadUserProfile } from "./services/profile";
@@ -59,6 +61,7 @@ function AppShell() {
 
   return (
     <CourseProvider>
+      <LearningContextProvider key={user?.id || 'guest'}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/calendar" element={<Calendar />} />
@@ -73,6 +76,8 @@ function AppShell() {
         <Route path="/mypage" element={<MyPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      <LearningMateHost />
+      </LearningContextProvider>
     </CourseProvider>
   );
 }

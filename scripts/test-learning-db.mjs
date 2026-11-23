@@ -37,6 +37,8 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230006_review_s
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230007_learning_issues.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230008_explanation_revisions.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230009_learning_worker.sql', import.meta.url), 'utf8'));
+await db.exec('create table summary_chat_sessions(id uuid primary key,user_id uuid,material_id text,updated_at timestamptz)');
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230010_learning_mate.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -196,6 +198,16 @@ check((await db.query('select revision from review_cards where id=$1',[autoCard.
 await db.exec('savepoint paused_attempt');
 await rejects(()=>db.query('select review_start($1,$2,$3,$4,false)',[user,autoCard.id,randomUUID(),'답변']),/LS_CONFLICT/);
 await db.exec('rollback to savepoint paused_attempt');
+await db.exec('rollback');
+await db.exec('begin');
+await db.query("update learning_sessions set status='paused' where user_id=$1",[user]);
+const lockToken=randomUUID();
+await db.query('select learning_assessment_lock($1,$2,true,1)',[user,lockToken]);
+check((await db.query('select learning_assessment_active($1) as active',[user])).rows[0].active===true,'Assessment locks block tutor access');
+await db.query('select learning_assessment_lock($1,$2,false,3)',[user,lockToken]);
+await db.query('select learning_assessment_lock($1,$2,true,2)',[user,lockToken]);
+check((await db.query('select learning_assessment_active($1) as active',[user])).rows[0].active===false,'Late lock renewal cannot resurrect an ended assessment');
+check((await db.query('select learning_assessment_active($1) as active',[other])).rows[0].active===false,'Assessment locks are scoped to the owner');
 await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);

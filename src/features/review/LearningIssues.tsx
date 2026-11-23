@@ -1,3 +1,4 @@
+import { useLearningScope } from '../learningMate/context';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card } from '../../common';
@@ -22,6 +23,7 @@ function Issue({ id }: { id: string }) {
     catch (e) { setError(e instanceof Error ? e.message : '저장하지 못했어요.'); }
     finally { setBusy(false); }
   }
+  useLearningScope(data ? { courseId: data.concept.course_id, materialId: data.concept.material_id, title: data.concept.title } : null);
   return <Card className="learning-card workflow-stack">
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setPending(null); setRetry(n => n + 1); }}>새로 불러오기</button></p>}
     {!data ? <p role="status">이슈를 불러오는 중…</p> : <>

@@ -9,6 +9,8 @@ export type SummaryChatSession = {
 };
 
 export type SummaryChatTarget = {
+  courseId?: string;
+  sourceHash?: string;
   summaryId?: string | null;
   materialId?: string | null;
 };
@@ -177,6 +179,8 @@ export async function loadSummaryChatSessions(target: SummaryChatTarget): Promis
       query = query.eq('summary_id', target.summaryId);
     } else {
       query = query.eq('material_id', target.materialId);
+      if (target.courseId) query = query.eq('course_id', target.courseId).eq('source_hash', target.sourceHash);
+      else query = query.is('course_id', null);
     }
 
     const { data, error } = await query;
@@ -212,6 +216,7 @@ export async function createSummaryChatSession(target: SummaryChatTarget, title:
     .insert({
       summary_id: target.summaryId || null,
       material_id: target.materialId || null,
+      ...(target.courseId ? { course_id: target.courseId, source_hash: target.sourceHash } : {}),
       user_id: user.id,
       title: title || '새 튜터 대화',
     })

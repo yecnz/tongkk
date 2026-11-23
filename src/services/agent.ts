@@ -1,4 +1,7 @@
+import { workflowRequest } from './workflow';
 import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
+
+export type MateScope = { courseId: string; materialId: string; sourceHash: string };
 
 export type AgentRole = 'user' | 'assistant';
 
@@ -31,11 +34,19 @@ export async function sendAgentMessage(
   markdown?: string,
   sourceMarkdown?: string,
   pages?: string,
+  scope?: MateScope,
 ): Promise<AgentResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
 
   try {
+    if (scope) {
+      const data = await workflowRequest<{ result: string; thread_id: string; messages: AgentMessage[]; citations: { label: string; quote: string }[] }>('/learning-mate', 'POST', {
+        course_id: scope.courseId, material_id: scope.materialId, source_hash: scope.sourceHash, messages: messages.slice(-20),
+      }, controller.signal);
+      const citations = data.citations.length ? '\n\n근거로 본 자료: ' + data.citations.map(h => h.label).join(', ') : '';
+      return { result: data.result + citations, threadId: data.thread_id, messages: data.messages };
+    }
     const response = await fetch(`${BACKEND_URL}/agent`, {
       method: 'POST',
       headers: await getJsonRequestHeaders(),

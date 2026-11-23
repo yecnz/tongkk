@@ -1,3 +1,4 @@
+import { useLearningScope } from '../features/learningMate/context';
 import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import html2canvas from "html2canvas";
@@ -2054,6 +2055,7 @@ const MaterialDetailView = ({
   onTabChange,
   onRequestDelete,
 }: MaterialDetailViewProps) => {
+  useLearningScope({ courseName: selectedCourse, materialId: material.id, title: material.name });
   const learningNavigate = useNavigate();
   const [activeTab, setActiveTab] = useState<MaterialDetailTab>(initialTab);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
