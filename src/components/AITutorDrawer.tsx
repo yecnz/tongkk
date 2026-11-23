@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { PINK, CYAN, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication } from "../common";
+import { PINK, CYAN, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication, parseAiSuggestions } from "../common";
 import { AgentThreadExpiredError, sendAgentMessage, type AgentMessage } from "../services/agent";
 import {
   createSummaryChatSession,
@@ -157,7 +157,7 @@ const copyRichText = async (html: string, plain: string) => {
   await navigator.clipboard.writeText(plain);
 };
 
-const FormattedTutorText = ({ content }: { content: string }) => {
+export const FormattedTutorText = ({ content }: { content: string }) => {
   const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(content.replace(/\r\n/g, "\n").trim())));
   if (!cleaned) return null;
 
@@ -167,75 +167,6 @@ const FormattedTutorText = ({ content }: { content: string }) => {
       {cleaned}
     </ReactMarkdown>
   );
-};
-
-const SUGGESTION_TRIGGER = /원하시면|다음으로는|해드릴게요|알려드릴게요|다음 단계로|중 하나로|바꿔드릴게요|골라주세요|선택해주세요/;
-
-const parseAiSuggestions = (content: string): { mainContent: string; suggestions: string[] } => {
-  const lines = content.split("\n");
-  let tail = lines.length - 1;
-  while (tail >= 0 && !lines[tail].trim()) tail--;
-
-  const bulletItems: string[] = [];
-  let bulletStart = tail + 1;
-  let i = tail;
-  while (i >= 0) {
-    const line = lines[i].trim();
-    if (!line) {
-      i--;
-      continue;
-    }
-    const match = line.match(/^[-•*]\s+(.{4,80})$/);
-    if (!match) break;
-    bulletItems.unshift(match[1].replace(/\*\*/g, ""));
-    bulletStart = i;
-    i--;
-  }
-
-  if (bulletItems.length === 0) {
-    let cutIndex = lines.length;
-    let inSection = false;
-    for (let j = lines.length - 1; j >= 0; j--) {
-      const line = lines[j].trim();
-      if (!line) continue;
-      const quotedMatches = [...line.matchAll(/[“”“”]([^””“”]{4,60})[“”“”]/g)].map(match => match[1]);
-      if (quotedMatches.length > 0) {
-        bulletItems.unshift(...quotedMatches);
-        cutIndex = j;
-        inSection = true;
-      } else if (SUGGESTION_TRIGGER.test(line)) {
-        cutIndex = j;
-        inSection = true;
-      } else if (inSection) {
-        break;
-      } else {
-        break;
-      }
-    }
-    if (bulletItems.length > 0) {
-      return { mainContent: lines.slice(0, cutIndex).join("\n").trim(), suggestions: bulletItems };
-    }
-    return { mainContent: content, suggestions: [] };
-  }
-
-  if (bulletItems.length < 2) return { mainContent: content, suggestions: [] };
-
-  let cutIdx = bulletStart;
-  let j = bulletStart - 1;
-  while (j >= 0 && bulletStart - j <= 6) {
-    const line = lines[j].trim();
-    if (!line) {
-      j--;
-      continue;
-    }
-    if (SUGGESTION_TRIGGER.test(line)) cutIdx = j;
-    j--;
-  }
-
-  return {
-    mainContent: lines.slice(0, cutIdx).join("\n").trim(),
-    suggestions: bulletItems,
-  };
 };
 
 const formatSessionDate = (timestamp: number) =>

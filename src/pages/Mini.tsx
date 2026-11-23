@@ -155,7 +155,7 @@ export default function Mini() {
             onChange={e => setQuestion(e.target.value)}
             placeholder="튜터에게 물어보기…"
             disabled={!user}
-            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-text-strong outline-none placeholder:text-muted"
+            className="min-w-0 flex-1 border-0 bg-transparent! p-0 text-[13px]! text-text-strong outline-none placeholder:text-muted"
           />
           <span className="shrink-0 text-[12px] text-muted">↵</span>
         </form>
