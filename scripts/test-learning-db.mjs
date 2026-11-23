@@ -39,6 +39,9 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230008_explanat
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230009_learning_worker.sql', import.meta.url), 'utf8'));
 await db.exec('create table summary_chat_sessions(id uuid primary key,user_id uuid,material_id text,updated_at timestamptz)');
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230010_learning_mate.sql', import.meta.url), 'utf8'));
+await db.exec(`create table summaries(id uuid primary key,user_id uuid,course_id uuid,template text,content text,material_ids text[],page_range text,source_hash text,request_key text,generation_config jsonb,generation_id uuid,created_at timestamptz default now());
+create table quiz_sets(id uuid primary key,user_id uuid,course_id uuid,title text,difficulty text,question_type text,count integer,material_ids text[],questions jsonb,created_at timestamptz default now());`);
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230011_preparation.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -209,6 +212,22 @@ await db.query('select learning_assessment_lock($1,$2,true,2)',[user,lockToken])
 check((await db.query('select learning_assessment_active($1) as active',[user])).rows[0].active===false,'Late lock renewal cannot resurrect an ended assessment');
 check((await db.query('select learning_assessment_active($1) as active',[other])).rows[0].active===false,'Assessment locks are scoped to the owner');
 await db.exec('rollback');
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const preparationId=randomUUID();
+const prepConfig={pages:'',material_name:'자료',summary_identity:{request_key:'summary-key',generation_config:{}}};
+const prep=(await db.query('select preparation_create($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::text[]) as data',[user,preparationId,course,'lecture:100',hash,'prepare-key',text,JSON.stringify(prepConfig),['summary']])).rows[0].data;
+check(prep.artifacts.length===1,'Preparation creates durable artifact work');
+const prepAgain=(await db.query('select preparation_create($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::text[]) as data',[user,randomUUID(),course,'lecture:100',hash,'prepare-key',text,JSON.stringify(prepConfig),['summary']])).rows[0].data;
+check(prepAgain.request.id===preparationId,'Same preparation conditions reuse the request');
+const prepJob=(await db.query('select workflow_claim() as data')).rows[0].data;
+await db.query('select workflow_complete($1,$2,$3::jsonb,$4::jsonb,null)',[prepJob.id,prepJob.lease_token,JSON.stringify({content:'생성한 요약'}),'{}']);
+const applied=(await db.query('select preparation_apply($1,$2) as data',[user,prep.artifacts[0].id])).rows[0].data;
+check(applied.status==='applied' && applied.applied_id,'Verified preparation can be applied');
+check((await db.query('select preparation_apply($1,$2) as data',[user,prep.artifacts[0].id])).rows[0].data.applied_id===applied.applied_id,'Duplicate approval preserves one result');
+check(Number((await db.query('select count(*) from summaries')).rows[0].count)===1,'Approval creates one summary without overwrites');
+check((await db.query('select preparation_read($1,$2) as data',[other,preparationId])).rows[0].data===null,'Other owner cannot read preparation drafts');
+await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -241,7 +260,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -255,7 +274,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -268,7 +287,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

@@ -16,6 +16,8 @@ async def run_one(repo=None, generator=None):
     job = await repo._rpc('workflow_claim', {})
     if not job:
         return False
+    from usage import request_usage
+    usage_token = request_usage.set({'owner': job['user_id'], 'feature': 'learning_' + job['kind'], 'request_id': job['id']})
     feedback, metrics, error = None, {}, None
     try:
         if job['kind'] == 'session':
@@ -36,11 +38,15 @@ async def run_one(repo=None, generator=None):
                 bundle = await repo.load(job['user_id'], r['session_id'])
                 item = next(i for i in bundle['items'] if i['id'] == r['item_id'])
                 feedback, metrics = await (generator or Generator()).evaluate(bundle['pack'], concept_for(bundle, item), r['answer'])
+        elif job['kind'] == 'preparation':
+            from preparation import generate_artifact
+            feedback, metrics = await asyncio.wait_for(generate_artifact(repo, job), timeout=95)
         else:
             error = 'UNSUPPORTED_JOB'
     except Exception as exc:
         error, metrics = 'WORKER_FAILED', getattr(exc, 'metrics', {})
         logger.warning('job_failed kind=%s error_type=%s', job['kind'], type(exc).__name__)
+    request_usage.reset(usage_token)
     await repo._rpc('workflow_complete', {'p_job': job['id'], 'p_token': job['lease_token'],
         'p_feedback': feedback, 'p_metrics': metrics, 'p_error': error})
     return True

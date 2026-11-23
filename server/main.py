@@ -127,6 +127,8 @@ from workflow import router as workflow_router
 app.include_router(workflow_router)
 from learning_mate import router as mate_router
 app.include_router(mate_router)
+from preparation import router as preparation_router
+app.include_router(preparation_router)
 
 logger = logging.getLogger("tongkk")
 

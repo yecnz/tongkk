@@ -1,3 +1,5 @@
+import PreparationPanel, { PreparationOptions } from '../features/preparation/PreparationPanel';
+import { prepareUploadedMaterials, type PreparationKind } from '../services/preparation';
 import { useLearningScope } from '../features/learningMate/context';
 import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -2069,6 +2071,7 @@ const MaterialDetailView = ({
   const [summaries, setSummaries] = useState<SavedSummary[]>([]);
   const [quizSets, setQuizSets] = useState<SavedQuizSet[]>([]);
   const [quizAttempts, setQuizAttempts] = useState<SavedQuizAttempt[]>([]);
+  const [hubRefresh, setHubRefresh] = useState(0);
   const [hubLoading, setHubLoading] = useState(false);
   const [hubError, setHubError] = useState("");
   // 원본(PDF) 탭: PDF 영역을 "화면 가용 높이 + Tongkk 바 높이"만큼 잡는다. 그러면 페이지 스크롤이 딱
@@ -2314,7 +2317,7 @@ const MaterialDetailView = ({
     return () => {
       ignore = true;
     };
-  }, [selectedCourse, material.id]);
+  }, [selectedCourse, material.id, hubRefresh]);
 
   // 사용자가 요약을 전환할 때마다 '마지막에 본 요약'으로 기억한다(다음 진입 시 그 요약을 먼저 보여줌).
   useEffect(() => {
@@ -2550,6 +2553,7 @@ const MaterialDetailView = ({
         marginLeft: 16, marginBottom: 20, padding: "8px 12px", borderRadius: 10,
         border: "none", background: "var(--color-tint-pink)", color: "var(--color-pink-deep)", cursor: "pointer", fontSize: 13, fontWeight: 600,
       }}>직접 설명하며 학습하기 →</button>
+      <PreparationPanel key={`${selectedCourse}:${material.id}`} course={selectedCourse} materialId={material.id} onApplied={(kind, id) => { if (kind === 'summary') { writeLastSummaryId(material.id, id); setActiveTab('summary'); } else if (kind === 'quiz') setActiveTab('quiz'); setHubRefresh(n => n + 1); }} />
       <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{
           flexShrink: 0,
@@ -3294,6 +3298,8 @@ export default function Summary() {
   const [uploading, setUploading] = useState(false);
   const [searched, setSearched] = useState(Boolean(initialCourse));
   const [selectedCourse] = useState(initialCourse);
+  const [autoPreparationKinds, setAutoPreparationKinds] = useState<PreparationKind[]>([]);
+  const [preparationNotice, setPreparationNotice] = useState('');
   const [inputMode, setInputMode] = useState<"file" | "text">("file");
   const [textMaterialTitle, setTextMaterialTitle] = useState("");
   const [textMaterialContent, setTextMaterialContent] = useState("");
@@ -3832,6 +3838,7 @@ export default function Summary() {
         await saveCourseMaterials(selectedCourse, nextMaterials);
         setMaterials(nextMaterials);
         setSelectedMaterialIds(prev => Array.from(new Set([...prev, ...uploadedMaterials.map(material => material.id)])));
+        setPreparationNotice(await prepareUploadedMaterials(selectedCourse, uploadedMaterials, autoPreparationKinds));
       }
     } finally {
       setIsExtracting(false);
@@ -3872,6 +3879,7 @@ export default function Summary() {
       await saveCourseMaterials(selectedCourse, nextMaterials);
       setMaterials(nextMaterials);
       setSelectedMaterialIds(prev => Array.from(new Set([...prev, material.id])));
+      setPreparationNotice(await prepareUploadedMaterials(selectedCourse, [material], autoPreparationKinds));
       setTextMaterialTitle("");
       setTextMaterialContent("");
       setSearched(true);
@@ -4469,6 +4477,7 @@ export default function Summary() {
 
         {view === "upload" && selectedCourse && (
           <div>
+            <Card className="learning-card"><p>업로드 후 함께 준비할 학습 자료</p><PreparationOptions value={autoPreparationKinds} onChange={setAutoPreparationKinds} />{preparationNotice && <p role="status">{preparationNotice}</p>}</Card>
             <button type="button" onClick={() => navigate(pageRoutes["대시보드"])} style={{
               background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
             }}>← 대시보드로</button>
