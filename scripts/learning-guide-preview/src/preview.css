@@ -1,0 +1,5 @@
+:root { color-scheme: light; }
+.guide-banner { text-align: center; padding: 7px 12px; font-size: 12px; color: var(--color-muted); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.guide-material { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 16px; padding: 28px; max-width: 680px; line-height: 1.9; }
+.guide-material h2 { font-size: 22px; margin: 0 0 18px; }
+.guide-material h3 { font-size: 17px; margin: 25px 0 10px; }
