@@ -43,6 +43,7 @@ await db.exec(`create table summaries(id uuid primary key,user_id uuid,course_id
 create table quiz_sets(id uuid primary key,user_id uuid,course_id uuid,title text,difficulty text,question_type text,count integer,material_ids text[],questions jsonb,created_at timestamptz default now());`);
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230011_preparation.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230012_concept_history.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230013_calendar_integration.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -240,6 +241,33 @@ check(reportedState.concept.evidence_count===0,'Reported material is excluded fr
 await db.query('update materials set markdown=$1 where course_id=$2 and id=$3',[text+'수정',course,'lecture:100']);
 check((await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data.concept.state==='source_changed','Memory stays tied to its source version');
 await db.exec('rollback');
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const oauthState='state-hash', codeHash='code-hash';
+await db.query('select integration_begin($1,$2)',[user,oauthState]);
+await db.exec('savepoint wrong_oauth_owner');
+await rejects(()=>db.query('select integration_consume($1,$2,$3)',[other,oauthState,codeHash]),/LS_NOT_FOUND/);
+await db.exec('rollback to savepoint wrong_oauth_owner');
+await db.query('select integration_consume($1,$2,$3)',[user,oauthState,codeHash]);
+const connection=(await db.query('select integration_connect($1,$2,$3) as data',[user,oauthState,'encrypted-only'])).rows[0].data;
+check(connection.status==='connected' && connection.revision===1,'OAuth state is bound to the authenticated user');
+check((await db.query('select integration_consume($1,$2,$3) as data',[user,oauthState,codeHash])).rows[0].data.status==='done','Completed callback replay is idempotent');
+const sync=(await db.query('select integration_queue($1) as data',[user])).rows[0].data;
+check((await db.query('select integration_queue($1) as data',[user])).rows[0].data.id===sync.id,'Sync clicks share one active job');
+const syncClaim=(await db.query('select workflow_claim() as data')).rows[0].data;
+const sampleEvent={external_id:'event-one',title:'시험',all_day:false,start_value:'2026-11-23T10:00:00+09:00',end_value:'2026-11-23T11:00:00+09:00',start_at:'2026-11-23T01:00:00Z',end_at:'2026-11-23T02:00:00Z'};
+await db.query('select integration_sync_finish($1,$2,$3::jsonb,null)',[syncClaim.id,syncClaim.lease_token,JSON.stringify([sampleEvent])]);
+const imported=(await db.query('select integration_events($1,$2,$3) as data',[user,'2026-11-23T00:00:00Z','2026-11-24T00:00:00Z'])).rows[0].data;
+check(imported.length===1 && imported[0].title==='시험','Imported events are separate from manual plans');
+await db.query('select integration_event_course($1,$2,$3)',[user,imported[0].id,course]);
+check((await db.query('select integration_events($1,$2,$3) as data',[other,'2026-11-23T00:00:00Z','2026-11-24T00:00:00Z'])).rows[0].data.length===0,'Imported events are owner scoped');
+await db.query('select integration_queue($1)',[user]);
+const oldSync=(await db.query('select workflow_claim() as data')).rows[0].data;
+await db.query('select integration_disconnect($1,1,true)',[user]);
+check((await db.query('select integration_sync_finish($1,$2,$3::jsonb,null) as done',[oldSync.id,oldSync.lease_token,JSON.stringify([sampleEvent])])).rows[0].done===false,'Disconnected jobs cannot resurrect imported events');
+check((await db.query('select integration_connection($1) as data',[user])).rows[0].data.tokens_ciphertext===null,'Disconnect removes stored credentials');
+check(Number((await db.query('select count(*) from external_calendar_events')).rows[0].count)===0,'Disconnect honors imported event deletion');
+await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -272,7 +300,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -286,7 +314,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -299,7 +327,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

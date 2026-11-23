@@ -45,3 +45,15 @@ AI 사용량은 인증된 사용자별 `/usage`에 최근 30일 집계로 제공
 전환 전 기존 실행 중 평가가 끝나도록 기다린다. false이면 기존 프로세스 내 BackgroundTasks를 사용하므로 서버 재시작 후 자동 실행은 보장하지 않는다. true이면 별도 워커가 필요하다. 워커는 DB에서 작업을 잠그고 lease를 발급받아 처리하며, 중단된 작업은 제한된 횟수로 재개한다. 외부 모델 과금의 정확히 한 번 실행을 보장하지 않는다. 사용자별 자동 복습은 마이페이지에서 별도로 켠다.
 
 자료 자동 준비에는 010~011 마이그레이션도 적용한다. 선택 범위는 12,000자 이내이며 긴 자료는 페이지 범위를 지정한다. 사용자별 하루 준비 초안은 30개까지, 실패한 초안은 최대 3세대까지만 명시적으로 재시도한다. 초안을 확인한 뒤 저장하며, 원문이 변경된 결과는 적용하지 않는다.
+
+## Google Calendar 읽기 전용 연결
+
+013 마이그레이션을 적용한다. Google Cloud에서 Calendar API를 활성화하고 웹 애플리케이션 OAuth 앱을 등록한다. GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET을 서버 환경변수로 설정한다. 프론트와 FRONTEND_ORIGIN을 맞추고 등록된 redirect URI를 정확히 `<FRONTEND_ORIGIN>/integrations/google-calendar/callback`으로 설정한다. 코드 교환은 로그인된 사용자의 JWT로 서버에서 수행하며 Supabase 로그인 콜백과 분리한다.
+
+INTEGRATION_ENCRYPTION_KEY는 `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'`로 한 번 생성하고 비밀 저장소에 보관한다. 재시작마다 바꾸지 않는다. 기존 암호문을 이전 키로 복호화·재암호화하기 전에 키를 바꾸면 재연결이 필요하다. 이 값과 OAuth secret을 VITE_ 변수나 저장소에 넣지 않는다.
+
+마이페이지에서 연결 후 일정 가져오기를 누르면 워커가 기본 캘린더의 지난 30일~앞 180일을 읽는다. 최대 1,000개·10페이지를 모두 받아야 기존 스냅샷을 교체한다. 부분 실패는 기존 일정을 보존한다. 외부 일정 쓰기·상시 자동 동기화·복수 캘린더는 지원하지 않는다. 연결 해제는 자격 증명을 즉시 제거하고 늦은 작업을 차단한다. Google 권한 회수 요청 실패 시 앱 연결은 해제되며 계정 권한 관리에서 별도로 회수할 수 있다.
+
+설정 없이 연결 성공을 표시하지 않는다. 실제 OAuth 앱 승인·계정 연결·운영 동기화는 별도 확인이 필요하다.
+
+공식 계약: [Google 웹 서버 OAuth 흐름](https://developers.google.com/identity/protocols/oauth2/web-server), [Calendar events.list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list).

@@ -70,3 +70,12 @@ async def review_action(card_id: UUID, request: ReviewAction, auth=Depends(sessi
             'p_key': str(request.command_key), 'p_action': request.action, 'p_days': request.days})
     except WriteConflict:
         fail('CONFLICT', '복습 상태가 바뀌었어요. 새로 불러온 뒤 다시 시도해주세요.')
+
+
+@router.delete('/data')
+async def clear_data(auth=Depends(session_user), repo=Depends(repository)):
+    from calendar_integration import disconnect, Disconnect
+    connection = await repo._rpc('integration_connection', {'p_user': auth[0]})
+    if connection and connection['status'] != 'disconnected':
+        await disconnect(Disconnect(revision=connection['revision'], delete_events=True), auth=auth, repo=repo)
+    return {'cleared': await repo._rpc('learning_workflow_clear', {'p_user': auth[0]})}

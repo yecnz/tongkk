@@ -131,6 +131,8 @@ from preparation import router as preparation_router
 app.include_router(preparation_router)
 from concept_history import router as concepts_router
 app.include_router(concepts_router)
+from calendar_integration import router as integrations_router
+app.include_router(integrations_router)
 
 logger = logging.getLogger("tongkk")
 

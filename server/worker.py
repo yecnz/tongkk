@@ -38,15 +38,21 @@ async def run_one(repo=None, generator=None):
                 bundle = await repo.load(job['user_id'], r['session_id'])
                 item = next(i for i in bundle['items'] if i['id'] == r['item_id'])
                 feedback, metrics = await (generator or Generator()).evaluate(bundle['pack'], concept_for(bundle, item), r['answer'])
+        elif job['kind'] == 'calendar_sync':
+            from calendar_integration import fetch_calendar
+            feedback = await asyncio.wait_for(fetch_calendar(repo, job), timeout=90)
         elif job['kind'] == 'preparation':
             from preparation import generate_artifact
             feedback, metrics = await asyncio.wait_for(generate_artifact(repo, job), timeout=95)
         else:
             error = 'UNSUPPORTED_JOB'
     except Exception as exc:
-        error, metrics = 'WORKER_FAILED', getattr(exc, 'metrics', {})
+        error, metrics = getattr(exc, 'error_code', 'WORKER_FAILED'), getattr(exc, 'metrics', {})
         logger.warning('job_failed kind=%s error_type=%s', job['kind'], type(exc).__name__)
     request_usage.reset(usage_token)
+    if job['kind'] == 'calendar_sync':
+        await repo._rpc('integration_sync_finish', {'p_job': job['id'], 'p_token': job['lease_token'], 'p_events': feedback, 'p_error': error})
+        return True
     await repo._rpc('workflow_complete', {'p_job': job['id'], 'p_token': job['lease_token'],
         'p_feedback': feedback, 'p_metrics': metrics, 'p_error': error})
     return True

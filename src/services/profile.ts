@@ -1,3 +1,4 @@
+import { workflowRequest } from './workflow';
 import type { User } from '@supabase/supabase-js';
 import { invalidateCoursesCache } from './courses';
 import { invalidateMaterialsCache, MATERIAL_STORAGE_BUCKET } from './materials';
@@ -144,6 +145,7 @@ export async function uploadAvatar(file: File): Promise<string> {
 
 export async function deleteOwnAppData(): Promise<void> {
   const user = await requireSupabaseUser();
+  await workflowRequest('/learning-workflow/data', 'DELETE');
   await deleteStoragePrefix('avatars', user.id);
   await deleteStoragePrefix(MATERIAL_STORAGE_BUCKET, user.id);
 
