@@ -14,16 +14,16 @@ const hash = createHash('sha256').update(text).digest('hex');
 const migration = readFileSync(new URL('../supabase/migrations/202611220001_learning_sessions.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 check(schema.includes(migration), 'Fresh schema and migration must agree');
-for (const file of readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter(name => /^2026112300(?:0[7-9]|1[0-4])_/.test(name))) {
+for (const file of readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter(name => /^2026112300(?:0[7-9]|1[0-8])_/.test(name))) {
   check(schema.includes(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8')), `Fresh schema mirrors ${file}`);
 }
 
 await db.exec(`
   create role anon; create role authenticated; create role service_role bypassrls;
   create schema auth; create table auth.users(id uuid primary key);
-  create table public.courses(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+  create table public.courses(id uuid primary key,user_id uuid references auth.users(id) on delete cascade,name text default '과목');
   create table public.materials(course_id uuid references courses(id) on delete cascade,id text,
-    user_id uuid references auth.users(id) on delete cascade,markdown text, primary key(course_id,id));
+    user_id uuid references auth.users(id) on delete cascade,markdown text,name text default '자료',type text default 'file',mime_type text, primary key(course_id,id));
   grant usage on schema public,auth to service_role,anon,authenticated;
   grant select, update on courses,materials to service_role;
 `);
@@ -48,6 +48,7 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230011_preparat
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230012_concept_history.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230013_calendar_integration.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230014_workflow_hardening.sql', import.meta.url), 'utf8'));
+for (const file of readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter(name => /^20261123001[5-8]_/.test(name)).sort()) await db.exec(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -317,7 +318,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses', 'learning_preferences', 'learning_assessment_locks', 'concept_learning_state']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses', 'learning_preferences', 'learning_assessment_locks', 'concept_learning_state', 'learning_concept_links', 'review_questions', 'external_material_drafts']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [

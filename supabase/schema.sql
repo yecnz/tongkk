@@ -2021,3 +2021,399 @@ language sql stable security invoker set search_path=public,pg_catalog as $$
  select id,action,created_at from learning_issue_events where user_id=p_user and issue_id=p_issue order by created_at desc,id limit 100) r),'[]'::jsonb))
  from learning_issues i join learning_concepts c on c.id=i.concept_id and c.user_id=p_user where i.id=p_issue and i.user_id=p_user; $$;
 commit;
+
+begin;
+create table public.learning_concept_links (
+ id uuid primary key,user_id uuid not null references auth.users(id) on delete cascade,
+ source_id uuid not null,target_id uuid not null,relation text not null check(relation in ('equivalent','prerequisite')),
+ created_at timestamptz not null default now(),check(source_id<>target_id),unique(user_id,source_id,target_id,relation),
+ foreign key(source_id,user_id) references learning_concepts(id,user_id) on delete cascade,
+ foreign key(target_id,user_id) references learning_concepts(id,user_id) on delete cascade
+);
+alter table learning_concept_links enable row level security;
+revoke all on learning_concept_links from public,anon,authenticated;
+grant all on learning_concept_links to service_role;
+create function public.learning_graph_read(p_user uuid) returns jsonb
+language sql stable security invoker set search_path=public,pg_catalog as $$
+ select jsonb_build_object('nodes',coalesce((select jsonb_agg(to_jsonb(r) order by r.title,r.id) from (
+ select s.*,c.name as course_name,m.name as material_name from concept_learning_state s
+ join courses c on c.id=s.course_id and c.user_id=p_user join materials m on m.course_id=s.course_id and m.id=s.material_id and m.user_id=p_user
+ where s.user_id=p_user) r),'[]'::jsonb),'links',coalesce((select jsonb_agg(to_jsonb(e) order by e.created_at,e.id) from learning_concept_links e where user_id=p_user),'[]'::jsonb)); $$;
+create function public.learning_graph_link(p_user uuid,p_id uuid,p_source uuid,p_target uuid,p_relation text) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare old learning_concept_links;has_path boolean;
+begin
+ perform pg_advisory_xact_lock(hashtextextended(p_user::text,15));
+ select * into old from learning_concept_links where id=p_id;
+ if found then
+ if old.user_id=p_user and old.source_id=p_source and old.target_id=p_target and old.relation=p_relation then return true; end if;
+ raise exception 'LS_CONFLICT'; end if;
+ if p_source=p_target or p_relation not in ('equivalent','prerequisite') then raise exception 'LS_CONFLICT'; end if;
+ if (select count(*) from concept_learning_state where user_id=p_user and id in (p_source,p_target) and not source_changed)<>2 then raise exception 'LS_NOT_FOUND'; end if;
+ if (select count(*) from learning_concept_links where user_id=p_user)>=3000 then raise exception 'LS_BUSY'; end if;
+ with recursive edges as (
+ select source_id as a,target_id as b,relation='prerequisite' as ordered from learning_concept_links where user_id=p_user
+ union select target_id,source_id,false from learning_concept_links where user_id=p_user and relation='equivalent'
+ ), walk(id,ordered) as (
+ select p_target,false union select e.b,w.ordered or e.ordered from walk w join edges e on e.a=w.id
+ ) select exists(select 1 from walk where id=p_source and (p_relation='prerequisite' or ordered)) into has_path;
+ if has_path then raise exception 'LS_GRAPH_CYCLE'; end if;
+ if p_relation='equivalent' then
+ with recursive edges as (
+ select source_id as a,target_id as b,relation='prerequisite' as ordered from learning_concept_links where user_id=p_user
+ union select target_id,source_id,false from learning_concept_links where user_id=p_user and relation='equivalent'
+ ),walk(id,ordered) as (select p_source,false union select e.b,w.ordered or e.ordered from walk w join edges e on e.a=w.id)
+ select exists(select 1 from walk where id=p_target and ordered) into has_path;
+ if has_path then raise exception 'LS_GRAPH_CYCLE'; end if;
+ end if;
+ insert into learning_concept_links(id,user_id,source_id,target_id,relation) values(p_id,p_user,p_source,p_target,p_relation) on conflict(user_id,source_id,target_id,relation) do nothing;
+ return true;
+end; $$;
+create function public.learning_graph_unlink(p_user uuid,p_id uuid) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ perform pg_advisory_xact_lock(hashtextextended(p_user::text,15));
+ delete from learning_concept_links where id=p_id and user_id=p_user; return true;
+end; $$;
+revoke all on function learning_graph_read(uuid),learning_graph_link(uuid,uuid,uuid,uuid,text),learning_graph_unlink(uuid,uuid) from public,anon,authenticated;
+grant execute on function learning_graph_read(uuid),learning_graph_link(uuid,uuid,uuid,uuid,text),learning_graph_unlink(uuid,uuid) to service_role;
+commit;
+
+begin;
+create table public.review_questions (
+ id uuid primary key default gen_random_uuid(),user_id uuid not null,card_id uuid not null,round_key timestamptz not null,
+ status text not null default 'queued' check(status in ('queued','ready','failed')),generation integer not null default 1,
+ content jsonb,error_code text,created_at timestamptz not null default now(),unique(card_id,round_key),unique(id,user_id),
+ foreign key(card_id,user_id) references review_cards(id,user_id) on delete cascade
+);
+alter table review_questions enable row level security;
+revoke all on review_questions from public,anon,authenticated;
+grant all on review_questions to service_role;
+alter table review_attempts add column question_id uuid;
+alter table review_attempts add constraint review_question_owner_fk foreign key(question_id,user_id) references review_questions(id,user_id);
+alter table background_jobs drop constraint background_jobs_kind_check;
+alter table background_jobs add constraint background_jobs_kind_check check(kind in ('session','review','revision','preparation','calendar_sync','review_question'));
+alter table background_jobs add column question_id uuid;
+alter table background_jobs add constraint question_job_fk foreign key(question_id,user_id) references review_questions(id,user_id) on delete cascade;
+alter function public.review_context(uuid,uuid) rename to review_context_base;
+create function public.review_context(p_user uuid,p_card uuid) returns jsonb
+language sql stable security invoker set search_path=public,pg_catalog as $$
+ select review_context_base(p_user,p_card)||jsonb_build_object('auto_questions',coalesce((select auto_review from learning_preferences where user_id=p_user),false),
+ 'questions',coalesce((select jsonb_agg(to_jsonb(q)) from review_questions q where q.user_id=p_user and q.card_id=p_card),'[]'::jsonb),
+ 'next_question',(select to_jsonb(q) from review_questions q join review_cards c on c.id=q.card_id and c.user_id=p_user where q.user_id=p_user and q.card_id=p_card and q.round_key=c.due_at)); $$;
+create function public.review_question_queue(p_user uuid,p_card uuid,p_retry boolean default false) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c review_cards;q review_questions;
+begin
+ select * into c from review_cards where id=p_card and user_id=p_user for update;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ if c.paused then raise exception 'LS_CONFLICT'; end if;
+ if (review_context(p_user,p_card)->>'source_changed')::boolean then raise exception 'LS_SOURCE_CHANGED'; end if;
+ select * into q from review_questions where card_id=p_card and user_id=p_user and round_key=c.due_at for update;
+ if found then
+ if not p_retry or q.status<>'failed' then return to_jsonb(q); end if;
+ if q.generation>=3 then raise exception 'LS_BUSY'; end if;
+ update review_questions set status='queued',generation=generation+1,error_code=null where id=q.id returning * into q;
+ else
+ if (select count(*) from review_questions where user_id=p_user and created_at>=current_date)>=30 then raise exception 'LS_BUSY'; end if;
+ insert into review_questions(user_id,card_id,round_key) values(p_user,p_card,c.due_at) returning * into q;
+ end if;
+ insert into background_jobs(user_id,kind,target_id,generation,question_id,review_card_id) values(p_user,'review_question',q.id,q.generation,q.id,p_card);
+ return to_jsonb(q);
+end; $$;
+create function public.review_question_finish(p_job uuid,p_token uuid,p_content jsonb,p_error text) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare j background_jobs;q review_questions;
+begin
+ select * into j from background_jobs where id=p_job for update;
+ if not found or j.kind<>'review_question' or j.status<>'running' or j.lease_token<>p_token or j.lease_expires_at<=now() then return false; end if;
+ select * into q from review_questions where id=j.question_id and user_id=j.user_id for update;
+ if not found or q.generation<>j.generation or q.status<>'queued' then return false; end if;
+ if (review_context(q.user_id,q.card_id)->>'source_changed')::boolean then p_error:='SOURCE_CHANGED'; end if;
+ update review_questions set status=case when p_error is null then 'ready' else 'failed' end,content=case when p_error is null then p_content end,error_code=p_error where id=q.id;
+ update background_jobs set status=case when p_error is null then 'succeeded' else 'failed' end,error_code=p_error where id=j.id; return true;
+end; $$;
+create function public.review_start_variant(p_user uuid,p_card uuid,p_id uuid,p_answer text,p_assisted boolean,p_question uuid) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare a review_attempts;r jsonb;c review_cards;
+begin
+ select * into c from review_cards where id=p_card and user_id=p_user for update;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ select * into a from review_attempts where id=p_id;
+ if found then
+ if a.user_id<>p_user or a.card_id<>p_card or a.question_id is distinct from p_question or a.answer<>p_answer or a.assisted<>p_assisted then raise exception 'LS_CONFLICT'; end if;
+ return to_jsonb(a)||jsonb_build_object('claimed',false); end if;
+ if p_question is not null and not exists(select 1 from review_questions where id=p_question and user_id=p_user and card_id=p_card and status='ready' and round_key=c.due_at) then raise exception 'LS_CONFLICT'; end if;
+ r:=review_start(p_user,p_card,p_id,p_answer,p_assisted);
+ update review_attempts set question_id=p_question where id=p_id returning * into a;
+ return to_jsonb(a)||jsonb_build_object('claimed',(r->>'claimed')::boolean);
+end; $$;
+create or replace function public.review_check(p_user uuid,p_card uuid,p_id uuid,p_selected integer,p_interval integer,p_success boolean) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare a review_attempts;ctx jsonb;q jsonb;correct boolean;
+begin
+ perform 1 from review_cards where id=p_card and user_id=p_user for update;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ select * into a from review_attempts where user_id=p_user and card_id=p_card and id=p_id for update;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ if a.check_selected is not null then
+ if a.check_selected<>p_selected then raise exception 'LS_CONFLICT'; end if;
+ return to_jsonb(a); end if;
+ if a.status<>'graded' then raise exception 'LS_CONFLICT'; end if;
+ ctx:=review_context(p_user,p_card);
+ if (ctx->>'source_changed')::boolean then raise exception 'LS_SOURCE_CHANGED'; end if;
+ if a.question_id is null then q:=ctx->'concept'->'check';
+ else select content->'check' into q from review_questions where id=a.question_id and user_id=p_user and card_id=p_card and status='ready'; end if;
+ if q is null then raise exception 'LS_CONFLICT'; end if;
+ if p_selected<0 or p_selected>=jsonb_array_length(q->'options') then raise exception 'LS_CONFLICT'; end if;
+ correct:=p_selected=(q->>'answer_index')::integer;
+ if p_success and (not correct or a.assisted or exists(select 1 from jsonb_array_elements(a.feedback->'criteria') r where r->>'status'<>'met')) then raise exception 'LS_CONFLICT'; end if;
+ if p_interval is not null and (p_interval<1 or p_interval>365 or exists(select 1 from jsonb_array_elements(a.feedback->'criteria') r where r->>'status'='uncertain')) then raise exception 'LS_CONFLICT'; end if;
+ update review_attempts set check_selected=p_selected,check_result=jsonb_build_object('selected',p_selected,
+ 'correct',correct,'answer_index',(q->>'answer_index')::integer,'explanation',q->>'explanation') where id=p_id returning * into a;
+ if a.eligible_for_schedule and p_interval is not null then
+ update review_cards set due_at=now()+make_interval(days=>p_interval),interval_days=p_interval,last_reviewed_at=now(),
+ successful_reviews=case when p_success then successful_reviews+1 else 0 end where id=p_card;
+ end if;
+ return to_jsonb(a);
+end;
+$$;
+create or replace function public.learning_capture_review() returns trigger
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c review_cards; outcome text;
+begin
+ if new.check_selected is null or new.status<>'graded' then return new; end if;
+ select * into c from review_cards where id=new.card_id and user_id=new.user_id;
+ if not found then return new; end if;
+ outcome:=case when exists(select 1 from jsonb_array_elements(new.feedback->'criteria') f where f->>'status'='uncertain') then 'uncertain'
+ when not (new.check_result->>'correct')::boolean or exists(select 1 from jsonb_array_elements(new.feedback->'criteria') f where f->>'status'<>'met') then 'needs_review' else 'met' end;
+ perform learning_record_evidence(new.user_id,c.concept_id,c.source_session_id,c.source_item_id,'review',new.id,outcome,new.assisted,new.question_id is not null and new.eligible_for_schedule and not new.assisted and not exists(select 1 from review_attempts prior where prior.user_id=new.user_id and prior.question_id=new.question_id and (prior.created_at,prior.id)<(new.created_at,new.id)));
+ return new;
+end; $$;
+create or replace view public.concept_learning_state with (security_invoker=true) as
+select c.id,c.user_id,c.course_id,c.material_id,c.title,c.source_hash,
+ c.source_hash<>encode(sha256(convert_to(m.markdown,'UTF8')),'hex') as source_changed,
+ coalesce(e.evidence_count,0) as evidence_count,coalesce(e.independent_questions,0)+coalesce(r.novel_questions,0) as independent_questions,
+ coalesce(e.assisted_count,0) as assisted_count,coalesce(r.delayed_practice,0) as delayed_practice,
+ e.last_outcome,e.last_evaluated_at,'concept-state-v2'::text as policy_version,
+ case when c.source_hash<>encode(sha256(convert_to(m.markdown,'UTF8')),'hex') then 'source_changed'
+ when coalesce(e.evidence_count,0)=0 then 'unassessed'
+ when e.last_verified_outcome='needs_review' or e.recent_failures>=2 then 'needs_review'
+ when e.last_outcome='uncertain' then 'needs_confirmation'
+ when coalesce(e.independent_questions,0)+coalesce(r.novel_questions,0)>=2 and coalesce(r.delayed_practice,0)>=1 and e.recent_failures=0 then 'recent_stable'
+ when exists(select 1 from learning_issues i where i.concept_id=c.id and i.user_id=c.user_id and i.status='awaiting_reassessment') then 'awaiting_reassessment'
+ else 'needs_confirmation' end as state
+from learning_concepts c join materials m on m.course_id=c.course_id and m.id=c.material_id and m.user_id=c.user_id
+left join lateral (
+ select count(*) as evidence_count,count(*) filter(where v.assisted) as assisted_count,
+ count(distinct md5(p.content->'concepts'->i.position->>'question')) filter(where v.independent and not v.assisted and v.source_kind='recall' and v.outcome='met') as independent_questions,
+ count(*) filter(where v.outcome='needs_review' and v.created_at>=now()-interval '14 days') as recent_failures,
+ (array_agg(v.outcome order by v.created_at desc,v.id desc) filter(where v.source_kind not in ('quiz','revision') and (v.outcome='needs_review' or v.independent and v.outcome='met')))[1] as last_verified_outcome,
+ (array_agg(v.outcome order by v.created_at desc,v.id desc))[1] as last_outcome,max(v.created_at) as last_evaluated_at
+ from learning_evidence v join learning_session_items i on i.id=v.item_id and i.user_id=c.user_id
+ join learning_sessions s on s.id=v.session_id and s.user_id=c.user_id
+ join learning_session_packs p on p.id=s.pack_id and p.user_id=c.user_id
+ where v.concept_id=c.id and v.user_id=c.user_id and not (i.data ? 'report')
+) e on true
+left join lateral (
+ select count(*) as delayed_practice,count(distinct md5(q.content->>'question')) filter(where a.question_id is not null and not exists(select 1 from review_attempts prior where prior.user_id=a.user_id and prior.question_id=a.question_id and (prior.created_at,prior.id)<(a.created_at,a.id))) as novel_questions from review_cards k join review_attempts a on a.card_id=k.id and a.user_id=c.user_id
+ left join review_questions q on q.id=a.question_id and q.user_id=c.user_id
+ join learning_session_items ri on ri.id=k.source_item_id and ri.user_id=c.user_id
+ where k.concept_id=c.id and k.user_id=c.user_id and not (ri.data ? 'report') and a.status='graded' and a.eligible_for_schedule and not a.assisted
+ and coalesce((a.check_result->>'correct')::boolean,false) and jsonb_array_length(coalesce(a.feedback->'criteria','[]'))>0
+ and not exists(select 1 from jsonb_array_elements(a.feedback->'criteria') f where f->>'status'<>'met')
+) r on true;
+
+create function public.review_question_job_failed() returns trigger
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ if new.kind='review_question' and new.status='failed' then update review_questions set status='failed',error_code=coalesce(new.error_code,'WORKER_FAILED') where id=new.question_id and user_id=new.user_id and generation=new.generation and status='queued'; end if; return new;
+end; $$;
+create trigger review_question_failure after update of status on background_jobs for each row execute function review_question_job_failed();
+revoke all on function review_context(uuid,uuid),review_question_queue(uuid,uuid,boolean),review_question_finish(uuid,uuid,jsonb,text),review_start_variant(uuid,uuid,uuid,text,boolean,uuid),review_question_job_failed() from public,anon,authenticated;
+grant execute on function review_context(uuid,uuid),review_question_queue(uuid,uuid,boolean),review_question_finish(uuid,uuid,jsonb,text),review_start_variant(uuid,uuid,uuid,text,boolean,uuid),review_question_job_failed() to service_role;
+commit;
+
+begin;
+alter table external_connections add column sync_enabled boolean not null default false;
+alter table external_connections add column sync_interval_minutes integer not null default 30 check(sync_interval_minutes between 15 and 1440);
+alter table external_connections add column next_sync_at timestamptz;
+alter table external_connections add column consecutive_failures integer not null default 0;
+create function public.integration_sync_preferences(p_user uuid,p_revision integer,p_enabled boolean,p_minutes integer) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c external_connections;
+begin
+ select * into c from external_connections where user_id=p_user and provider='google_calendar' for update;
+ if not found or c.status<>'connected' then raise exception 'LS_NOT_FOUND'; end if;
+ if c.revision<>p_revision or p_minutes not between 15 and 1440 then raise exception 'LS_CONFLICT'; end if;
+ update external_connections set sync_enabled=p_enabled,sync_interval_minutes=p_minutes,next_sync_at=case when p_enabled then now() end,
+ revision=revision+1 where id=c.id returning * into c;
+ update background_jobs set status='cancelled' where connection_id=c.id and status in ('queued','running');
+ return to_jsonb(c);
+end; $$;
+create function public.integration_schedule_next() returns trigger
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ if new.status='disconnected' then new.sync_enabled:=false;new.next_sync_at:=null;
+ elsif new.last_synced_at is distinct from old.last_synced_at then
+ new.consecutive_failures:=0;
+ if new.sync_enabled then new.next_sync_at:=now()+make_interval(mins=>new.sync_interval_minutes); end if;
+ elsif new.last_error is not null and (new.last_error is distinct from old.last_error or new.last_synced_at is not distinct from old.last_synced_at) then
+ new.consecutive_failures:=least(old.consecutive_failures+1,8);
+ if new.sync_enabled then new.next_sync_at:=now()+make_interval(mins=>least(1440,new.sync_interval_minutes*(2^new.consecutive_failures)::integer)); end if;
+ end if;return new;
+end; $$;
+create trigger integration_schedule before update of status,last_synced_at,last_error on external_connections for each row execute function integration_schedule_next();
+create function public.workflow_schedule() returns integer
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c external_connections;r review_cards;n integer:=0;
+begin
+ if not pg_try_advisory_xact_lock(230017) then return 0; end if;
+ for c in select * from external_connections where provider='google_calendar' and status='connected' and sync_enabled and coalesce(next_sync_at,now())<=now() order by next_sync_at nulls first for update skip locked limit 20 loop
+ begin
+ perform integration_queue(c.user_id);
+ update external_connections set next_sync_at=now()+make_interval(mins=>sync_interval_minutes) where id=c.id;
+ n:=n+1;
+ exception when raise_exception then update external_connections set next_sync_at=now()+interval '1 hour' where id=c.id;
+ end;
+ end loop;
+ for r in select k.* from review_cards k join learning_preferences p on p.user_id=k.user_id and p.auto_review
+ join concept_learning_state s on s.id=k.concept_id and s.user_id=k.user_id
+ where not k.paused and k.due_at<=now() and not s.source_changed
+ and (select count(*) from review_questions q where q.user_id=k.user_id and q.created_at>=current_date)<30
+ and not exists(select 1 from review_questions q where q.card_id=k.id and q.round_key=k.due_at)
+ order by k.due_at limit 20 loop
+ begin perform review_question_queue(r.user_id,r.id,false); n:=n+1; exception when raise_exception then null; end;
+ end loop;
+ return n;
+end; $$;
+create function public.calendar_job_expired() returns trigger
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ if new.kind='calendar_sync' and new.status='failed' and old.status='running' and new.error_code='WORKER_EXPIRED' then
+ update external_connections set last_error='WORKER_EXPIRED' where id=new.connection_id and user_id=new.user_id and revision=new.connection_revision and status='connected'; end if; return new;
+end; $$;
+create trigger calendar_job_expiry after update of status on background_jobs for each row execute function calendar_job_expired();
+revoke all on function integration_sync_preferences(uuid,integer,boolean,integer),integration_schedule_next(),workflow_schedule(),calendar_job_expired() from public,anon,authenticated;
+grant execute on function integration_sync_preferences(uuid,integer,boolean,integer),integration_schedule_next(),workflow_schedule(),calendar_job_expired() to service_role;
+commit;
+
+begin;
+alter table external_connections drop constraint external_connections_provider_check;
+alter table external_connections add constraint external_connections_provider_check check(provider in ('google_calendar','google_drive','notion'));
+alter table external_connections add column refresh_lease uuid;
+alter table external_connections add column refresh_expires_at timestamptz;
+create table public.external_material_drafts (
+ id uuid primary key default gen_random_uuid(),user_id uuid not null,connection_id uuid not null,course_id uuid not null,
+ external_id text not null,title text not null,source_modified text not null,content_hash text not null,markdown text not null check(length(markdown) between 1 and 300000),
+ notices jsonb not null default '[]',status text not null default 'ready' check(status in ('ready','applied','discarded')),material_id text,
+ created_at timestamptz not null default now(),unique(connection_id,course_id,external_id,content_hash),
+ foreign key(connection_id,user_id) references external_connections(id,user_id) on delete cascade,
+ foreign key(course_id,user_id) references courses(id,user_id) on delete cascade
+);
+alter table external_material_drafts enable row level security;
+revoke all on external_material_drafts from public,anon,authenticated;
+grant all on external_material_drafts to service_role;
+grant insert on materials to service_role;
+create function public.source_connection(p_user uuid,p_provider text) returns jsonb
+language sql stable security invoker set search_path=public,pg_catalog as $$ select to_jsonb(c) from external_connections c where user_id=p_user and provider=p_provider; $$;
+create function public.source_begin(p_user uuid,p_provider text,p_state text) returns void
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c external_connections;
+begin
+ if p_provider not in ('google_drive','notion') then raise exception 'LS_CONFLICT'; end if;
+ delete from integration_oauth_states where expires_at<now()-interval '1 day';
+ insert into external_connections(user_id,provider) values(p_user,p_provider) on conflict(user_id,provider) do nothing;
+ select * into c from external_connections where user_id=p_user and provider=p_provider for update;
+ insert into integration_oauth_states(state_hash,user_id,connection_id,expected_revision) values(p_state,p_user,c.id,c.revision);
+end; $$;
+create function public.source_consume(p_user uuid,p_provider text,p_state text,p_code text) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ if not exists(select 1 from integration_oauth_states s join external_connections c on c.id=s.connection_id and c.user_id=p_user and c.provider=p_provider where s.state_hash=p_state and s.user_id=p_user) then raise exception 'LS_NOT_FOUND'; end if;
+ return integration_consume(p_user,p_state,p_code);
+end; $$;
+create function public.source_disconnect(p_user uuid,p_provider text,p_revision integer) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c external_connections;
+begin
+ select * into c from external_connections where user_id=p_user and provider=p_provider for update;
+ if not found or c.status='disconnected' then return true; end if;
+ if c.revision<>p_revision then raise exception 'LS_CONFLICT'; end if;
+ update external_connections set status='disconnected',tokens_ciphertext=null,revision=revision+1,refresh_lease=null,refresh_expires_at=null where id=c.id;
+ delete from integration_oauth_states where connection_id=c.id and user_id=p_user;
+ update external_material_drafts set status='discarded' where connection_id=c.id and user_id=p_user and status='ready';
+ return true;
+end; $$;
+create function public.source_refresh_claim(p_user uuid,p_provider text,p_revision integer) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c external_connections;
+begin
+ select * into c from external_connections where user_id=p_user and provider=p_provider for update;
+ if not found or c.status<>'connected' or c.revision<>p_revision then raise exception 'LS_CONFLICT'; end if;
+ if c.refresh_expires_at>now() then raise exception 'LS_BUSY'; end if;
+ update external_connections set refresh_lease=gen_random_uuid(),refresh_expires_at=now()+interval '60 seconds' where id=c.id returning * into c;
+ return to_jsonb(c);
+end; $$;
+create function public.source_refresh_save(p_user uuid,p_id uuid,p_revision integer,p_lease uuid,p_cipher text) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ update external_connections set tokens_ciphertext=coalesce(p_cipher,tokens_ciphertext),refresh_lease=null,refresh_expires_at=null,
+ status=case when p_cipher is null then 'reconnect' else status end
+ where id=p_id and user_id=p_user and revision=p_revision and refresh_lease=p_lease and refresh_expires_at>now() and status='connected'; return found;
+end; $$;
+create function public.source_draft_create(p_user uuid,p_connection uuid,p_revision integer,p_course uuid,p_external text,p_title text,p_modified text,p_markdown text,p_notices jsonb) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare d external_material_drafts;
+begin
+ perform 1 from external_connections where id=p_connection and user_id=p_user and revision=p_revision and status='connected' and provider in ('google_drive','notion') for share;
+ if not found then raise exception 'LS_CONFLICT'; end if;
+ perform 1 from courses where id=p_course and user_id=p_user for share;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ select * into d from external_material_drafts where user_id=p_user and connection_id=p_connection and course_id=p_course and external_id=p_external and content_hash=encode(sha256(convert_to(p_markdown,'UTF8')),'hex') for update;
+ if found then
+ update external_material_drafts set source_modified=p_modified,status=case when status='discarded' or status='applied' and not exists(select 1 from materials where course_id=p_course and id=d.material_id and user_id=p_user) then 'ready' else status end where id=d.id returning * into d;
+ return to_jsonb(d); end if;
+ if (select count(*) from external_material_drafts where user_id=p_user and created_at>=current_date)>=50 then raise exception 'LS_BUSY'; end if;
+ insert into external_material_drafts(user_id,connection_id,course_id,external_id,title,source_modified,content_hash,markdown,notices)
+ values(p_user,p_connection,p_course,p_external,p_title,p_modified,encode(sha256(convert_to(p_markdown,'UTF8')),'hex'),p_markdown,p_notices)
+ on conflict(connection_id,course_id,external_id,content_hash) do update set source_modified=excluded.source_modified
+ returning * into d;return to_jsonb(d);
+end; $$;
+create function public.source_draft_action(p_user uuid,p_id uuid,p_action text) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare d external_material_drafts;c external_connections;
+begin
+ select x.* into c from external_connections x join external_material_drafts a on a.connection_id=x.id and a.user_id=p_user where a.id=p_id and x.user_id=p_user for share of x;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ select * into d from external_material_drafts where id=p_id and user_id=p_user for update;
+ if p_action='discard' and d.status='ready' then update external_material_drafts set status='discarded' where id=d.id returning * into d;return to_jsonb(d); end if;
+ if p_action<>'apply' then raise exception 'LS_CONFLICT'; end if;
+ if d.status='applied' then return to_jsonb(d); end if;
+ if d.status<>'ready' or c.status<>'connected' then raise exception 'LS_CONFLICT'; end if;
+ d.material_id:='external:'||d.id::text;
+ insert into materials(course_id,id,user_id,name,type,markdown,mime_type)
+ values(d.course_id,d.material_id,p_user,d.title,'file',d.markdown,'text/markdown');
+ update external_material_drafts set status='applied',material_id=d.material_id where id=d.id returning * into d;
+ return to_jsonb(d);
+end; $$;
+create function public.source_drafts(p_user uuid,p_provider text) returns jsonb
+language sql stable security invoker set search_path=public,pg_catalog as $$
+ select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at desc),'[]'::jsonb) from (
+ select d.* from external_material_drafts d join external_connections c on c.id=d.connection_id and c.user_id=p_user and c.provider=p_provider where d.user_id=p_user order by d.created_at desc limit 50) r; $$;
+revoke all on function source_connection(uuid,text),source_begin(uuid,text,text),source_consume(uuid,text,text,text),source_disconnect(uuid,text,integer),source_refresh_claim(uuid,text,integer),source_refresh_save(uuid,uuid,integer,uuid,text),source_draft_create(uuid,uuid,integer,uuid,text,text,text,text,jsonb),source_draft_action(uuid,uuid,text),source_drafts(uuid,text) from public,anon,authenticated;
+grant execute on function source_connection(uuid,text),source_begin(uuid,text,text),source_consume(uuid,text,text,text),source_disconnect(uuid,text,integer),source_refresh_claim(uuid,text,integer),source_refresh_save(uuid,uuid,integer,uuid,text),source_draft_create(uuid,uuid,integer,uuid,text,text,text,text,jsonb),source_draft_action(uuid,uuid,text),source_drafts(uuid,text) to service_role;
+create or replace function public.integration_disconnect(p_user uuid,p_revision integer,p_delete boolean) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare c external_connections;
+begin
+ select * into c from external_connections where user_id=p_user and provider='google_calendar' for update;
+ if not found or c.status='disconnected' then return true; end if;
+ if c.revision<>p_revision then raise exception 'LS_CONFLICT'; end if;
+ update external_connections set status='disconnected',tokens_ciphertext=null,revision=revision+1,last_error=null where id=c.id;
+ update background_jobs set status='cancelled' where connection_id=c.id and status in ('queued','running');
+ delete from integration_oauth_states where user_id=p_user and connection_id=c.id;
+ if p_delete then delete from external_calendar_events where user_id=p_user and connection_id=c.id; end if;
+ return true;
+end; $$;
+commit;
