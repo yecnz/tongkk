@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const auth = vi.hoisted(() => ({ initialize: vi.fn(), getSession: vi.fn(), onAuthStateChange: vi.fn(),
-  setSession: vi.fn(), signUp: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), resetPasswordForEmail: vi.fn(), resend: vi.fn() }));
+  setSession: vi.fn(), signUp: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), resetPasswordForEmail: vi.fn(), resend: vi.fn(), verifyOtp: vi.fn() }));
 vi.mock('./services/supabase', () => ({ supabase: { auth } }));
 vi.mock('./services/courses', () => ({ invalidateCoursesCache: vi.fn() }));
 vi.mock('./services/materials', () => ({ invalidateMaterialsCache: vi.fn() }));
@@ -183,15 +183,20 @@ describe('login, signup and reset email UI', () => {
     await render('/auth', { modal: true }); await click('비밀번호 찾기'); await input(0, 'ui-reset@example.test');
     expect(container.querySelector('button[type=submit]')?.hasAttribute('disabled')).toBe(true);
   });
-  it('keeps signup confirmation guidance visible and allows resend after the cooldown', async () => {
+  it('asks for the 6-digit signup code and signs in once it is verified', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
+    auth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
     await render('/auth', { modal: true, signup: true });
     await input(0, 'ui-signup@example.test'); await input(1, 'new-password'); await submit();
     expect(closed).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('가입 확인이 필요');
+    expect(container.textContent).toContain('6자리 인증번호');
+    expect(container.textContent).toContain('남은 시간');
     expect(container.querySelector('input[type=password]')).toBeNull();
-    expect(container.querySelector('button[type=submit]')?.textContent).toContain('초 후');
+    expect(container.querySelector<HTMLButtonElement>('button[type=submit]')?.disabled).toBe(true);
+    await input(0, '12a3456'); await submit();
+    expect(auth.verifyOtp).toHaveBeenCalledWith({ email: 'ui-signup@example.test', token: '123456', type: 'signup' });
+    expect(closed).toHaveBeenCalledTimes(1);
   });
   it('closes after immediate signup when confirmation is disabled', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
