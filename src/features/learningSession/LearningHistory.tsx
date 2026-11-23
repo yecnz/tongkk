@@ -1,3 +1,4 @@
+import { StartRevision } from '../review/ExplanationRevision';
 import { reviewRequest } from '../../services/reviews';
 import { useState } from 'react';
 import { Card } from '../../common';
@@ -29,6 +30,7 @@ export default function LearningHistory({ sessionId }: { sessionId?: string }) {
       {item.question && <Markdown text={item.question} />}
       {item.answer ? <><h3>내 설명</h3><Markdown text={item.answer} /></> : <p>제출한 설명이 없어요.</p>}
       {item.feedback && <LearningFeedback feedback={item.feedback} />}
+      {sessionId && item.answer && <StartRevision sessionId={sessionId} itemId={item.id} />}
       {item.check && <><h3>확인 문제</h3><Markdown text={item.check.question} />
         {item.check_result && <><p>내 선택: {item.check.options[item.check_result.selected]}</p><p>정답: {item.check.options[item.check_result.answer_index]}</p><Markdown text={item.check_result.explanation} /></>}</>}
       {Object.entries(item.help).filter(([, text]) => text).map(([kind, text]) => <details key={kind}><summary>{({ source: '원문', hint1: '첫 힌트', hint2: '추가 힌트', reference: '모범 설명' } as Record<string, string>)[kind] || '사용한 도움'}</summary><Markdown text={text!} /></details>)}

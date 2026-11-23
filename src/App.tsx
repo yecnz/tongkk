@@ -15,6 +15,7 @@ import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import LearningSession from "./pages/LearningSession";
+import ExplanationRevision from "./features/review/ExplanationRevision";
 import ReviewPractice from "./features/learningSession/ReviewPractice";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
@@ -65,6 +66,7 @@ function AppShell() {
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/learn" element={<LearningSession />} />
         <Route path="/learn/review/:cardId" element={<ReviewPractice />} />
+        <Route path="/learn/:sessionId/revisions/:revisionId" element={<ExplanationRevision />} />
         <Route path="/learn/:sessionId" element={<LearningSession />} />
         <Route path="/review" element={<ReviewHome />} />
         <Route path="/stats" element={<Stats />} />

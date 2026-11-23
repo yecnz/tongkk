@@ -35,6 +35,7 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230004_review_c
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230005_review_submission.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230006_review_stats.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230007_learning_issues.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230008_explanation_revisions.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -150,6 +151,24 @@ await db.exec('set role service_role');
 const linked=(await db.query('select learning_issue_from_quiz($1,$2,0,$3) as data',[user,quizAttemptId,conceptRows[0].id])).rows[0].data;
 check(linked.evidence.some(e=>e.source_kind==='quiz' && e.outcome==='uncertain' && e.answer==='내 답'),'Legacy quiz mapping preserves uncertain evidence and student answer');
 await rejects(()=>db.query('select learning_issue_from_quiz($1,$2,0,$3)',[other,quizAttemptId,conceptRows[0].id]),/LS_NOT_FOUND/);
+await db.exec('begin');
+await db.query("update learning_sessions set status='completed' where id=$1",[stored.session.id]);
+const revisionId=randomUUID(), evaluationKey=randomUUID();
+const revision=(await db.query('select explanation_create($1,$2,$3,$4,null) as data',[user,revisionId,stored.session.id,stored.items[0].id])).rows[0].data;
+check(revision.baseline==='고정 답안','Explanation revisions preserve the original submission');
+await db.query('select explanation_create($1,$2,$3,$4,null)',[user,revisionId,stored.session.id,stored.items[0].id]);
+check((await db.query('select explanation_read($1,$2) as data',[other,revisionId])).rows[0].data===null,'Revision reads are owner scoped');
+await db.query('select explanation_save($1,$2,0,$3,true)',[user,revisionId,'수정한 설명']);
+const reserved=(await db.query('select explanation_submit($1,$2,1,$3) as data',[user,revisionId,evaluationKey])).rows[0].data;
+check(reserved.claimed===true,'First revision submission reserves an evaluation');
+check((await db.query('select explanation_submit($1,$2,1,$3) as data',[user,revisionId,evaluationKey])).rows[0].data.claimed===false,'Evaluation replay does not duplicate calls');
+await db.query('select explanation_finish($1,$2,$3,$4::jsonb,$5::jsonb,null)',[user,revisionId,evaluationKey,JSON.stringify({criteria:[{status:'met'}]}),'{}']);
+const evaluated=(await db.query('select explanation_read($1,$2) as data',[user,revisionId])).rows[0].data;
+check(evaluated.revision.status==='graded' && evaluated.baseline==='고정 답안','Revision evaluation never overwrites the baseline');
+await db.exec('savepoint immutable_revision');
+await rejects(()=>db.query('select explanation_save($1,$2,1,$3,true)',[user,revisionId,'몰래 수정']),/LS_CONFLICT/);
+await db.exec('rollback to savepoint immutable_revision');
+await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -182,7 +201,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -196,7 +215,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -209,7 +228,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

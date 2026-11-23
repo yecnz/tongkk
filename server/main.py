@@ -121,6 +121,8 @@ from reviews import router as reviews_router
 app.include_router(reviews_router)
 from learning_issues import router as issues_router
 app.include_router(issues_router)
+from explanation_revisions import router as revisions_router
+app.include_router(revisions_router)
 
 logger = logging.getLogger("tongkk")
 
