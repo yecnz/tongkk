@@ -19,6 +19,7 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   resendConfirmation: (email: string) => Promise<void>;
+  verifySignupCode: (email: string, code: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
   updateEmail: (newEmail: string) => Promise<void>;
   // 비밀번호 재설정 메일 링크로 진입한 상태(새 비밀번호 입력 단계). true면 자동 로그인 대신 재설정 폼을 띄운다.
@@ -142,6 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     resetPassword: email => sendAuthEmail('reset', email),
     resendConfirmation: email => sendAuthEmail('signup', email),
+    // 가입 확인 메일의 인증번호로 이메일을 확인한다. 성공하면 세션이 생겨 바로 로그인된다.
+    verifySignupCode: async (email, code) => {
+      const { error } = await supabase.auth.verifyOtp({ email, token: code, type: 'signup' });
+      if (error) throw error;
+      setAuthCallbackError(null);
+    },
     // recovery 링크로 진입한 사용자가 새 비밀번호를 설정한다. (현재 세션은 recovery 토큰으로 인증됨)
     updatePassword: async (newPassword) => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
