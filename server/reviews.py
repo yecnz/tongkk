@@ -41,6 +41,7 @@ class SubmitReview(BaseModel):
     attempt_id: UUID
     answer: str = Field(min_length=1,max_length=4000)
     assisted: bool = False
+    question_id: UUID | None = None
 
     @field_validator('answer')
     @classmethod
@@ -62,18 +63,28 @@ async def context(repo,user,card):
     return value
 
 
+def review_concept(ctx, entry=None):
+    question = next((q for q in ctx.get('questions', []) if entry and q['id'] == entry.get('question_id')), None)
+    return question['content'] if question else ctx['concept']
+
+
 def review_view(ctx):
     card,concept=ctx['card'],ctx['concept']
     attempts=[]
     for a in ctx['attempts']:
         expired=a['status']=='pending' and datetime.fromisoformat(a['lease_expires_at'])<=datetime.now(timezone.utc)
-        attempts.append({'id':a['id'],'answer':a['answer'],'assisted':a['assisted'],
+        attempts.append({'id':a['id'],'question_id':a.get('question_id'),'question':review_concept(ctx,a)['question'],'answer':a['answer'],'assisted':a['assisted'],
                          'status':'ungraded' if expired else a['status'],'feedback':a.get('feedback'),
                          'check_result':a.get('check_result'),'eligible_for_schedule':a.get('eligible_for_schedule',False),
                          'error_code':'EXPIRED' if expired else a.get('error_code')})
     latest=attempts[0] if attempts else None
+    next_question=ctx.get('next_question')
+    concept=review_concept(ctx,ctx['attempts'][0] if attempts else None)
+    next_concept=next_question['content'] if next_question and next_question['status']=='ready' else ctx['concept']
     show_check=latest and latest['status']=='graded'
     return {'id':card['id'],'title':concept['title'],'question':concept['question'],'due_at':card['due_at'],
+            'auto_questions':ctx.get('auto_questions',False),'next_question':next_concept['question'],'question_id':next_question['id'] if next_question and next_question['status']=='ready' else None,
+            'question_status':next_question['status'] if next_question else None,
             'source_changed':ctx['source_changed'],'paused':card.get('paused',False),'latest':latest,
             'check':{'question':concept['check']['question'],'options':concept['check']['options']} if show_check else None,
             'baseline':{'answer':ctx['baseline'].get('draft'),'feedback':ctx['baseline'].get('feedback')} if show_check else None,
@@ -87,7 +98,7 @@ async def run_review(repo,user,card,attempt):
         return
     output,metrics,error=None,{},None
     try:
-        output,metrics=await Generator().evaluate(ctx['pack'],ctx['concept'],entry['answer'])
+        output,metrics=await Generator().evaluate(ctx['pack'],review_concept(ctx,entry),entry['answer'])
     except Exception as exc:
         metrics=getattr(exc,'metrics',{})
         error='MODEL_FAILED'
@@ -108,8 +119,8 @@ async def read(card_id: UUID,auth=Depends(session_user),repo=Depends(get_reposit
 @router.post('/{card_id}/answers',status_code=202)
 async def submit(card_id: UUID,request: SubmitReview,tasks: BackgroundTasks,auth=Depends(session_user),repo=Depends(get_repository)):
     try:
-        entry=await repo._rpc('review_start',{'p_user':auth[0],'p_card':str(card_id),'p_id':str(request.attempt_id),
-                                            'p_answer':request.answer,'p_assisted':request.assisted})
+        entry=await repo._rpc('review_start_variant' if request.question_id else 'review_start',{'p_user':auth[0],'p_card':str(card_id),'p_id':str(request.attempt_id),
+                                            'p_answer':request.answer,'p_assisted':request.assisted,**({'p_question':str(request.question_id)} if request.question_id else {})})
     except WriteConflict:
         fail('CONFLICT','이전 복습 요청을 확인해주세요.')
     if entry.get('claimed') and entry['status']=='pending':
@@ -125,7 +136,7 @@ async def check(card_id: UUID,request: CheckReview,auth=Depends(session_user),re
     attempt=next((a for a in ctx['attempts'] if a['id']==str(request.attempt_id)),None)
     if not attempt or attempt['status']!='graded':
         fail('INVALID_STATE','설명 평가 후 확인 문제를 풀어주세요.')
-    correct=request.selected==ctx['concept']['check']['answer_index']
+    correct=request.selected==review_concept(ctx,attempt)['check']['answer_index']
     interval,success=next_review(attempt['feedback'],attempt['assisted'] or not correct,ctx['card']['successful_reviews'])
     try:
         await repo._rpc('review_check',{'p_user':auth[0],'p_card':str(card_id),'p_id':str(request.attempt_id),
@@ -133,3 +144,15 @@ async def check(card_id: UUID,request: CheckReview,auth=Depends(session_user),re
     except WriteConflict:
         fail('CONFLICT','이미 제출한 답안이나 학습 상태를 확인해주세요.')
     return review_view(await context(repo,auth[0],str(card_id)))
+
+
+class PrepareQuestion(BaseModel):
+    retry: bool = False
+
+@router.post('/{card_id}/questions', status_code=202)
+async def prepare_question(card_id: UUID, request: PrepareQuestion, auth=Depends(session_user), repo=Depends(get_repository)):
+    from workflow import durable_enabled
+    if not durable_enabled():
+        fail('WORKER_REQUIRED', '새 복습 문제 생성에는 학습 워커가 필요해요.', 503)
+    await repo._rpc('review_question_queue', {'p_user':auth[0], 'p_card':str(card_id), 'p_retry':request.retry})
+    return review_view(await context(repo, auth[0], str(card_id)))

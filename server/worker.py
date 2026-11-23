@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import logging
 import signal
+import time
 from learning_sessions.repository import Repository
 from learning_sessions.service import Service, concept_for
 from learning_sessions.generation import Generator
@@ -28,7 +29,8 @@ async def run_one(repo=None, generator=None):
             if ctx['source_changed']:
                 error = 'SOURCE_CHANGED'
             else:
-                feedback, metrics = await (generator or Generator()).evaluate(ctx['pack'], ctx['concept'], entry['answer'])
+                from reviews import review_concept
+                feedback, metrics = await (generator or Generator()).evaluate(ctx['pack'], review_concept(ctx, entry), entry['answer'])
         elif job['kind'] == 'revision':
             ctx = await repo._rpc('explanation_read', {'p_user': job['user_id'], 'p_id': job['revision_id']})
             r = ctx['revision']
@@ -38,6 +40,12 @@ async def run_one(repo=None, generator=None):
                 bundle = await repo.load(job['user_id'], r['session_id'])
                 item = next(i for i in bundle['items'] if i['id'] == r['item_id'])
                 feedback, metrics = await (generator or Generator()).evaluate(bundle['pack'], concept_for(bundle, item), r['answer'])
+        elif job['kind'] == 'review_question':
+            ctx = await repo._rpc('review_context', {'p_user':job['user_id'],'p_card':job['review_card_id']})
+            if ctx['source_changed']:
+                error = 'SOURCE_CHANGED'
+            else:
+                feedback, metrics = await asyncio.wait_for((generator or Generator()).review_question(ctx['pack'],ctx['concept'],[q['content']['question'] for q in ctx.get('questions',[]) if q.get('content')]),timeout=65)
         elif job['kind'] == 'calendar_sync':
             from calendar_integration import fetch_calendar
             feedback = await asyncio.wait_for(fetch_calendar(repo, job), timeout=90)
@@ -50,6 +58,9 @@ async def run_one(repo=None, generator=None):
         error, metrics = getattr(exc, 'error_code', 'WORKER_FAILED'), getattr(exc, 'metrics', {})
         logger.warning('job_failed kind=%s error_type=%s', job['kind'], type(exc).__name__)
     request_usage.reset(usage_token)
+    if job['kind'] == 'review_question':
+        await repo._rpc('review_question_finish', {'p_job':job['id'],'p_token':job['lease_token'],'p_content':feedback,'p_error':error})
+        return True
     if job['kind'] == 'calendar_sync':
         await repo._rpc('integration_sync_finish', {'p_job': job['id'], 'p_token': job['lease_token'], 'p_events': feedback, 'p_error': error})
         return True
@@ -67,8 +78,12 @@ async def main(once=False):
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
+    next_schedule = 0
     while not stop.is_set():
         try:
+            if time.monotonic() >= next_schedule:
+                await repo._rpc('workflow_schedule', {})
+                next_schedule = time.monotonic() + 30
             processed = await run_one(repo)
         except Exception as exc:
             logger.warning('worker_unavailable error_type=%s', type(exc).__name__)

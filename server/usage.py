@@ -136,7 +136,7 @@ def track_generation(function):
     async def tracked(self, *args, **kwargs):
         started, metrics, failed = time.monotonic(), {}, False
         context_feature = (request_usage.get() or {}).get('feature')
-        feature = 'learning_prepare' if function.__name__ == 'prepare' else ('review_grade' if context_feature in {'review', 'learning_review'} else 'explanation_grade' if context_feature == 'learning_revision' else 'learning_grade')
+        feature = 'review_question' if function.__name__ == 'review_question' else 'learning_prepare' if function.__name__ == 'prepare' else ('review_grade' if context_feature in {'review', 'learning_review'} else 'explanation_grade' if context_feature == 'learning_revision' else 'learning_grade')
         try:
             result, metrics = await function(self, *args, **kwargs)
             return result, metrics

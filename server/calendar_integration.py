@@ -48,13 +48,20 @@ def configured():
         return False
 
 
+def token_cipher():
+    try:
+        return Fernet(os.getenv('INTEGRATION_ENCRYPTION_KEY', '').encode())
+    except (ValueError,TypeError):
+        fail('INTEGRATION_SETUP', '서버의 연동 암호화 키 설정이 필요해요.', 503)
+
+
 def encrypt_tokens(tokens, user, connection):
-    return settings()[2].encrypt(json.dumps({'user': user, 'connection': connection, 'tokens': tokens}).encode()).decode()
+    return token_cipher().encrypt(json.dumps({'user': user, 'connection': connection, 'tokens': tokens}).encode()).decode()
 
 
 def decrypt_tokens(value, user, connection):
     try:
-        payload = json.loads(settings()[2].decrypt(value.encode()))
+        payload = json.loads(token_cipher().decrypt(value.encode()))
         if payload['user'] != user or payload['connection'] != connection:
             raise ValueError('Token context mismatch')
         return payload['tokens']
@@ -63,7 +70,7 @@ def decrypt_tokens(value, user, connection):
 
 
 def public_connection(value):
-    return {key: value.get(key) for key in ('id', 'status', 'revision', 'last_synced_at', 'last_error')} if value else None
+    return {key: value.get(key) for key in ('id', 'status', 'revision', 'last_synced_at', 'last_error', 'sync_enabled', 'sync_interval_minutes', 'next_sync_at', 'consecutive_failures')} if value else None
 
 
 class CalendarSyncError(Exception):
@@ -110,7 +117,7 @@ async def callback(request: Callback, auth=Depends(session_user), repo=Depends(r
     client_id, secret, _, redirect = settings()
     state_hash = hashlib.sha256(request.state.encode()).hexdigest()
     try:
-        state = await repo._rpc('integration_consume', {'p_user': auth[0], 'p_state': state_hash, 'p_code': hashlib.sha256(request.code.encode()).hexdigest()})
+        state = await repo._rpc('source_consume', {'p_user': auth[0], 'p_provider':'google_calendar', 'p_state': state_hash, 'p_code': hashlib.sha256(request.code.encode()).hexdigest()})
         if state['status'] == 'done':
             return {'connection': public_connection(await repo._rpc('integration_connection', {'p_user': auth[0]}))}
         async with httpx.AsyncClient(timeout=20) as client:
@@ -147,7 +154,11 @@ async def disconnect(request: Disconnect, auth=Depends(session_user), repo=Depen
     except WriteConflict:
         fail('CONFLICT', '연결 상태가 바뀌었어요. 새로 불러온 뒤 다시 시도해주세요.')
     revoked = False
-    if value and value.get('tokens_ciphertext') and configured():
+    shared_active = False
+    if os.getenv('GOOGLE_CALENDAR_CLIENT_ID') and os.getenv('GOOGLE_CALENDAR_CLIENT_ID') == os.getenv('GOOGLE_DRIVE_CLIENT_ID'):
+        drive = await repo._rpc('source_connection', {'p_user':auth[0],'p_provider':'google_drive'})
+        shared_active = bool(drive and drive['status'] == 'connected')
+    if value and value.get('tokens_ciphertext') and configured() and not shared_active:
         try:
             tokens = decrypt_tokens(value['tokens_ciphertext'], auth[0], value['id'])
             async with httpx.AsyncClient(timeout=10) as client:
@@ -232,3 +243,21 @@ async def day_events(day: str, auth=Depends(session_user), repo=Depends(reposito
 @router.put('/events/{event_id}/course')
 async def event_course(event_id: UUID, request: EventCourse, auth=Depends(session_user), repo=Depends(repository)):
     return {'saved': await repo._rpc('integration_event_course', {'p_user': auth[0], 'p_event': str(event_id), 'p_course': str(request.course_id) if request.course_id else None})}
+
+
+class SyncPreferences(BaseModel):
+    revision: int = Field(ge=0)
+    enabled: bool
+    minutes: int = Field(default=30, ge=15, le=1440)
+
+@router.put('/google-calendar/schedule')
+async def schedule(request: SyncPreferences, auth=Depends(session_user), repo=Depends(repository)):
+    if request.enabled:
+        settings()
+        if not durable_enabled():
+            fail('WORKER_REQUIRED', '자동 동기화에는 학습 워커가 필요해요.', 503)
+    try:
+        value = await repo._rpc('integration_sync_preferences', {'p_user':auth[0], 'p_revision':request.revision, 'p_enabled':request.enabled, 'p_minutes':request.minutes})
+    except WriteConflict:
+        fail('CONFLICT', '연결 상태가 바뀌었어요. 다시 불러와주세요.', 409)
+    return {'connection': public_connection(value)}
