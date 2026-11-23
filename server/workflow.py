@@ -78,4 +78,9 @@ async def clear_data(auth=Depends(session_user), repo=Depends(repository)):
     connection = await repo._rpc('integration_connection', {'p_user': auth[0]})
     if connection and connection['status'] != 'disconnected':
         await disconnect(Disconnect(revision=connection['revision'], delete_events=True), auth=auth, repo=repo)
+    from source_integrations import disconnect as disconnect_source, Disconnect as DisconnectSource
+    for provider in ('google-drive','notion'):
+        source = await repo._rpc('source_connection', {'p_user':auth[0],'p_provider':provider.replace('-','_')})
+        if source and source['status'] != 'disconnected':
+            await disconnect_source(provider,DisconnectSource(revision=source['revision']),auth=auth,repo=repo)
     return {'cleared': await repo._rpc('learning_workflow_clear', {'p_user': auth[0]})}

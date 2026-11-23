@@ -1,3 +1,4 @@
+import SourceConnections from '../features/integrations/SourceConnections';
 import CalendarConnections from '../features/integrations/CalendarConnections';
 import LearningPreferences from '../features/review/LearningPreferences';
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -516,7 +517,7 @@ export default function MyPage() {
         </div>
 
         <LearningPreferences key={user?.id || 'guest'} />
-        <CalendarConnections key={`calendar-${user?.id || 'guest'}`} />
+        <CalendarConnections key={`calendar-${user?.id || 'guest'}`} /><SourceConnections key={`sources-${user?.id || 'guest'}`} />
         {/* 하단: 데이터 관리 (왼) + 지원 및 정보 (오) */}
         <div className="mypage-grid">
           {/* 데이터 관리 */}

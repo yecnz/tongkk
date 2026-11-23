@@ -100,3 +100,8 @@ it('keeps external calendar authorization separate from app login callbacks', ()
   expect(readAuthCallback('https://app.test/integrations/google-calendar/callback?code=calendar-code&state=random-state')).toEqual({ isRecovery: false, hasCallback: false, error: null });
   expect(readAuthCallback('https://app.test/integrations/google-calendar/callback?error=access_denied')).toEqual({ isRecovery: false, hasCallback: false, error: null });
 });
+
+
+it.each(['google-drive','notion'])('keeps %s OAuth separate from app authentication', provider => {
+  expect(readAuthCallback(`https://app.test/integrations/${provider}/callback?code=external&state=random-state`)).toEqual({isRecovery:false,hasCallback:false,error:null});
+});

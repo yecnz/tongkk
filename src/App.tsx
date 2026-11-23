@@ -15,6 +15,7 @@ import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import LearningSession from "./pages/LearningSession";
+import SourceCallback from './features/integrations/SourceCallback';
 import CalendarCallback from "./features/integrations/CalendarCallback";
 import LearningContextProvider from "./features/learningMate/LearningContextProvider";
 import LearningMateHost from "./features/learningMate/LearningMateHost";
@@ -74,6 +75,7 @@ function AppShell() {
         <Route path="/learn/:sessionId" element={<LearningSession />} />
         <Route path="/review" element={<ReviewHome />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/integrations/:provider/callback" element={<SourceCallback />} />
         <Route path="/integrations/google-calendar/callback" element={<CalendarCallback />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="*" element={<Navigate to="/" />} />
