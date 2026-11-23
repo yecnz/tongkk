@@ -22,7 +22,7 @@ type WrongEntry = {
   createdAt: number;
 };
 
-export default function ReviewNotes() {
+export default function ReviewNotes({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -183,17 +183,17 @@ export default function ReviewNotes() {
 
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-      {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
+      {!embedded && sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
+      {!embedded && <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
-      </div>
+      </div>}
 
-      <div className="app-container narrow">
+      <div className={embedded ? undefined : "app-container narrow"}>
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>오답 노트</h2>
           <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.</p>

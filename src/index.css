@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+.workflow-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.workflow-tabs button, .workflow-button { border: 1px solid var(--color-border); border-radius: 10px; padding: 10px 16px; background: var(--color-card); color: var(--color-text); cursor: pointer; }
+.workflow-tabs button[aria-pressed="true"] { background: var(--color-tint-cyan); color: var(--color-cyan-deep); }
+.workflow-stack { display: grid; gap: 16px; }
+.workflow-stack textarea { width: 100%; min-height: 160px; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-card); color: var(--color-text); }
+.workflow-muted { color: var(--color-text-secondary); }
+
 /* ── 디자인 토큰 ──
    각 토큰을 light-dark(라이트값, 다크값)로 한 곳에서 정의한다. 실제 적용 값은
    color-scheme에 따라 자동 선택된다(아래 :root / [data-theme] 참고).

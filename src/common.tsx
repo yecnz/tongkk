@@ -152,7 +152,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
           padding: "14px 24px", border: "none", background: active === item ? "color-mix(in srgb, var(--color-pink) 11%, transparent)" : "transparent",
           textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
           color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
-        }}>{item}</button>
+        }}>{item === "오답 노트" ? "복습 관리" : item}</button>
       ))}
 
       {/* 하단 피드백 — mailto로 메일 작성을 띄우고, 메일 클라이언트가 없는 사용자를 위해 주소도 노출 */}

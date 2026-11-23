@@ -10,7 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
 import Quiz from "./pages/Quiz";
-import ReviewNotes from "./pages/ReviewNotes";
+import ReviewHome from "./features/review/ReviewHome";
 import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
@@ -66,7 +66,7 @@ function AppShell() {
         <Route path="/learn" element={<LearningSession />} />
         <Route path="/learn/review/:cardId" element={<ReviewPractice />} />
         <Route path="/learn/:sessionId" element={<LearningSession />} />
-        <Route path="/review" element={<ReviewNotes />} />
+        <Route path="/review" element={<ReviewHome />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="*" element={<Navigate to="/" />} />
