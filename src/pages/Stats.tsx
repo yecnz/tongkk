@@ -1,3 +1,4 @@
+import ConceptGraph from '../features/learningHistory/ConceptGraph';
 import ConceptHistory from '../features/learningHistory/ConceptHistory';
 import UsageOverview from "../features/learningSession/UsageOverview";
 import ReviewOverview from "../features/learningSession/ReviewOverview";
@@ -66,6 +67,7 @@ export default function Stats() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const showConcepts = params.get('view') === 'concepts';
+  const showGraph = params.get('view') === 'graph';
   const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "학습 통계";
@@ -143,8 +145,8 @@ export default function Stats() {
       </div>
 
       <div className="stats-shell">
-        <nav className="workflow-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!showConcepts} onClick={() => setParams({})}>학습 통계</button><button type="button" aria-pressed={showConcepts} onClick={() => setParams({ view: 'concepts' })}>개념별 학습 기록</button></nav>
-        {showConcepts ? <ConceptHistory key={user?.id || 'guest'} /> : <>
+        <nav className="workflow-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!showConcepts && !showGraph} onClick={() => setParams({})}>학습 통계</button><button type="button" aria-pressed={showConcepts} onClick={() => setParams({ view: 'concepts' })}>개념별 학습 기록</button><button type="button" aria-pressed={showGraph} onClick={() => setParams({ view: 'graph' })}>개념 지도</button></nav>
+        {showGraph ? <ConceptGraph key={user?.id || 'guest'} /> : showConcepts ? <ConceptHistory key={user?.id || 'guest'} /> : <>
         <div className="stats-hero">
           <div>
             <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900, color: "var(--color-text-strong)", letterSpacing: 0 }}>학습 통계</h2>

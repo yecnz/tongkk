@@ -17,7 +17,9 @@ async def listing(limit: int = Query(30, ge=1, le=100), offset: int = Query(0, g
 
 @router.get('/recommendations')
 async def recommendations(auth=Depends(session_user), repo=Depends(repository)):
-    return {'issues': await repo._rpc('learning_issue_recommendations', {'p_user': auth[0]})}
+    from concept_graph import graph_view
+    graph = graph_view(await repo._rpc('learning_graph_read', {'p_user':auth[0]}))
+    return {'issues': await repo._rpc('learning_issue_recommendations', {'p_user': auth[0]}), 'prerequisites':graph['recommendations']}
 
 
 @router.get('/{concept_id}')

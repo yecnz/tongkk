@@ -12,6 +12,7 @@ export default function LearningBriefing() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [cards, setCards] = useState<ReviewCard[]>([]);
   const [issues, setIssues] = useState<{ id: string; concept_id: string; title: string }[]>([]);
+  const [prerequisites,setPrerequisites] = useState<{concept_id:string;title:string;reason:string}[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [retry, setRetry] = useState(0);
@@ -19,11 +20,12 @@ export default function LearningBriefing() {
     if (!user) return;
     let active = true;
     setLoading(true); setErrors([]);
-    Promise.allSettled([listLearningSessions(), reviewRequest<{ cards: ReviewCard[] }>(), workflowRequest<{ issues: { id: string; concept_id: string; title: string }[] }>('/learning-concepts/recommendations')]).then(([a, b, c]) => {
+    Promise.allSettled([listLearningSessions(), reviewRequest<{ cards: ReviewCard[] }>(), workflowRequest<{ issues: { id: string; concept_id: string; title: string }[]; prerequisites?:{concept_id:string;title:string;reason:string}[] }>('/learning-concepts/recommendations')]).then(([a, b, c]) => {
       if (!active) return;
       setSessions(a.status === 'fulfilled' ? a.value.sessions : []);
       setCards(b.status === 'fulfilled' ? b.value.cards.filter(c => !c.source_changed) : []);
       setIssues(c.status === 'fulfilled' ? c.value.issues : []);
+      setPrerequisites(c.status === 'fulfilled' ? c.value.prerequisites || [] : []);
       setErrors([...(c.status === 'rejected' ? ['학습 이슈'] : []),...(a.status === 'rejected' ? ['진행 중 학습'] : []), ...(b.status === 'rejected' ? ['복습'] : [])]);
       setLoading(false);
     });
@@ -37,8 +39,9 @@ export default function LearningBriefing() {
         {sessions.slice(0, 1).map(s => <li key={s.id}><Link to={learningTargetUrl({ kind: 'session', id: s.id })}>{s.material_name} · 이어서 하기 →</Link></li>)}
         {cards.slice(0, 2).map(c => <li key={c.id}><Link to={learningTargetUrl({ kind: 'review', id: c.id })}>{c.title} · 기억에서 다시 설명하기 →</Link></li>)}
         {issues.filter(i => !cards.slice(0, 2).some(c => c.concept_id === i.concept_id)).slice(0, 1).map(i => <li key={i.id}><Link to={learningTargetUrl({ kind: 'issue', id: i.id })}>{i.title} · 보완 근거 확인하기 →</Link></li>)}
+        {prerequisites.slice(0,1).map(p=><li key={p.concept_id}><Link to={`/stats?view=concepts&conceptId=${p.concept_id}`}>{p.title} · 먼저 보완하기 ({p.reason}) →</Link></li>)}
       </ul>
-      {!sessions.length && !cards.length && !issues.length && !errors.length && <p>지금 이어갈 학습이 없어요. 새 학습을 시작해보세요.</p>}
+      {!sessions.length && !cards.length && !issues.length && !prerequisites.length && !errors.length && <p>지금 이어갈 학습이 없어요. 새 학습을 시작해보세요.</p>}
       <Link to="/review?tab=today">복습 전체 보기 →</Link>
       {errors.length > 0 && <p role="alert">{errors.join('·')} 정보를 불러오지 못했어요. <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>}
     </>}
