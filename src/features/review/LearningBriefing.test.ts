@@ -3,15 +3,16 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ sessions: vi.fn(), reviews: vi.fn(), auth: { user: { id: 'u' } as { id: string } | null } }));
+const mocks = vi.hoisted(() => ({ sessions: vi.fn(), reviews: vi.fn(), issues: vi.fn(), auth: { user: { id: 'u' } as { id: string } | null } }));
 vi.mock('../../AuthContext', () => ({ useAuth: () => mocks.auth }));
 vi.mock('../../services/learningSessions', () => ({ listLearningSessions: mocks.sessions }));
 vi.mock('../../services/reviews', () => ({ reviewRequest: mocks.reviews }));
+vi.mock('../../services/workflow', () => ({ workflowRequest: mocks.issues }));
 import LearningBriefing from './LearningBriefing';
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  mocks.auth.user = { id: 'u' }; mocks.sessions.mockReset(); mocks.reviews.mockReset();
+  mocks.auth.user = { id: 'u' }; mocks.sessions.mockReset(); mocks.reviews.mockReset(); mocks.issues.mockResolvedValue({ issues: [] });
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });

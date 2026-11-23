@@ -42,6 +42,7 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230010_learning
 await db.exec(`create table summaries(id uuid primary key,user_id uuid,course_id uuid,template text,content text,material_ids text[],page_range text,source_hash text,request_key text,generation_config jsonb,generation_id uuid,created_at timestamptz default now());
 create table quiz_sets(id uuid primary key,user_id uuid,course_id uuid,title text,difficulty text,question_type text,count integer,material_ids text[],questions jsonb,created_at timestamptz default now());`);
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230011_preparation.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230012_concept_history.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -227,6 +228,17 @@ check(applied.status==='applied' && applied.applied_id,'Verified preparation can
 check((await db.query('select preparation_apply($1,$2) as data',[user,prep.artifacts[0].id])).rows[0].data.applied_id===applied.applied_id,'Duplicate approval preserves one result');
 check(Number((await db.query('select count(*) from summaries')).rows[0].count)===1,'Approval creates one summary without overwrites');
 check((await db.query('select preparation_read($1,$2) as data',[other,preparationId])).rows[0].data===null,'Other owner cannot read preparation drafts');
+await db.exec('rollback');
+await db.exec('begin');
+const conceptState=(await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data;
+check(conceptState.concept.evidence_count>=1 && conceptState.concept.state==='needs_review','Concept memory reflects actual missing criteria');
+check(conceptState.concept.independent_questions===0,'Legacy mapped quizzes and missing criteria cannot inflate independent performance');
+check((await db.query('select learning_concept_history_detail($1,$2) as data',[other,conceptRows[0].id])).rows[0].data===null,'Concept memory is owner scoped');
+await db.query("update learning_session_items set data=data||'{\"report\":{\"reason\":\"question\"}}'::jsonb where id=$1",[stored.items[0].id]);
+const reportedState=(await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data;
+check(reportedState.concept.evidence_count===0,'Reported material is excluded from mastery aggregation');
+await db.query('update materials set markdown=$1 where course_id=$2 and id=$3',[text+'수정',course,'lecture:100']);
+check((await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data.concept.state==='source_changed','Memory stays tied to its source version');
 await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);

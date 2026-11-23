@@ -1,7 +1,8 @@
+import ConceptHistory from '../features/learningHistory/ConceptHistory';
 import UsageOverview from "../features/learningSession/UsageOverview";
 import ReviewOverview from "../features/learningSession/ReviewOverview";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useToast } from "../ToastContext";
 import { useAuth } from "../AuthContext";
@@ -63,6 +64,8 @@ const CHART_TOP_PAD = 22;
 
 export default function Stats() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const showConcepts = params.get('view') === 'concepts';
   const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "학습 통계";
@@ -140,6 +143,8 @@ export default function Stats() {
       </div>
 
       <div className="stats-shell">
+        <nav className="workflow-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!showConcepts} onClick={() => setParams({})}>학습 통계</button><button type="button" aria-pressed={showConcepts} onClick={() => setParams({ view: 'concepts' })}>개념별 학습 기록</button></nav>
+        {showConcepts ? <ConceptHistory key={user?.id || 'guest'} /> : <>
         <div className="stats-hero">
           <div>
             <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900, color: "var(--color-text-strong)", letterSpacing: 0 }}>학습 통계</h2>
@@ -297,6 +302,7 @@ export default function Stats() {
             )}
           </Card>
         </div>
+        </>}
       </div>
     </div>
   );
