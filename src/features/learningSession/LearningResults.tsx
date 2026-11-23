@@ -26,6 +26,7 @@ export default function LearningResults({ results }: { results: SessionResult[] 
       </section>)}</div>
       <div className="learning-notice">보완할 개념은 원문을 확인한 뒤 다시 설명해보세요.</div>
       <div className="learning-actions"><LearningLink to="/learn" className="learning-button primary">다른 범위 학습하기 →</LearningLink>
+        <LearningLink to="/review?tab=issues" className="learning-button">학습 이슈 보기</LearningLink>
         <LearningLink to="/" className="learning-button">대시보드로 돌아가기</LearningLink></div>
     </Card>
   </>;

@@ -1,0 +1,12 @@
+.guide-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 20px; padding: 7px 12px; font-size: 12px; color: var(--color-muted); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.guide-banner label { display: flex; align-items: center; gap: 8px; }
+.guide-banner select { font: inherit; padding: 3px 6px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-card); color: var(--color-text); }
+.guide-host-page { min-height: 100vh; background: var(--color-page); font-family: inherit; }
+.guide-host-header { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--color-border-soft); }
+.guide-host-header button { display: flex; align-items: center; padding: 4px; border: 0; background: none; cursor: pointer; }
+.guide-host-header a { font-size: 20px; font-weight: 700; color: var(--color-pink); text-decoration: none; }
+.guide-host-header span { font-size: 14px; color: var(--color-muted); }
+.guide-host-title { margin: 0 0 20px; font-size: 24px; font-weight: 800; line-height: 1.4; color: var(--color-text-strong); }
+.guide-material { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 16px; padding: 28px; max-width: 680px; line-height: 1.9; }
+.guide-material h2 { font-size: 22px; margin: 0 0 18px; }
+.guide-material h3 { font-size: 17px; margin: 25px 0 10px; }

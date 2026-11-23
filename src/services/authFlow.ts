@@ -68,6 +68,7 @@ export async function authResponseError(response: Response): Promise<AuthActionE
 
 export function readAuthCallback(href: string) {
   const url = new URL(href);
+  if (/^\/integrations\/(google-calendar|google-drive|notion)\/callback$/.test(url.pathname)) return { isRecovery: false, hasCallback: false, error: null };
   const hash = new URLSearchParams(url.hash.slice(1));
   const get = (key: string) => hash.get(key) ?? url.searchParams.get(key);
   const hasError = Boolean(get('error') || get('error_code') || get('error_description') || url.searchParams.get('auth_error') === 'invalid_link');

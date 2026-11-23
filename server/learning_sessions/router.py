@@ -27,7 +27,9 @@ def get_service():
 
 def finish(bundle, operation, user, tasks, response, service):
     if operation:
-        tasks.add_task(service.run, user, bundle["session"]["id"], operation)
+        from workflow import durable_enabled
+        if not durable_enabled():
+            tasks.add_task(service.run, user, bundle["session"]["id"], operation)
         response.status_code = 202
     return public_view(bundle)
 

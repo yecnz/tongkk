@@ -8,9 +8,13 @@ import { loadQuizSetsFromServer } from "../services/quizSets";
 import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer } from "../services/wrongAnswerAnalyses";
 import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type WrongAnswerAnalysis, type WrongAnalysisItem } from "../services/gpt";
 
+import QuizIssueLink from '../features/review/QuizIssueLink';
+
 const ALL = "전체";
 
 type WrongEntry = {
+  attemptId: string;
+  questionIndex: number;
   courseName: string;
   quizSetId: string | null;
   question: string;
@@ -22,7 +26,7 @@ type WrongEntry = {
   createdAt: number;
 };
 
-export default function ReviewNotes() {
+export default function ReviewNotes({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -65,12 +69,13 @@ export default function ReviewNotes() {
     const seen = new Set<string>();
     const result: WrongEntry[] = [];
     for (const attempt of attempts) {
-      for (const answer of attempt.answers) {
+      for (const [questionIndex, answer] of attempt.answers.entries()) {
         if (answer.isCorrect) continue;
         const key = `${attempt.courseName}␟${answer.question}`;
         if (seen.has(key)) continue;
         seen.add(key);
         result.push({
+          attemptId: attempt.id, questionIndex,
           courseName: attempt.courseName,
           quizSetId: attempt.quizSetId,
           question: answer.question,
@@ -183,17 +188,17 @@ export default function ReviewNotes() {
 
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-      {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
+      {!embedded && sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
+      {!embedded && <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
-      </div>
+      </div>}
 
-      <div className="app-container narrow">
+      <div className={embedded ? undefined : "app-container narrow"}>
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>오답 노트</h2>
           <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.</p>
@@ -309,6 +314,7 @@ export default function ReviewNotes() {
                         <span>내 답: <strong style={{ color: PINK }}>{entry.studentAnswer ?? "미응답"}</strong></span>
                         <span>정답: <strong style={{ color: CYAN }}>{entry.correctAnswer ?? "정답 정보 없음"}</strong></span>
                         <span>해설: {entry.feedback || entry.explanation}</span>
+                        <QuizIssueLink attemptId={entry.attemptId} questionIndex={entry.questionIndex} />
                       </div>
                     </Card>
                   ))}

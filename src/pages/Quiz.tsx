@@ -1,3 +1,4 @@
+import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -1105,6 +1106,8 @@ export default function Quiz() {
 
       return {
         question: quiz.question,
+        questionId: quiz.id,
+        questionVersion: quiz.version,
         type,
         studentAnswer,
         correctAnswer,
@@ -1932,6 +1935,7 @@ export default function Quiz() {
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
+      {examMode && <AssessmentLock />}
       <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

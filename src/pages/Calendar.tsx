@@ -1,3 +1,5 @@
+import ExternalEvents from '../features/integrations/ExternalEvents';
+import ReviewQueue from '../features/review/ReviewQueue';
 import { useState, useEffect, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
@@ -280,6 +282,8 @@ export default function Calendar() {
 
           {/* 선택한 날 + 목표(페이스) */}
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <ReviewQueue key={`${user?.id}:${selectedDate}`} day={selectedDate} />
+            <ExternalEvents key={`external-${user?.id}:${selectedDate}`} day={selectedDate} />
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>{formatPanelDate(selectedDate)}</h3>

@@ -10,11 +10,16 @@ import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Summary from "./pages/Summary";
 import Quiz from "./pages/Quiz";
-import ReviewNotes from "./pages/ReviewNotes";
+import ReviewHome from "./features/review/ReviewHome";
 import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import LearningSession from "./pages/LearningSession";
+import SourceCallback from './features/integrations/SourceCallback';
+import CalendarCallback from "./features/integrations/CalendarCallback";
+import LearningContextProvider from "./features/learningMate/LearningContextProvider";
+import LearningMateHost from "./features/learningMate/LearningMateHost";
+import ExplanationRevision from "./features/review/ExplanationRevision";
 import ReviewPractice from "./features/learningSession/ReviewPractice";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
@@ -58,6 +63,7 @@ function AppShell() {
 
   return (
     <CourseProvider>
+      <LearningContextProvider key={user?.id || 'guest'}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/calendar" element={<Calendar />} />
@@ -65,12 +71,17 @@ function AppShell() {
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/learn" element={<LearningSession />} />
         <Route path="/learn/review/:cardId" element={<ReviewPractice />} />
+        <Route path="/learn/:sessionId/revisions/:revisionId" element={<ExplanationRevision />} />
         <Route path="/learn/:sessionId" element={<LearningSession />} />
-        <Route path="/review" element={<ReviewNotes />} />
+        <Route path="/review" element={<ReviewHome />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/integrations/:provider/callback" element={<SourceCallback />} />
+        <Route path="/integrations/google-calendar/callback" element={<CalendarCallback />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      <LearningMateHost />
+      </LearningContextProvider>
     </CourseProvider>
   );
 }
