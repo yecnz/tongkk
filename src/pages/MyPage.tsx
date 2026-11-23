@@ -1,3 +1,4 @@
+import LearningPreferences from '../features/review/LearningPreferences';
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
@@ -513,6 +514,7 @@ export default function MyPage() {
           </Card>
         </div>
 
+        <LearningPreferences key={user?.id || 'guest'} />
         {/* 하단: 데이터 관리 (왼) + 지원 및 정보 (오) */}
         <div className="mypage-grid">
           {/* 데이터 관리 */}

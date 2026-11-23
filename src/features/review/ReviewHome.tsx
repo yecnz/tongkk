@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import LearningLayout from '../learningSession/LearningLayout';
-import ReviewOverview from '../learningSession/ReviewOverview';
+import ReviewQueue from './ReviewQueue';
 import LearningIssues from './LearningIssues';
 import ReviewNotes from '../../pages/ReviewNotes';
 import { reviewTab } from '../../services/learningTargets';
@@ -16,6 +16,6 @@ export default function ReviewHome() {
         <button type="button" key={id} aria-pressed={tab === id} onClick={() => setParams({ tab: id })}>{label}</button>)}
     </nav>
     {!user ? <p>로그인하면 복습과 학습 기록을 확인할 수 있어요.</p>
-      : tab === 'issues' ? <LearningIssues key={user.id} /> : tab === 'wrong' ? <ReviewNotes key={user.id} embedded /> : <ReviewOverview key={user.id} variant="all" />}
+      : tab === 'issues' ? <LearningIssues key={user.id} /> : tab === 'wrong' ? <ReviewNotes key={user.id} embedded /> : <ReviewQueue key={user.id} />}
   </LearningLayout>;
 }

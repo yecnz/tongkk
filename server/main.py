@@ -123,6 +123,8 @@ from learning_issues import router as issues_router
 app.include_router(issues_router)
 from explanation_revisions import router as revisions_router
 app.include_router(revisions_router)
+from workflow import router as workflow_router
+app.include_router(workflow_router)
 
 logger = logging.getLogger("tongkk")
 
@@ -132,7 +134,7 @@ app.add_middleware(
     # 학습 세션의 초안 저장에 PATCH를 사용한다.
     # 프론트가 보내는 요청 헤더는 Authorization·Content-Type뿐(backend.ts getJsonRequestHeaders).
     # allow_credentials는 미설정(기본 False) 유지 — 쿠키가 아니라 Bearer 토큰 인증이라 불필요.
-    allow_methods=["POST", "GET", "PATCH", "OPTIONS"],
+    allow_methods=["POST", "GET", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

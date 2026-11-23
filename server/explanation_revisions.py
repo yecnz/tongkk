@@ -92,5 +92,7 @@ async def submit(revision_id: UUID, request: Submit, tasks: BackgroundTasks, aut
     except WriteConflict:
         fail('CONFLICT', '설명과 평가 상태를 다시 확인해주세요.')
     if value.get('claimed'):
-        tasks.add_task(evaluate, repo, auth[0], str(revision_id), str(request.command_key))
+        from workflow import durable_enabled
+        if not durable_enabled():
+            tasks.add_task(evaluate, repo, auth[0], str(revision_id), str(request.command_key))
     return await read_value(repo, auth[0], str(revision_id))

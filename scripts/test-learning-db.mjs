@@ -36,6 +36,7 @@ await db.exec(readFileSync(new URL('../supabase/migrations/202611230005_review_s
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230006_review_stats.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230007_learning_issues.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230008_explanation_revisions.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230009_learning_worker.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -169,6 +170,33 @@ await db.exec('savepoint immutable_revision');
 await rejects(()=>db.query('select explanation_save($1,$2,1,$3,true)',[user,revisionId,'몰래 수정']),/LS_CONFLICT/);
 await db.exec('rollback to savepoint immutable_revision');
 await db.exec('rollback');
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const queuedJob=randomUUID();
+await db.query("insert into background_jobs(id,user_id,kind,target_id) values($1,$2,'calendar_sync',$3)",[queuedJob,user,randomUUID()]);
+const firstClaim=(await db.query('select workflow_claim() as data')).rows[0].data;
+check(firstClaim.id===queuedJob && firstClaim.attempts===1,'Worker claims durable jobs with a lease');
+check((await db.query('select workflow_claim() as data')).rows[0].data===null,'Unexpired work is not claimed twice');
+check((await db.query('select workflow_complete($1,$2,null,null,null) as done',[queuedJob,randomUUID()])).rows[0].done===false,'Wrong lease cannot commit results');
+await db.query("update background_jobs set lease_expires_at=now()-interval '1 second' where id=$1",[queuedJob]);
+const reclaimed=(await db.query('select workflow_claim() as data')).rows[0].data;
+check(reclaimed.attempts===2 && reclaimed.lease_token!==firstClaim.lease_token,'Worker restart reclaims expired work with a new lease');
+check((await db.query('select workflow_complete($1,$2,null,null,null) as done',[queuedJob,firstClaim.lease_token])).rows[0].done===false,'Late worker cannot overwrite a reclaimed job');
+await db.query("update background_jobs set lease_expires_at=now()-interval '1 second' where id=$1",[queuedJob]);
+await db.query('select workflow_claim()');
+check((await db.query('select status from background_jobs where id=$1',[queuedJob])).rows[0].status==='failed','Exhausted work fails visibly');
+await db.query('select learning_preferences_set($1,true,$2)',[user,'Asia/Seoul']);
+await db.query("update learning_sessions set status='completed' where id=$1",[stored.session.id]);
+const autoCards=(await db.query('select review_list($1,false,30) as data',[user])).rows[0].data;
+check(autoCards.length===1,'Opt-in completion automatically seeds one review card');
+const autoCard=autoCards[0], scheduleKey=randomUUID();
+await db.query('select workflow_review_action($1,$2,0,$3,$4,1)',[user,autoCard.id,scheduleKey,'pause']);
+await db.query('select workflow_review_action($1,$2,0,$3,$4,1)',[user,autoCard.id,scheduleKey,'pause']);
+check((await db.query('select revision from review_cards where id=$1',[autoCard.id])).rows[0].revision===1,'Schedule command replay changes state once');
+await db.exec('savepoint paused_attempt');
+await rejects(()=>db.query('select review_start($1,$2,$3,$4,false)',[user,autoCard.id,randomUUID(),'답변']),/LS_CONFLICT/);
+await db.exec('rollback to savepoint paused_attempt');
+await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -201,7 +229,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -215,7 +243,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -228,7 +256,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

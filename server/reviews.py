@@ -74,7 +74,7 @@ def review_view(ctx):
     latest=attempts[0] if attempts else None
     show_check=latest and latest['status']=='graded'
     return {'id':card['id'],'title':concept['title'],'question':concept['question'],'due_at':card['due_at'],
-            'source_changed':ctx['source_changed'],'latest':latest,
+            'source_changed':ctx['source_changed'],'paused':card.get('paused',False),'latest':latest,
             'check':{'question':concept['check']['question'],'options':concept['check']['options']} if show_check else None,
             'baseline':{'answer':ctx['baseline'].get('draft'),'feedback':ctx['baseline'].get('feedback')} if show_check else None,
             'previous':attempts[1] if len(attempts)>1 and show_check else None}
@@ -113,7 +113,9 @@ async def submit(card_id: UUID,request: SubmitReview,tasks: BackgroundTasks,auth
     except WriteConflict:
         fail('CONFLICT','이전 복습 요청을 확인해주세요.')
     if entry.get('claimed') and entry['status']=='pending':
-        tasks.add_task(run_review,repo,auth[0],str(card_id),str(request.attempt_id))
+        from workflow import durable_enabled
+        if not durable_enabled():
+            tasks.add_task(run_review,repo,auth[0],str(card_id),str(request.attempt_id))
     return review_view(await context(repo,auth[0],str(card_id)))
 
 
