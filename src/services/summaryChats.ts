@@ -259,13 +259,12 @@ export async function loadSummaryChatMessages(sessionId: string): Promise<AgentM
 // 자료에 직접 연결된 튜터 세션 정리(자료 삭제 시). material_id는 FK가 아니라 cascade가 없어
 // 여기서 지워야 한다. 메시지는 session_id FK의 on delete cascade로 함께 삭제된다.
 // 요약 기반 세션은 summaries 삭제 시 summary_id cascade로 정리되므로 대상이 아니다.
-export async function deleteChatSessionsByMaterialId(materialId: string): Promise<void> {
+export async function deleteChatSessionsByMaterialId(materialId: string, courseId?: string): Promise<void> {
   if (isChatSessionSchemaMarkedMissing()) return;
 
-  const { error } = await supabase
-    .from('summary_chat_sessions')
-    .delete()
-    .eq('material_id', materialId);
+  let query = supabase.from('summary_chat_sessions').delete().eq('material_id', materialId);
+  query = courseId ? query.or(`course_id.is.null,course_id.eq.${courseId}`) : query.is('course_id', null);
+  const { error } = await query;
 
   if (error) {
     if (isMissingChatSessionSchemaError(error)) {

@@ -5,7 +5,7 @@ import { BACKEND_URL, getJsonRequestHeaders } from '../../services/backend';
 import './LearningResume.css';
 type Group = { feature: string; model: string; calls: number; failures: number; average_ms: number; input_tokens: number | null;
   output_tokens: number | null; estimated_usd: number | null; priced_calls: number; token_known_calls: number };
-const labels: Record<string,string> = {summary:'요약',quiz:'퀴즈',grading:'채점',wrong_analysis:'오답 분석',planning:'학습 계획',tutor:'튜터',document_vision:'문서 분석',learning_prepare:'학습 준비',learning_grade:'학습 평가',review_grade:'복습 평가'};
+const labels: Record<string,string> = {summary:'요약',quiz:'퀴즈',grading:'채점',wrong_analysis:'오답 분석',planning:'학습 계획',tutor:'튜터',document_vision:'문서 분석',learning_prepare:'학습 준비',learning_grade:'학습 평가',review_grade:'복습 평가',explanation_grade:'설명 개선 평가',preparation_summary:'준비 요약',preparation_quiz:'준비 퀴즈',learning_preparation:'자료 준비',learning_revision:'설명 개선'};
 export default function UsageOverview() {
   const { user } = useAuth();
   const userId = user?.id;

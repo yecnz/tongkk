@@ -34,6 +34,7 @@ function Issue({ id }: { id: string }) {
       </div>
       <p className="workflow-muted">보완 후 같은 문제를 맞힌 기록과 독립적인 이해 확인은 구분해요. 수동 종료는 이해 완료 판정이 아니에요.</p>
       {data.review_card_id && <Link to={`/learn/review/${data.review_card_id}`}>기존 문제로 다시 확인하기 →</Link>}
+      {data.source_changed && <p>이전 원문 버전의 근거예요. 현재 자료로 새로 학습한 기록과 구분해요.</p>}
       <h3>원문 근거</h3>{data.concept.source_refs.map((ref, i) => <blockquote key={i}>{ref.quote}</blockquote>)}
       <h3>학습 근거</h3>{data.evidence.map(e => <section key={e.id}>
         <p>{new Date(e.created_at).toLocaleString('ko-KR')} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움 사용' : ''}</p>

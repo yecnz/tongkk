@@ -40,7 +40,7 @@ AI 사용량은 인증된 사용자별 `/usage`에 최근 30일 집계로 제공
 
 ## 영속 학습 워커
 
-007~009 마이그레이션을 먼저 적용한다. API와 별도 워커 프로세스 모두 LEARNING_WORKER_ENABLED=true로 설정한 뒤 서버 디렉터리에서 `python -m worker`를 실행한다. Docker에서는 같은 이미지의 명령을 `python -m worker`로 바꿔 별도 컨테이너를 운영한다. 서버 전용 Supabase 키를 두 프로세스에만 설정한다. 사용자 JWT를 예약 작업에 저장하지 않는다.
+이 브랜치의 전체 기능은 007~014 마이그레이션을 순서대로 적용한다. 014는 작업 세대 확인·실행 lease·초안 적용·데이터 초기화 권한을 보완한다. API와 별도 워커 프로세스 모두 LEARNING_WORKER_ENABLED=true로 설정한 뒤 서버 디렉터리에서 `python -m worker`를 실행한다. Docker에서는 같은 이미지의 명령을 `python -m worker`로 바꿔 별도 컨테이너를 운영한다. 서버 전용 Supabase 키를 두 프로세스에만 설정한다. 사용자 JWT를 예약 작업에 저장하지 않는다.
 
 전환 전 기존 실행 중 평가가 끝나도록 기다린다. false이면 기존 프로세스 내 BackgroundTasks를 사용하므로 서버 재시작 후 자동 실행은 보장하지 않는다. true이면 별도 워커가 필요하다. 워커는 DB에서 작업을 잠그고 lease를 발급받아 처리하며, 중단된 작업은 제한된 횟수로 재개한다. 외부 모델 과금의 정확히 한 번 실행을 보장하지 않는다. 사용자별 자동 복습은 마이페이지에서 별도로 켠다.
 
@@ -57,3 +57,9 @@ INTEGRATION_ENCRYPTION_KEY는 `python -c 'from cryptography.fernet import Fernet
 설정 없이 연결 성공을 표시하지 않는다. 실제 OAuth 앱 승인·계정 연결·운영 동기화는 별도 확인이 필요하다.
 
 공식 계약: [Google 웹 서버 OAuth 흐름](https://developers.google.com/identity/protocols/oauth2/web-server), [Calendar events.list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list).
+
+## 학습 기능 회귀 검증
+
+저장소 루트에서 `npm test`, `npx tsc -b`, `npm run lint`, `npm run build`, `npm run test:learning-db`, `npm run test:workflow-db`를 실행한다. 서버에서는 `python -m pytest -q`와 `python scripts/evaluate_quality.py`를 실행한다. CI에도 두 DB 검사를 연결했다.
+
+DB 검사는 자격 증명 없이 격리된 PGlite PostgreSQL에서 수행한다. 기존 스키마의 순차 변경과 새 설치 전체 스키마, 소유권·명령 중복·버전 충돌·만료 작업·늦은 완료·초안 적용·사용자 데이터 초기화를 확인한다. Auth/Storage 기반 시설은 테스트 대역을 사용하며 실제 Supabase 운영 적용을 대신하지 않는다. 모델 응답과 Google HTTP는 대역으로 검증하므로 실제 모델 호출·Google 계정 연결은 별도 환경에서 확인한다.

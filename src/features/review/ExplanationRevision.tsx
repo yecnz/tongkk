@@ -55,7 +55,10 @@ function Editor({ id, userId }: { id: string; userId: string }) {
         const local = JSON.parse(localStorage.getItem(key) || 'null');
         if (value.revision.status === 'draft' && local?.baseRevision === value.revision.revision && typeof local.text === 'string') draft = local.text;
         if (value.revision.status === 'draft' && typeof local?.text === 'string' && local.baseRevision !== value.revision.revision && local.text !== draft) setConflictDraft(local.text);
-        if (local?.pending?.command_key) pending.current = local.pending;
+        if (local?.pending?.command_key) {
+          if (value.evaluation?.id === local.pending.command_key) { pending.current = null; localStorage.removeItem(key); }
+          else pending.current = local.pending;
+        }
       } catch { /* The server remains the source of truth. */ }
       textRef.current = draft; setText(draft);
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); });

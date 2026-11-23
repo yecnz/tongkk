@@ -1,6 +1,6 @@
 // Real PostgreSQL (WASM), isolated in memory. Never connects to the project database.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 
@@ -14,6 +14,9 @@ const hash = createHash('sha256').update(text).digest('hex');
 const migration = readFileSync(new URL('../supabase/migrations/202611220001_learning_sessions.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 check(schema.includes(migration), 'Fresh schema and migration must agree');
+for (const file of readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter(name => /^2026112300(?:0[7-9]|1[0-4])_/.test(name))) {
+  check(schema.includes(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8')), `Fresh schema mirrors ${file}`);
+}
 
 await db.exec(`
   create role anon; create role authenticated; create role service_role bypassrls;
@@ -44,6 +47,7 @@ create table quiz_sets(id uuid primary key,user_id uuid,course_id uuid,title tex
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230011_preparation.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230012_concept_history.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230013_calendar_integration.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230014_workflow_hardening.sql', import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -268,6 +272,12 @@ check((await db.query('select integration_sync_finish($1,$2,$3::jsonb,null) as d
 check((await db.query('select integration_connection($1) as data',[user])).rows[0].data.tokens_ciphertext===null,'Disconnect removes stored credentials');
 check(Number((await db.query('select count(*) from external_calendar_events')).rows[0].count)===0,'Disconnect honors imported event deletion');
 await db.exec('rollback');
+await db.exec('begin');
+await db.query('select learning_preferences_set($1,true,$2)',[other,'UTC']);
+await db.query('select learning_workflow_clear($1)',[user]);
+check(Number((await db.query('select count(*) from learning_session_packs where user_id=$1',[user])).rows[0].count)===0,'App data reset removes learning snapshots and linked records');
+check((await db.query('select learning_preferences_get($1) as data',[other])).rows[0].data.auto_review===true,'App data reset preserves other owners');
+await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -285,6 +295,13 @@ stored.operations.push({ ...stored.operations[0], id: randomUUID(), command_key:
   status: 'running', lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + 90000).toISOString() });
 stored.session.calls += 1;
 stored = await write(stored, 2);
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const oldGeneration=randomUUID(), activeOperation=stored.operations.at(-1);
+await db.query("insert into background_jobs(id,user_id,kind,target_id,generation,session_id,run_after) values($1,$2,'session',$3,0,$4,now()-interval '1 day')",[oldGeneration,user,activeOperation.id,stored.session.id]);
+check((await db.query('select workflow_claim() as data')).rows[0].data===null,'A queued job cannot execute a newer operation generation');
+check((await db.query('select status from background_jobs where id=$1',[oldGeneration])).rows[0].status==='succeeded','Superseded work is consumed without model execution');
+await db.exec('rollback');
 const simultaneous = bundle();
 simultaneous.operations[0] = { ...simultaneous.operations[0], kind: 'prepare', status: 'running', lease_token: randomUUID(),
   lease_expires_at: new Date(Date.now() + 90000).toISOString() };
@@ -300,7 +317,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses', 'learning_preferences', 'learning_assessment_locks', 'concept_learning_state']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -314,7 +331,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'preparation_requests', 'preparation_artifacts', 'learning_concepts', 'learning_item_concepts', 'review_cards', 'review_attempts']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -327,7 +344,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'preparation_requests', 'preparation_artifacts', 'learning_concepts', 'learning_item_concepts', 'review_cards', 'review_attempts']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

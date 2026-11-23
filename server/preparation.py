@@ -111,6 +111,10 @@ async def generate_artifact(repo, job):
     if a['status'] != 'queued' or a['generation'] != job['generation']:
         raise ValueError('Work was superseded')
     config = r['config']
+    from usage import request_usage
+    usage_context = request_usage.get()
+    if usage_context:
+        usage_context['feature'] = 'preparation_' + a['kind']
     if a['kind'] == 'pack':
         cached = await repo.cached_pack(job['user_id'], config['pack']['preparation_key'])
         if cached and cached['status'] == 'ready':

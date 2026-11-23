@@ -70,3 +70,25 @@ def test_storage_failure_does_not_fail_provider_result(monkeypatch):
     monkeypatch.setenv('AI_USAGE_DB','/missing/directory/file.sqlite3')
     usage.record('test',time.monotonic(),usage={'input_tokens':2,'output_tokens':3})
     assert usage.estimate('model-test',None,3) is None
+
+
+@pytest.mark.parametrize(('context_feature', 'expected'), [
+    ('review', 'review_grade'),
+    ('learning_review', 'review_grade'),
+    ('learning_revision', 'explanation_grade'),
+    ('learning_session', 'learning_grade'),
+])
+def test_durable_evaluation_usage_is_attributed_to_the_requested_feature(context_feature, expected):
+    class Fake:
+        model = 'model-test'
+
+        @usage.track_generation
+        async def evaluate(self):
+            return {'criteria': []}, {'usage': {'prompt_tokens': 4, 'completion_tokens': 5}}
+
+    token = usage.request_usage.set({'owner': 'user', 'feature': context_feature, 'request_id': 'job'})
+    try:
+        asyncio.run(Fake().evaluate())
+    finally:
+        usage.request_usage.reset(token)
+    assert usage.summary('user')[0]['feature'] == expected
