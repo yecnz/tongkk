@@ -74,12 +74,12 @@ function Practice({ id, userId }: { id: string; userId: string }) {
   }, [attempt?.id, attempt?.status, attempt?.answer,attempt?.question_id,attempt?.question,view?.question]);
   const answering = !attempt || attempt.status === 'ungraded' || (Boolean(attempt.check_result) && (newRound || (!showResult && Boolean(view && new Date(view.due_at).getTime() <= Date.now()))));
   const blocked = preparing || busy || Boolean(pending) || polling || view?.source_changed || view?.paused;
-  return <>
+  return <div className="workflow-surface">
     <div className="learning-page-title"><p className="learning-eyebrow">복습</p><h1>{view?.title || '복습 불러오는 중'}</h1></div>
     {error && <div className="learning-notice learning-error" role="alert">{error}</div>}
     {pending && <button type="button" disabled={busy} onClick={() => { void send(pending); }}>이전 제출 결과 확인</button>}
     {!view && !busy && error && <button type="button" onClick={() => { void refresh(); }}>다시 불러오기</button>}
-    {view && <Card className="learning-card">
+    {view && <Card className="workflow-panel workflow-stack">
       {view.paused ? <p>일시 정지한 복습이에요. 복습 관리에서 재개해주세요.</p> : view.source_changed ? <div className="learning-notice">원문이 바뀌었어요. 새 자료로 학습한 뒤 복습을 추가해주세요.</div>
         : answering ? <>
           {attempt?.status === 'ungraded' && <p role="status">평가하지 못했어요. 답변은 보존됐고 일정은 그대로예요.</p>}
@@ -113,7 +113,7 @@ function Practice({ id, userId }: { id: string; userId: string }) {
         </>}
       <div className="learning-actions"><LearningLink to="/learn" className="learning-button">학습 목록으로</LearningLink></div>
     </Card>}
-  </>;
+  </div>;
 }
 export default function ReviewPractice() {
   const { user } = useAuth(); const { cardId } = useParams();

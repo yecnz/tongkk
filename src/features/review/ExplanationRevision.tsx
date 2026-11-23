@@ -110,19 +110,19 @@ function Editor({ id, userId }: { id: string; userId: string }) {
     } catch (e) { if (e instanceof WorkflowError && e.status < 500) pending.current = null; setError(e instanceof Error ? e.message : '제출 결과를 확인하지 못했어요.'); }
     finally { setBusy(false); }
   }
-  return <div className="workflow-stack"><h1>설명 개선</h1>
+  return <div className="workflow-surface workflow-stack"><h1>설명 개선</h1>
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>서버 기록 확인</button></p>}
     {!data ? <p role="status">설명을 불러오는 중…</p> : <>
       <h2>{data.title}</h2><p>{data.question}</p>
       {conflictDraft !== null && <div role="alert"><p>서버와 다른 기기 초안이 남아 있어요.</p><button type="button" className="workflow-button" onClick={() => { change(conflictDraft); setConflictDraft(null); }}>기기 초안을 편집창으로 가져오기</button></div>}
       {data.source_changed && <p role="alert">원문이 바뀌었어요. 새 원문으로 학습한 뒤 설명을 개선해주세요.</p>}
-      <Card className="learning-card"><h3>처음 제출한 설명</h3><p style={{ whiteSpace: 'pre-wrap' }}>{data.baseline}</p>{data.baseline_feedback && <LearningFeedback feedback={data.baseline_feedback} />}</Card>
-      <Card className="learning-card"><h3>수정 설명</h3>
+      <Card className="workflow-panel workflow-stack"><h3>처음 제출한 설명</h3><p style={{ whiteSpace: 'pre-wrap' }}>{data.baseline}</p>{data.baseline_feedback && <LearningFeedback feedback={data.baseline_feedback} />}</Card>
+      <Card className="workflow-panel workflow-stack"><h3>수정 설명</h3>
         <textarea aria-label="수정 설명" maxLength={4000} value={text} disabled={busy || data.revision.status !== 'draft' || data.source_changed}
           onChange={e => change(e.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
-        <details><summary>변경 내용 비교</summary>{explanationChanges(data.baseline, text).map((change, index) => <p key={index} style={{ whiteSpace: 'pre-wrap' }}>{change.kind === 'removed' ? <del>− {change.text}</del> : change.kind === 'added' ? <ins>+ {change.text}</ins> : change.text}</p>)}</details>
+        <details className="workflow-details"><summary>변경 내용 비교</summary>{explanationChanges(data.baseline, text).map((change, index) => <p key={index} style={{ whiteSpace: 'pre-wrap' }}>{change.kind === 'removed' ? <del>− {change.text}</del> : change.kind === 'added' ? <ins>+ {change.text}</ins> : change.text}</p>)}</details>
         <p className="workflow-muted">{saved ? '저장됨 · ' : ''}피드백을 참고한 보완 수행으로 기록해요. 독립적인 기억 확인은 복습에서 진행해요.</p>
-        {!polling && data.revision.status !== 'graded' && <button type="button" className="workflow-button" disabled={busy || composing || !text.trim() || data.source_changed} onClick={() => { void submit(); }}>{pending.current ? '이전 제출 결과 확인' : data.evaluation?.status === 'ungraded' ? '같은 설명 재평가' : '수정 설명 평가'}</button>}
+        {!polling && data.revision.status !== 'graded' && <button type="button" className="workflow-button workflow-primary" disabled={busy || composing || !text.trim() || data.source_changed} onClick={() => { void submit(); }}>{pending.current ? '이전 제출 결과 확인' : data.evaluation?.status === 'ungraded' ? '같은 설명 재평가' : '수정 설명 평가'}</button>}
         {polling && <p role="status">설명을 평가하는 중…</p>}
         {data.evaluation?.status === 'ungraded' && <p>평가하지 못했어요. 답변은 보존됐어요.</p>}
         {data.evaluation?.feedback && <LearningFeedback feedback={data.evaluation.feedback} />}

@@ -28,7 +28,7 @@ export default function LearningLayout({ children, active = '학습 세션' }: {
       <header className="learning-header">
         <button type="button" className="learning-menu-button" aria-label="메뉴 열기" onClick={() => setSidebar(true)}><SidebarIcon /></button>
         <LearningLink to="/" className="learning-logo">Tongkk</LearningLink>
-        <span className="learning-header-label">{active === '오답 노트' ? '복습 관리' : active}</span>
+        <span className="learning-header-label">/ {active === '오답 노트' ? '복습 관리' : active}</span>
         <LearningLink to="/" className="learning-header-back">대시보드로</LearningLink>
       </header>
       <main className="app-container learning-main">

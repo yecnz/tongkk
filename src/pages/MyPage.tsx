@@ -516,8 +516,8 @@ export default function MyPage() {
           </Card>
         </div>
 
-        <LearningPreferences key={user?.id || 'guest'} />
-        <CalendarConnections key={`calendar-${user?.id || 'guest'}`} /><SourceConnections key={`sources-${user?.id || 'guest'}`} />
+        {user && <div className="workflow-settings"><LearningPreferences key={user.id} />
+        <CalendarConnections key={`calendar-${user.id}`} /><SourceConnections key={`sources-${user.id}`} /></div>}
         {/* 하단: 데이터 관리 (왼) + 지원 및 정보 (오) */}
         <div className="mypage-grid">
           {/* 데이터 관리 */}

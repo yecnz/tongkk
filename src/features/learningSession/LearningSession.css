@@ -1,7 +1,7 @@
 .learning-page { min-height: 100vh; background: var(--color-page); color: var(--color-text); font-size: 14px; }
 .learning-header { padding: 16px 24px; border-bottom: 1px solid var(--color-border-soft); display: flex; gap: 16px; align-items: center; }
 .learning-main { padding-bottom: 64px; overflow-wrap: anywhere; }
-.learning-main h1 { margin: 12px 0; font-size: clamp(23px, 3vw, 28px); line-height: 1.45; color: var(--color-text-strong); }
+.learning-main h1 { margin: 0 0 12px; font-size: 24px; font-weight: 800; line-height: 1.4; color: var(--color-text-strong); }
 .learning-main h2 { font-size: 18px; margin: 8px 0 18px; font-weight: 600; }
 .learning-main p { line-height: 1.75; }
 .learning-muted { color: var(--color-text-secondary); }
@@ -86,7 +86,7 @@
 .learning-section-heading .learning-caption { margin: 8px 0 20px; }
 .learning-page .learning-menu-button { padding: 4px; border: 0; background: transparent; display: flex; align-items: center; }
 .learning-logo { font-weight: 700; color: var(--color-pink); text-decoration: none; font-size: 20px; }
-.learning-header-label { color: var(--color-text-secondary); font-size: 13px; }
+.learning-header-label { color: var(--color-muted); font-size: 14px; }
 .learning-header-back { margin-left: auto; color: var(--color-text-secondary); text-decoration: none; font-size: 13px; }
 .learning-button { display: inline-flex; justify-content: center; align-items: center; text-decoration: none; font: inherit; color: var(--color-text); background: var(--color-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 10px 16px; }
 .learning-badge { display: inline-flex; flex-shrink: 0; padding: 5px 9px; border-radius: 999px; background: var(--color-tint-cyan); color: var(--color-cyan-deep); font-size: 11px; font-weight: 600; }

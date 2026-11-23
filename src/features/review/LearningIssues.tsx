@@ -24,11 +24,11 @@ function Issue({ id }: { id: string }) {
     finally { setBusy(false); }
   }
   useLearningScope(data ? { courseId: data.concept.course_id, materialId: data.concept.material_id, title: data.concept.title } : null);
-  return <Card className="learning-card workflow-stack">
+  return <Card className="workflow-panel workflow-stack">
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setPending(null); setRetry(n => n + 1); }}>새로 불러오기</button></p>}
     {!data ? <p role="status">이슈를 불러오는 중…</p> : <>
-      <h2>{data.concept.title}</h2><p>{issueLabels[data.issue.status]}</p>
-      <div className="workflow-tabs">
+      <div className="workflow-card-heading"><h2>{data.concept.title}</h2><span className="workflow-badge" data-state={data.issue.status}>{issueLabels[data.issue.status]}</span></div>
+      <div className="workflow-actions">
         {(data.issue.status === 'closed' || data.issue.status === 'resolved' ? [['reopen', '다시 열기']] : [['start', '보완 시작'], ['reassess', '재평가 대기'], ['close', '수동 종료']]).map(([action, label]) =>
           <button type="button" disabled={busy || Boolean(pending && pending.action !== action)} key={action} onClick={() => { void act(action); }}>{pending?.action === action ? '이전 저장 결과 확인' : label}</button>)}
       </div>
@@ -36,12 +36,12 @@ function Issue({ id }: { id: string }) {
       {data.review_card_id && <Link to={`/learn/review/${data.review_card_id}`}>기존 문제로 다시 확인하기 →</Link>}
       {data.source_changed && <p>이전 원문 버전의 근거예요. 현재 자료로 새로 학습한 기록과 구분해요.</p>}
       <h3>원문 근거</h3>{data.concept.source_refs.map((ref, i) => <blockquote key={i}>{ref.quote}</blockquote>)}
-      <h3>학습 근거</h3>{data.evidence.map(e => <section key={e.id}>
-        <p>{new Date(e.created_at).toLocaleString('ko-KR')} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움 사용' : ''}</p>
+      <h3>학습 근거</h3>{data.evidence.map(e => <section className="workflow-item" key={e.id}>
+        <p className="workflow-meta">{new Date(e.created_at).toLocaleString('ko-KR')} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움 사용' : ''}</p>
         {e.answer !== null && <p>{String(e.answer)}</p>}
         <Link to={`/learn/${encodeURIComponent(e.session_id)}`}>답변·피드백과 설명 개선 보기 →</Link>
       </section>)}
-      <details><summary>상태 변경 이력</summary>{data.events.map(e => <p key={e.id}>{new Date(e.created_at).toLocaleString('ko-KR')} · {({ evidence: '보완 근거 추가', practice: '학습 근거 추가', start: '보완 시작', reassess: '재평가 대기', close: '수동 종료', reopen: '다시 열기' } as Record<string, string>)[e.action] || e.action}</p>)}</details>
+      <details className="workflow-details"><summary>상태 변경 이력</summary>{data.events.map(e => <p key={e.id}>{new Date(e.created_at).toLocaleString('ko-KR')} · {({ evidence: '보완 근거 추가', practice: '학습 근거 추가', start: '보완 시작', reassess: '재평가 대기', close: '수동 종료', reopen: '다시 열기' } as Record<string, string>)[e.action] || e.action}</p>)}</details>
     </>}
   </Card>;
 }
@@ -61,15 +61,15 @@ export default function LearningIssues() {
       .catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [page, retry, id]);
-  if (id) return <><button className="workflow-button" type="button" onClick={() => setParams({ tab: 'issues' })}>← 이슈 목록</button><Issue key={id} id={id} /></>;
-  return <div className="workflow-stack">
+  if (id) return <div className="workflow-surface workflow-stack"><button className="workflow-button" type="button" onClick={() => setParams({ tab: 'issues' })}>← 이슈 목록</button><Issue key={id} id={id} /></div>;
+  return <div className="workflow-surface workflow-stack">
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
       : loading ? <p role="status">이슈를 불러오는 중…</p> : <>
-        <p>학습 이슈 {total}개</p>
+        <p className="workflow-muted">학습 이슈 {total}개</p>
         {!items.length && <p>아직 기록된 이슈가 없어요. 학습에서 보완할 개념이 나오면 이곳에 모여요.</p>}
-        {items.map(item => <Card key={item.id} className="learning-card"><h2>{item.title}</h2><p>{issueLabels[item.status]}</p>
+        {items.map(item => <Card key={item.id} className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{item.title}</h3><span className="workflow-badge" data-state={item.status}>{issueLabels[item.status]}</span></div>
           <button className="workflow-button" type="button" onClick={() => setParams({ tab: 'issues', issueId: item.id })}>근거·보완 기록 보기 →</button></Card>)}
-        <div className="workflow-tabs"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>이전</button><button type="button" disabled={(page + 1) * 30 >= total} onClick={() => setPage(p => p + 1)}>다음</button></div>
+        <div className="workflow-actions"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>이전</button><button type="button" disabled={(page + 1) * 30 >= total} onClick={() => setPage(p => p + 1)}>다음</button></div>
       </>}
   </div>;
 }

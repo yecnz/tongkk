@@ -32,17 +32,17 @@ export default function LearningBriefing() {
     return () => { active = false; };
   }, [user, retry]);
   if (!user) return null;
-  return <Card className="learning-resume" aria-label="이어갈 학습과 복습">
-    <div className="learning-resume-heading"><h2>이어서 학습하기</h2><Link to="/learn">새 학습 →</Link></div>
+  return <Card className="workflow-surface workflow-panel workflow-briefing" aria-label="이어갈 학습과 복습">
+    <div className="workflow-heading"><h2 className="workflow-panel-title">이어서 학습하기</h2><Link to="/learn" className="workflow-button">새 학습 →</Link></div>
     {loading ? <p role="status">학습을 확인하는 중…</p> : <>
-      <ul className="learning-resume-list">
-        {sessions.slice(0, 1).map(s => <li key={s.id}><Link to={learningTargetUrl({ kind: 'session', id: s.id })}>{s.material_name} · 이어서 하기 →</Link></li>)}
-        {cards.slice(0, 2).map(c => <li key={c.id}><Link to={learningTargetUrl({ kind: 'review', id: c.id })}>{c.title} · 기억에서 다시 설명하기 →</Link></li>)}
-        {issues.filter(i => !cards.slice(0, 2).some(c => c.concept_id === i.concept_id)).slice(0, 1).map(i => <li key={i.id}><Link to={learningTargetUrl({ kind: 'issue', id: i.id })}>{i.title} · 보완 근거 확인하기 →</Link></li>)}
-        {prerequisites.slice(0,1).map(p=><li key={p.concept_id}><Link to={`/stats?view=concepts&conceptId=${p.concept_id}`}>{p.title} · 먼저 보완하기 ({p.reason}) →</Link></li>)}
+      <ul className="workflow-briefing-list">
+        {sessions.slice(0, 1).map(s => <li key={s.id}><Link className="workflow-briefing-link" to={learningTargetUrl({ kind: 'session', id: s.id })}><span><strong>{s.material_name}</strong><small>진행 중인 설명 학습</small></span><span className="workflow-row-action">이어서 하기 →</span></Link></li>)}
+        {cards.slice(0, 2).map(c => <li key={c.id}><Link className="workflow-briefing-link" to={learningTargetUrl({ kind: 'review', id: c.id })}><span><strong>{c.title}</strong><small>예정된 복습</small></span><span className="workflow-row-action">기억에서 다시 설명하기 →</span></Link></li>)}
+        {issues.filter(i => !cards.slice(0, 2).some(c => c.concept_id === i.concept_id)).slice(0, 1).map(i => <li key={i.id}><Link className="workflow-briefing-link" to={learningTargetUrl({ kind: 'issue', id: i.id })}><span><strong>{i.title}</strong><small>보완할 학습 이슈</small></span><span className="workflow-row-action">보완 근거 확인하기 →</span></Link></li>)}
+        {prerequisites.slice(0,1).map(p=><li key={p.concept_id}><Link className="workflow-briefing-link" to={`/stats?view=concepts&conceptId=${p.concept_id}`}><span><strong>{p.title}</strong><small>{p.reason}</small></span><span className="workflow-row-action">먼저 보완하기 →</span></Link></li>)}
       </ul>
       {!sessions.length && !cards.length && !issues.length && !prerequisites.length && !errors.length && <p>지금 이어갈 학습이 없어요. 새 학습을 시작해보세요.</p>}
-      <Link to="/review?tab=today">복습 전체 보기 →</Link>
+      <div className="workflow-briefing-footer"><Link to="/review?tab=today">복습 전체 보기 →</Link></div>
       {errors.length > 0 && <p role="alert">{errors.join('·')} 정보를 불러오지 못했어요. <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>}
     </>}
   </Card>;
