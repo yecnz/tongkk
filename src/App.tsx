@@ -15,6 +15,7 @@ import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import LearningSession from "./pages/LearningSession";
+import Mini from "./pages/Mini";
 import ReviewPractice from "./features/learningSession/ReviewPractice";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
@@ -87,6 +88,7 @@ function App() {
                   <Routes>
                     <Route path="/auth" element={<Auth />} />
                     <Route path={RESET_PASSWORD_PATH} element={<Auth />} />
+                    <Route path="/mini" element={<Mini />} />
                     <Route path="/*" element={<AppShell />} />
                   </Routes>
                 </AuthCallbackBoundary>
