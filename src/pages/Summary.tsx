@@ -1,3 +1,4 @@
+import BrandLogo from "../components/BrandLogo";
 import PreparationPanel, { PreparationOptions } from '../features/preparation/PreparationPanel';
 import { prepareUploadedMaterials, type PreparationKind } from '../services/preparation';
 import { useLearningScope } from '../features/learningMate/context';
@@ -4398,10 +4399,10 @@ export default function Summary() {
       )}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 자료 요약</span>
         <TutorialHelpButton tutorialKey="summary-upload" style={{ marginLeft: "auto" }} />
       </div>

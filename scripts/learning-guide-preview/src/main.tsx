@@ -1,3 +1,4 @@
+import BrandLogo from '../../../src/components/BrandLogo';
 /* eslint-disable react-refresh/only-export-components -- Standalone documentation preview entry point. */
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -28,7 +29,7 @@ function HostLayout({ active, narrow = false, children }: { active: PageRouteLab
   const [sidebar, setSidebar] = useState(false);
   return <div className="guide-host-page">
     {sidebar && <Sidebar active={active} onClose={() => setSidebar(false)} onNav={item => navigate(pageRoutes[item])} />}
-    <header className="guide-host-header"><button type="button" aria-label="메뉴 열기" onClick={() => setSidebar(true)}><SidebarIcon /></button><Link to="/">Tongkk</Link><span>/ {active}</span></header>
+    <header className="guide-host-header"><button type="button" aria-label="메뉴 열기" onClick={() => setSidebar(true)}><SidebarIcon /></button><Link to="/" className="brand-home"><BrandLogo /></Link><span>/ {active}</span></header>
     <main className={`app-container${narrow ? ' narrow' : ''}`}>{children}</main>
   </div>;
 }

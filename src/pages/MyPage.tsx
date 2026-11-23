@@ -1,3 +1,4 @@
+import BrandLogo from "../components/BrandLogo";
 import SourceConnections from '../features/integrations/SourceConnections';
 import CalendarConnections from '../features/integrations/CalendarConnections';
 import LearningPreferences from '../features/review/LearningPreferences';
@@ -17,7 +18,7 @@ import {
 } from "../services/profile";
 import { applyTheme } from "../services/theme";
 
-type ToggleProps = { on: boolean; onToggle: () => void };
+type ToggleProps = { label: string; on: boolean; onToggle: () => void };
 type ProfileEditModalProps = {
   nickname: string;
   avatarUrl: string | null;
@@ -28,8 +29,8 @@ type ProfileEditModalProps = {
 };
 type SettingsDialog = "notice" | "contact" | "deleteAccount" | "changeEmail" | null;
 
-const Toggle = ({ on, onToggle }: ToggleProps) => (
-  <button type="button" onClick={onToggle} style={{
+const Toggle = ({ label, on, onToggle }: ToggleProps) => (
+  <button type="button" role="switch" aria-label={label} aria-checked={on} onClick={onToggle} style={{
     width: 46, height: 26, borderRadius: 13, border: "none", padding: 2,
     background: on ? CYAN : "var(--color-border-soft)", cursor: "pointer", transition: "background 0.2s",
     display: "flex", alignItems: "center"
@@ -413,10 +414,10 @@ export default function MyPage() {
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} currentEmail={user?.email} onChangeEmail={updateEmail} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 마이페이지</span>
       </div>
 
@@ -489,7 +490,7 @@ export default function MyPage() {
             <div style={{ display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid var(--color-border-soft)" }}>
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>다크모드</span>
-                <Toggle on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
+                <Toggle label="다크모드" on={profile.darkMode} onToggle={() => updateProfile({ ...profile, darkMode: !profile.darkMode })} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "14px 0", borderBottom: "1px solid var(--color-border-soft)" }}>
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>화면 크기</span>
@@ -497,7 +498,7 @@ export default function MyPage() {
                   {[{ label: "작게", value: 0.8 }, { label: "보통", value: 0.9 }, { label: "크게", value: 1 }].map(opt => {
                     const selected = uiScale === opt.value;
                     return (
-                      <button type="button" key={opt.label} onClick={() => changeUiScale(opt.value)} style={{
+                      <button type="button" key={opt.label} aria-pressed={selected} onClick={() => changeUiScale(opt.value)} style={{
                         padding: "6px 12px", borderRadius: 8,
                         border: selected ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                         background: selected ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -510,7 +511,7 @@ export default function MyPage() {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
                 <span style={{ fontSize: 14, color: "var(--color-text)" }}>알림 설정</span>
-                <Toggle on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
+                <Toggle label="알림 설정" on={profile.notificationsEnabled} onToggle={() => updateProfile({ ...profile, notificationsEnabled: !profile.notificationsEnabled })} />
               </div>
             </div>
           </Card>

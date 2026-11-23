@@ -1,3 +1,4 @@
+import BrandLogo from "../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
@@ -191,10 +192,10 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       {!embedded && sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       {!embedded && <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
       </div>}
 

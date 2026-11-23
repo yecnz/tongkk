@@ -1,0 +1,169 @@
+{
+  "desktopInitial": [
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/calendar",
+      "scroll": 1280,
+      "title": "학습 캘린더",
+      "unnamedButtons": 1,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/stats",
+      "scroll": 1280,
+      "title": "학습 통계",
+      "unnamedButtons": 1,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/mypage",
+      "scroll": 1280,
+      "unnamedButtons": 3,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/",
+      "scroll": 1280,
+      "title": "오늘의 학습 브리핑",
+      "unnamedButtons": 0,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/",
+      "scroll": 1280,
+      "title": "오늘의 학습 브리핑",
+      "unnamedButtons": 0,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/auth",
+      "scroll": 1280,
+      "title": "로그인이 필요합니다",
+      "unnamedButtons": 0,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/review",
+      "scroll": 1280,
+      "title": "복습 관리",
+      "unnamedButtons": 0,
+      "width": 1280
+    },
+    {
+      "broken": 0,
+      "logo": true,
+      "path": "/auth",
+      "scroll": 1280,
+      "title": "로그인이 필요합니다",
+      "unnamedButtons": 0,
+      "width": 1280
+    }
+  ],
+  "mobile390": [
+    {
+      "overflow": [],
+      "path": "/",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "overflow": [],
+      "path": "/calendar",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "overflow": [],
+      "path": "/stats",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "overflow": [],
+      "path": "/mypage",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "overflow": [],
+      "path": "/review",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "overflow": [],
+      "path": "/auth",
+      "scroll": 390,
+      "width": 390
+    }
+  ],
+  "learningMobile390": [
+    {
+      "broken": 0,
+      "path": "/review?tab=today",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/review?tab=issues&issueId=issue-process",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/stats?view=graph",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/stats?view=concepts&conceptId=concept-process",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/mypage?panel=all",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/summary?panel=preparation",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/learn/review/review-process",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "broken": 0,
+      "path": "/learn/session-process/revisions/revision-process",
+      "scroll": 390,
+      "width": 390
+    }
+  ],
+  "productionNarrowAfterFix": {
+    "path": "/",
+    "scroll": 320,
+    "width": 320
+  },
+  "productionErrors": []
+}

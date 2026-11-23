@@ -1,3 +1,4 @@
+import BrandLogo from "../components/BrandLogo";
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -1228,11 +1229,11 @@ export default function Dashboard() {
       {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-border-soft)" }}>
+      <div className="dashboard-header">
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <NoticeBanner messages={[
           { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: PINK },
           "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",

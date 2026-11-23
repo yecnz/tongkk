@@ -1,3 +1,4 @@
+import BrandLogo from "../components/BrandLogo";
 import ExternalEvents from '../features/integrations/ExternalEvents';
 import ReviewQueue from '../features/review/ReviewQueue';
 import { useState, useEffect, type CSSProperties } from "react";
@@ -243,10 +244,10 @@ export default function Calendar() {
       )}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-surface)" }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
       </div>
 
       <div className="app-container">
