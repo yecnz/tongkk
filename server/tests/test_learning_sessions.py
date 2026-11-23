@@ -226,6 +226,13 @@ def test_source_and_feedback_validation():
                                           "reason": "근거", "source_refs": concept["source_refs"]}]}, concept, source_units, "학생 답변")
 
 
+def test_quote_ignores_markdown_and_whitespace():
+    md_units = [{"id": "u0", "text": "  - **개체 무결성 제약조건**\n    - 기본키는 `NULL`을 가질 수 없다."}]
+    raw = pack_content(md_units)
+    raw["concepts"][0]["source_refs"][0]["quote"] = "개체 무결성 제약조건\n- 기본키는 NULL을 가질 수 없다."
+    validate_pack(raw, md_units, 2)
+
+
 def test_revision_and_idempotency_key_conflicts_and_other_owner():
     async def scenario():
         service, b = await ready()

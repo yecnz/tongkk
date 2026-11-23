@@ -44,10 +44,15 @@ class GenerationError(ValueError):
         self.metrics = metrics
 
 
+def _plain(text):
+    # 모델은 인용할 때 **굵게**·`코드` 표시와 들여쓰기를 자주 빼므로 비교에서 무시한다.
+    return re.sub(r"\s+", " ", re.sub(r"\*\*|__|`", "", text)).strip()
+
+
 def validate_refs(refs, source_units):
-    mapping = {u["id"]: u["text"] for u in source_units}
+    mapping = {u["id"]: _plain(u["text"]) for u in source_units}
     for ref in refs:
-        if ref.unit_id not in mapping or ref.quote not in mapping[ref.unit_id]:
+        if ref.unit_id not in mapping or _plain(ref.quote) not in mapping[ref.unit_id]:
             raise ValueError("Unsupported source reference")
 
 
