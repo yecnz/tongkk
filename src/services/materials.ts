@@ -200,7 +200,7 @@ export const loadCourseMaterialsFromServer = async (
 ): Promise<CourseMaterial[]> => {
   const cacheKey = `${course}::${options?.includeMarkdown ? 'full' : 'light'}`;
 
-  const fetchList = async (): Promise<CourseMaterial[]> => {
+  const fetchList = async (save: (items: CourseMaterial[]) => void): Promise<CourseMaterial[]> => {
     const courseId = (await findCourseRecord(course))?.id;
     if (!courseId) return [];
 
@@ -223,7 +223,7 @@ export const loadCourseMaterialsFromServer = async (
       // 목록은 자료 이름 자연정렬(숫자 인식: 2강 < 10강)로 보여준다. 서버 정렬을 자연정렬로 보정.
       .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true, sensitivity: 'base' }));
 
-    materialsCache.set(cacheKey, materials);
+    save(materials);
     return materials;
   };
 
@@ -245,7 +245,7 @@ export const countCourseMaterialsFromServer = async (course: string): Promise<nu
     return cachedList.length;
   }
 
-  const fetchCount = async (): Promise<number> => {
+  const fetchCount = async (save: (count: number) => void): Promise<number> => {
     const courseId = (await findCourseRecord(course))?.id;
     if (!courseId) return 0;
 
@@ -257,7 +257,7 @@ export const countCourseMaterialsFromServer = async (course: string): Promise<nu
     if (error) throw new Error(formatSupabaseError(error));
 
     const total = count ?? 0;
-    materialsCountCache.set(cacheKey, total);
+    save(total);
     return total;
   };
 

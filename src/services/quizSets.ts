@@ -66,7 +66,7 @@ export async function loadQuizSetsFromServer(
 ): Promise<SavedQuizSet[]> {
   const cacheKey = `${course}::${options?.includeQuestions ? 'full' : 'light'}`;
 
-  const fetchList = async (): Promise<SavedQuizSet[]> => {
+  const fetchList = async (save: (items: SavedQuizSet[]) => void): Promise<SavedQuizSet[]> => {
     const courseId = await getCourseId(course);
     if (!courseId) return [];
 
@@ -84,7 +84,7 @@ export async function loadQuizSetsFromServer(
 
     if (error) throw new Error(formatSupabaseError(error));
     const quizSets = (data || []).map(toSavedQuizSet);
-    quizSetsCache.set(cacheKey, quizSets);
+    save(quizSets);
     return quizSets;
   };
 
@@ -106,7 +106,7 @@ export async function countQuizSetsFromServer(course: string): Promise<number> {
     return cachedList.length;
   }
 
-  const fetchCount = async (): Promise<number> => {
+  const fetchCount = async (save: (count: number) => void): Promise<number> => {
     const courseId = await getCourseId(course);
     if (!courseId) return 0;
 
@@ -118,7 +118,7 @@ export async function countQuizSetsFromServer(course: string): Promise<number> {
     if (error) throw new Error(formatSupabaseError(error));
 
     const total = count ?? 0;
-    quizSetsCountCache.set(cacheKey, total);
+    save(total);
     return total;
   };
 

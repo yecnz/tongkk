@@ -12,7 +12,12 @@ export const SWR_STALE_TTL_MS = 30 * 60_000;
 
 export function createTtlCache<T>(ttlMs: number, staleTtlMs = 0) {
   const store = new Map<string, { data: T; expiry: number }>();
-  const inflight = new Set<string>();
+  const inflight = new Map<string, symbol>();
+  let revision = 0;
+
+  const set = (key: string, data: T) => {
+    store.set(key, { data, expiry: Date.now() + ttlMs });
+  };
 
   const read = (key: string, allowStale: boolean): T | undefined => {
     const hit = store.get(key);
@@ -34,10 +39,15 @@ export function createTtlCache<T>(ttlMs: number, staleTtlMs = 0) {
     getStale(key: string): T | undefined {
       return read(key, true);
     },
-    set(key: string, data: T): void {
-      store.set(key, { data, expiry: Date.now() + ttlMs });
+    set,
+    // 무효화 전에 시작한 요청은 완료되더라도 캐시에 다시 쓰지 않는다.
+    captureWrite(key: string): (data: T) => void {
+      const started = revision;
+      return data => { if (started === revision) set(key, data); };
     },
     invalidate(course?: string): void {
+      revision++;
+      inflight.clear();
       if (course === undefined) {
         store.clear();
         return;
@@ -48,23 +58,24 @@ export function createTtlCache<T>(ttlMs: number, staleTtlMs = 0) {
       }
     },
     // stale 반환 후 백그라운드 갱신. 같은 키 갱신이 이미 진행 중이면 무시한다.
-    // 캐시 set은 fetcher가 직접 한다(기존 load 함수들이 성공 경로에서만 set하는 관례 유지).
     // 실패는 경고만 남기고 삼킨다(백그라운드라 unhandled rejection 금지).
     revalidate(key: string, fetcher: () => Promise<T>): void {
       if (inflight.has(key)) return;
-      inflight.add(key);
+      const request = Symbol();
+      inflight.set(key, request);
       fetcher()
         .catch(error => console.warn('cache revalidate failed', error))
-        .finally(() => inflight.delete(key));
+        .finally(() => { if (inflight.get(key) === request) inflight.delete(key); });
     },
   };
 }
 
-// createTtlCache 항목들이 공유하는 SWR 읽기 패턴. fetcher는 성공 경로에서 직접 cache.set을 한다.
+// 조회 성공 시 fetcher가 save를 호출해 아직 유효한 캐시에만 기록한다.
 type SwrCache<T> = {
   get(key: string): T | undefined;
   getStale(key: string): T | undefined;
   revalidate(key: string, fetcher: () => Promise<T>): void;
+  captureWrite(key: string): (data: T) => void;
 };
 
 // 목록/개수 조회의 공통 SWR 흐름을 한 곳에 모은다:
@@ -73,16 +84,17 @@ type SwrCache<T> = {
 export async function readThroughCache<T>(
   cache: SwrCache<T>,
   key: string,
-  fetcher: () => Promise<T>,
+  fetcher: (save: (data: T) => void) => Promise<T>,
 ): Promise<T> {
   const fresh = cache.get(key);
   if (fresh !== undefined) return fresh;
 
+  const load = () => fetcher(cache.captureWrite(key));
   const stale = cache.getStale(key);
   if (stale !== undefined) {
-    cache.revalidate(key, fetcher);
+    cache.revalidate(key, load);
     return stale;
   }
 
-  return fetcher();
+  return load();
 }
