@@ -11,6 +11,7 @@ import { useAuthGate } from "../AuthGateContext";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { buildPaceCalendarEntries, paceDateKey, type PacePlan } from "../services/pace";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
+import { workflowRequest } from "../services/workflow";
 import {
   createClientId,
   ddayTypeColors,
@@ -42,6 +43,22 @@ const formatPanelDate = (dateStr: string) => {
   const d = new Date(`${dateStr}T00:00:00`);
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]})`;
 };
+
+type ExternalEventRow = { title: string; all_day: boolean; start_value: string; end_value: string; start_at: string; end_at: string };
+// 가져온 일정이 걸친 날짜들(YYYY-MM-DD). 종일 일정의 끝 날짜와 자정에 끝나는 일정의 끝은 포함하지 않는다.
+function externalEventDays(e: ExternalEventRow, timeZone: string): string[] {
+  const dayOf = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+  const first = e.all_day ? e.start_value : dayOf(e.start_at);
+  const last = e.all_day
+    ? new Date(Date.parse(`${e.end_value}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
+    : dayOf(new Date(Date.parse(e.end_at) - 1).toISOString());
+  const days: string[] = [];
+  // 아주 긴 일정이 달력을 덮지 않게 최대 62일까지만.
+  for (let t = Date.parse(`${first}T00:00:00Z`); days.length < 62 && t <= Date.parse(`${last}T00:00:00Z`); t += 86400000) {
+    days.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return days.length ? days : [first];
+}
 
 export default function Calendar() {
   const navigate = useNavigate();
@@ -92,6 +109,19 @@ export default function Calendar() {
         setLoaded(true);
       })
       .catch(error => console.warn("학습 캘린더 상태 불러오기 실패", error));
+    return () => { ignore = true; };
+  }, [user]);
+
+  // Google 캘린더에서 가져온 일정 — 달력 칸에 칩으로 보여준다(상세·과목 연결은 오른쪽 카드).
+  const [externalEvents, setExternalEvents] = useState<{ days: string[]; title: string }[]>([]);
+  useEffect(() => {
+    let ignore = false;
+    if (!user) { setExternalEvents([]); return () => { ignore = true; }; }
+    workflowRequest<{ timezone: string; events: ExternalEventRow[] }>("/integrations/events")
+      .then(({ timezone, events }) => {
+        if (!ignore) setExternalEvents(events.map(e => ({ title: e.title, days: externalEventDays(e, timezone) })));
+      })
+      .catch(error => console.warn("가져온 캘린더 일정 불러오기 실패", error));
     return () => { ignore = true; };
   }, [user]);
 
@@ -156,7 +186,7 @@ export default function Calendar() {
     });
   });
   plans.forEach(plan => { if (plan.date) pushMarker(plan.date, plan.done ? PLAN_DONE_MARKER_COLOR : PLAN_MARKER_COLOR); });
-  // 칸 안 칩 = 마감·일정(D-day, 타입색)만.
+  // 칸 안 칩 = 마감·일정(D-day, 타입색) + 가져온 캘린더 일정.
   const eventsByDate: Record<string, CalendarChip[]> = {};
   ddays.forEach(dday => {
     if (!dday.date) return;
@@ -165,6 +195,9 @@ export default function Calendar() {
       label: dday.subj,
       color: { bg: ddayTypeColors[type].soft, fg: ddayTypeColors[type].solid },
     });
+  });
+  externalEvents.forEach(event => {
+    event.days.forEach(day => (eventsByDate[day] ??= []).push({ label: event.title, color: { bg: ddayTypeColors.event.soft, fg: ddayTypeColors.event.solid } }));
   });
   const dayPaceEntries = sortByUrgency(paceEntriesByDate[selectedDate] ?? []);
   const pacePlanById = Object.fromEntries(pacePlans.map(plan => [plan.id, plan] as const));

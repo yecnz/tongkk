@@ -230,6 +230,15 @@ async def fetch_calendar(repo, job):
         raise CalendarSyncError('SYNC_LIMIT')
 
 
+@router.get('/events')
+async def window_events(auth=Depends(session_user), repo=Depends(repository)):
+    # 달력 칸 표시용: 가져오기 범위(지난 30일~앞으로 180일)를 한 번에 돌려준다.
+    prefs = await repo._rpc('learning_preferences_get', {'p_user': auth[0]})
+    now = datetime.now(timezone.utc)
+    return {'timezone': prefs['timezone'], 'events': await repo._rpc('integration_events', {'p_user': auth[0],
+        'p_from': (now - timedelta(days=31)).isoformat(), 'p_to': (now + timedelta(days=181)).isoformat()})}
+
+
 @router.get('/events/{day}')
 async def day_events(day: str, auth=Depends(session_user), repo=Depends(repository)):
     prefs = await repo._rpc('learning_preferences_get', {'p_user': auth[0]})

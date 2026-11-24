@@ -102,4 +102,6 @@ if __name__ == '__main__':
     parser.add_argument('--once', action='store_true')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
+    # 2초마다 도는 일감 확인 요청 로그가 쌓이지 않게 한다. 실패(경고)는 그대로 남는다.
+    logging.getLogger('httpx').setLevel(logging.WARNING)
     asyncio.run(main(args.once))
