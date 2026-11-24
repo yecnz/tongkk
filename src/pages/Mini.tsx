@@ -34,6 +34,8 @@ export default function Mini() {
   const [materialId, setMaterialId] = useState("");
   const [materialLoading, setMaterialLoading] = useState(false);
   const [materialError, setMaterialError] = useState("");
+  const [courseRetry, setCourseRetry] = useState(0);
+  const [materialRetry, setMaterialRetry] = useState(0);
   const [expandedList, setExpandedList] = useState<"course" | "material" | null>(null);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function Mini() {
     })
       .catch(() => { if (!ignore) setCourseError("과목을 불러오지 못했어요."); });
     return () => { ignore = true; };
-  }, [selectorOpen, user]);
+  }, [selectorOpen, user, courseRetry]);
 
   useEffect(() => {
     if (!course) return;
@@ -55,7 +57,7 @@ export default function Mini() {
       .catch(() => { if (!ignore) setMaterialError("자료를 불러오지 못했어요."); })
       .finally(() => { if (!ignore) setMaterialLoading(false); });
     return () => { ignore = true; };
-  }, [course]);
+  }, [course, materialRetry]);
 
   useEffect(() => {
     if (!user) return;
@@ -172,10 +174,10 @@ export default function Mini() {
               ) : (
                 <MiniSelect label="강의자료" placeholder={!course ? "먼저 과목을 선택하세요" : "강의자료 선택"} value={materialId} options={materials.map(material => ({ value: material.id, label: material.name }))} disabled={!course || materialLoading} expanded={expandedList === "material"} onToggle={() => setExpandedList(expandedList === "material" ? null : "material")} onChange={next => { setMaterialId(next); setSelectorOpen(false); setExpandedList(null); }} />
               )}
-              {courseError && <p role="alert" className="mini-panel-error">{courseError}</p>}
+              {courseError && <div role="alert" className="mini-panel-error"><p>{courseError}</p><button type="button" className="mini-retry" onClick={() => { setCourseError(""); setCourseRetry(value => value + 1); }}>다시 시도</button></div>}
               {materialLoading && <p className="mini-panel-status">자료를 불러오는 중…</p>}
               {course && !materialLoading && materials.length === 0 && !materialError && <p className="mini-panel-status">이 과목에 업로드된 자료가 없어요.</p>}
-              {materialError && <p role="alert" className="mini-panel-error">{materialError}</p>}
+              {materialError && <div role="alert" className="mini-panel-error"><p>{materialError}</p><button type="button" className="mini-retry" onClick={() => { setMaterialError(""); setMaterialLoading(true); setMaterialRetry(value => value + 1); }}>다시 시도</button></div>}
             </div>
           )}
           <input

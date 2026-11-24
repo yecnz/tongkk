@@ -238,7 +238,14 @@ export default function MiniTutor() {
           </button>
           <p>Tongkk 튜터</p>
           {user && courses.length > 0 && (
-            <details className="mini-tutor-source">
+            <details className="mini-tutor-source" onKeyDown={event => {
+              if (event.key === "Escape" && event.currentTarget.open) {
+                event.stopPropagation();
+                event.currentTarget.open = false;
+                setExpandedList(null);
+                event.currentTarget.querySelector("summary")?.focus();
+              }
+            }}>
               <summary className="mini-tutor-course" aria-label="과목 및 강의자료 선택"><span>{course || "과목 선택"}</span><span aria-hidden="true">⌄</span></summary>
               <div className="mini-tutor-materials">
                 <MiniSelect

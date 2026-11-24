@@ -122,3 +122,5 @@ html.menubar-app .mini-stage { padding-top: 0; }
 
 .mini-tutor-paragraph { line-height: 1.5; }
 .mini-tutor-source-note { display: table; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--mini-source-bg); color: var(--mini-source-text); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.mini-retry { margin-top: 6px; padding: 0; border: 0; background: transparent; color: var(--color-text); font-size: 10px; text-decoration: underline; text-underline-offset: 2px; }
