@@ -17,7 +17,9 @@
     "test": "vitest run",
     "test:learning-db": "node scripts/test-learning-db.mjs",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "menubar:dev": "tauri dev",
+    "menubar:build": "tauri build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
@@ -37,6 +39,7 @@
     "@electric-sql/pglite": "0.5.17",
     "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.3.5",
+    "@tauri-apps/cli": "^2.12.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.3.0",
