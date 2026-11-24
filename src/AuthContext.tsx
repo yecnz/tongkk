@@ -16,7 +16,7 @@ type AuthContextValue = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
-  signOut: () => Promise<void>;
+  signOut: (options?: { scope: "local" }) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   resendConfirmation: (email: string) => Promise<void>;
   verifySignupCode: (email: string, code: string) => Promise<void>;
@@ -29,6 +29,23 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+async function signOutLocally(): Promise<void> {
+  let resolveSignedOut!: () => void;
+  const signedOut = new Promise<void>(resolve => { resolveSignedOut = resolve; });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+    if (event === "SIGNED_OUT") resolveSignedOut();
+  });
+  try {
+    // 로컬 세션이 지워지면 서버 토큰 폐기를 기다리지 않고 다음 화면을 연다.
+    const revocation = supabase.auth.signOut({ scope: "local" }).then(({ error }) => {
+      if (error) throw error;
+    });
+    await Promise.race([signedOut, revocation]);
+  } finally {
+    subscription.unsubscribe();
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -137,7 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!data.session) startEmailCooldown('signup', email);
       return { needsEmailConfirmation: !data.session };
     },
-    signOut: async () => {
+    signOut: async (options) => {
+      if (options?.scope === "local") return signOutLocally();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },

@@ -31,6 +31,7 @@ export async function sendAgentMessage(
   markdown?: string,
   sourceMarkdown?: string,
   pages?: string,
+  signal?: AbortSignal,
 ): Promise<AgentResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
@@ -40,7 +41,7 @@ export async function sendAgentMessage(
       method: 'POST',
       headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ thread_id: threadId || undefined, messages, markdown, source_markdown: sourceMarkdown, pages }),
-      signal: controller.signal,
+      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
     });
 
     if (response.status === 409 && threadId) {
@@ -57,7 +58,7 @@ export async function sendAgentMessage(
       messages: data.messages || [],
     };
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (!signal?.aborted && err instanceof DOMException && err.name === 'AbortError') {
       throw new Error('Agent 요청 시간 초과. 다시 시도해주세요.');
     }
     throw err;

@@ -28,6 +28,7 @@ fn show_under_tray(window: &WebviewWindow, tray: Rect) {
     }
     let _ = window.show();
     let _ = window.set_focus();
+    let _ = window.eval("window.dispatchEvent(new Event('tongkk:mini-open'))");
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -56,7 +57,12 @@ pub fn run() {
                     .always_on_top(true)
                     .skip_taskbar(true)
                     .visible(false)
-                    .initialization_script("document.documentElement.classList.add('menubar-app')")
+                    // WebKit may run the script before the root element exists.
+                    .initialization_script(
+                        "const markMenubar = () => document.documentElement.classList.add('menubar-app');
+                         if (document.documentElement) markMenubar();
+                         else document.addEventListener('DOMContentLoaded', markMenubar, { once: true });",
+                    )
                     // target="_blank" 링크: 로그인은 이 창 안에서(세션을 앱에 남기려고), 나머지는 기본 브라우저로.
                     .on_new_window(move |url, _| {
                         if url.path().starts_with("/auth") {

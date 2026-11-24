@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import LoginModal from "../components/LoginModal";
+import MiniAccount from "../components/MiniAccount";
 import MiniSelect from "../components/MiniSelect";
 import { parseAiSuggestions } from "../common";
 import { FormattedTutorText } from "../components/AITutorDrawer";
@@ -15,11 +17,18 @@ import "./Mini.css";
 // 대화는 저장하지 않는다 — 길게 이어갈 대화는 본 앱의 AI 튜터에서.
 export default function MiniTutor() {
   const { user, loading } = useAuth();
+  return <MiniTutorScreen key={user?.id ?? null} user={user} loading={loading} />;
+}
+
+function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolean }) {
   // 로그인은 /auth로 보내지 않고 팝오버 자리에 작은 로그인 카드로 — 웹 로그인 페이지는 팝오버에 너무 크다.
   const [showLogin, setShowLogin] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const initialSelection = (location.state as { question?: string; course?: string; materialId?: string } | null);
+  const [initialSelection] = useState(() => {
+    const state = location.state as { accountId: string; question?: string; course?: string; materialId?: string } | null;
+    return user && state?.accountId === user.id ? state : null;
+  });
   const initialCourse = initialSelection?.course || "";
   const initialMaterialId = initialSelection?.materialId || "";
   const [courses, setCourses] = useState<string[]>([]);
@@ -36,14 +45,21 @@ export default function MiniTutor() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const firstQuestionSent = useRef(false);
+  const activeRequest = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loading && location.state) navigate("/mini/tutor", { replace: true });
+  }, [loading, location.state, navigate]);
+
+  useEffect(() => () => activeRequest.current?.abort(), []);
 
   // Esc로 팝오버 첫 화면(/mini)으로 돌아간다.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") navigate("/mini"); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !showLogin) navigate("/mini"); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate]);
+  }, [navigate, showLogin]);
 
   useEffect(() => {
     if (!user) return;
@@ -84,6 +100,8 @@ export default function MiniTutor() {
   }, [messages, sending]);
 
   const ask = async (text: string, history: AgentMessage[], currentThread: string) => {
+    const request = new AbortController();
+    activeRequest.current = request;
     const userMessage: AgentMessage = { role: "user", content: text };
     const nextMessages = [...history, userMessage];
     setMessages(nextMessages);
@@ -93,25 +111,26 @@ export default function MiniTutor() {
       const selectedMaterial = materials.find(material => material.id === materialId);
       const source = selectedMaterial?.markdown.trim();
       if (selectedMaterial && !source) throw new Error("선택한 자료의 본문이 없어 질문에 반영할 수 없어요.");
-      const sendFull = () => sendAgentMessage("", nextMessages, source ? `# ${selectedMaterial!.name}\n\n${source}` : undefined);
+      const sendFull = () => sendAgentMessage("", nextMessages, source ? `# ${selectedMaterial!.name}\n\n${source}` : undefined, undefined, undefined, request.signal);
       const response = currentThread
-        ? await sendAgentMessage(currentThread, [userMessage]).catch(err => {
-          if (err instanceof AgentThreadExpiredError) return sendFull();
+        ? await sendAgentMessage(currentThread, [userMessage], undefined, undefined, undefined, request.signal).catch(err => {
+          if (!request.signal.aborted && err instanceof AgentThreadExpiredError) return sendFull();
           throw err;
         })
         : await sendFull();
+      if (request.signal.aborted) return;
       setThreadId(response.threadId);
       setMessages([...nextMessages, { role: "assistant", content: response.result }]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "튜터 응답을 받지 못했어요.");
+      if (!request.signal.aborted) setError(err instanceof Error ? err.message : "튜터 응답을 받지 못했어요.");
     } finally {
-      setSending(false);
+      if (!request.signal.aborted) setSending(false);
     }
   };
 
   // /mini에서 넘어온 첫 질문은 과목 자료가 준비된 뒤 한 번만 보낸다.
   useEffect(() => {
-    const question = (location.state as { question?: string } | null)?.question?.trim();
+    const question = initialSelection?.question?.trim();
     if (!ready || !question || firstQuestionSent.current || (initialMaterialId && materialsLoading)) return;
     firstQuestionSent.current = true;
     if (initialMaterialId && (materialsError || !materials.some(material => material.id === initialMaterialId))) {
@@ -124,6 +143,7 @@ export default function MiniTutor() {
   }, [ready, materialsLoading, materials, materialsError, initialMaterialId]);
 
   const changeCourse = (next: string) => {
+    if (next === course) return;
     // 자료가 바뀌면 이전 대화 맥락이 맞지 않으니 새 대화로 시작한다.
     setCourse(next);
     setMaterials([]);
@@ -136,6 +156,7 @@ export default function MiniTutor() {
   };
 
   const changeMaterial = (next: string) => {
+    if (next === materialId) return;
     setMaterialId(next);
     setMessages([]);
     setThreadId("");
@@ -226,75 +247,83 @@ export default function MiniTutor() {
     );
   }
 
-  if (!user && showLogin) return <LoginModal compact onClose={() => setShowLogin(false)} />;
-
   return (
-    <div className="mini-stage">
-      <div className="mini-tutor">
-        <div className="mini-tutor-titlebar">
-          <button type="button" onClick={() => navigate("/mini")} aria-label="뒤로" title="뒤로 (Esc)"
-            className="mini-window-back">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <p>Tongkk 튜터</p>
-          {user && courses.length > 0 && (
-            <details className="mini-tutor-source" onKeyDown={event => {
-              if (event.key === "Escape" && event.currentTarget.open) {
-                event.stopPropagation();
-                event.currentTarget.open = false;
-                setExpandedList(null);
-                event.currentTarget.querySelector("summary")?.focus();
-              }
-            }}>
-              <summary className="mini-tutor-course" aria-label="과목 및 강의자료 선택"><span>{course || "과목 선택"}</span><span aria-hidden="true">⌄</span></summary>
-              <div className="mini-tutor-materials">
-                <MiniSelect
-                  label="과목"
-                  placeholder="과목 선택"
-                  value={course}
-                  options={courses.map(name => ({ value: name, label: name }))}
-                  disabled={sending}
-                  expanded={expandedList === "course"}
-                  onToggle={() => setExpandedList(expandedList === "course" ? null : "course")}
-                  onChange={next => { changeCourse(next); setExpandedList(null); }}
-                />
-                <MiniSelect
-                  label="강의자료"
-                  placeholder={materialsLoading ? "자료 불러오는 중…" : !course ? "먼저 과목을 선택하세요" : "강의자료 선택"}
-                  value={materialId}
-                  options={materials.map(material => ({ value: material.id, label: material.name }))}
-                  disabled={!course || materialsLoading || sending}
-                  expanded={expandedList === "material"}
-                  onToggle={() => setExpandedList(expandedList === "material" ? null : "material")}
-                  onChange={next => { changeMaterial(next); setExpandedList(null); }}
-                />
-                {course && !materialsLoading && !materialsError && materials.length === 0 && <p className="text-[11px] text-muted">이 과목에 업로드된 자료가 없어요.</p>}
-                {materialsError && <p role="alert" className="text-[11px] text-danger">{materialsError}</p>}
-                {messages.length > 0 && <p className="text-[11px] text-muted">과목이나 자료를 바꾸면 새 대화가 시작돼요.</p>}
-              </div>
-            </details>
-          )}
+    <>
+      <div className="mini-stage" hidden={showLogin}>
+        <div className="mini-tutor">
+          <div className="mini-tutor-titlebar">
+            <button type="button" onClick={() => navigate("/mini")} aria-label="뒤로" title="뒤로 (Esc)"
+              className="mini-window-back">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            <p>Tongkk 튜터</p>
+            {user && courses.length > 0 && (
+              <details className="mini-tutor-source" onKeyDown={event => {
+                if (event.key === "Escape" && event.currentTarget.open) {
+                  event.stopPropagation();
+                  event.currentTarget.open = false;
+                  setExpandedList(null);
+                  event.currentTarget.querySelector("summary")?.focus();
+                }
+              }}>
+                <summary className="mini-tutor-course" aria-label="과목 및 강의자료 선택"><span>{course || "과목 선택"}</span><span aria-hidden="true">⌄</span></summary>
+                <div className="mini-tutor-materials">
+                  <MiniSelect
+                    label="과목"
+                    placeholder="과목 선택"
+                    value={course}
+                    options={courses.map(name => ({ value: name, label: name }))}
+                    disabled={sending}
+                    expanded={expandedList === "course"}
+                    onToggle={() => setExpandedList(expandedList === "course" ? null : "course")}
+                    onChange={next => { changeCourse(next); setExpandedList(null); }}
+                  />
+                  <MiniSelect
+                    label="강의자료"
+                    placeholder={materialsLoading ? "자료 불러오는 중…" : !course ? "먼저 과목을 선택하세요" : "강의자료 선택"}
+                    value={materialId}
+                    options={materials.map(material => ({ value: material.id, label: material.name }))}
+                    disabled={!course || materialsLoading || sending}
+                    expanded={expandedList === "material"}
+                    onToggle={() => setExpandedList(expandedList === "material" ? null : "material")}
+                    onChange={next => { changeMaterial(next); setExpandedList(null); }}
+                  />
+                  {course && !materialsLoading && !materialsError && materials.length === 0 && <p className="text-[11px] text-muted">이 과목에 업로드된 자료가 없어요.</p>}
+                  {materialsError && <p role="alert" className="text-[11px] text-danger">{materialsError}</p>}
+                  {messages.length > 0 && <p className="text-[11px] text-muted">과목이나 자료를 바꾸면 새 대화가 시작돼요.</p>}
+                </div>
+              </details>
+            )}
+            {user && <MiniAccount user={user} onSwitchAccount={() => setShowLogin(true)} />}
+          </div>
+          <div className="mini-tutor-messages">{body}</div>
+          <form onSubmit={submit} className="mini-tutor-compose">
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="이어서 질문하기…"
+              disabled={!user || materialsLoading}
+              aria-label="이어서 질문하기"
+              className="mini-tutor-input"
+            />
+            <button
+              type="submit"
+              aria-label="보내기"
+              disabled={!user || materialsLoading || sending || !input.trim()}
+              className="mini-tutor-send"
+            >
+              ↑
+            </button>
+          </form>
         </div>
-        <div className="mini-tutor-messages">{body}</div>
-        <form onSubmit={submit} className="mini-tutor-compose">
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="이어서 질문하기…"
-            disabled={!user || materialsLoading}
-            aria-label="이어서 질문하기"
-            className="mini-tutor-input"
-          />
-          <button
-            type="submit"
-            aria-label="보내기"
-            disabled={!user || materialsLoading || sending || !input.trim()}
-            className="mini-tutor-send"
-          >
-            ↑
-          </button>
-        </form>
       </div>
-    </div>
+      {showLogin && <LoginModal compact
+        subtitle={user ? "다른 계정으로 학습을 이어가세요." : undefined}
+        onClose={() => setShowLogin(false)}
+        onAuthenticated={user ? () => {
+          setShowLogin(false);
+          navigate("/mini", { replace: true });
+        } : undefined} />}
+    </>
   );
 }

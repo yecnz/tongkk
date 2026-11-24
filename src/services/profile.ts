@@ -76,7 +76,7 @@ export async function loadUserProfile(): Promise<UserProfile> {
   if (error) throw new Error(formatSupabaseError(error));
   if (data) return toProfile(data);
 
-  return saveUserProfile({
+  return upsertUserProfile(user.id, {
     nickname: defaultNickname(user),
     avatarUrl: null,
     school: null,
@@ -89,10 +89,14 @@ export async function loadUserProfile(): Promise<UserProfile> {
 
 export async function saveUserProfile(profile: UserProfile): Promise<UserProfile> {
   const user = await requireSupabaseUser();
+  return upsertUserProfile(user.id, profile);
+}
+
+async function upsertUserProfile(userId: string, profile: UserProfile): Promise<UserProfile> {
   const { data, error } = await supabase
     .from('profiles')
     .upsert({
-      id: user.id,
+      id: userId,
       nickname: profile.nickname,
       avatar_url: profile.avatarUrl,
       school: profile.school,
