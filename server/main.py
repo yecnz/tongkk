@@ -1331,6 +1331,14 @@ def _summary_chunk_instructions(req: SummarizeStreamRequest) -> str:
     ]
     if req.chunk_index == 1:
         lines.append("- 첫 구간이므로 문서 제목(# 수준)을 한 번만 만들고 시작해.")
+    elif req.template == "LECTURE_NOTE":
+        # 강의 노트 섹션 순서 규칙('# 강의 제목' → ...)이 '제목 만들지 마' 지시보다 강하게 먹혀
+        # 둘째 구간부터 '# 강의 제목'이라는 글자가 그대로 찍혔다. 구간마다 실제 단원명을 쓰게 한다.
+        lines.append(
+            "- 강의 노트 섹션 순서는 이 구간 안에서 그대로 지키되, 맨 위 '# 강의 제목' 자리에는 "
+            "'강의 제목'이라는 글자를 절대 그대로 쓰지 말고 이 구간이 다루는 실제 단원·주제 이름을 '# 단원명'으로 써라. "
+            "직전 구간 요약에 이미 있는 제목과 같은 이름은 쓰지 마."
+        )
     elif req.is_continuation:
         # 같은 원본 섹션이 길어서 쪼개진 '이어지는' 구간 → 직전에 만든 제목을 다시 만들면 안 된다.
         lines.append(
