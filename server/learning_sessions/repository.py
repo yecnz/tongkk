@@ -43,7 +43,8 @@ class Repository:
             if "LS_NOT_FOUND" in message:
                 fail("NOT_FOUND", "자료 또는 학습 세션을 찾을 수 없습니다.", 404)
             fail("DB_UNAVAILABLE", "학습 기록을 저장하지 못했습니다. DB 설정을 확인해주세요.", 503)
-        return res.json()
+        # returns void 함수(source_begin 등)는 204 빈 본문을 돌려준다.
+        return res.json() if res.content else None
 
     async def material(self, user: str, token: str, course: str, material: str):
         self.available()
