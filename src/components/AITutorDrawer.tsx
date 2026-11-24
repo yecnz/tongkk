@@ -157,13 +157,23 @@ const copyRichText = async (html: string, plain: string) => {
   await navigator.clipboard.writeText(plain);
 };
 
-export const FormattedTutorText = ({ content }: { content: string }) => {
+// 메뉴바 튜터는 같은 마크다운 렌더러에 작은 말풍선과 출처 배지 스타일만 적용한다.
+const miniMarkdownComponents: Components = {
+  ...markdownComponents,
+  p: ({ children }) => {
+    const text = nodeToText(children);
+    if (isSourceNoteText(text)) return <p className="mini-tutor-source-note">{text.replace(/^근거(?:로)?\s*본\s*자료\s*[:：]?\s*/, "").replace(/\*\*/g, "")}</p>;
+    return <p className="mini-tutor-paragraph">{children}</p>;
+  },
+};
+
+export const FormattedTutorText = ({ content, compact = false }: { content: string; compact?: boolean }) => {
   const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(content.replace(/\r\n/g, "\n").trim())));
   if (!cleaned) return null;
 
   return (
     // 단일 '~'(예: 'p.8~p.9' 페이지 범위)를 취소선으로 오인하지 않도록 singleTilde:false. '~~'만 취소선.
-    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={compact ? miniMarkdownComponents : markdownComponents}>
       {cleaned}
     </ReactMarkdown>
   );
