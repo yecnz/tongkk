@@ -16,7 +16,7 @@ export function startEmailCooldown(kind: EmailKind, email: string): void {
 // 모달을 닫았다 다시 열거나 동시에 눌러도 같은 메일을 중복 요청하지 않는다.
 export async function sendAuthEmail(kind: EmailKind, rawEmail: string): Promise<void> {
   const email = rawEmail.trim();
-  if (!isValidAuthEmail(email)) throw new AuthActionError('이메일 형식이 올바르지 않아요. 예: name@example.com');
+  if (!isValidAuthEmail(email)) throw new AuthActionError('이메일 주소를 다시 확인해주세요.');
   const key = requestKey(kind, email);
   if (requests.get(key)?.pending) throw new AuthActionError('메일을 요청하고 있습니다. 잠시 기다려주세요.');
   if (emailWaitSeconds(kind, email) > 0) throw new AuthActionError('잠시 후 메일을 다시 요청해주세요.');

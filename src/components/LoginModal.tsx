@@ -4,6 +4,7 @@ import { useAuth } from "../AuthContext";
 import { AuthActionError, authErrorMessage, isValidAuthEmail } from "../services/authFlow";
 import { emailWaitSeconds } from "../services/authEmails";
 import closeIcon from "../assets/mini/login-close.svg";
+import LegalLinks from "./LegalLinks";
 
 export type AuthMode = "signIn" | "signUp";
 type View = 'credentials' | 'reset' | 'confirmation';
@@ -73,10 +74,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     if (view === 'confirmation' && expired) { void resend(); return; }
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail)) {
-      setError("이메일 형식이 올바르지 않아요. 예: name@example.com"); return;
+      setError("이메일 주소를 다시 확인해주세요."); return;
     }
     if (view === 'credentials' && mode === 'signUp' && password.length < 8) {
-      setError("비밀번호는 8자 이상이어야 해요."); return;
+      setError("비밀번호를 8자 이상 입력해주세요."); return;
     }
     if (view === 'reset' && emailWaitSeconds(kind, email) > 0) return;
     pending.current = true;
@@ -115,7 +116,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     if (pending.current || wait > 0) return;
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail)) {
-      setError("이메일 형식이 올바르지 않아요. 예: name@example.com"); return;
+      setError("이메일 주소를 다시 확인해주세요."); return;
     }
     pending.current = true;
     setError(''); setMessage(''); setSubmitting(true);
@@ -227,6 +228,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             <button type="button" disabled={submitting} onClick={() => { setMode('signIn'); changeView('credentials'); }} style={linkStyle}>로그인으로 돌아가기</button>
           )}
         </div>
+        {!compact && view === 'credentials' && <LegalLinks style={{ justifyContent: 'center', marginTop: 16, fontSize: 12 }} />}
       </form>
     </div>
   );
