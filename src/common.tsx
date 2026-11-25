@@ -1,9 +1,13 @@
 import BrandLogo from "./components/BrandLogo";
+import { MenubarDownloadModal } from "./components/MenubarDownloadModal";
 import { useEffect, useState } from "react";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 // 피드백을 받을 팀 메일 (사이드바 하단·문의 메일 공통)
 export const FEEDBACK_EMAIL = "tongkk.team@gmail.com";
+
+// GitHub Releases 최신 릴리스의 Tongkk.dmg를 항상 가리키는 고정 링크 (메뉴바 앱)
+export const MENUBAR_DMG_URL = "https://github.com/yecnz/tongkk/releases/latest/download/Tongkk.dmg";
 
 // 색상은 모두 CSS 변수를 가리켜 라이트/다크 토큰을 자동으로 따른다(정의: src/index.css).
 // 브랜드색 PINK·CYAN도 다크에서 채도를 낮춘 값으로 전환되며, 투명도를 섞을 때는
@@ -129,6 +133,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
     document.body.classList.add("tongkk-sidebar-open");
     return () => document.body.classList.remove("tongkk-sidebar-open");
   }, []);
+  const [showMenubarGuide, setShowMenubarGuide] = useState(false);
 
   // height:100vh 대신 top/bottom 0 — #root에 zoom이 걸려 있어 100vh는 축소되지만
   // 뷰포트 모서리 기준 offset은 zoom과 무관하게 전체 높이를 채운다(정의: src/index.css).
@@ -158,6 +163,21 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
 
       {/* 하단 피드백 — mailto로 메일 작성을 띄우고, 메일 클라이언트가 없는 사용자를 위해 주소도 노출 */}
       <div style={{ marginTop: "auto", padding: "16px 20px 4px", borderTop: `1px solid ${BORDER_COLOR}` }}>
+        {/* 메뉴바 앱 받기 — 다운로드를 시작하면서 설치 안내 모달을 띄운다 */}
+        <a
+          href={MENUBAR_DMG_URL}
+          download
+          onClick={() => setShowMenubarGuide(true)}
+          className="tongkk-hover-fade"
+          style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 4px 16px", textDecoration: "none" }}
+        >
+          <img src="/favicon.svg" alt="" width={26} height={26} style={{ borderRadius: 6, filter: "grayscale(1)", opacity: 0.75 }} />
+          <span style={{ flex: 1, display: "flex", flexDirection: "column", lineHeight: 1.35 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-strong)" }}>메뉴바 앱</span>
+            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>macOS</span>
+          </span>
+          <span style={{ padding: "4px 10px", borderRadius: 999, background: "color-mix(in srgb, var(--color-pink) 12%, transparent)", color: PINK, fontSize: 13, fontWeight: 700 }}>받기</span>
+        </a>
         <a
           href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Tongkk 피드백")}`}
           style={{
@@ -175,6 +195,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
         </p>
       </div>
     </div>
+    {showMenubarGuide && <MenubarDownloadModal onClose={() => setShowMenubarGuide(false)} />}
     </>
   );
 };
