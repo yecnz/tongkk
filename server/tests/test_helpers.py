@@ -281,3 +281,24 @@ class TestStripForeignScript:
 
     def test_list_content(self):
         assert main._message_content_to_text([{"text": "가ไทย나"}]) == "가나"
+
+
+class TestSearchSourcePages:
+    MD = (
+        "<!-- p.1 -->\n강의 소개와 일정\n\n"
+        "<!-- p.2 -->\nUDP는 비연결형이다.\n\n"
+        "<!-- p.3 -->\nTCP 혼잡제어: slow start, TCP 재전송\n\n"
+        "<!-- p.4 -->\nTCP 3-way handshake\n"
+    )
+
+    def test_picks_pages_with_terms_in_page_order(self):
+        out = main._search_source_pages(self.MD, "TCP는 어떻게 동작해?", k=2)
+        assert out.index("<!-- p.3 -->") < out.index("<!-- p.4 -->")
+        assert "p.1" not in out and "p.2" not in out
+
+    def test_strips_josa(self):
+        assert "<!-- p.3 -->" in main._search_source_pages(self.MD, "혼잡제어는 뭐야")
+
+    def test_no_hit_or_no_marker_returns_empty(self):
+        assert main._search_source_pages(self.MD, "이거 설명해줘") == ""
+        assert main._search_source_pages("마커 없는 TCP 본문", "TCP") == ""
