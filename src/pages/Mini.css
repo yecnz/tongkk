@@ -25,6 +25,7 @@
   line-height: 1.5;
 }
 html.menubar-app .mini-stage { padding-top: 0; }
+html.menubar-app .mini-home-stage { min-height: 0; }
 .mini-stage[hidden] { display: none; }
 .mini-stage p, .mini-stage h2 { margin: 0; }
 .mini-stage button, .mini-stage input, .mini-stage select { font-family: inherit; }
@@ -50,9 +51,9 @@ html.menubar-app .mini-stage { padding-top: 0; }
 .mini-tasks-heading { display: flex; justify-content: space-between; align-items: center; height: 16px; color: var(--color-muted); }
 .mini-tasks-heading h2 { font-size: 11px; font-weight: 700; }
 .mini-tasks-heading > span { font-size: 10px; }
-.mini-task-list { height: 39px; margin-top: 6px; color: var(--color-muted); font-size: 12px; }
-.mini-task-list-filled { height: 91px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
-.mini-task { display: flex; align-items: center; gap: 8px; min-height: 25px; font-size: 11px; }
+.mini-task-list { --task-row-height: 23px; margin-top: 6px; color: var(--color-muted); font-size: 12px; }
+.mini-task-list-filled { max-height: calc(4 * var(--task-row-height)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+.mini-task { display: flex; align-items: center; gap: 8px; min-height: var(--task-row-height); font-size: 11px; }
 .mini-task-check { width: 12px; flex: 0 0 12px; padding: 0; border: 0; background: transparent; color: var(--color-muted); font-size: 14px; line-height: 1; }
 .mini-task-done .mini-task-check { color: var(--color-pink); }
 .mini-task a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); text-decoration: none; }
@@ -162,8 +163,9 @@ html.menubar-app .mini-stage { padding-top: 0; }
 .mini-tutor-send { display: grid; place-items: center; flex: 0 0 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--color-pink); color: var(--color-on-brand); font-size: 15px; font-weight: 700; }
 .mini-tutor-send:disabled { background: var(--mini-send-muted); }
 
-/* 펼친 목록이 짧은 D-day 빈 상태의 카드 위로 벗어나지 않게 공간을 확보한다. */
-.mini-card:has(.mini-select-options) .mini-dday-empty { height: 87px; }
+/* 자료 선택 패널이 팝오버 위로 잘리지 않도록 열려 있는 동안 공간을 확보한다. */
+.mini-card:has(.mini-material-panel) .mini-dday-empty { height: 87px; }
+.mini-card:has(.mini-material-panel) .mini-task-list { min-height: calc(4 * var(--task-row-height)); }
 
 .mini-tutor-paragraph { line-height: 1.5; }
 .mini-tutor-source-note { display: table; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--mini-source-bg); color: var(--mini-source-text); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }

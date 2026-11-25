@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useMenubarDisplay } from "../services/menubarSettings";
 import { useAuth } from "../AuthContext";
 import LoginModal from "../components/LoginModal";
@@ -29,6 +29,8 @@ export default function Mini() {
 
 function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) {
   const [showLogin, setShowLogin] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const native = isTauri();
   const navigate = useNavigate();
   const [ddays, setDdays] = useState<Dday[]>([]);
   const [plans, setPlans] = useState<Plan[] | null>(null);
@@ -97,8 +99,31 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
     saveDashboardState("plans", next).catch(console.warn);
   };
 
+  useEffect(() => {
+    if (!native) return;
+
+    // 이전 버전의 앱은 크기 변경 명령 없이도 웹 카드의 높이를 표시할 수 있다.
+    if (showLogin) {
+      void invoke("resize_popover", { height: null }).catch(() => {});
+      return;
+    }
+
+    const stage = stageRef.current;
+    if (!stage) return;
+    let lastHeight = 0;
+    const resize = () => {
+      const height = Math.ceil(stage.getBoundingClientRect().height);
+      if (height === lastHeight) return;
+      lastHeight = height;
+      void invoke("resize_popover", { height }).catch(() => {});
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(stage);
+    resize();
+    return () => observer.disconnect();
+  }, [native, showLogin]);
+
   const today = paceDateKey(new Date());
-  const native = isTauri();
   const { ddayScope } = useMenubarDisplay();
   const nextDday = ddays
     .map(d => ({ ...d, daysLeft: getDaysLeft(d.date) }))
@@ -159,7 +184,7 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
 
   return (
     <>
-      <div className="mini-stage" hidden={showLogin}>
+      <div ref={stageRef} className="mini-stage mini-home-stage" hidden={showLogin}>
         <div className={`mini-card ${user ? "" : "mini-card-guest"}`}>
           {user && <MiniAccount user={user} onSwitchAccount={() => setShowLogin(true)} />}
           {body}

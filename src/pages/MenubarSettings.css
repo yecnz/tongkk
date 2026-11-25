@@ -15,7 +15,7 @@ html.menubar-settings-app, html.menubar-settings-app body { overflow: hidden; }
   --settings-divider: light-dark(#e6e6eb, #333944);
   --settings-track: light-dark(#efeff3, #16181d);
   --settings-chip: light-dark(#f1f1f1, #313131);
-  --settings-check: light-dark(#e8e8e8, #3b3b3b);
+  --settings-check: light-dark(#E8FAFE, #18272E);
   --settings-neutral-border: light-dark(#e3e3e3, #3a3a3a);
   --settings-text: light-dark(#444444, #c8c8c8);
   --settings-strong: light-dark(#222222, #e8e8e8);
@@ -51,7 +51,32 @@ html.menubar-settings-app, html.menubar-settings-app body { overflow: hidden; }
   height: 12px;
 }
 .menubar-traffic-lights img { position: absolute; inset: 0; pointer-events: none; }
-.menubar-traffic-lights button { width: 12px; height: 12px; z-index: 1; border-radius: 50%; }
+.menubar-traffic-lights button {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  z-index: 1;
+  border-radius: 50%;
+}
+.menubar-traffic-lights button:first-of-type { color: rgb(134 24 20); }
+.menubar-traffic-lights button:last-of-type { color: rgb(120 74 0); }
+.menubar-traffic-lights button::before,
+.menubar-traffic-lights button:first-of-type::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+.menubar-traffic-lights button:first-of-type::before { transform: translate(-50%, -50%) rotate(45deg); }
+.menubar-traffic-lights button:first-of-type::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.menubar-traffic-lights:is(:hover, :has(:focus-visible)) button:enabled::before,
+.menubar-traffic-lights:is(:hover, :has(:focus-visible)) button:enabled::after { opacity: 1; }
 
 .menubar-settings-content {
   display: flex;
@@ -154,6 +179,7 @@ kbd.menubar-settings-button { color: var(--settings-strong); }
   overflow: hidden; border-radius: 50%; background: var(--color-tint-cyan); color: var(--color-cyan-deep);
   font-weight: 700;
 }
+.menubar-settings-avatar:has(img) { background: transparent; }
 .menubar-settings-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .menubar-profile-info { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .menubar-profile-info > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

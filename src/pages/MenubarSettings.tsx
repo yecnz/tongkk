@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import LoginModal from "../components/LoginModal";
 import ReminderTimePicker from "../components/ReminderTimePicker";
+import PopoverShortcutControl, { type PopoverShortcut } from "../components/PopoverShortcutControl";
 import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
 import { hasNewWebBuild } from "../services/appVersion";
 import { loadUserProfile, updateNotificationsEnabled, type UserProfile } from "../services/profile";
@@ -94,6 +95,7 @@ function SettingsWindow({ userId, email, loading, signOut }: {
   const [remindersReady, setRemindersReady] = useState(!userId);
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [version, setVersion] = useState(desktopConfig.version);
+  const [shortcut, setShortcut] = useState<PopoverShortcut>();
   const [pending, setPending] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -112,8 +114,12 @@ function SettingsWindow({ userId, email, loading, signOut }: {
   useEffect(() => {
     if (!native) return;
     let active = true;
-    void invoke<{ autostart: boolean; version: string }>("settings_info").then(info => {
-      if (active) { setAutostart(info.autostart); setVersion(info.version); }
+    void invoke<{ autostart: boolean; version: string; shortcut?: PopoverShortcut }>("settings_info").then(info => {
+      if (active) {
+        setAutostart(info.autostart);
+        setVersion(info.version);
+        setShortcut(info.shortcut);
+      }
     }).catch(() => { if (active) setError("Mac 설정을 불러오지 못했어요."); });
     return () => { active = false; };
   }, [native]);
@@ -177,6 +183,12 @@ function SettingsWindow({ userId, email, loading, signOut }: {
       setProfile({ ...profile, notificationsEnabled: enabled });
       writeReminderCache(userId, reminders);
     }, "알림 설정을 저장하지 못했어요.");
+  }
+
+  function changeShortcut(accelerator: string) {
+    void runAction(async () => {
+      setShortcut(await invoke<PopoverShortcut>("set_popover_shortcut", { accelerator }));
+    }, "이 단축키를 등록하지 못했어요. 다른 조합을 눌러 보세요.");
   }
 
   function checkUpdates() {
@@ -248,8 +260,7 @@ function SettingsWindow({ userId, email, loading, signOut }: {
                 onChange={ddayScope => saveMenubarDisplay({ ...display, ddayScope })} />
             </div>
             <hr />
-            <div className="menubar-settings-row menubar-action-row"><span>메뉴바 창 열기 단축키</span>
-              <kbd className="menubar-settings-button">⌥ ⌘ T</kbd></div>
+            <PopoverShortcutControl shortcut={shortcut} disabled={pending} onChange={changeShortcut} />
             <p className="menubar-settings-note">할 일을 체크하면 Tongkk 웹에도 바로 반영돼요.</p>
           </SettingsGroup>}
           {tab === "account" && <>
