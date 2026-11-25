@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import LegalLinks from "../components/LegalLinks";
 import { FEEDBACK_EMAIL } from "../common";
 
 // 개인정보처리방침·이용약관. Notion Public integration과 Google OAuth 검증에 공개 URL로 등록한다.
@@ -161,10 +162,7 @@ export default function Legal({ kind }: { kind: "privacy" | "terms" }) {
             )}
           </section>
         ))}
-        <nav style={{ display: "flex", gap: 16, fontSize: 13, borderTop: "1px solid var(--color-border-soft)", paddingTop: 16 }}>
-          <Link to="/privacy" style={{ color: "var(--color-muted)" }}>개인정보처리방침</Link>
-          <Link to="/terms" style={{ color: "var(--color-muted)" }}>이용약관</Link>
-        </nav>
+        <LegalLinks style={{ borderTop: "1px solid var(--color-border-soft)", paddingTop: 16 }} />
       </article>
     </main>
   );
