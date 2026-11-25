@@ -1,7 +1,7 @@
 import BrandLogo from "../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import { pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useToast } from "../ToastContext";
 import { useAuth } from "../AuthContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
@@ -10,6 +10,7 @@ import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer }
 import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type WrongAnswerAnalysis, type WrongAnalysisItem } from "../services/gpt";
 
 import QuizIssueLink from '../features/review/QuizIssueLink';
+import './ReviewNotes.css';
 
 const ALL = "전체";
 
@@ -36,6 +37,8 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
   const [analyses, setAnalyses] = useState<Map<string, WrongAnswerAnalysis>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [loadRetry, setLoadRetry] = useState(0);
   const [params, setParams] = useSearchParams();
   const filter = params.get('course') || ALL;
   const setFilter = (course: string) => setParams(previous => {
@@ -46,6 +49,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
   });
   const [retryingCourse, setRetryingCourse] = useState<string | null>(null);
   const [analyzingCourse, setAnalyzingCourse] = useState<string | null>(null);
+  const [expandedAnalyses, setExpandedAnalyses] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let ignore = false;
@@ -57,6 +61,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       return () => { ignore = true; };
     }
     setLoading(true);
+    setLoadError("");
     Promise.all([
       loadAllQuizAttemptsFromServer({ includeAnswers: true }),
       // 분석 테이블이 아직 없거나 실패해도 오답 노트 본문은 보이도록 빈 Map으로 흘려보낸다.
@@ -67,10 +72,10 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
         setAttempts(rows);
         setAnalyses(analysisMap);
       })
-      .catch(err => { if (!ignore) showToast(err instanceof Error ? err.message : "오답 노트를 불러오지 못했습니다.", "error"); })
+      .catch(err => { if (!ignore) setLoadError(err instanceof Error ? err.message : "오답 노트를 불러오지 못했습니다."); })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
-  }, [user, showToast]);
+  }, [user, loadRetry]);
 
   // attempts는 created_at desc → 처음 만난 question 텍스트가 가장 최근 회차
   const wrongEntries = useMemo(() => {
@@ -186,6 +191,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       const analysis = await analyzeWrongAnswers(courseName, items);
       await saveWrongAnswerAnalysisToServer(courseName, analysis);
       setAnalyses(prev => new Map(prev).set(courseName, analysis));
+      setExpandedAnalyses(prev => new Set(prev).add(courseName));
       showToast("오답 분석을 완료했습니다.", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "오답 분석에 실패했습니다.", "error");
@@ -195,7 +201,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
   };
 
   return (
-    <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div className={`review-notes${embedded ? "" : " review-notes-page"}`}>
       {!embedded && sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       {!embedded && <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
@@ -206,132 +212,141 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 오답 노트</span>
       </div>}
 
-      <div className={embedded ? undefined : "app-container narrow"}>
-        <div style={{ marginBottom: 18 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>오답 노트</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>틀린 문제를 확인하고 다시 푸세요.</p>
-        </div>
+      <section className={embedded ? "review-notes-content" : "app-container narrow review-notes-content"} aria-labelledby="wrong-notes-heading">
+        <header className="review-notes-heading">
+          <div>
+            <h2 id="wrong-notes-heading">오답 노트</h2>
+            <p>틀린 문제를 확인하고, 과목별로 다시 풀어보세요.</p>
+          </div>
+          {!loading && !loadError && wrongEntries.length > 0 && <span className="review-notes-total">{courseNames.length}과목 · 오답 {wrongEntries.length}문항</span>}
+        </header>
 
         {courseNames.length > 0 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+          <div className="review-course-filters" role="group" aria-label="오답 과목 필터">
             {[ALL, ...courseNames].map(name => {
               const active = filter === name;
               return (
-                <button type="button" key={name} onClick={() => setFilter(name)} style={{
-                  padding: "8px 14px", borderRadius: 999,
-                  border: active ? `1px solid ${PINK}` : `1px solid ${BORDER_COLOR}`,
-                  background: active ? "var(--color-tint-pink)" : "var(--color-card)",
-                  color: active ? PINK : "var(--color-text-secondary)", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                }}>{name}</button>
+                <button type="button" key={name} aria-pressed={active} onClick={() => setFilter(name)}>
+                  {name}<span className="review-filter-count">{name === ALL ? wrongEntries.length : entriesByCourse.get(name)?.length}</span>
+                </button>
               );
             })}
           </div>
         )}
 
         {loading ? (
-          <Card style={{ padding: 40, textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--color-muted)" }}>불러오는 중...</p>
+          <Card className="review-empty" role="status">
+            <p>오답을 불러오는 중…</p>
+          </Card>
+        ) : loadError ? (
+          <Card className="review-empty">
+            <p role="alert">{loadError}</p>
+            <button type="button" className="workflow-button" onClick={() => setLoadRetry(value => value + 1)}>다시 불러오기</button>
           </Card>
         ) : wrongEntries.length === 0 ? (
-          <Card style={{ padding: 40, textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--color-muted)" }}>아직 오답이 없습니다</p>
+          <Card className="review-empty">
+            <h3>아직 기록된 오답이 없어요</h3>
+            <p>퀴즈를 풀고 채점하면 틀린 문제가 여기에 모입니다.</p>
+          </Card>
+        ) : visibleCourses.length === 0 ? (
+          <Card className="review-empty">
+            <p>선택한 과목에 기록된 오답이 없습니다.</p>
+            <button type="button" className="workflow-button" onClick={() => setFilter(ALL)}>전체 오답 보기</button>
           </Card>
         ) : (
           visibleCourses.map(courseName => {
             const entries = entriesByCourse.get(courseName) || [];
             const analysis = analyses.get(courseName);
             return (
-              <div key={courseName} style={{ marginBottom: 28 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{courseName}</span>
-                    <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: "var(--color-muted)" }}>{entries.length}문항</span>
+              <section key={courseName} className="review-course" aria-label={`${courseName} 오답`}>
+                <header className="review-course-heading">
+                  <div className="review-course-title">
+                    <h3>{courseName}</h3>
+                    <span>{entries.length}문항</span>
+                  </div>
+                  <div className="review-course-actions">
                     <button
                       type="button"
+                      className="workflow-button workflow-primary"
+                      onClick={() => handleRetry(courseName)}
+                      disabled={retryingCourse !== null}
+                      aria-busy={retryingCourse === courseName}
+                      aria-label={`${courseName} 오답 다시 풀기`}
+                    >
+                      {retryingCourse === courseName ? "준비 중…" : <>오답 다시 풀기 <span aria-hidden="true">→</span></>}
+                    </button>
+                    <button
+                      type="button"
+                      className="workflow-button"
                       onClick={() => handleAnalyze(courseName)}
                       disabled={analyzingCourse !== null}
-                      style={{
-                        flexShrink: 0,
-                        padding: "7px 12px", borderRadius: 999,
-                        border: `1px solid ${analyzingCourse === courseName ? CYAN : BORDER_COLOR}`,
-                        background: analyzingCourse === courseName ? "var(--color-tint-cyan)" : "var(--color-card)",
-                        color: analyzingCourse !== null && analyzingCourse !== courseName ? "var(--color-muted)" : CYAN,
-                        fontSize: 12, fontWeight: 800,
-                        cursor: analyzingCourse !== null ? "default" : "pointer",
-                      }}
+                      aria-busy={analyzingCourse === courseName}
+                      aria-label={`${courseName} ${analysis ? "오답 다시 분석" : "오답 분석"}`}
                     >
-                      {analyzingCourse === courseName ? "분석 중..." : "과목 오답 분석"}
+                      {analyzingCourse === courseName ? "분석 중…" : analysis ? "다시 분석" : "오답 분석"}
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRetry(courseName)}
-                    disabled={retryingCourse !== null}
-                    style={{
-                      flexShrink: 0,
-                      padding: "9px 14px", borderRadius: 10, border: "none",
-                      background: retryingCourse !== null ? "var(--color-border-soft)" : PINK,
-                      color: retryingCourse !== null ? "var(--color-muted)" : "var(--color-on-brand)",
-                      fontSize: 13, fontWeight: 800,
-                      cursor: retryingCourse !== null ? "default" : "pointer",
-                    }}
-                  >
-                    {retryingCourse === courseName ? "준비 중..." : "이 과목 오답만 다시 풀기"}
-                  </button>
-                </div>
+                </header>
 
                 {analysis && (
-                  <div style={{
-                    marginBottom: 14, padding: "14px 16px", borderRadius: 12,
-                    border: "1px solid var(--color-tint-cyan)", background: "var(--color-surface)",
+                  <details className="review-analysis" open={expandedAnalyses.has(courseName)} onToggle={event => {
+                    const open = event.currentTarget.open;
+                    setExpandedAnalyses(prev => {
+                      if (prev.has(courseName) === open) return prev;
+                      const next = new Set(prev);
+                      if (open) next.add(courseName);
+                      else next.delete(courseName);
+                      return next;
+                    });
                   }}>
-                    <div style={{ fontSize: 13, fontWeight: 850, color: "var(--color-text-strong)", marginBottom: 8 }}>
-                      오답 분석
-                    </div>
+                    <summary>과목 오답 분석</summary>
                     {analysis.summary && (
-                      <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>{analysis.summary}</p>
+                      <p>{analysis.summary}</p>
                     )}
-                    <div style={{ display: "grid", gap: 6, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+                    <dl className="review-analysis-points">
                       {analysis.weaknesses.length > 0 && (
-                        <span><strong style={{ color: PINK }}>취약점</strong> · {analysis.weaknesses.join(" / ")}</span>
+                        <div><dt>취약점</dt><dd>{analysis.weaknesses.join(" / ")}</dd></div>
                       )}
                       {analysis.studyPoints.length > 0 && (
-                        <span><strong style={{ color: CYAN }}>더 공부할 내용</strong> · {analysis.studyPoints.join(" / ")}</span>
+                        <div><dt>더 공부할 내용</dt><dd>{analysis.studyPoints.join(" / ")}</dd></div>
                       )}
                       {analysis.memorize.length > 0 && (
-                        <span><strong style={{ color: "var(--color-text-strong)" }}>암기 포인트</strong> · {analysis.memorize.join(" / ")}</span>
+                        <div><dt>암기 포인트</dt><dd>{analysis.memorize.join(" / ")}</dd></div>
                       )}
                       {analysis.studyMethod && (
-                        <span><strong>공부 방법</strong> · {analysis.studyMethod}</span>
+                        <div><dt>공부 방법</dt><dd>{analysis.studyMethod}</dd></div>
                       )}
-                    </div>
-                  </div>
+                    </dl>
+                  </details>
                 )}
 
-                <div style={{ display: "grid", gap: 10 }}>
+                <div className="review-question-list">
                   {entries.map((entry, index) => (
-                    <Card key={`${entry.question}-${index}`} style={{ padding: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <span style={{ padding: "3px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>{entry.courseName}</span>
-                        <span style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 700 }}>{entry.type}</span>
+                    <Card key={`${entry.question}-${index}`} className="review-question">
+                      <div className="review-question-meta">
+                        <span className="review-question-number">문항 {index + 1}</span>
+                        <span>{entry.type}</span>
                       </div>
-                      <div style={{ marginBottom: 8, fontSize: 14, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
-                        {entry.question}
+                      <h4>{entry.question}</h4>
+                      <dl className="review-answer-comparison">
+                        <div className="review-answer-student"><dt>내 답</dt><dd>{entry.studentAnswer ?? "미응답"}</dd></div>
+                        <div className="review-answer-correct"><dt>정답</dt><dd>{entry.correctAnswer ?? "정답 정보 없음"}</dd></div>
+                      </dl>
+                      <div className="review-question-explanation">
+                        <h5>해설</h5>
+                        <p>{entry.feedback || entry.explanation || "등록된 해설이 없습니다."}</p>
                       </div>
-                      <div style={{ display: "grid", gap: 5, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                        <span>내 답: <strong style={{ color: PINK }}>{entry.studentAnswer ?? "미응답"}</strong></span>
-                        <span>정답: <strong style={{ color: CYAN }}>{entry.correctAnswer ?? "정답 정보 없음"}</strong></span>
-                        <span>해설: {entry.feedback || entry.explanation}</span>
+                      <div className="review-question-footer">
                         <QuizIssueLink attemptId={entry.attemptId} questionIndex={entry.questionIndex} />
                       </div>
                     </Card>
                   ))}
                 </div>
-              </div>
+              </section>
             );
           })
         )}
-      </div>
+      </section>
     </div>
   );
 }

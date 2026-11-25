@@ -40,8 +40,8 @@
   --color-violet: light-dark(#8b5cf6, #9d88d4);
 
   /* 표면 — page→card→surface 순으로 밝아져 깊이감을 준다 */
-  --color-page: light-dark(#f7f7f7, #181818);
-  --color-card: light-dark(#fcfcfc, #202020);
+  --color-page: light-dark(#f7f8fb, #16181d);
+  --color-card: light-dark(#fbfcfe, #1d2027);
   --color-surface: light-dark(#fafafa, #282828);
   --color-muted-surface: light-dark(#f1f1f1, #313131);
   --color-mini-card: light-dark(#fafafb, #1d2027);
@@ -59,6 +59,8 @@
   --color-action-pink: light-dark(#c0397e, #a63369);
   --color-action-cyan: light-dark(#0a7491, #14728d);
   --color-on-brand: #ffffff;       /* hex-ok: 브랜드색 배경 위 글자 — 라이트·다크 공통 */
+  --color-button-neutral: light-dark(#f0f0f0, #313131);
+  --color-button-text: light-dark(#333333, #e8e8e8);
 
   /* 틴트·상태 */
   --color-tint-pink: light-dark(#fff0f6, #2a1f26);

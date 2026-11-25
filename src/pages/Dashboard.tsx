@@ -1,7 +1,7 @@
 import BrandLogo from "../components/BrandLogo";
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import LegalLinks from "../components/LegalLinks";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
 import { useCourses } from "../CourseContext";
@@ -48,6 +48,7 @@ import {
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 import LearningBriefing from "../features/review/LearningBriefing";
 import LearningRecommendations from "../features/review/LearningRecommendations";
+import './Dashboard.css';
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void; onAddAndUpload: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -1150,17 +1151,26 @@ export default function Dashboard() {
     // 남은 계획 수는 같은 카드의 '오늘 할 일'에서 표시한다.
     todayPlansLeft: 0,
   });
-  // "자료 복습하기" 대상 과목: 추천 과목 → 요약 있는 과목 → 자료 있는 과목 순.
-  // (페이스 플랜이 없어도 복습 동선이 끊기지 않게 한다.)
+  // 자료 개수를 아직 불러오지 않았거나 첫 자료를 올리기 전에도 과목 자료로 진입한다.
   const reviewCourse = recommendedCourse
     ?? courses.find(course => (courseStats[course]?.summaries ?? 0) > 0)
     ?? courses.find(course => (courseStats[course]?.materials ?? 0) > 0)
+    ?? courses[0]
     ?? null;
 
   // "자료 복습하기"는 라벨대로 '보러' 간다: 가장 최근 요약이 달린 자료 상세(요약 탭)로
-  // 바로 이동하고, 과목에 요약이 아직 없으면 요약 설정 화면으로 폴백한다.
+  // 바로 이동하고, 과목에 요약이 아직 없으면 자료 업로드 화면으로 폴백한다.
   const handleReviewMaterials = async () => {
-    if (!reviewCourse || reviewNavigating) return;
+    if (reviewNavigating) return;
+    if (!requireAuth("자료를 복습하려면 로그인이 필요해요")) return;
+    if (!hasLoadedCourses) {
+      showToast("강의 목록을 불러오는 중이에요. 잠시 후 다시 눌러주세요.", "info");
+      return;
+    }
+    if (!reviewCourse) {
+      setShowAddCourse(true);
+      return;
+    }
     setReviewNavigating(true);
     const fallbackState = { selectedCourse: reviewCourse, fromDashboard: true };
     try {
@@ -1306,15 +1316,8 @@ export default function Dashboard() {
                   강의를 만들고 강의자료를 올려보세요.<br />AI로 요약·퀴즈·학습 계획을 만드세요.
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-                  <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
-                    padding: "11px 18px", borderRadius: 10, border: "none", background: "var(--color-action-pink)",
-                    color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
-                    boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
-                  }}>+ 강의 추가하기</button>
-                  <button type="button" onClick={openSampleDemo} style={{
-                    padding: "11px 18px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, background: "transparent",
-                    color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                  }}>예시로 둘러보기</button>
+                  <button type="button" className="dashboard-action dashboard-action--brand" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }}>+ 강의 추가하기</button>
+                  <button type="button" className="dashboard-action dashboard-action--text" onClick={openSampleDemo}>예시로 둘러보기</button>
                 </div>
               </div>
             ) : (
@@ -1380,10 +1383,7 @@ export default function Dashboard() {
                     </Card>
                   );
                 })}
-                <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
-                  minHeight: 120, borderRadius: 18, border: "1px dashed var(--color-border)",
-                  background: "var(--color-card)", color: "var(--color-pink-deep)", fontSize: 15, fontWeight: 850, cursor: "pointer",
-                }}>+ 강의 추가하기</button>
+                <button type="button" className="dashboard-action dashboard-action--brand dashboard-course-add" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }}>+ 강의 추가하기</button>
               </div>
             )}
           </div>
@@ -1476,19 +1476,19 @@ export default function Dashboard() {
                 <h4 id="today-recommendations-heading" className="m-0 text-[13px] font-bold text-text-strong">오늘의 추천</h4>
                 {stepView && <p className="m-0 mt-1.5 text-xs leading-5 text-muted">{startHint}</p>}
                 <LearningRecommendations key={user?.id || 'guest'} items={recommendations} />
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate(pageRoutes["오답 노트"])}
-                    className="cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-pink-deep hover:underline"
-                  >오답 다시 풀기 →</button>
+                <div className="today-review-actions">
+                  <Link
+                    to={`${pageRoutes["오답 노트"]}?tab=wrong`}
+                    className="dashboard-action"
+                  >오답 다시 풀기</Link>
                   <button
                     type="button"
                     onClick={() => void handleReviewMaterials()}
-                    disabled={!reviewCourse || reviewNavigating}
-                    title={!reviewCourse ? "과목과 자료를 먼저 추가하세요" : `${reviewCourse} ${(courseStats[reviewCourse]?.summaries ?? 0) > 0 ? "최근 요약 보기" : "요약 만들러 가기"}`}
-                    className="cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-cyan-deep hover:underline disabled:cursor-default disabled:text-muted disabled:no-underline"
-                  >{reviewNavigating ? "불러오는 중…" : "자료 복습하기 →"}</button>
+                    disabled={reviewNavigating}
+                    aria-busy={reviewNavigating}
+                    title={reviewCourse ? `${reviewCourse} 자료 복습하기` : "강의를 추가하고 자료 복습 시작하기"}
+                    className="dashboard-action"
+                  >{reviewNavigating ? "불러오는 중…" : "자료 복습하기"}</button>
                 </div>
               </section>
               <div className="mb-3 flex items-center justify-between gap-2">

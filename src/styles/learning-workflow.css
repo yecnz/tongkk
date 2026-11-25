@@ -48,18 +48,19 @@
   text-decoration: none; cursor: pointer;
   transition: background .15s, color .15s, border-color .15s;
 }
-.workflow-surface .workflow-primary, .learning-page .workflow-primary {
-  border-color: var(--color-pink); background: var(--color-pink); color: var(--color-on-brand); font-weight: 700;
+.workflow-surface .workflow-primary, .learning-page .workflow-primary, .workflow-button.workflow-primary {
+  border: 1.5px solid var(--color-pink-deep); background: var(--color-tint-pink); color: var(--color-pink-deep); font-weight: 700;
 }
 .workflow-surface .workflow-danger { color: var(--color-danger); }
 .workflow-surface :is(button, input, select, textarea):disabled, .workflow-tabs button:disabled, .workflow-button:disabled { opacity: .5; cursor: default; }
+.workflow-button:disabled { border-color: var(--color-border); background: var(--color-muted-surface); color: var(--color-muted); }
 .workflow-surface :is(button, input, select, textarea, summary):focus-visible, .workflow-tabs button:focus-visible, .workflow-button:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 2px; }
 .workflow-tabs, .workflow-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .workflow-tabs { margin: 16px 0 20px; }
 .workflow-actions { margin: 0; }
 .workflow-tabs button[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--color-pink) 40%, var(--color-border));
-  background: var(--color-tint-pink); color: var(--color-pink); font-weight: 700;
+  border-color: var(--color-pink-deep);
+  background: var(--color-tint-pink); color: var(--color-pink-deep); font-weight: 700;
 }
 .workflow-surface a:not([class]), .workflow-link { color: var(--color-pink-deep); font-size: 13px; font-weight: 600; text-decoration: none; }
 .workflow-surface a:not([class]):hover, .workflow-link:hover { text-decoration: underline; }
@@ -145,7 +146,7 @@
 .learning-mate-chat { min-height: 0; flex: 1; overflow: hidden; }
 @media (hover: hover) {
   .workflow-surface button:not(:disabled):hover, .workflow-tabs button:not(:disabled):hover, .workflow-button:not(:disabled):hover { background: var(--color-muted-surface); }
-  .workflow-surface .workflow-primary:not(:disabled):hover { background: var(--color-pink-deep); border-color: var(--color-pink-deep); color: var(--color-on-brand); }
+  .workflow-surface .workflow-primary:not(:disabled):hover, .workflow-button.workflow-primary:not(:disabled):hover { background: color-mix(in srgb, var(--color-pink) 16%, var(--color-card)); border-color: var(--color-pink-deep); color: var(--color-pink-deep); }
   .workflow-tabs button[aria-pressed="true"]:hover { background: var(--color-tint-pink); }
   .workflow-surface .workflow-danger:not(:disabled):hover { background: var(--color-tint-pink); }
 }

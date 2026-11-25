@@ -1,0 +1,38 @@
+.dashboard-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-button-neutral);
+  color: var(--color-button-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color .15s, color .15s;
+}
+.dashboard-action--brand {
+  background: var(--color-pink);
+  color: var(--color-on-brand);
+}
+.dashboard-action--text { background: transparent; color: var(--color-text-secondary); font-weight: 500; }
+.dashboard-course-add { min-height: 120px; border-radius: 18px; }
+.today-review-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.today-review-actions .dashboard-action { width: 100%; padding-inline: 8px; }
+.dashboard-action:disabled { opacity: .5; cursor: default; }
+@media (hover: hover) {
+  .dashboard-action:not(:disabled):hover { background: color-mix(in srgb, var(--color-button-text) 6%, var(--color-button-neutral)); }
+  .dashboard-action--brand:not(:disabled):hover { background: color-mix(in srgb, var(--color-pink) 90%, var(--color-action-pink)); }
+  .dashboard-action--text:not(:disabled):hover { background: transparent; color: var(--color-text-strong); text-decoration: underline; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-action { transition: none; }
+}
