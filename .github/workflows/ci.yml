@@ -26,6 +26,10 @@ jobs:
         run: npm run test:learning-db
       - name: Fresh workflow schema
         run: npm run test:workflow-db
+      - name: Flashcard ownership and review scheduling
+        run: npm run test:flashcards-db
+      - name: Study path ownership and chapter progress
+        run: npm run test:study-paths-db
       - name: Build
         run: npm run build
 

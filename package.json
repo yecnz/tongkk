@@ -19,6 +19,8 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "test:workflow-db": "node scripts/test-workflow-schema.mjs",
+    "test:flashcards-db": "node scripts/test-flashcards-db.mjs",
+    "test:study-paths-db": "node scripts/test-study-paths-db.mjs",
     "menubar:dev": "tauri dev",
     "menubar:build": "tauri build"
   },

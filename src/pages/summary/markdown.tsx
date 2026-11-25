@@ -73,7 +73,7 @@ export const markdownComponents: Components = {
   p: ({ children }) => {
     const text = getNodeText(children);
     // 출처 줄은 내부 굵게·하이라이트 스타일이 흐린 톤을 깨지 않도록 순수 텍스트로만 렌더한다.
-    if (isSourceNoteText(text)) return <p style={markdownStyles.sourceNote}>{text.replace(/\*\*/g, "")}</p>;
+    if (isSourceNoteText(text)) return <p style={markdownStyles.sourceNote}>{children}</p>;
     return <p style={markdownStyles.paragraph}>{renderHighlightSyntax(children)}</p>;
   },
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
@@ -134,7 +134,7 @@ export const cheatSheetMarkdownComponents: Components = {
     const text = getNodeText(children);
     // 출처 줄은 본문보다 확실히 작고 옅게, 내부 마크업 무시하고 순수 텍스트로 렌더한다.
     if (isSourceNoteText(text)) {
-      return <p style={{ margin: "0 0 8px", fontSize: 11.5, lineHeight: 1.5, color: "color-mix(in srgb, var(--color-muted) 75%, transparent)" }}>{text.replace(/\*\*/g, "")}</p>;
+      return <p style={{ margin: "0 0 8px", fontSize: 11.5, lineHeight: 1.5, color: "color-mix(in srgb, var(--color-muted) 75%, transparent)" }}>{children}</p>;
     }
     return <p style={{ margin: "0 0 8px", lineHeight: 1.65, color: "var(--color-text)" }}>{renderHighlightSyntax(children)}</p>;
   },

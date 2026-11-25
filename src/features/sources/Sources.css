@@ -1,0 +1,14 @@
+.source-citation, a[href^="/source?"] { color: var(--color-cyan); text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
+.source-citation:focus-visible, a[href^="/source?"]:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 3px; border-radius: 3px; }
+.source-page { min-height: 100vh; background: var(--color-surface); color: var(--color-text); padding: 24px; box-sizing: border-box; }
+.source-page header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.source-page h1 { font-size: 22px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.source-page p { line-height: 1.6; }
+.source-page a { color: var(--color-text); }
+.source-viewer { height: calc(100vh - 190px); min-height: 400px; border: 1px solid var(--color-border-soft); border-radius: 12px; overflow: hidden; }
+.source-notice { border: 1px solid var(--color-border-soft); border-radius: 10px; padding: 12px 16px; background: var(--color-card); }
+.source-choice { display: grid; gap: 12px; max-width: 720px; }
+.source-choice a { display: block; padding: 16px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-card); overflow-wrap: anywhere; }
+.source-text { padding: 24px; background: var(--color-card); border-radius: 12px; overflow-wrap: anywhere; }
+.source-image { max-width: 100%; max-height: 75vh; object-fit: contain; }
+@media (max-width: 600px) { .source-page { padding: 16px; } .source-page h1 { font-size: 19px; } }

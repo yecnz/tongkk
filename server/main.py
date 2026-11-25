@@ -137,6 +137,10 @@ from concept_history import router as concepts_router
 app.include_router(concepts_router)
 from calendar_integration import router as integrations_router
 app.include_router(integrations_router)
+from flashcards import router as flashcards_router
+from study_paths import router as study_paths_router
+app.include_router(flashcards_router)
+app.include_router(study_paths_router)
 
 logger = logging.getLogger("tongkk")
 
