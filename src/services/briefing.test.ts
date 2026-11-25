@@ -29,4 +29,18 @@ describe('buildBriefing', () => {
   it('데이터가 없으면 빈 목록', () => {
     expect(buildBriefing({ ddays: [], paces: [], scores: {}, todayPlansLeft: 0 })).toEqual([]);
   });
+
+  it('추천 항목에 해당 일정·페이스·과목으로 이동할 문맥을 담는다', () => {
+    const items = buildBriefing({
+      ddays: [{ id: 'exam', date: '2026-12-02', subj: '자료구조', type: 'exam', daysLeft: 3 }],
+      paces: [{ id: 'pace', date: '2026-11-29', course: '운영체제', status: 'behind', progress: 20, todayTarget: 5, unitLabel: '페이지' }],
+      scores: { 확률통계: [60] },
+      todayPlansLeft: 0,
+    });
+    expect(items.map(item => item.target)).toEqual([
+      { kind: 'calendar', date: '2026-12-02', ddayId: 'exam' },
+      { kind: 'calendar', date: '2026-11-29', paceId: 'pace' },
+      { kind: 'wrong', course: '확률통계' },
+    ]);
+  });
 });

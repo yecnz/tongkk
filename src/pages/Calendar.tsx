@@ -2,7 +2,7 @@ import BrandLogo from "../components/BrandLogo";
 import ExternalEvents from '../features/integrations/ExternalEvents';
 import ReviewQueue from '../features/review/ReviewQueue';
 import { useState, useEffect, type CSSProperties } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
 import type { PageRouteLabel } from "../common";
 import { useCourses } from "../CourseContext";
@@ -12,6 +12,7 @@ import { loadDashboardState, saveDashboardState } from "../services/dashboardSta
 import { buildPaceCalendarEntries, paceDateKey, type PacePlan } from "../services/pace";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
 import { workflowRequest } from "../services/workflow";
+import { calendarDateKey } from "../services/learningTargets";
 import {
   createClientId,
   ddayTypeColors,
@@ -76,7 +77,25 @@ export default function Calendar() {
   const [loaded, setLoaded] = useState(false);
 
   const todayStr = paceDateKey(new Date());
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [params, setParams] = useSearchParams();
+  const selectedDate = calendarDateKey(params.get('date')) ?? todayStr;
+  const focusedDday = params.get('ddayId');
+  const focusedPace = params.get('paceId');
+  const setSelectedDate = (date: string) => setParams(previous => {
+    const next = new URLSearchParams(previous);
+    next.set('date', date);
+    next.delete('ddayId');
+    next.delete('paceId');
+    return next;
+  });
+
+  useEffect(() => {
+    if (!loaded || (!focusedDday && !focusedPace)) return;
+    const target = document.getElementById(focusedDday ? `calendar-dday-${focusedDday}` : `calendar-pace-${focusedPace}`)
+      ?? document.getElementById('calendar-day-details');
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: 'nearest' });
+  }, [loaded, focusedDday, focusedPace, selectedDate]);
 
   const [showAddDday, setShowAddDday] = useState(false);
   const [showAddPlan, setShowAddPlan] = useState(false);
@@ -318,9 +337,9 @@ export default function Calendar() {
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <ReviewQueue key={`${user?.id}:${selectedDate}`} day={selectedDate} />
             <ExternalEvents key={`external-${user?.id}:${selectedDate}`} day={selectedDate} />
-            <Card style={{ padding: 20 }}>
+            <Card id="calendar-day-details" tabIndex={-1} aria-labelledby="calendar-day-heading" style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>{formatPanelDate(selectedDate)}</h3>
+                <h3 id="calendar-day-heading" style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>{formatPanelDate(selectedDate)}</h3>
                 {selectedIsToday && (
                   <span style={{ fontSize: 11, fontWeight: 800, color: CYAN, background: "var(--color-tint-cyan)", borderRadius: 999, padding: "2px 8px" }}>오늘</span>
                 )}
@@ -346,9 +365,10 @@ export default function Calendar() {
                     const canCheck = selectedDate <= todayStr && !entry.readOnly && !done && Boolean(plan);
                     const meta = PACE_STATUS_META[done ? "done" : entry.status];
                     return (
-                      <div key={`pace-${entry.planId}-${idx}`} style={{
+                      <div key={`pace-${entry.planId}-${idx}`} id={`calendar-pace-${entry.planId}`} tabIndex={focusedPace === entry.planId ? -1 : undefined} style={{
                         display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
                         borderTop: idx > 0 ? "1px solid var(--color-border-soft)" : "none",
+                        background: focusedPace === entry.planId ? "var(--color-tint-cyan)" : undefined,
                       }}>
                         {entry.readOnly ? (
                           <span aria-hidden style={{
@@ -429,9 +449,10 @@ export default function Calendar() {
                   const type = d.type || "assignment";
                   const left = getDaysLeft(d.date);
                   return (
-                    <div key={d.id || `${d.subj}-${d.date}-${idx}`} style={{
+                    <div key={d.id || `${d.subj}-${d.date}-${idx}`} id={d.id ? `calendar-dday-${d.id}` : undefined} tabIndex={focusedDday === d.id ? -1 : undefined} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                       padding: "8px 0", borderTop: idx > 0 ? "1px solid var(--color-border-soft)" : "none",
+                      background: focusedDday === d.id ? "var(--color-tint-cyan)" : undefined,
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                         <span style={{

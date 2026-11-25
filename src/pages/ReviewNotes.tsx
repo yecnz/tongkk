@@ -1,6 +1,6 @@
 import BrandLogo from "../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useToast } from "../ToastContext";
 import { useAuth } from "../AuthContext";
@@ -36,7 +36,14 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
   const [analyses, setAnalyses] = useState<Map<string, WrongAnswerAnalysis>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>(ALL);
+  const [params, setParams] = useSearchParams();
+  const filter = params.get('course') || ALL;
+  const setFilter = (course: string) => setParams(previous => {
+    const next = new URLSearchParams(previous);
+    if (course === ALL) next.delete('course');
+    else next.set('course', course);
+    return next;
+  });
   const [retryingCourse, setRetryingCourse] = useState<string | null>(null);
   const [analyzingCourse, setAnalyzingCourse] = useState<string | null>(null);
 

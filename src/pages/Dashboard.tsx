@@ -1142,10 +1142,10 @@ export default function Dashboard() {
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
   const recommendations = buildBriefing({
-    ddays: sortedDdays.map(dday => ({ subj: dday.subj, type: dday.type, daysLeft: getDaysLeft(dday.date) })),
+    ddays: sortedDdays.map(dday => ({ id: dday.id, date: dday.date, subj: dday.subj, type: dday.type, daysLeft: getDaysLeft(dday.date) })),
     paces: [...activePaceViews]
       .sort((a, b) => statusRank[a.status] - statusRank[b.status] || a.daysLeft - b.daysLeft)
-      .map(view => ({ course: view.plan.course, status: view.status, progress: view.progress, todayTarget: view.todayTarget, unitLabel: view.unitLabel })),
+      .map(view => ({ id: view.plan.id, date: todayStr, course: view.plan.course, status: view.status, progress: view.progress, todayTarget: view.todayTarget, unitLabel: view.unitLabel })),
     scores: Object.fromEntries(Object.entries(courseQuizAttempts).map(([course, attempts]) => [course, attempts.map(attempt => attempt.scorePercent)])),
     // 남은 계획 수는 같은 카드의 '오늘 할 일'에서 표시한다.
     todayPlansLeft: 0,
