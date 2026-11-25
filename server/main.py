@@ -211,7 +211,11 @@ async def login_with_password(payload: LoginRequest, request: Request):
         error_body = {}
     if not isinstance(error_body, dict):
         error_body = {}
-    error_code = error_body.get("code") or error_body.get("error_code")
+    # Supabase는 숫자 HTTP 상태를 code에, 실제 인증 오류를 error_code에 함께 보낼 수 있다.
+    error_code = error_body.get("error_code")
+    if not isinstance(error_code, str) or not error_code:
+        legacy_code = error_body.get("code")
+        error_code = legacy_code if isinstance(legacy_code, str) else None
     # 구형 Auth의 invalid_grant 중에서도 자격 증명 오류만 횟수에 포함한다.
     invalid_credentials = error_code == "invalid_credentials" or (
         not error_code and error_body.get("error") == "invalid_grant"
