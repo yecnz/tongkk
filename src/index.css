@@ -23,53 +23,56 @@
   /* 브랜드 — 다크에선 채도를 약간 낮춰 형광기를 뺀다 */
   --color-pink: light-dark(#F070AE, #e57dab);
   --color-cyan: light-dark(#00C0E8, #33aed1);
+  /* 보라는 요약 템플릿·마인드맵 전용 예외 색상이다. */
   --color-violet: light-dark(#8b5cf6, #9d88d4);
 
   /* 표면 — page→card→surface 순으로 밝아져 깊이감을 준다 */
-  --color-page: light-dark(#f7f8fb, #16181d);
-  --color-card: light-dark(#fbfcfe, #1d2027);
-  --color-surface: light-dark(#fafafa, #252932);
-  --color-muted-surface: light-dark(#f1f4f8, #2c313b);
+  --color-page: light-dark(#f7f7f7, #181818);
+  --color-card: light-dark(#fcfcfc, #202020);
+  --color-surface: light-dark(#fafafa, #282828);
+  --color-muted-surface: light-dark(#f1f1f1, #313131);
   --color-mini-card: light-dark(#fafafb, #1d2027);
   --color-mini-input: light-dark(#ffffff, #16181d);
 
   /* 테두리 */
-  --color-border: light-dark(#e2e6ee, #333944);
-  --color-border-soft: light-dark(#e0e0e0, #2a2f39);
+  --color-border: light-dark(#e3e3e3, #3a3a3a);
+  --color-border-soft: light-dark(#e0e0e0, #303030);
 
   /* 텍스트 — 다크는 순백 대신 오프화이트로 과대비를 피한다 */
-  --color-text-strong: light-dark(#222222, #e6e9ef);
-  --color-text: light-dark(#444444, #c5cad3);
-  --color-text-secondary: light-dark(#666666, #9298a4);
-  --color-muted: light-dark(#888888, #6b7280);
+  --color-text-strong: light-dark(#222222, #e8e8e8);
+  --color-text: light-dark(#444444, #c8c8c8);
+  --color-text-secondary: light-dark(#666666, #989898);
+  --color-muted: light-dark(#888888, #757575);
   --color-on-brand: #ffffff;       /* hex-ok: 브랜드색 배경 위 글자 — 라이트·다크 공통 */
 
   /* 틴트·상태 */
   --color-tint-pink: light-dark(#fff0f6, #2a1f26);
   --color-tint-cyan: light-dark(#e8fafe, #18272e);
   --color-tint-violet: light-dark(#ede9fe, #241f33);
-  --color-tint-yellow: light-dark(#fff3bf, #2e2a1a);
-  --color-tint-green: light-dark(#f1fff5, #1d2a21);
-  --color-danger: light-dark(#e53e3e, #e08585);
-  --color-success: light-dark(#2f9e44, #86c796);
-  --color-amber-deep: light-dark(#9a6b00, #d9b56a);
+  /* 기존 상태 토큰 이름은 호환용으로 유지하고, 명도로 상태를 구분한다. */
+  --color-tint-yellow: light-dark(#f1f1f1, #313131);
+  --color-tint-green: light-dark(#e8e8e8, #3b3b3b);
+  --color-danger: light-dark(#444444, #b8b8b8);
+  --color-action-neutral: light-dark(#444444, #666666);
+  --color-success: light-dark(#555555, #d0d0d0);
+  --color-amber-deep: light-dark(#666666, #b8b8b8);
 
   /* 틴트 배경 위 글자용 딥 톤 — 라이트에선 진하게, 다크에선 밝은 파스텔로 뒤집힌다 */
   --color-pink-deep: light-dark(#c0397e, #e8a3c5);
   --color-cyan-deep: light-dark(#0a7491, #7cc8de);
   --color-violet-deep: light-dark(#5b21b6, #c3b3ee);
 
-  /* 캘린더 요일·통계 보조색 */
-  --color-sunday: light-dark(#ff6b6b, #e38d8d);
-  --color-saturday: light-dark(#5b9cf6, #8db4ec);
-  --color-indigo: light-dark(#6574f7, #8b96e8);
+  /* 요일은 브랜드 색, 통계 보조 강조는 회색을 쓴다. */
+  --color-sunday: var(--color-pink);
+  --color-saturday: var(--color-cyan);
+  --color-indigo: var(--color-text-secondary);
 
   /* 비색상 토큰 */
   --radius-card: 18px;
   /* light-dark()는 <color> 전용이라 그림자 목록 전체를 감싸면 무효(그림자 사라짐).
      라이트 값을 기본으로 두고 다크는 아래 [data-theme="dark"] 블록에서 통째로 덮어쓴다. */
-  --shadow-card: 0 10px 28px rgba(15, 23, 42, .045);
-  --glass-bg: light-dark(rgba(255, 255, 255, 0.75), rgba(26, 30, 38, 0.72));
+  --shadow-card: 0 10px 28px rgba(0, 0, 0, .045);
+  --glass-bg: light-dark(rgba(255, 255, 255, 0.75), rgba(30, 30, 30, 0.72));
   --glass-border: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.10));
 }
 
@@ -219,7 +222,7 @@ body.tongkk-sidebar-open #root {
   .tongkk-hover-lift:hover {
     transform: translateY(-2px) !important;
     /* light-dark()는 색상 자리에서만 유효 — 그림자 목록을 감싸면 선언이 무효가 된다 */
-    box-shadow: 0 14px 32px light-dark(rgba(15, 23, 42, 0.1), rgba(0, 0, 0, 0.45)) !important;
+    box-shadow: 0 14px 32px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45)) !important;
   }
   .tongkk-hover-row:hover {
     background: var(--color-surface) !important;
@@ -426,7 +429,7 @@ body.tongkk-sidebar-open #root {
 /* 요약 화면·AI 튜터에서만 표면색(--color-surface)을 살짝 진한 연한 회색으로 덮어쓴다.
    나머지 화면은 @theme의 기본값을 그대로 쓴다. 적용: Summary 페이지 루트에 클래스 부여. */
 .tongkk-soft-surface {
-  --color-surface: light-dark(#f2f4f8, #252932);
+  --color-surface: light-dark(#f3f3f3, #282828);
 }
 
 button,

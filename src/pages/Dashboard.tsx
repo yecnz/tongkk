@@ -189,7 +189,7 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
         <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
         <button type="button" onClick={() => { onDelete(course); onClose(); }} style={{
           padding: "8px 18px", borderRadius: 10, border: "none",
-          background: "var(--color-danger)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 700
+          background: "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 700
         }}>삭제</button>
       </div>
     </Card>

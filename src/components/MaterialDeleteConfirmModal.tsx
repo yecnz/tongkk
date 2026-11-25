@@ -47,7 +47,7 @@ export const MaterialDeleteConfirmModal = ({ materialName, materialCount, summar
               type="button"
               onClick={onConfirm}
               disabled={busy}
-              style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: busy ? "var(--color-muted-surface)" : "light-dark(#4b5563, #5b6473)", color: "var(--color-on-brand)", cursor: busy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
+              style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: busy ? "var(--color-muted-surface)" : "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: busy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
             >
               {busy ? "삭제 중" : "삭제"}
             </button>

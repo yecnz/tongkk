@@ -8,11 +8,11 @@ import type { SavedQuizSet } from "./quizSets";
 // D-day 종류. 저장된 레거시 데이터에 type이 없으면 assignment로 간주(하위호환).
 export type DdayType = "assignment" | "event" | "exam";
 export const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정", exam: "시험" };
-// 타입별 색(과제=핑크, 일정=청록, 시험=보라). soft=배경, solid=글자/포인트.
+// 타입별 색(과제=핑크, 일정=파랑, 시험=회색). soft=배경, solid=글자/포인트.
 export const ddayTypeColors: Record<DdayType, { solid: string; soft: string }> = {
   assignment: { solid: PINK, soft: "var(--color-tint-pink)" },
   event: { solid: CYAN, soft: "var(--color-tint-cyan)" },
-  exam: { solid: "var(--color-violet)", soft: "var(--color-tint-violet)" },
+  exam: { solid: "var(--color-text-secondary)", soft: "var(--color-muted-surface)" },
 };
 
 export type Dday = { id?: string; type?: DdayType; subj: string; date: string };

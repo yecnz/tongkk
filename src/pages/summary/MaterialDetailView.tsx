@@ -1242,7 +1242,7 @@ export const MaterialDetailView = ({
                 type="button"
                 onClick={confirmDelete}
                 disabled={deleteBusy}
-                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "light-dark(#4b5563, #5b6473)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
+                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
               >
                 {deleteBusy ? "삭제 중" : "삭제"}
               </button>
