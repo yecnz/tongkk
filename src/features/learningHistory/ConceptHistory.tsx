@@ -22,7 +22,9 @@ function ConceptDetail({ id }: { id: string }) {
     {!data ? <p role="status">기록을 불러오는 중…</p> : <>
       <div className="workflow-card-heading"><h2>{data.concept.title}</h2><span className="workflow-badge" data-state={data.concept.state}>{labels[data.concept.state]}</span></div>
       <dl className="workflow-metrics"><div><dt>수행 근거</dt><dd>{data.concept.evidence_count}개</dd></div><div><dt>도움 사용</dt><dd>{data.concept.assisted_count}회</dd></div><div><dt>독립 설명의 서로 다른 질문</dt><dd>{data.concept.independent_questions}개</dd></div><div><dt>예정일 이후 복습 성공</dt><dd>{data.concept.delayed_practice}회</dd></div></dl>
-      <p className="workflow-muted">같은 문제 반복, 피드백을 본 설명 수정, 독립 수행을 구분해요. 한 번의 정답으로 장기 이해를 확정하지 않아요.</p>
+      <details className="workflow-details"><summary>학습 기록·평가 기준</summary>
+        <p>문제 반복, 피드백을 참고한 수정, 도움 없는 수행을 구분합니다. 한 번의 정답으로 장기 이해를 판단하지 않습니다.</p>
+      </details>
       {data.concept.source_changed && <p>원문이 변경되었습니다. 이전 자료의 학습 기록입니다.</p>}
       {data.issue_id && <Link to={`/review?tab=issues&issueId=${data.issue_id}`}>연결된 학습 이슈 →</Link>}
       <h3>최근 수행 기록</h3>{data.evidence.map(e => <section className="workflow-item" key={e.id}><p className="workflow-meta">{new Date(e.created_at).toLocaleString('ko-KR')} · {({ recall: '자기 설명', check: '기초 확인', review: '복습', revision: '설명 개선', quiz: '연결한 오답' } as Record<string, string>)[e.source_kind]} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움·사전 설명 있음' : ''}</p><Link to={`/learn/${e.session_id}`}>학습 답변·피드백 보기 →</Link></section>)}

@@ -156,7 +156,9 @@ export default function LearningSetup() {
           <div className="learning-choice-options">{[1, 2, 3].map(n => <label key={n} className="learning-choice">
             <input type="radio" name="learning-count" value={n} checked={count === n} onChange={() => setCount(n)} />{n}개</label>)}</div>
         </fieldset>
-        <p className="learning-caption">분량은 개념 수로 정해요. 목표 시간이 지나도 계속할 수 있습니다.</p>
+        <details className="learning-note"><summary>학습 분량·시간 안내</summary>
+          <p>학습 분량은 선택한 개념 수로 정합니다. 목표 시간이 지나도 학습을 계속할 수 있습니다.</p>
+        </details>
         <div className="learning-flow" aria-label="학습 순서">{familiarity === 'new' ? '짧은 설명 → 직접 설명 → 보완 → 기초 확인' : '기억에서 설명 → 보완 → 기초 확인'}</div>
         <div className="learning-setup-summary"><span>{selected.length}개 구간 선택</span><strong>목표 {minutes}분 · 최대 {count}개 개념</strong></div>
         {error && <div className="learning-notice learning-error" role="alert">{error}</div>}

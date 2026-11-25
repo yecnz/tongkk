@@ -32,7 +32,9 @@ function Issue({ id }: { id: string }) {
         {(data.issue.status === 'closed' || data.issue.status === 'resolved' ? [['reopen', '다시 열기']] : [['start', '보완 시작'], ['reassess', '재평가 대기'], ['close', '수동 종료']]).map(([action, label]) =>
           <button type="button" disabled={busy || Boolean(pending && pending.action !== action)} key={action} onClick={() => { void act(action); }}>{pending?.action === action ? '이전 저장 결과 확인' : label}</button>)}
       </div>
-      <p className="workflow-muted">보완 후 같은 문제를 맞힌 기록과 독립적인 이해 확인은 구분해요. 수동 종료는 이해 완료 판정이 아니에요.</p>
+      <details className="workflow-details"><summary>이슈 종료·평가 기준</summary>
+        <p>수동 종료는 이해 완료를 뜻하지 않습니다. 같은 문제를 다시 맞힌 기록과 도움 없이 이해를 확인한 기록은 구분됩니다.</p>
+      </details>
       {data.review_card_id && <Link to={`/learn/review/${data.review_card_id}`}>기존 문제로 다시 확인하기 →</Link>}
       {data.source_changed && <p>이전 자료의 학습 근거입니다.</p>}
       <h3>원문 근거</h3>{data.concept.source_refs.map((ref, i) => <blockquote key={i}>{ref.quote}</blockquote>)}

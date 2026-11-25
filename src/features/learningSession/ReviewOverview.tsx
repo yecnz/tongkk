@@ -33,7 +33,9 @@ export default function ReviewOverview({ variant = 'dashboard' }: { variant?: 'd
         <p className="learning-resume-message">완료한 학습 {data.stats.completed_sessions}회 · 복습 예정 {data.stats.due_cards}개</p>
         {variant === 'stats' ? <><p>학습 직후 확인: {ratio(data.stats.initial_correct, data.stats.initial_checks)}</p>
           <p>시간을 둔 독립 수행: {ratio(data.stats.retention_correct, data.stats.retention_checks)}</p>
-          <p className="learning-resume-message">도움 없이 예정일 이후 설명·문제를 모두 제출한 기록이에요. 판단 보류와 변경된 원문은 제외해요.</p></>
+          <details className="learning-note"><summary>기억 유지 집계 기준</summary>
+            <p>예정일 이후 도움 없이 설명과 문제를 모두 제출한 기록을 집계합니다. 판단 보류와 원문이 변경된 기록은 제외합니다.</p>
+          </details></>
           : data.cards.length === 0 ? <p className="learning-resume-message">{variant === 'all' ? '완료한 학습에서 복습할 개념을 추가하세요.' : '지금 복습할 개념이 없습니다.'}</p>
             : <ul className="learning-resume-list">{data.cards.map(card => <li key={card.id}>
               <Link to={card.source_changed ? '/learn' : `/learn/review/${card.id}`}><span className="learning-resume-material"><strong>{card.title}</strong>

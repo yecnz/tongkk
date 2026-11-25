@@ -121,7 +121,10 @@ function Editor({ id, userId }: { id: string; userId: string }) {
         <textarea aria-label="수정 설명" maxLength={4000} value={text} disabled={busy || data.revision.status !== 'draft' || data.source_changed}
           onChange={e => change(e.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
         <details className="workflow-details"><summary>변경 내용 비교</summary>{explanationChanges(data.baseline, text).map((change, index) => <p key={index} style={{ whiteSpace: 'pre-wrap' }}>{change.kind === 'removed' ? <del>− {change.text}</del> : change.kind === 'added' ? <ins>+ {change.text}</ins> : change.text}</p>)}</details>
-        <p className="workflow-muted">{saved ? '저장됨 · ' : ''}피드백을 참고한 보완 수행으로 기록해요. 독립적인 기억 확인은 복습에서 진행해요.</p>
+        {saved && <p className="workflow-meta" role="status">저장됨</p>}
+        <details className="workflow-details"><summary>설명 수정·복습의 차이</summary>
+          <p>설명 수정은 피드백을 참고한 보완 기록입니다. 도움 없이 기억하는지는 복습에서 확인합니다.</p>
+        </details>
         {!polling && data.revision.status !== 'graded' && <button type="button" className="workflow-button workflow-primary" disabled={busy || composing || !text.trim() || data.source_changed} onClick={() => { void submit(); }}>{pending.current ? '이전 제출 결과 확인' : data.evaluation?.status === 'ungraded' ? '같은 설명 재평가' : '수정 설명 평가'}</button>}
         {polling && <p role="status">설명을 평가하는 중…</p>}
         {data.evaluation?.status === 'ungraded' && <p>평가하지 못했어요. 답변은 보존됐어요.</p>}

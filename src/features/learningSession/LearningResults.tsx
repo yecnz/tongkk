@@ -15,7 +15,9 @@ export default function LearningResults({ results }: { results: SessionResult[] 
     </div>
     <Card className="learning-card" role="region" aria-labelledby="learning-results-title">
       <h2 id="learning-results-title">개념별 학습 기록</h2>
-      <p className="learning-caption">이번 설명·문제 결과예요. 장기 기억·응용 능력은 평가하지 않았어요.</p>
+      <details className="learning-note"><summary>결과 해석 안내</summary>
+        <p>이번 설명과 확인 문제의 결과입니다. 장기 기억이나 응용 능력을 평가한 결과는 아닙니다.</p>
+      </details>
       <div className="learning-results-list">{results.map((result, index) => <section className="learning-result-row" key={index}>
         <div className="learning-section-heading"><h3>{result.title}</h3>
           <span className={`learning-badge${result.skipped || ['needs_review', 'uncertain'].includes(result.recall) || result.check === 'incorrect' ? ' is-pink' : ''}`}>
