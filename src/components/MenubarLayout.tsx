@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { Outlet, useLocation } from "react-router-dom";
 import { useMenubarDisplay } from "../services/menubarSettings";
 import { useAuth } from "../AuthContext";
@@ -12,6 +12,12 @@ export default function MenubarLayout() {
   const settings = pathname === "/mini/settings";
   const { user, loading } = useAuth();
   useStudyReminders(native && !settings && !loading ? user?.id ?? null : null);
+
+  useEffect(() => {
+    if (native && /^\/mini\/tutor\/?$/.test(pathname)) {
+      void invoke("resize_popover", { height: null }).catch(() => {});
+    }
+  }, [native, pathname]);
 
   useEffect(() => {
     if (!native && !settings) return;

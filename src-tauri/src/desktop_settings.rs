@@ -11,10 +11,15 @@ pub const LOGIN_START: &str = "--menubar-login-start";
 pub struct SettingsInfo {
     autostart: bool,
     version: String,
+    shortcut: crate::popover_shortcut::ShortcutInfo,
 }
 
 // WKWebView IPC reports the remote origin. Check the current route as well.
-fn check_route(window: &WebviewWindow, label: &str, paths: &[&str]) -> Result<(), String> {
+pub(crate) fn check_route(
+    window: &WebviewWindow,
+    label: &str,
+    paths: &[&str],
+) -> Result<(), String> {
     let url = window.url().map_err(|e| e.to_string())?;
     let trusted_origin = if cfg!(debug_assertions) {
         window
@@ -39,7 +44,7 @@ fn check_route(window: &WebviewWindow, label: &str, paths: &[&str]) -> Result<()
     }
 }
 
-fn check_settings(window: &WebviewWindow) -> Result<(), String> {
+pub(crate) fn check_settings(window: &WebviewWindow) -> Result<(), String> {
     check_route(window, "settings", &["/mini/settings"])
 }
 
@@ -49,6 +54,7 @@ pub fn settings_info(app: AppHandle, window: WebviewWindow) -> Result<SettingsIn
     Ok(SettingsInfo {
         autostart: app.autolaunch().is_enabled().map_err(|e| e.to_string())?,
         version: app.package_info().version.to_string(),
+        shortcut: crate::popover_shortcut::shortcut_info(&app),
     })
 }
 

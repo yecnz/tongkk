@@ -15,6 +15,7 @@
   },
   "permissions": [
     "allow-settings-info",
+    "allow-set-popover-shortcut",
     "allow-set-settings-autostart",
     "allow-close-settings",
     "allow-minimize-settings",

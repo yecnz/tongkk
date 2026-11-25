@@ -1,4 +1,5 @@
 mod desktop_settings;
+mod popover_shortcut;
 
 use desktop_settings::{LOGIN_START, SETTINGS_HEIGHT, SETTINGS_WIDTH};
 use tauri::{
@@ -7,13 +8,34 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     webview::NewWindowResponse,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 // 메뉴바 팝오버(이슈 104). 웹의 /mini 화면을 그대로 띄운다 — 운영은 tongkk.com, 개발은 devUrl.
 // 웹을 배포하면 앱 화면도 같이 바뀌므로 앱 업데이트는 창 껍데기가 바뀔 때만 필요하다.
 const WIDTH: f64 = 468.0;
 const HEIGHT: f64 = 608.0;
 const TRAY_ID: &str = "tongkk";
+
+#[tauri::command]
+fn resize_popover(window: WebviewWindow, height: Option<u32>) -> Result<(), String> {
+    desktop_settings::check_route(
+        &window,
+        "main",
+        &["/mini", "/mini/", "/mini/tutor", "/mini/tutor/"],
+    )?;
+    let height = height.map_or(HEIGHT, |height| f64::from(height).clamp(120.0, HEIGHT));
+    let size = LogicalSize::new(WIDTH, height);
+    let scale = window.scale_factor().map_err(|error| error.to_string())?;
+    if window.inner_size().map_err(|error| error.to_string())? == size.to_physical::<u32>(scale) {
+        return Ok(());
+    }
+
+    let anchor = window.outer_position().map_err(|error| error.to_string())?;
+    window.set_size(size).map_err(|error| error.to_string())?;
+    window
+        .set_position(anchor)
+        .map_err(|error| error.to_string())
+}
 
 fn show_settings(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("settings") {
@@ -61,19 +83,32 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![LOGIN_START]),
         ))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _, event| {
+                    if event.state == ShortcutState::Pressed
+                        && let Some(rect) = app.tray_by_id(TRAY_ID).and_then(|tray| tray.rect().ok().flatten())
+                    {
+                        toggle_popover(app, rect);
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             desktop_settings::settings_info,
+            popover_shortcut::set_popover_shortcut,
             desktop_settings::set_settings_autostart,
             desktop_settings::close_settings,
             desktop_settings::minimize_settings,
             desktop_settings::drag_settings,
             desktop_settings::resize_settings,
             desktop_settings::notify_study,
+            resize_popover,
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Regular);
+            popover_shortcut::initialize(app.handle());
 
             let handle = app.handle().clone();
             // 원격 frontendDist를 사용할 때 App 경로가 홈으로 해석되지 않도록 주소를 명시한다.
@@ -158,16 +193,6 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
-            let shortcut = Shortcut::new(Some(Modifiers::ALT | Modifiers::SUPER), Code::KeyT);
-            if let Err(error) = app.global_shortcut().on_shortcut(shortcut, |app, _, event| {
-                if event.state == ShortcutState::Pressed
-                    && let Some(rect) = app.tray_by_id(TRAY_ID).and_then(|tray| tray.rect().ok().flatten())
-                {
-                    toggle_popover(app, rect);
-                }
-            }) {
-                eprintln!("Could not register Tongkk shortcut: {error}");
-            }
             Ok(())
         })
         .on_window_event(|window, event| match (window.label(), event) {
