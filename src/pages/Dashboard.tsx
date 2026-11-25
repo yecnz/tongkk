@@ -1796,20 +1796,29 @@ export default function Dashboard() {
                     const showTopBorder = idx > 0;
                     return (
                       <div key={p.id || `${p.text}-${i}`} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                        display: "flex", alignItems: "center", gap: 8, padding: "10px 0",
                         borderTop: showTopBorder ? "1px solid var(--color-border-soft)" : "none"
                       }}>
-                        <button type="button" onClick={() => {
-                          setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));
-                        }} style={{
-                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "var(--color-border-soft)"}`,
-                          background: p.done ? CYAN : "var(--color-card)", cursor: "pointer", display: "flex",
-                          alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
+                        <label style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 44, height: 44, flexShrink: 0, cursor: "pointer",
                         }}>
-                          {p.done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
-                        </button>
+                          <input
+                            type="checkbox"
+                            checked={p.done}
+                            aria-label={`${p.text} 완료`}
+                            onChange={e => {
+                              const done = e.target.checked;
+                              setPlans(prev => prev.map((item, index) => index === i ? { ...item, done } : item));
+                            }}
+                            style={{ width: 22, height: 22, margin: 0, accentColor: "var(--color-cyan-deep)", cursor: "pointer" }}
+                          />
+                        </label>
                         {isEditing ? (
                           <input
+                            name="study-plan"
+                            aria-label="학습 계획 수정"
+                            autoComplete="off"
                             value={editingPlanText}
                             onChange={e => setEditingPlanText(e.target.value)}
                             onBlur={() => finishEditPlan(p, i)}
@@ -1823,7 +1832,7 @@ export default function Dashboard() {
                             autoFocus
                             style={{
                               flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
-                              border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
+                              border: `1px solid ${CYAN}`, fontSize: 14,
                               color: "var(--color-text-strong)", boxSizing: "border-box",
                             }}
                           />
