@@ -112,7 +112,7 @@ describe('password recovery routing and forms', () => {
   it('requires a valid session and blocks password submission while signed out', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     await render('/auth/reset-password');
-    expect(container.querySelector('[role=alert]')?.textContent).toContain('세션');
+    expect(container.querySelector('[role=alert]')?.textContent).toBe('이 링크는 만료되었거나 더 이상 사용할 수 없어요.');
     expect(container.querySelector('input[type=password]')).toBeNull();
     expect(auth.updateUser).not.toHaveBeenCalled();
   });
@@ -158,6 +158,19 @@ describe('login, signup and reset email UI', () => {
     expect(auth.setSession).toHaveBeenCalledWith({ access_token: 'user-access', refresh_token: 'user-refresh' });
     expect(closed).toHaveBeenCalledTimes(1);
   });
+  it.each([
+    ['student@gmail', 'some-password'],
+    ['student@@example.test', 'some-password'],
+    ['student@example.test', ''],
+  ])('uses the login error for invalid credentials without calling the server (%s)', async (email, password) => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await render('/auth', { modal: true });
+    expect(container.querySelector('form')?.noValidate).toBe(true);
+    await input(0, email); await input(1, password); await submit();
+    expect(container.querySelector('[role=alert]')?.textContent).toBe('이메일 또는 비밀번호가 맞지 않아요. 다시 확인해주세요.');
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('keeps login available for retry after a network failure', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
@@ -171,16 +184,20 @@ describe('login, signup and reset email UI', () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     let finish!: (value: { error: null }) => void;
     auth.resetPasswordForEmail.mockReturnValue(new Promise(resolve => { finish = resolve; }));
-    await render('/auth', { modal: true }); await click('비밀번호 찾기');
+    await render('/auth', { modal: true }); await click('비밀번호를 잊으셨나요?');
     expect(container.querySelector('input[type=password]')).toBeNull();
+    expect(container.querySelector('form')?.noValidate).toBe(true);
+    await input(0, 'student@@example.test'); await submit();
+    expect(container.querySelector('[role=alert]')?.textContent).toBe('이메일 주소를 다시 확인해주세요.');
+    expect(auth.resetPasswordForEmail).not.toHaveBeenCalled();
     await input(0, 'ui-reset@example.test'); await submit(true);
     expect(auth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
     expect(container.querySelector('button[type=submit]')?.hasAttribute('disabled')).toBe(true);
     await act(async () => finish({ error: null }));
-    expect(container.querySelector('[role=status]')?.textContent).toContain('메일함');
+    expect(container.querySelector('[role=status]')?.textContent).toContain('가입한 이메일이라면 재설정 링크를 보냈어요.');
     expect(container.querySelector('button[type=submit]')?.textContent).toContain('초 후');
     expect(container.querySelector('button[type=submit]')?.hasAttribute('disabled')).toBe(true);
-    await render('/auth', { modal: true }); await click('비밀번호 찾기'); await input(0, 'ui-reset@example.test');
+    await render('/auth', { modal: true }); await click('비밀번호를 잊으셨나요?'); await input(0, 'ui-reset@example.test');
     expect(container.querySelector('button[type=submit]')?.hasAttribute('disabled')).toBe(true);
   });
   it('uses inline signup validation and blocks invalid credentials before calling auth', async () => {
@@ -226,7 +243,13 @@ describe('login, signup and reset email UI', () => {
     await render('/auth', { modal: true });
     await input(0, 'pending@example.test'); await input(1, 'password'); await submit();
     expect(container.textContent).toContain('이메일 인증');
+    expect(container.textContent).toContain('pending@example.test 으로 받은 인증번호를 입력해 주세요.');
+    expect(container.textContent).not.toContain('인증번호를 보냈어요.');
+    expect(auth.resend).not.toHaveBeenCalled();
     expect(container.querySelector('input[type=password]')).toBeNull();
+    await click('인증번호 재전송');
+    expect(auth.resend).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('pending@example.test 으로 인증번호를 보냈어요.');
     expect(closed).not.toHaveBeenCalled();
   });
 });

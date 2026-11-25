@@ -1,4 +1,5 @@
 export const RESET_PASSWORD_PATH = '/auth/reset-password';
+export const INVALID_LOGIN_CREDENTIALS_MESSAGE = '이메일 또는 비밀번호가 맞지 않아요. 다시 확인해주세요.';
 
 export const isValidAuthEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
@@ -20,7 +21,7 @@ export function authErrorMessage(error: unknown, fallback = '인증 요청에 �
     otp_expired: '링크가 만료되었거나 이미 사용되었습니다. 새 메일을 요청해주세요.',
     access_denied: '인증 링크를 확인할 수 없습니다. 새 메일을 요청해주세요.',
     email_not_confirmed: '이메일 인증을 완료해주세요. 인증 메일을 다시 받을 수 있습니다.',
-    invalid_credentials: '이메일 또는 비밀번호가 맞지 않아요. 다시 확인해주세요.',
+    invalid_credentials: INVALID_LOGIN_CREDENTIALS_MESSAGE,
     same_password: '기존 비밀번호와 다른 비밀번호를 입력해주세요.',
     weak_password: '비밀번호가 보안 기준에 맞지 않습니다. 더 길고 다양한 문자를 사용해주세요.',
     over_email_send_rate_limit: `메일 요청이 너무 많아요. ${retry}`,

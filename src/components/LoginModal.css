@@ -34,7 +34,7 @@
   min-width: 0;
 }
 
-.auth-dialog h2 {
+.auth-dialog :is(h1, h2) {
   margin: 0;
   color: var(--color-text-strong);
   font-size: 22px;
@@ -52,12 +52,13 @@
   cursor: pointer;
 }
 
-.auth-signup-fields {
+.auth-credential-fields {
   display: grid;
   gap: 14px;
 }
 
-.auth-signup-input {
+.auth-credential-input,
+.auth-dialog .auth-credential-input {
   display: block;
   width: 100%;
   min-height: 46px;
@@ -70,11 +71,17 @@
   line-height: 20px;
 }
 
-.auth-signup input.auth-signup-input[aria-invalid="true"] {
+.auth-dialog .auth-credential-input:autofill {
+  box-shadow: 0 0 0 1000px var(--color-muted-surface) inset;
+  -webkit-text-fill-color: var(--color-text-strong);
+  caret-color: var(--color-text-strong);
+}
+
+.auth-credential-input[aria-invalid="true"] {
   border-color: var(--color-danger);
 }
 
-:root .mini-stage .auth-signup input.auth-signup-input[aria-invalid="true"]:focus {
+:root .mini-stage .auth-signup input.auth-credential-input[aria-invalid="true"]:focus {
   outline-color: var(--color-danger);
 }
 
@@ -82,7 +89,7 @@
   position: relative;
 }
 
-.auth-password-control input.auth-signup-input {
+.auth-password-control input.auth-credential-input {
   min-height: 49px;
   padding-inline-end: 44px;
 }
@@ -122,11 +129,11 @@
   color: var(--color-danger);
 }
 
-.auth-signup.mini-login-card .auth-signup-input {
+.auth-signup.mini-login-card .auth-credential-input {
   min-height: 0;
 }
 
-:root .mini-stage .auth-signup .auth-password-control input.auth-signup-input {
+:root .mini-stage .auth-signup .auth-password-control input.auth-credential-input {
   padding-inline-end: 44px;
 }
 
@@ -163,7 +170,7 @@
   line-height: 16px;
 }
 
-.auth-signup .auth-dialog-footer button,
+.auth-dialog-footer > button:not(.auth-recovery-link),
 .auth-confirmation .auth-confirmation-resend button {
   margin-inline-start: 6px;
   padding: 0;
@@ -172,6 +179,75 @@
   color: var(--color-text-strong);
   font-weight: 700;
   cursor: pointer;
+}
+
+.auth-login-reset {
+  justify-self: end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.auth-form-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.auth-recovery-page {
+  width: min(380px, 100%);
+}
+
+.auth-recovery-card {
+  max-height: none;
+  text-align: left;
+}
+
+.auth-recovery-description {
+  margin: 6px 0 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.auth-recovery-description.auth-form-error {
+  color: var(--color-danger);
+}
+
+.auth-recovery-link {
+  align-self: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+[data-theme="dark"] .auth-recovery {
+  box-shadow: 0 18px 48px rgba(15, 23, 42, .4);
+}
+
+.auth-recovery .auth-dialog-submit {
+  color: light-dark(var(--color-on-brand), var(--color-card));
+}
+
+.auth-recovery .auth-dialog-submit[data-cooldown="true"] {
+  background: var(--color-muted-surface);
+  color: var(--color-text-secondary);
+  opacity: 1;
 }
 
 .auth-signup-legal {
@@ -194,6 +270,11 @@
   gap: 24px;
   padding-block-end: 36px;
   border-radius: 16px;
+}
+
+.auth-confirmation .auth-dialog-close {
+  font-size: 18px;
+  line-height: 22px;
 }
 
 [data-theme="dark"] .auth-dialog.auth-confirmation {
@@ -278,10 +359,6 @@
   color: light-dark(var(--color-on-brand), #1d2027);
 }
 
-.auth-confirmation[data-expired="true"] .auth-dialog-submit {
-  opacity: .5;
-}
-
 [data-theme="dark"] .auth-confirmation .auth-dialog-submit:is(:not(:disabled), [data-incomplete="true"]) {
   opacity: 1;
 }
@@ -293,7 +370,8 @@
 
 .auth-confirmation-resend span {
   margin-inline-start: 6px;
-  color: var(--color-muted);
+  color: light-dark(#aaa, var(--color-muted));
+  font-weight: 500;
 }
 
 .auth-confirmation .auth-confirmation-resend button {

@@ -1,14 +1,12 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from "react";
-import { PINK, CYAN, CARD_BACKGROUND, BORDER_COLOR, MUTED_SURFACE } from "../common";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useAuth } from "../AuthContext";
-import { AuthActionError, authErrorMessage, isValidAuthEmail } from "../services/authFlow";
+import { AuthActionError, authErrorMessage, INVALID_LOGIN_CREDENTIALS_MESSAGE, isValidAuthEmail } from "../services/authFlow";
 import { emailWaitSeconds } from "../services/authEmails";
 import closeIcon from "../assets/mini/login-close.svg";
-import visibilityIcon from "../assets/auth/visibility.svg";
-import visibilityOffIcon from "../assets/auth/visibility-off.svg";
 import checkSuccessIcon from "../assets/auth/check-success.svg";
 import checkMutedIcon from "../assets/auth/check-muted.svg";
 import LegalLinks from "./LegalLinks";
+import PasswordControl, { type PasswordControlProps } from "./PasswordControl";
 import "./LoginModal.css";
 
 export type AuthMode = "signIn" | "signUp";
@@ -23,48 +21,22 @@ type LoginModalProps = {
   compact?: boolean;
 };
 
-const inputStyle = (focused: boolean): CSSProperties => ({
-  width: "100%", padding: "13px 16px", borderRadius: 12,
-  border: `1.5px solid ${focused ? CYAN : BORDER_COLOR}`, fontSize: 14, outline: "none",
-  boxSizing: "border-box", background: focused ? "rgba(0,192,232,0.04)" : MUTED_SURFACE,
-  transition: "border 0.2s, background 0.2s", color: "var(--color-text-strong)",
-});
-const linkStyle: CSSProperties = {
-  background: "none", border: "none", fontSize: 12, color: "var(--color-muted)", cursor: "pointer", padding: 0,
-};
-const labelStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block",
-};
 // Supabase 대시보드의 Email OTP length(6) · Email OTP expiration(300초)과 맞춘다.
 const CODE_LENGTH = 6;
 const CODE_TTL_MS = 5 * 60_000;
 const pad = (n: number) => String(n).padStart(2, '0');
 
-function SignupPasswordField({ id, label, value, onChange, hint, valid, error, disabled, compact }: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
+function SignupPasswordField({ hint, valid, error, compact, ...control }: Omit<PasswordControlProps, 'autoComplete' | 'invalid' | 'describedBy'> & {
   hint: string;
   valid: boolean;
   error: string;
-  disabled: boolean;
   compact: boolean;
 }) {
-  const [visible, setVisible] = useState(false);
+  const hintId = control.id + '-hint';
   return (
     <div className={compact ? 'mini-login-field' : undefined}>
-      <div className="auth-password-control">
-        <input id={id} className="auth-signup-input" type={visible ? 'text' : 'password'}
-          aria-label={label} aria-invalid={!!error} aria-describedby={`${id}-hint`}
-          placeholder={label} autoComplete="new-password" required disabled={disabled}
-          value={value} onChange={event => onChange(event.target.value)} />
-        <button type="button" aria-label={`${label} ${visible ? '숨기기' : '보기'}`}
-          aria-controls={id} disabled={disabled} onClick={() => setVisible(!visible)}>
-          <img src={visible ? visibilityIcon : visibilityOffIcon} alt="" width={20} height={20} />
-        </button>
-      </div>
-      <p id={`${id}-hint`} className="auth-signup-hint" data-valid={valid} role={error ? 'alert' : undefined}>
+      <PasswordControl {...control} autoComplete="new-password" invalid={!!error} describedBy={hintId} />
+      <p id={hintId} className="auth-signup-hint" data-valid={valid} role={error ? 'alert' : undefined}>
         {!error && <img src={valid ? checkSuccessIcon : checkMutedIcon} alt="" width={12} height={12} />}
         {error || hint}
       </p>
@@ -84,8 +56,6 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const [code, setCode] = useState("");
   const [codeFocus, setCodeFocus] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
-  const [emailFocus, setEmailFocus] = useState(false);
-  const [passwordFocus, setPasswordFocus] = useState(false);
   const [error, setError] = useState("");
   const [wrongCode, setWrongCode] = useState(false);
   const [message, setMessage] = useState("");
@@ -94,7 +64,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const [now, setNow] = useState(Date.now);
   const id = useId();
   const signingUp = view === 'credentials' && mode === 'signUp';
+  const webSignIn = !compact && view === 'credentials' && mode === 'signIn';
   const confirming = view === 'confirmation';
+  const resetting = view === 'reset';
+  const webReset = resetting && !compact;
   const emailValid = isValidAuthEmail(email) && !emailTypeMismatch;
   const passwordValid = password.length >= 8;
   const passwordsMatch = passwordConfirmation.length > 0 && password === passwordConfirmation;
@@ -135,8 +108,12 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
       setError('');
       if (!signupValid) return;
     }
+    if (webSignIn && (!emailValid || !password)) {
+      setError(INVALID_LOGIN_CREDENTIALS_MESSAGE);
+      return;
+    }
     const trimmedEmail = email.trim();
-    if (!isValidAuthEmail(trimmedEmail)) {
+    if (!isValidAuthEmail(trimmedEmail) || (webReset && emailTypeMismatch)) {
       setError("이메일 주소를 다시 확인해주세요."); return;
     }
     if (view === 'reset' && emailWaitSeconds(kind, email) > 0) return;
@@ -203,43 +180,44 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const compactCredentials = compact && view === 'credentials';
   const codeError = wrongCode && !expired;
   const confirmationNotice = error || (expired ? '인증번호가 만료되었습니다. 새 인증번호를 받아 주세요.'
-    : codeError ? '인증번호가 틀렸어요. 다시 확인해주세요.' : message);
+    : codeError ? '인증번호가 일치하지 않습니다. 다시 확인해주세요.' : message);
   const submitDisabled = submitting || (view === 'reset' && wait > 0)
     || (confirming && (expired ? wait > 0 : code.length < CODE_LENGTH));
-  const designedView = signingUp || confirming;
 
   return (
-    <div className={compact ? 'mini-stage' : designedView ? 'auth-overlay' : undefined}
+    <div className={compact ? 'mini-stage' : 'auth-overlay'}
       style={compact ? undefined : { position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxSizing: 'border-box', background: 'rgba(15,23,42,0.2)', backdropFilter: 'blur(6px)', padding: designedView ? undefined : 24 }}>
-      <form onSubmit={handleSubmit} noValidate={signingUp} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}
-        data-expired={confirming ? expired : undefined}
-        className={[compact ? 'mini-login-card' : designedView ? 'auth-dialog' : '', confirming ? 'auth-confirmation' : '', signingUp ? 'auth-signup' : ''].filter(Boolean).join(' ') || undefined}
+        boxSizing: 'border-box', background: 'rgba(15,23,42,0.2)', backdropFilter: 'blur(6px)' }}>
+      <form onSubmit={handleSubmit} noValidate={signingUp || webSignIn || webReset} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}
+        aria-describedby={webSignIn && subtitle ? `${id}-description` : undefined}
+        className={[compact ? 'mini-login-card' : 'auth-dialog', confirming ? 'auth-confirmation' : '', signingUp ? 'auth-signup' : '', webReset ? 'auth-recovery' : ''].filter(Boolean).join(' ')}
         onKeyDown={compact ? (event) => {
           if (event.key !== 'Escape') return;
           event.stopPropagation();
           if (!pending.current) onClose();
-        } : undefined}
-        style={compact || designedView ? undefined : { width: 'min(380px, 100%)', maxHeight: 'calc(100dvh - 48px)', overflowY: 'auto', background: CARD_BACKGROUND,
-          borderRadius: 20, padding: '36px 32px', border: `1px solid ${BORDER_COLOR}`,
-          boxShadow: '0 18px 48px rgba(15,23,42,0.09)', boxSizing: 'border-box' }}>
-        <div className={compact ? 'mini-login-heading' : designedView ? 'auth-dialog-heading' : undefined}
-          style={compact || designedView ? undefined : { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        } : undefined}>
+        <div className={compact ? 'mini-login-heading' : 'auth-dialog-heading'}>
           <div>
-            <h2 id={`${id}-title`} style={compact || designedView ? undefined : { margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--color-text-strong)' }}>{title}</h2>
+            <h2 id={`${id}-title`}>{title}</h2>
             {confirming ? <p className="auth-confirmation-description">
-              {email.trim()} 으로 인증번호를 보냈어요.<br />
+              {email.trim()} 으로 {sentAt === null ? '받은 인증번호를 입력해 주세요.' : '인증번호를 보냈어요.'}<br />
               메일이 안 보이면 스팸함을 확인해주세요.
-            </p> : !signingUp && <p style={compact ? undefined : { margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--color-text-secondary)', whiteSpace: 'pre-line', wordBreak: 'break-all' }}>
-              {view === 'reset' ? '가입한 이메일로 재설정 링크를 받으세요' : subtitle ?? '계정에 로그인하세요'}
-            </p>}
+            </p> : webReset ? (
+              <p className="auth-recovery-description" role={message ? 'status' : undefined}>
+                {message ? <>가입한 이메일이라면 재설정 링크를 보냈어요.<br />메일이 안 보이면 스팸함을 확인해 주세요.</>
+                  : '가입한 이메일로 비밀번호 재설정 링크를 보내드려요.'}
+              </p>
+            ) : webSignIn ? (subtitle && <p id={`${id}-description`} className="sr-only">{subtitle}</p>)
+              : !signingUp && <p>{resetting ? '가입한 이메일로 재설정 링크를 받으세요' : subtitle ?? '계정에 로그인하세요'}</p>}
           </div>
-          <button type="button" onClick={onClose} disabled={submitting} aria-label="닫기" className={compact ? 'mini-login-close' : designedView ? 'auth-dialog-close' : undefined}
-            style={compact || designedView ? undefined : { ...linkStyle, fontSize: 18, padding: 8 }}>{compact ? <img src={closeIcon} alt="" /> : '✕'}</button>
+          <button type="button" onClick={onClose} disabled={submitting} aria-label="닫기"
+            className={compact ? 'mini-login-close' : 'auth-dialog-close'}>
+            {compact ? <img src={closeIcon} alt="" /> : '✕'}
+          </button>
         </div>
-        {signingUp && <div className="auth-signup-fields">
+        {signingUp && <div className="auth-credential-fields">
           <div className={compact ? 'mini-login-field' : undefined}>
-            <input id={`${id}-email`} className="auth-signup-input" type="email" aria-label="이메일"
+            <input id={`${id}-email`} className="auth-credential-input" type="email" aria-label="이메일"
               aria-invalid={!!emailError} aria-describedby={emailError ? `${id}-email-error` : undefined}
               placeholder="이메일" autoComplete="email" autoFocus={compact} required disabled={submitting}
               value={email} onChange={changeEmail} />
@@ -253,18 +231,27 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             compact={compact} disabled={submitting}
             error={signupAttempted && !passwordsMatch ? '비밀번호가 일치하지 않아요.' : ''} />
         </div>}
-        {!confirming && !signingUp && <div className={compact ? 'mini-login-field' : undefined} style={compact ? undefined : { marginBottom: 14 }}>
-          <label htmlFor={`${id}-email`} style={compact ? undefined : labelStyle}>이메일</label>
-          <input id={`${id}-email`} type="email" value={email} disabled={submitting} required autoComplete="email" autoFocus={compact}
-            onChange={changeEmail}
-            onFocus={() => setEmailFocus(true)} onBlur={() => setEmailFocus(false)} placeholder="이메일을 입력하세요" style={compact ? undefined : inputStyle(emailFocus)} />
+        {webSignIn && <div className="auth-credential-fields">
+          <input id={`${id}-email`} className="auth-credential-input" type="email" aria-label="이메일"
+            placeholder="이메일" autoComplete="email" required disabled={submitting} value={email} onChange={changeEmail} />
+          <PasswordControl id={`${id}-password`} label="비밀번호" value={password} onChange={setPassword}
+            autoComplete="current-password" disabled={submitting} />
+          <button type="button" className="auth-login-reset" disabled={submitting} onClick={() => changeView('reset')}>
+            비밀번호를 잊으셨나요?
+          </button>
         </div>}
-        {view === 'credentials' && !signingUp && <div className={compact ? 'mini-login-field' : undefined} style={compact ? undefined : { marginBottom: 24 }}>
-          <label htmlFor={`${id}-password`} style={compact ? undefined : labelStyle}>비밀번호</label>
+        {webReset && <input id={`${id}-email`} className="auth-credential-input" type="email" aria-label="이메일"
+          placeholder="이메일" autoComplete="email" required disabled={submitting} value={email} onChange={changeEmail} />}
+        {compact && !confirming && !signingUp && <div className="mini-login-field">
+          <label htmlFor={`${id}-email`}>이메일</label>
+          <input id={`${id}-email`} type="email" value={email} disabled={submitting} required autoComplete="email" autoFocus={compact}
+            onChange={changeEmail} placeholder="이메일을 입력하세요" />
+        </div>}
+        {compactCredentials && !signingUp && <div className="mini-login-field">
+          <label htmlFor={`${id}-password`}>비밀번호</label>
           <input id={`${id}-password`} type="password" value={password} disabled={submitting} required
-            onChange={event => setPassword(event.target.value)} onFocus={() => setPasswordFocus(true)} onBlur={() => setPasswordFocus(false)}
-            placeholder="비밀번호를 입력하세요" autoComplete="current-password"
-            minLength={1} style={compact ? undefined : inputStyle(passwordFocus)} />
+            onChange={event => setPassword(event.target.value)}
+            placeholder="비밀번호를 입력하세요" autoComplete="current-password" minLength={1} />
         </div>}
         {compactCredentials && <button type="button" className="mini-login-reset" disabled={submitting} onClick={() => changeView('reset')}>비밀번호를 잊으셨나요?</button>}
         {confirming && <>
@@ -295,21 +282,18 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             </p>}
           </div>}
         </>}
-        {!confirming && message && <p role="status" style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-secondary)' }}>{message}</p>}
-        {!confirming && error && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 12, lineHeight: 1.5 }}>{error}</p>}
+        {compact && resetting && message && <p role="status" style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-secondary)' }}>{message}</p>}
+        {!confirming && error && <p role="alert" className="auth-form-error">{error}</p>}
         <button type="submit" disabled={submitDisabled}
-          className={compact ? 'mini-login-submit' : designedView ? 'auth-dialog-submit' : undefined}
-          data-incomplete={signingUp ? !signupValid : confirming && !expired && !submitting && code.length < CODE_LENGTH}
-          style={compact || designedView ? undefined : { width: '100%', padding: '14px 0', borderRadius: 14, border: 'none', background: PINK,
-            color: 'var(--color-on-brand)', fontSize: 15, fontWeight: 600, cursor: submitting ? 'default' : 'pointer', margin: '8px 0 16px' }}>
+          className={compact ? 'mini-login-submit' : 'auth-dialog-submit'}
+          data-cooldown={webReset && wait > 0}
+          data-incomplete={signingUp ? !signupValid : confirming && !expired && !submitting && code.length < CODE_LENGTH}>
           {submitting ? '처리 중...' : view === 'reset' && wait > 0 ? `${wait}초 후 재전송 가능` : buttonLabel}
         </button>
-        {!(confirming && expired) && <div className={compact ? 'mini-login-footer' : designedView ? 'auth-dialog-footer' : undefined}
-          style={compact || designedView ? undefined : { display: 'flex', justifyContent: 'center', gap: 20 }}>
+        {!(confirming && expired) && <div className={compact ? 'mini-login-footer' : 'auth-dialog-footer'}>
           {view === 'credentials' ? <>
-            {signingUp ? <span>이미 계정이 있나요?</span> : compactCredentials ? <span>처음이신가요?</span>
-              : <button type="button" disabled={submitting} onClick={() => changeView('reset')} style={linkStyle}>비밀번호 찾기</button>}
-            <button type="button" disabled={submitting} onClick={() => { setMode(mode === 'signIn' ? 'signUp' : 'signIn'); changeView('credentials'); }} style={compact || signingUp ? undefined : linkStyle}>
+            <span>{signingUp ? '이미 계정이 있나요?' : webSignIn && error ? '계정이 없나요?' : '처음이신가요?'}</span>
+            <button type="button" disabled={submitting} onClick={() => { setMode(mode === 'signIn' ? 'signUp' : 'signIn'); changeView('credentials'); }}>
               {mode === 'signIn' ? '회원가입' : '로그인'}
             </button>
           </> : confirming ? <p className="auth-confirmation-resend">
@@ -318,10 +302,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
               ? <span>{Math.floor(wait / 60)}:{pad(wait % 60)} 후 재전송 가능</span>
               : <button type="button" disabled={submitting} onClick={resend}>인증번호 재전송</button>}
           </p> : (
-            <button type="button" disabled={submitting} onClick={() => { setMode('signIn'); changeView('credentials'); }} style={linkStyle}>로그인으로 돌아가기</button>
+            <button type="button" className={webReset ? 'auth-recovery-link' : undefined} disabled={submitting} onClick={() => { setMode('signIn'); changeView('credentials'); }}>로그인으로 돌아가기</button>
           )}
         </div>}
-        {!compact && view === 'credentials' && <LegalLinks signup={signingUp} style={{ justifyContent: 'center', marginTop: 16, fontSize: 12 }} />}
+        {!compact && signingUp && <LegalLinks signup />}
       </form>
     </div>
   );
