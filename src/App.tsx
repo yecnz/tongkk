@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { AuthGateProvider } from "./AuthGateContext";
 import { CourseProvider } from "./CourseContext";
@@ -17,12 +17,15 @@ import Auth from "./pages/Auth";
 import LearningSession from "./pages/LearningSession";
 import Mini from "./pages/Mini";
 import MiniTutor from "./pages/MiniTutor";
+import MenubarLayout from "./components/MenubarLayout";
 import ReviewPractice from "./features/learningSession/ReviewPractice";
 import { loadUserProfile } from "./services/profile";
 import { applyTheme } from "./services/theme";
 import UpdatePrompt from "./UpdatePrompt";
 import { RESET_PASSWORD_PATH } from "./services/authFlow";
 import AuthCallbackBoundary from "./components/AuthCallbackBoundary";
+
+const MenubarSettings = lazy(() => import("./pages/MenubarSettings"));
 
 function AppShell() {
   const { user, loading } = useAuth();
@@ -89,8 +92,11 @@ function App() {
                   <Routes>
                     <Route path="/auth" element={<Auth />} />
                     <Route path={RESET_PASSWORD_PATH} element={<Auth />} />
-                    <Route path="/mini" element={<Mini />} />
-                    <Route path="/mini/tutor" element={<MiniTutor />} />
+                    <Route path="/mini" element={<MenubarLayout />}>
+                      <Route index element={<Mini />} />
+                      <Route path="tutor" element={<MiniTutor />} />
+                      <Route path="settings" element={<Suspense fallback={null}><MenubarSettings /></Suspense>} />
+                    </Route>
                     <Route path="/*" element={<AppShell />} />
                   </Routes>
                 </AuthCallbackBoundary>

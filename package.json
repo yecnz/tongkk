@@ -22,7 +22,9 @@
     "menubar:build": "tauri build"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-kr": "^5.3.1",
     "@supabase/supabase-js": "^2.119.2",
+    "@tauri-apps/api": "^2.12.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "katex": "^0.19.1",

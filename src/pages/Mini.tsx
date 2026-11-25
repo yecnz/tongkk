@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
+import { isTauri } from "@tauri-apps/api/core";
+import { useMenubarDisplay } from "../services/menubarSettings";
 import { useAuth } from "../AuthContext";
 import LoginModal from "../components/LoginModal";
 import MiniAccount from "../components/MiniAccount";
@@ -96,9 +98,12 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
   };
 
   const today = paceDateKey(new Date());
+  const native = isTauri();
+  const { ddayScope } = useMenubarDisplay();
   const nextDday = ddays
     .map(d => ({ ...d, daysLeft: getDaysLeft(d.date) }))
-    .filter(d => d.daysLeft >= 0)
+    .filter(d => d.daysLeft >= 0 && (!native || d.type === "exam" ||
+      (ddayScope === "exam-assignment" && (!d.type || d.type === "assignment"))))
     .sort((a, b) => a.daysLeft - b.daysLeft)[0];
   const todayPlans = (plans ?? [])
     .map((plan, index) => ({ plan, index }))

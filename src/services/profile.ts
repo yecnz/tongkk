@@ -114,6 +114,12 @@ async function upsertUserProfile(userId: string, profile: UserProfile): Promise<
   return toProfile(data);
 }
 
+export async function updateNotificationsEnabled(enabled: boolean): Promise<void> {
+  const user = await requireSupabaseUser();
+  const { error } = await supabase.from('profiles').update({ notifications_enabled: enabled }).eq('id', user.id);
+  if (error) throw new Error(formatSupabaseError(error));
+}
+
 // '요약 안내 팝업 다시 보지 않기' 설정만 가볍게 갱신한다. (다른 프로필 필드는 건드리지 않음)
 export async function updateHideSummaryNotice(hide: boolean): Promise<void> {
   const user = await requireSupabaseUser();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PINK } from "./common";
+import { hasNewWebBuild } from "./services/appVersion";
 
 // 배포 후 새 버전 감지: /version.json을 주기적으로 받아 현재 번들(__BUILD_ID__)과 비교한다.
 // 다르면 "새 버전이 있어요" 배너를 띄우고, 사용자가 직접 새로고침하도록 한다(작업 중 데이터 보호를 위해 자동 리로드는 하지 않음).
@@ -15,13 +16,7 @@ export default function UpdatePrompt() {
 
     const check = async () => {
       try {
-        // 캐시를 우회해 항상 최신 버전을 받는다(쿼리 무력화 + no-store).
-        const res = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { buildId?: string };
-        if (!stopped && data.buildId && data.buildId !== __BUILD_ID__) {
-          setUpdateAvailable(true);
-        }
+        if (await hasNewWebBuild() && !stopped) setUpdateAvailable(true);
       } catch {
         // 네트워크 일시 오류는 무시하고 다음 주기에 다시 확인한다.
       }
