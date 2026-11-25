@@ -663,7 +663,10 @@ const formatExamCards = (sectionLines: string[]): string[] => {
       }
     }
     if (idx > 0) out.push("");
-    out.push(`> ${question}`);
+    // 번호는 LLM에 맡기지 않고 여기서 매긴다. 박스마다 '1.'로 시작하면 각 박스가 새 목록이 돼
+    // 전부 '1.'로 찍히거나(번호를 안 쓰면) 아예 없어서, LLM 번호를 떼고 '1\.'(목록 아님)로 통일한다.
+    question = question.replace(/^(?:\*\*(?:Q\s*)?\d+\s*[.)]\*\*|(?:Q\s*)?\d+\s*[.)])\s*/i, "");
+    out.push(`> ${idx + 1}\\. ${question}`);
     if (answerLines.length) {
       out.push(">");
       const labelIdx = answerLines.findIndex(a => ANSWER_LABEL.test(a));
