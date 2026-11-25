@@ -12,8 +12,10 @@ vi.mock('./services/summaries', () => ({ invalidateSummariesCache: vi.fn() }));
 vi.mock('./services/quizSets', () => ({ invalidateQuizSetsCache: vi.fn() }));
 vi.mock('./services/learningSessions', () => ({ clearLearningDrafts: vi.fn() }));
 import { AuthProvider, useAuth } from './AuthContext';
+import { AuthGateProvider, useAuthGate } from './AuthGateContext';
 import { ToastProvider } from './ToastContext';
 import Auth from './pages/Auth';
+import Legal from './pages/Legal';
 import LoginModal from './components/LoginModal';
 import AuthCallbackBoundary from './components/AuthCallbackBoundary';
 
@@ -148,6 +150,33 @@ describe('password recovery routing and forms', () => {
 });
 
 describe('login, signup and reset email UI', () => {
+  it.each([
+    ['privacy', '개인정보처리방침'],
+    ['terms', '이용약관'],
+  ] as const)('closes the signup dialog on navigation to /%s', async (kind, title) => {
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    function OpenDialog() {
+      const { openLogin } = useAuthGate();
+      return h('button', { onClick: () => openLogin('signUp') }, '팝업 열기');
+    }
+
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root!.render(h(AuthProvider, null, h(MemoryRouter, null,
+      h(AuthGateProvider, null, h(Routes, null,
+        h(Route, { path: '/', element: h(OpenDialog) }),
+        h(Route, { path: `/${kind}`, element: h(Legal, { kind }) }),
+      ))))));
+
+    await click('팝업 열기');
+    const link = container.querySelector<HTMLAnchorElement>(`[role=dialog] a[href="/${kind}"]`);
+    expect(link).not.toBeNull();
+    await act(async () => link!.click());
+    expect(container.querySelector('h1')?.textContent).toBe(title);
+    expect(container.querySelector('[role=dialog]')).toBeNull();
+  });
+
   it('establishes the returned Supabase session and closes on a successful login', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     const fetch = vi.fn(async () => new Response(JSON.stringify({ access_token: 'user-access', refresh_token: 'user-refresh' }), { status: 200 }));

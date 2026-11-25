@@ -305,7 +305,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             <button type="button" className={webReset ? 'auth-recovery-link' : undefined} disabled={submitting} onClick={() => { setMode('signIn'); changeView('credentials'); }}>로그인으로 돌아가기</button>
           )}
         </div>}
-        {!compact && signingUp && <LegalLinks signup />}
+        {!compact && signingUp && <LegalLinks signup onNavigate={onClose} />}
       </form>
     </div>
   );
