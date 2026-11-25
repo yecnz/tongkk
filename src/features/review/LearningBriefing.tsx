@@ -6,8 +6,9 @@ import { listLearningSessions, type SessionSummary } from '../../services/learni
 import { reviewRequest, type ReviewCard } from '../../services/reviews';
 import { workflowRequest } from '../../services/workflow';
 import { learningTargetUrl } from '../../services/learningTargets';
+import type { ResumePoint } from '../../services/dashboardState';
 
-export default function LearningBriefing() {
+export default function LearningBriefing({ resumePoint }: { resumePoint?: ResumePoint | null }) {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [cards, setCards] = useState<ReviewCard[]>([]);
@@ -34,6 +35,7 @@ export default function LearningBriefing() {
   if (!user) return null;
   return <Card className="workflow-surface workflow-panel workflow-briefing" aria-label="이어갈 학습과 복습">
     <div className="workflow-heading"><h2 className="workflow-panel-title">이어서 학습하기</h2><Link to="/learn" className="workflow-button">새 학습 →</Link></div>
+    {resumePoint && <Link className="workflow-briefing-link" to={resumePoint.route} state={resumePoint.state}><span><strong>{resumePoint.title}</strong><small>{resumePoint.course} · {resumePoint.activity}</small></span><span className="workflow-row-action">이어서 하기 →</span></Link>}
     {loading ? <p role="status">학습을 확인하는 중…</p> : <>
       <ul className="workflow-briefing-list">
         {sessions.slice(0, 1).map(s => <li key={s.id}><Link className="workflow-briefing-link" to={learningTargetUrl({ kind: 'session', id: s.id })}><span><strong>{s.material_name}</strong><small>진행 중인 설명 학습</small></span><span className="workflow-row-action">이어서 하기 →</span></Link></li>)}
@@ -41,7 +43,7 @@ export default function LearningBriefing() {
         {issues.filter(i => !cards.slice(0, 2).some(c => c.concept_id === i.concept_id)).slice(0, 1).map(i => <li key={i.id}><Link className="workflow-briefing-link" to={learningTargetUrl({ kind: 'issue', id: i.id })}><span><strong>{i.title}</strong><small>보완할 학습 이슈</small></span><span className="workflow-row-action">보완 근거 확인하기 →</span></Link></li>)}
         {prerequisites.slice(0,1).map(p=><li key={p.concept_id}><Link className="workflow-briefing-link" to={`/stats?view=concepts&conceptId=${p.concept_id}`}><span><strong>{p.title}</strong><small>{p.reason}</small></span><span className="workflow-row-action">먼저 보완하기 →</span></Link></li>)}
       </ul>
-      {!sessions.length && !cards.length && !issues.length && !prerequisites.length && !errors.length && <p>이어갈 학습이 없습니다. 새 학습을 시작하세요.</p>}
+      {!resumePoint && !sessions.length && !cards.length && !issues.length && !prerequisites.length && !errors.length && <p>이어갈 학습이 없습니다. 새 학습을 시작하세요.</p>}
       <div className="workflow-briefing-footer"><Link to="/review?tab=today">복습 전체 보기 →</Link></div>
       {errors.length > 0 && <p role="alert">{errors.join('·')} 정보를 불러오지 못했어요. <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>}
     </>}

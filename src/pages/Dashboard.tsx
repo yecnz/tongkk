@@ -1141,13 +1141,14 @@ export default function Dashboard() {
       : stepView.dday
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
-  const briefing = buildBriefing({
+  const recommendations = buildBriefing({
     ddays: sortedDdays.map(dday => ({ subj: dday.subj, type: dday.type, daysLeft: getDaysLeft(dday.date) })),
     paces: [...activePaceViews]
       .sort((a, b) => statusRank[a.status] - statusRank[b.status] || a.daysLeft - b.daysLeft)
       .map(view => ({ course: view.plan.course, status: view.status, progress: view.progress, todayTarget: view.todayTarget, unitLabel: view.unitLabel })),
     scores: Object.fromEntries(Object.entries(courseQuizAttempts).map(([course, attempts]) => [course, attempts.map(attempt => attempt.scorePercent)])),
-    todayPlansLeft: todayPlanEntries.filter(({ plan }) => !plan.done).length,
+    // 남은 계획 수는 같은 카드의 '오늘 할 일'에서 표시한다.
+    todayPlansLeft: 0,
   });
   // "자료 복습하기" 대상 과목: 추천 과목 → 요약 있는 과목 → 자료 있는 과목 순.
   // (페이스 플랜이 없어도 복습 동선이 끊기지 않게 한다.)
@@ -1277,69 +1278,10 @@ export default function Dashboard() {
       </div>
 
       <div className="app-container">
-        <LearningBriefing key={user?.id || 'guest'} />
-        <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
-          <h2 className="m-0 text-xl font-extrabold leading-7 text-text-strong">
-            오늘의 학습 브리핑
-          </h2>
-          <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
-            {!stepView && briefing.length > 0 ? "오늘 챙길 것을 모아봤어요." : startHint}
-          </p>
-          {briefing.length > 0 && (
-            <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0" aria-label="오늘의 브리핑">
-              {briefing.map(item => (
-                <li key={item.title} className="flex items-start gap-2.5 rounded-xl bg-white px-4 py-3 dark:bg-slate-900">
-                  <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.urgent ? "bg-pink" : "bg-cyan"}`} />
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <button type="button" onClick={() => item.target && navigate(learningTargetUrl(item.target))} className="text-left text-sm font-extrabold text-text-strong cursor-pointer">{item.title} →</button>
-                    <span className="text-xs font-semibold text-muted">{item.reason}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {resumePoint && courses.includes(resumePoint.course) && (
-            <button
-              type="button"
-              onClick={() => navigate(resumePoint.route, { state: resumePoint.state })}
-              className="mt-4 flex w-full items-center justify-between gap-3 rounded-[14px] border border-cyan bg-cyan px-5 py-4 text-left cursor-pointer hover:opacity-90"
-            >
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="text-xs font-bold text-white/80">이어서 하기 · {resumePoint.course}</span>
-                <span className="truncate text-base font-extrabold text-white">{resumePoint.title}</span>
-                <span className="text-xs font-semibold text-white/80">{resumePoint.activity}</span>
-              </span>
-              <span aria-hidden className="shrink-0 text-xl font-extrabold text-white">→</span>
-            </button>
-          )}
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => navigate(pageRoutes["오답 노트"])}
-              className="flex flex-col items-start gap-1 rounded-[14px] border border-pink bg-white px-5 py-4 text-left cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
-            >
-              <span className="text-base font-extrabold text-pink">오답 다시 풀기</span>
-              <span className="text-xs font-semibold text-pink/80">틀린 문제부터 확인</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleReviewMaterials()}
-              disabled={!reviewCourse}
-              className={reviewCourse
-                ? "flex flex-col items-start gap-1 rounded-[14px] border border-cyan bg-white px-5 py-4 text-left cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
-                : "flex flex-col items-start gap-1 rounded-[14px] border border-cyan/40 bg-white px-5 py-4 text-left cursor-default opacity-60 dark:bg-slate-900"}
-            >
-              <span className="text-base font-extrabold text-cyan">자료 복습하기</span>
-              <span className="text-xs font-semibold text-cyan/80">
-                {!reviewCourse
-                  ? "과목과 자료를 먼저 추가하세요"
-                  : (courseStats[reviewCourse]?.summaries ?? 0) > 0
-                    ? `${reviewCourse} 최근 요약 보기`
-                    : `${reviewCourse} 요약 만들러 가기`}
-              </span>
-            </button>
-          </div>
-        </Card>
+        <LearningBriefing
+          key={user?.id || 'guest'}
+          resumePoint={resumePoint && courses.includes(resumePoint.course) ? resumePoint : null}
+        />
         <div className="dash-main-grid">
           {/* 강의 목록 카드 그리드 */}
           <div>
@@ -1524,6 +1466,52 @@ export default function Dashboard() {
                     <line x1="16" y1="2" x2="16" y2="6" />
                   </svg>
                 </button>
+              </div>
+              <section aria-labelledby="today-recommendations-heading" className="mb-5 border-b border-border-soft pb-4">
+                <h4 id="today-recommendations-heading" className="m-0 text-[13px] font-bold text-text-strong">오늘의 추천</h4>
+                {stepView && <p className="m-0 mt-1.5 text-xs leading-5 text-muted">{startHint}</p>}
+                {recommendations.length > 0 ? (
+                  <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+                    {recommendations.map(item => (
+                      <li key={item.title}>
+                        <button
+                          type="button"
+                          onClick={() => item.target && navigate(learningTargetUrl(item.target))}
+                          className="flex w-full cursor-pointer items-start gap-2.5 rounded-[10px] border-0 bg-surface p-3 text-left hover:bg-muted-surface"
+                        >
+                          <span aria-hidden className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${item.urgent ? "bg-pink" : "bg-cyan"}`} />
+                          <span className="flex min-w-0 flex-1 flex-col gap-1">
+                            <span className="text-[13px] font-bold leading-5 break-words text-text-strong">{item.title}</span>
+                            <span className="text-xs leading-5 break-words text-text-secondary">{item.reason}</span>
+                          </span>
+                          <span aria-hidden className="shrink-0 text-text-secondary">→</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="m-0 mt-2 text-xs leading-5 text-muted">일정과 학습 기록이 쌓이면 오늘 챙길 것을 추천해드려요.</p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(pageRoutes["오답 노트"])}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-pink-deep hover:underline"
+                  >오답 다시 풀기 →</button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReviewMaterials()}
+                    disabled={!reviewCourse || reviewNavigating}
+                    title={!reviewCourse ? "과목과 자료를 먼저 추가하세요" : `${reviewCourse} ${(courseStats[reviewCourse]?.summaries ?? 0) > 0 ? "최근 요약 보기" : "요약 만들러 가기"}`}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-cyan-deep hover:underline disabled:cursor-default disabled:text-muted disabled:no-underline"
+                  >{reviewNavigating ? "불러오는 중…" : "자료 복습하기 →"}</button>
+                </div>
+              </section>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h4 className="m-0 text-[13px] font-bold text-text-strong">오늘 할 일</h4>
+                {todayPlanEntries.length > 0 && (
+                  <span className="text-xs text-muted">{todayPlanEntries.filter(({ plan }) => plan.done).length}/{todayPlanEntries.length} 완료</span>
+                )}
               </div>
               {studyPlanMessage ? (
                 <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
