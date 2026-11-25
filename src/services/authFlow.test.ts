@@ -56,7 +56,7 @@ describe('auth callback handling', () => {
 describe('email requests', () => {
   it('validates before making any request', async () => {
     expect(isValidAuthEmail(' name@example.test ')).toBe(true);
-    await expect(sendAuthEmail('reset', 'bad@address')).rejects.toThrow('이메일 형식');
+    await expect(sendAuthEmail('reset', 'bad@address')).rejects.toThrow('이메일 주소를 다시 확인');
     expect(auth.resetPasswordForEmail).not.toHaveBeenCalled();
   });
   it('blocks duplicate requests in flight, cooldown and modal remounts, then permits retry', async () => {

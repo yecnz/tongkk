@@ -45,7 +45,7 @@ export default function Auth() {
     event.preventDefault();
     if (pending.current || loading || !user || linkError) return;
     if (newPassword.length < 8) {
-      setRecoveryError("비밀번호는 8자 이상이어야 해요.");
+      setRecoveryError("비밀번호를 8자 이상 입력해주세요.");
       return;
     }
     if (newPassword !== confirmPassword) {

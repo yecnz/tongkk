@@ -27,7 +27,7 @@ export function authErrorMessage(error: unknown, fallback = '인증 요청에 �
     over_request_rate_limit: `요청이 너무 많아요. ${retry}`,
     account_locked: `로그인 실패가 반복돼 잠시 잠겼어요. ${retry}`,
     user_banned: '이 계정은 이용이 제한되어 있어요. 관리자에게 문의해주세요.',
-    email_address_invalid: '이메일 형식을 확인해주세요.',
+    email_address_invalid: '이메일 주소를 다시 확인해주세요.',
     user_already_exists: '이미 가입된 이메일입니다. 로그인 또는 비밀번호 찾기를 이용해주세요.',
     email_exists: '이미 가입된 이메일이에요. 로그인 또는 비밀번호 찾기를 이용해주세요.',
     email_address_not_authorized: '이 이메일로 메일을 보낼 수 없어요. 관리자에게 문의해주세요.',
