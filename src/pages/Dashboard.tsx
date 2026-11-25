@@ -126,7 +126,7 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
           }}>추가만 하기</button>
           <button type="button" onClick={handleAddAndUpload} disabled={!courseName} style={{
             padding: "8px 18px", borderRadius: 10, border: "none",
-            background: courseName ? PINK : "var(--color-border-soft)", color: "var(--color-on-brand)",
+            background: courseName ? "var(--color-action-pink)" : "var(--color-border-soft)", color: "var(--color-on-brand)",
             cursor: courseName ? "pointer" : "default", fontSize: 14, fontWeight: 600
           }}>추가하고 자료 올리기</button>
         </div>
@@ -169,7 +169,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleSave} disabled={!canSave} style={{
             padding: "8px 18px", borderRadius: 10, border: "none",
-            background: canSave ? PINK : "var(--color-border-soft)", color: "var(--color-on-brand)",
+            background: canSave ? "var(--color-action-pink)" : "var(--color-border-soft)", color: "var(--color-on-brand)",
             cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600
           }}>저장</button>
         </div>
@@ -390,8 +390,8 @@ const CourseDetailModal = ({
                         </span>
                       </span>
                       <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
-                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "summary"); }} style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)", cursor: "pointer" }}>요약 {summaryCount}</span>
-                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "quiz"); }} style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)", cursor: "pointer" }}>퀴즈 {quizCount}</span>
+                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "summary"); }} style={{ color: summaryCount > 0 ? "var(--color-pink-deep)" : "var(--color-muted)", cursor: "pointer" }}>요약 {summaryCount}</span>
+                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "quiz"); }} style={{ color: quizCount > 0 ? "var(--color-cyan-deep)" : "var(--color-muted)", cursor: "pointer" }}>퀴즈 {quizCount}</span>
                       </span>
                     </button>
                     <button
@@ -428,7 +428,7 @@ const CourseDetailModal = ({
             borderRadius: 10,
             border: "none",
             background: "var(--color-tint-pink)",
-            color: PINK,
+            color: "var(--color-pink-deep)",
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
@@ -438,7 +438,7 @@ const CourseDetailModal = ({
             borderRadius: 10,
             border: "none",
             background: "var(--color-tint-cyan)",
-            color: CYAN,
+            color: "var(--color-cyan-deep)",
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
@@ -507,7 +507,7 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
         {NOTICES.map((notice, i) => (
           <div key={i} style={{ padding: 16, borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-surface)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
-              <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>{notice.tag}</span>
+              <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: "var(--color-pink-deep)", fontSize: 11, fontWeight: 800 }}>{notice.tag}</span>
               <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>{notice.date}</span>
             </div>
             <p style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>{notice.title}</p>
@@ -520,7 +520,7 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12,
                   padding: "9px 16px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "var(--color-on-brand)",
+                  background: "var(--color-action-cyan)", color: "var(--color-on-brand)",
                   fontSize: 13, fontWeight: 800, textDecoration: "none", cursor: "pointer",
                 }}
               >
@@ -573,7 +573,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
             }}
             style={{
               flexShrink: 0, padding: "6px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
-              background: "var(--color-card)", color: copied ? CYAN : "var(--color-text-secondary)",
+              background: "var(--color-card)", color: copied ? "var(--color-cyan-deep)" : "var(--color-text-secondary)",
               fontSize: 12.5, fontWeight: 700, cursor: "pointer",
             }}
           >{copied ? "복사됨!" : "복사"}</button>
@@ -583,7 +583,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             padding: "12px 16px", borderRadius: 10, border: "none",
-            background: PINK, color: "var(--color-on-brand)",
+            background: "var(--color-action-pink)", color: "var(--color-on-brand)",
             fontSize: 14, fontWeight: 800, textDecoration: "none", cursor: "pointer",
             boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
           }}
@@ -1237,7 +1237,7 @@ export default function Dashboard() {
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <NoticeBanner messages={[
-          { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: PINK },
+          { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: "var(--color-pink-deep)" },
           "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",
           "Tongkk는 무료로 이용할 수 있습니다. ",
           "설문 참여는 공지사항을 확인하세요."
@@ -1307,7 +1307,7 @@ export default function Dashboard() {
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
                   <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
-                    padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
+                    padding: "11px 18px", borderRadius: 10, border: "none", background: "var(--color-action-pink)",
                     color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
                     boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
                   }}>+ 강의 추가하기</button>
@@ -1382,7 +1382,7 @@ export default function Dashboard() {
                 })}
                 <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
                   minHeight: 120, borderRadius: 18, border: "1px dashed var(--color-border)",
-                  background: "var(--color-card)", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
+                  background: "var(--color-card)", color: "var(--color-pink-deep)", fontSize: 15, fontWeight: 850, cursor: "pointer",
                 }}>+ 강의 추가하기</button>
               </div>
             )}
@@ -1393,9 +1393,9 @@ export default function Dashboard() {
             {/* D-day */}
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: PINK }}>D-day</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-pink-deep)" }}>D-day</h3>
                 <button type="button" onClick={() => { if (!requireAuth("D-day를 추가하려면 로그인이 필요해요")) return; setShowAddDday(true); }} aria-label="D-day 추가" title="D-day 추가" style={{
-                  background: "none", border: "none", fontSize: 20, color: PINK, cursor: "pointer", lineHeight: 1
+                  background: "none", border: "none", fontSize: 20, color: "var(--color-pink-deep)", cursor: "pointer", lineHeight: 1
                 }}>+</button>
               </div>
               {sortedDdays.length === 0 ? (
@@ -1420,7 +1420,7 @@ export default function Dashboard() {
                           <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{d.subj}</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? "var(--color-pink-deep)" : "var(--color-cyan-deep)" }}>
                             {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                           </span>
                           <button type="button"
@@ -1441,7 +1441,7 @@ export default function Dashboard() {
                   {sortedDdays.length > 3 && (
                     <button type="button" onClick={() => setShowAllDdays(!showAllDdays)} style={{
                       marginTop: 10, padding: "6px 0", width: "100%", background: "none",
-                      border: "none", color: PINK, fontSize: 13, cursor: "pointer", fontWeight: 500
+                      border: "none", color: "var(--color-pink-deep)", fontSize: 13, cursor: "pointer", fontWeight: 500
                     }}>{showAllDdays ? "접기" : `더보기 (${sortedDdays.length - 3}개)`}</button>
                   )}
                 </>
@@ -1550,7 +1550,7 @@ export default function Dashboard() {
                       flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 8,
                       border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN}`,
                       background: "var(--color-card)",
-                      color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : CYAN,
+                      color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : "var(--color-cyan-deep)",
                       cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
                       fontSize: 13, fontWeight: 800,
                     }}
@@ -1565,7 +1565,7 @@ export default function Dashboard() {
                     style={{
                       width: 30, flexShrink: 0, borderRadius: 8,
                       border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-card)",
-                      color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
+                      color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
                     }}
                   >
                     {showStudyPlanOptions ? "⌃" : "⌄"}
@@ -1577,7 +1577,7 @@ export default function Dashboard() {
                   style={{
                     flex: 1, padding: "8px 10px", borderRadius: 8,
                     border: `1px solid ${CYAN}`, background: "var(--color-card)",
-                    color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800,
+                    color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 13, fontWeight: 800,
                   }}
                 >
                   직접 추가하기
@@ -1718,7 +1718,7 @@ export default function Dashboard() {
                                 padding: "6px 9px", borderRadius: 999,
                                 border: `1px solid ${selected ? CYAN : "var(--color-border-soft)"}`,
                                 background: selected ? "var(--color-tint-cyan)" : "var(--color-card)",
-                                color: selected ? CYAN : "var(--color-text-secondary)",
+                                color: selected ? "var(--color-cyan-deep)" : "var(--color-text-secondary)",
                                 cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                               }}
                             >
@@ -1743,7 +1743,7 @@ export default function Dashboard() {
                         onClick={() => navigate(pageRoutes["퀴즈 생성"], { state: { course: diagnosticCourse, diagnostic: true, fromDashboard: true } })}
                         style={{
                           flexShrink: 0, padding: "6px 9px", borderRadius: 8, border: `1px solid ${CYAN}`,
-                          background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 12, fontWeight: 800,
+                          background: "var(--color-card)", color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 12, fontWeight: 800,
                         }}
                       >
                         진단 퀴즈 풀기
@@ -1765,7 +1765,7 @@ export default function Dashboard() {
                       disabled={!canSubmitPlan || studyPlanLoading}
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "none",
-                        background: !canSubmitPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
+                        background: !canSubmitPlan || studyPlanLoading ? "var(--color-border-soft)" : "var(--color-action-cyan)",
                         color: "var(--color-on-brand)",
                         cursor: !canSubmitPlan || studyPlanLoading ? "default" : "pointer",
                         fontSize: 12, fontWeight: 800,
@@ -1853,7 +1853,7 @@ export default function Dashboard() {
                             {p.origin === "ai" && (
                               <span style={{
                                 display: "inline-block", marginRight: 6, padding: "1px 6px", borderRadius: 999,
-                                background: "var(--color-tint-cyan)", color: CYAN, fontSize: 10, fontWeight: 850,
+                                background: "var(--color-tint-cyan)", color: "var(--color-cyan-deep)", fontSize: 10, fontWeight: 850,
                                 verticalAlign: "1px", textDecoration: "none",
                               }}>AI</span>
                             )}
@@ -1870,7 +1870,7 @@ export default function Dashboard() {
                             title={planActionLabels[p.action]}
                             style={{
                               width: 24, height: 24, borderRadius: 8, border: `1px solid ${CYAN}`,
-                              background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 13,
+                              background: "var(--color-card)", color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 13,
                               lineHeight: "22px", padding: 0, flexShrink: 0, fontWeight: 800,
                             }}
                           >↗</button>

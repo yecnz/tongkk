@@ -1,4 +1,3 @@
-import { PINK, CYAN } from "../common";
 import type { CourseMaterial } from "./materials";
 import type { SavedQuizSet } from "./quizSets";
 
@@ -10,8 +9,8 @@ export type DdayType = "assignment" | "event" | "exam";
 export const ddayTypeLabels: Record<DdayType, string> = { assignment: "과제", event: "일정", exam: "시험" };
 // 타입별 색(과제=핑크, 일정=파랑, 시험=회색). soft=배경, solid=글자/포인트.
 export const ddayTypeColors: Record<DdayType, { solid: string; soft: string }> = {
-  assignment: { solid: PINK, soft: "var(--color-tint-pink)" },
-  event: { solid: CYAN, soft: "var(--color-tint-cyan)" },
+  assignment: { solid: "var(--color-pink-deep)", soft: "var(--color-tint-pink)" },
+  event: { solid: "var(--color-cyan-deep)", soft: "var(--color-tint-cyan)" },
   exam: { solid: "var(--color-text-secondary)", soft: "var(--color-muted-surface)" },
 };
 

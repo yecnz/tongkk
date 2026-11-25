@@ -55,7 +55,9 @@
   --color-text-strong: light-dark(#222222, #e8e8e8);
   --color-text: light-dark(#444444, #c8c8c8);
   --color-text-secondary: light-dark(#666666, #989898);
-  --color-muted: light-dark(#888888, #757575);
+  --color-muted: light-dark(#707070, #969696);
+  --color-action-pink: light-dark(#c0397e, #a63369);
+  --color-action-cyan: light-dark(#0a7491, #14728d);
   --color-on-brand: #ffffff;       /* hex-ok: 브랜드색 배경 위 글자 — 라이트·다크 공통 */
 
   /* 틴트·상태 */

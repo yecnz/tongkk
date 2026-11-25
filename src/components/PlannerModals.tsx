@@ -181,7 +181,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
             <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} aria-label={dayLabel} aria-pressed={isSelected} style={{
               width: "100%", aspectRatio: "1", borderRadius: "50%",
               border: isSelected ? "none" : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "none",
-              background: isSelected ? PINK : "transparent",
+              background: isSelected ? "var(--color-action-pink)" : "transparent",
               color: isSelected ? "var(--color-on-brand)" : isToday ? "var(--color-cyan-deep)" : "var(--color-text-strong)",
               fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
               cursor: "pointer", transition: "background 0.15s",
@@ -265,7 +265,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
           background: "var(--glass-bg)"
         }}/>
         {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
-        <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? PINK : "var(--color-muted)" }}>
+        <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? "var(--color-pink-deep)" : "var(--color-muted)" }}>
           {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택하세요 (필수)"}
         </div>
         <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
@@ -275,7 +275,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleSubmit} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: "var(--color-action-pink)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>{submitLabel}</button>
         </div>
       </div>
@@ -319,7 +319,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: "var(--color-action-cyan)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
       </Card>
@@ -430,7 +430,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
         <div className="border-b border-border bg-white px-6 py-5 dark:bg-slate-900">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan">
+              <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan-deep">
                 PACE PLAN
               </span>
               <h3 className="m-0 text-[19px] font-extrabold text-text-strong">페이스 플랜 만들기</h3>
@@ -504,10 +504,10 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                                 : "border-border bg-white cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
                           }`}
                         >
-                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-text"}`}>
+                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan-deep" : "text-text"}`}>
                             {option.title}
                           </span>
-                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-text-secondary"}`}>
+                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan-deep" : "text-text-secondary"}`}>
                             {option.hint}
                           </span>
                         </button>
@@ -523,12 +523,12 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                           : "border-border bg-white hover:bg-slate-50 dark:bg-slate-800"
                       }`}
                     >
-                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan" : "text-text"}`}>직접 입력</span>
+                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan-deep" : "text-text"}`}>직접 입력</span>
                       <span className="shrink-0 text-xs font-semibold text-muted">숫자로 직접 지정</span>
                     </button>
                   </div>
                 )}
-                {metricsError && <p className="m-0 mt-2 text-xs text-pink">{metricsError}</p>}
+                {metricsError && <p className="m-0 mt-2 text-xs text-pink-deep">{metricsError}</p>}
               </div>
               {basis === "manual" && (
                 <div className="mb-4">
@@ -545,7 +545,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
               )}
               <div className="mb-5 flex items-center justify-between gap-3 rounded-[12px] bg-pink/10 px-4 py-3">
                 <span className="shrink-0 text-xs font-bold text-text-secondary">하루 권장 학습량</span>
-                <span className="text-right text-sm font-extrabold text-pink">{previewText}</span>
+                <span className="text-right text-sm font-extrabold text-pink-deep">{previewText}</span>
               </div>
             </>
           )}
@@ -554,7 +554,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
             <button type="button"
               onClick={handleAdd}
               disabled={!canAdd}
-              className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
+              className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-action-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
             >
               만들기
             </button>
@@ -633,7 +633,7 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
         </div>
 
         {isQuiz ? (
-          <p style={{ margin: "0 0 14px", fontSize: 12, color: CYAN, fontWeight: 700 }}>
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--color-cyan-deep)", fontWeight: 700 }}>
             퀴즈 진행도는 풀이 기록으로 자동 계산됩니다.
           </p>
         ) : (
@@ -658,7 +658,7 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
             disabled={!canSave}
             style={{
               padding: "8px 18px", borderRadius: 10, border: "none",
-              background: canSave ? PINK : "var(--color-muted)", color: "var(--color-on-brand)",
+              background: canSave ? "var(--color-action-pink)" : "var(--color-muted)", color: "var(--color-on-brand)",
               cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600,
             }}
           >저장</button>
