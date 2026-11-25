@@ -506,6 +506,43 @@ def _filter_markdown_by_pages(markdown: str, spec: str | None) -> str:
     return "\n\n".join(kept)
 
 
+# 질문에서 검색어로 쓰지 않을 말(지시어·질문 상투어).
+_SEARCH_STOPWORDS = {
+    "이거", "그거", "저거", "이것", "그것", "여기", "거기", "설명", "설명해", "설명해줘", "알려줘", "알려",
+    "뭐야", "무엇", "어떻게", "왜", "그리고", "그럼", "이게", "자료", "내용", "부분", "다시", "좀", "해줘",
+}
+# 검색어 끝의 조사를 떼어 원문 단어와 맞춘다("혼잡제어는" → "혼잡제어").
+_JOSA_RE = re.compile(r"(에서|으로|이란|이랑|은|는|이|가|을|를|의|에|와|과|로|란|도|만)$")
+
+
+def _search_source_pages(markdown: str, query: str, k: int = 3) -> str:
+    """`<!-- p.N -->` 마커로 원본을 페이지로 나눠 질문 단어가 많이 나온 상위 k페이지를 돌려준다.
+
+    마커가 없거나 맞는 페이지가 없으면 빈 문자열. 결과는 원래 페이지 순서로 이어 붙인다.
+    """
+    # ponytail: 키워드 빈도 매칭. 동의어·표현 차이로 자주 빗나가면 임베딩 검색으로 교체.
+    terms = set()
+    for word in re.findall(r"[A-Za-z0-9]{2,}|[가-힣]{2,}", query or ""):
+        word = word.lower()
+        if len(word) > 2 and re.match(r"[가-힣]", word):
+            word = _JOSA_RE.sub("", word)
+        if len(word) >= 2 and word not in _SEARCH_STOPWORDS:
+            terms.add(word)
+    matches = list(_PAGE_MARKER_RE.finditer(markdown or ""))
+    if not terms or not matches:
+        return ""
+    scored = []
+    for idx, match in enumerate(matches):
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(markdown)
+        block = markdown[match.start():end].strip()
+        lowered = block.lower()
+        score = sum(lowered.count(term) for term in terms)
+        if score:
+            scored.append((score, idx, block))
+    top = sorted(scored, key=lambda item: (-item[0], item[1]))[:k]
+    return "\n\n".join(block for _, _, block in sorted(top, key=lambda item: item[1]))
+
+
 def _pdf_page_image_coverage(page) -> float:
     """페이지에서 이미지(래스터) 블록이 차지하는 면적 비율(0~1)을 돌려준다.
 
@@ -1426,13 +1463,19 @@ async def agent(req: AgentRequest, user=Depends(require_api_user)):
             + "\n\n".join(parts)
         )
     elif req.markdown:
+        # 긴 원본은 마지막 질문과 관련된 페이지만 골라 요약과 함께 넣는다(맞는 페이지가 없으면 요약만).
+        question = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        hits = _search_source_pages(source, question) if source else ""
         note = (
-            " 원본 본문은 길어서 기본 컨텍스트에는 요약만 넣었어. "
-            "요약이 의심스럽거나 원본 확인이 필요하면 inspect_original_source 도구로 원본을 확인해."
+            " 원본 본문은 길어서 기본 컨텍스트에는 요약"
+            + ("과 질문 관련 원본 페이지" if hits else "")
+            + "만 넣었어. 다른 부분의 원본 확인이 필요하면 inspect_original_source 도구에 찾을 내용을 넣어 확인해."
             if source
             else ""
         )
         reference_context = f"다음 강의자료를 현재 대화의 참고 자료로 사용해.{note}\n\n[정리된 요약]\n{req.markdown}"
+        if hits:
+            reference_context += f"\n\n[질문 관련 원본 페이지]\n{hits}"
 
     return await _run_llm_call(
         lambda: run_study_agent(
