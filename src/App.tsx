@@ -14,6 +14,7 @@ import ReviewHome from "./features/review/ReviewHome";
 import Stats from "./pages/Stats";
 import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
+import Legal from "./pages/Legal";
 import LearningSession from "./pages/LearningSession";
 import SourceCallback from './features/integrations/SourceCallback';
 import CalendarCallback from "./features/integrations/CalendarCallback";
@@ -98,6 +99,8 @@ function App() {
                   <Routes>
                     <Route path="/auth" element={<Auth />} />
                     <Route path={RESET_PASSWORD_PATH} element={<Auth />} />
+                    <Route path="/privacy" element={<Legal kind="privacy" />} />
+                    <Route path="/terms" element={<Legal kind="terms" />} />
                     <Route path="/*" element={<AppShell />} />
                   </Routes>
                 </AuthCallbackBoundary>
