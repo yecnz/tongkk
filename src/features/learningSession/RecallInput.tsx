@@ -1,3 +1,4 @@
+import VoiceAnswer from '../audio/VoiceAnswer';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { learningRequest, readLocalDraft, removeLocalDraft, writeLocalDraft, type LearningSession } from '../../services/learningSessions';
 
@@ -13,6 +14,7 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [composing, setComposing] = useState(false);
+  const [audioBusy, setAudioBusy] = useState(false);
   const latest = useRef(text);
   const revision = useRef(item.revision);
   const serverText = useRef(item.draft);
@@ -59,11 +61,12 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
 
   useEffect(() => {
     flushRef.current = async () => {
+      if (audioBusy) throw new Error('녹음이나 전사를 마치거나 취소한 뒤 이동하세요.');
       if (conflict || composing) throw new Error('답변 충돌 또는 입력을 먼저 마무리하세요.');
       await save();
     };
     return () => { flushRef.current = null; };
-  }, [flushRef, save, conflict, composing]);
+  }, [flushRef, save, conflict, composing, audioBusy]);
 
   useEffect(() => {
     if (composing || conflict || disabled || text === serverText.current) return;
@@ -99,9 +102,11 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
     <label htmlFor="recall-answer"><p>자료를 보지 않고 핵심을 설명하세요.</p></label>
     <textarea id="recall-answer" value={text} maxLength={4000} disabled={busy || disabled}
       onChange={event => edit(event.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
+    <VoiceAnswer disabled={busy || disabled || conflict || composing} availableCharacters={4000 - text.length - (text ? 2 : 0)} onBusyChange={setAudioBusy}
+      onInsert={value => edit(latest.current ? `${latest.current}\n\n${value}` : value)} />
     <p className="learning-muted" aria-live="polite" style={{ fontSize: 13 }}>
       {text.length.toLocaleString()} / 4,000자 · {saveError || (saving ? '저장 중…' : text === item.draft ? '저장됨' : '임시 저장됨')}
     </p>
-    <button type="button" className="primary" disabled={busy || disabled || composing || conflict || !text.trim()} onClick={() => { void submit(); }}>설명 제출</button>
+    <button type="button" className="primary" disabled={busy || disabled || audioBusy || composing || conflict || !text.trim()} onClick={() => { void submit(); }}>설명 제출</button>
   </>;
 }

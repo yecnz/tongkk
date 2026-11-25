@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { randomUUID, createHash } from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+
+const db = new PGlite();
+let checks = 0;
+const check = (condition, name) => { assert.ok(condition, name); checks++; };
+await db.exec(`
+ create role anon; create role authenticated; create role service_role bypassrls;
+ create schema auth; create table auth.users(id uuid primary key);
+ create table courses(id uuid primary key,user_id uuid not null references auth.users on delete cascade,unique(id,user_id));
+ create table materials(course_id uuid,id text,user_id uuid,name text,markdown text,primary key(course_id,id),foreign key(course_id,user_id) references courses(id,user_id) on delete cascade);
+ create table learning_session_packs(id uuid primary key,user_id uuid,material_id text,source_hash text,selected_scope jsonb);
+ create table learning_sessions(id uuid primary key,user_id uuid,course_id uuid,pack_id uuid references learning_session_packs,status text,result jsonb default '[]',unique(id,user_id));
+ grant usage on schema public,auth to service_role,authenticated,anon;
+ grant select,insert,update,delete on all tables in schema public to service_role;
+`);
+await db.exec(readFileSync(new URL('../supabase/migrations/202611260002_study_paths.sql', import.meta.url), 'utf8'));
+const user = randomUUID(), other = randomUUID(), course = randomUUID(), foreignCourse = randomUUID(), path = randomUUID();
+const text = '첫 번째 자료', hash = createHash('sha256').update(text).digest('hex');
+await db.query('insert into auth.users values($1),($2)', [user, other]);
+await db.query('insert into courses values($1,$2),($3,$4)', [course, user, foreignCourse, other]);
+await db.query("insert into materials values($1,'one',$2,'강의',$3),($4,'foreign',$5,'외부',$3)", [course, user, text, foreignCourse, other]);
+const chapters = ['기초', '응용'].map(title => ({ id: randomUUID(), title, objective: '설명', included: true,
+  material_id: 'one', material_name: '강의', source_hash: hash, unit_ids: ['u0'], source_labels: ['문단 1'] }));
+const read = async (owner = user) => (await db.query('select study_path_read($1,$2) data', [owner, path])).rows[0].data;
+const edits = chapters.map(({ id, title, included }) => ({ id, title, included }));
+await db.exec('set role service_role');
+await db.query('select study_path_create($1,$2,$3,$4,$5::jsonb)', [user, path, course, '강의 코스', JSON.stringify(chapters)]);
+check((await read()).chapters.length === 2, 'Persists every chapter');
+check(await read(other) === null, 'Owner filter prevents another user reading a path');
+check((await db.query('select study_path_list($1) data', [other])).rows[0].data.length === 0, 'Owner list is isolated');
+await assert.rejects(db.query('select study_path_create($1,$2,$3,$4,$5::jsonb)', [other, randomUUID(), course, 'foreign', JSON.stringify(chapters)]), /LS_NOT_FOUND/); checks++;
+await db.query('select study_path_create($1,$2,$3,$4,$5::jsonb)', [user, path, course, 'retry', JSON.stringify(chapters)]);
+check((await read()).title === '강의 코스', 'Creation retry preserves original path');
+await db.query('select study_path_edit($1,$2,0,$3,$4::jsonb)', [user, path, '편집한 코스', JSON.stringify([...edits].reverse())]);
+check((await read()).chapters[0].id === chapters[1].id, 'Reorder preserves chapter identity');
+check((await read()).chapters[0].source_hash === hash, 'Edits preserve server-owned source identity');
+await assert.rejects(db.query('select study_path_edit($1,$2,0,$3,$4::jsonb)', [user, path, 'stale', JSON.stringify(edits)]), /LS_CONFLICT/); checks++;
+await assert.rejects(db.query('select study_path_edit($1,$2,1,$3,$4::jsonb)', [other, path, 'foreign', JSON.stringify(edits)]), /LS_NOT_FOUND/); checks++;
+await assert.rejects(db.query('select study_path_edit($1,$2,1,$3,$4::jsonb)', [user, path, 'empty', JSON.stringify(edits.map(c => ({ ...c, included: false })))]), /LS_CONFLICT/); checks++;
+const pack = randomUUID(), session = randomUUID(), wrong = randomUUID();
+await db.query('insert into learning_session_packs values($1,$2,$3,$4,$5::jsonb)', [pack, user, 'one', hash, JSON.stringify({ type: 'units', unit_ids: ['u0'] })]);
+await db.query("insert into learning_sessions(id,user_id,course_id,pack_id,status) values($1,$2,$3,$4,'active'),($5,$6,$3,$4,'active')", [session, user, course, pack, wrong, other]);
+await assert.rejects(db.query('select study_path_link_session($1,$2,$3,$4)', [user, path, chapters[0].id, wrong]), /LS_NOT_FOUND/); checks++;
+await db.query('select study_path_link_session($1,$2,$3,$4)', [user, path, chapters[0].id, session]);
+check((await read()).chapters.find(c => c.id === chapters[0].id).session_id === session, 'Valid owned source session is linked');
+check(!(await read()).chapters.find(c => c.id === chapters[0].id).completed, 'Active sessions are not completion');
+await db.query("update learning_sessions set status='completed',result=$2::jsonb where id=$1", [session, JSON.stringify([{ skipped: true, check: 'ungraded' }])]);
+check(!(await read()).chapters.find(c => c.id === chapters[0].id).completed, 'Skipped/partial sessions are not completion');
+await db.query('update learning_sessions set result=$2::jsonb where id=$1', [session, JSON.stringify([{ skipped: false, check: 'incorrect' }, { skipped: false, check: 'correct' }])]);
+check((await read()).chapters.find(c => c.id === chapters[0].id).completed, 'All performed checks count as activity completion, regardless of correctness');
+await db.query("update materials set markdown='바뀐 원문' where course_id=$1", [course]);
+check((await read()).chapters.every(c => c.source_changed), 'Source changes are surfaced without deleting history');
+await assert.rejects(db.query('select study_path_create($1,$2,$3,$4,$5::jsonb)', [user, randomUUID(), course, 'old source', JSON.stringify(chapters)]), /LS_SOURCE_CHANGED/); checks++;
+for (const role of ['anon', 'authenticated']) {
+  await db.exec(`reset role; set role ${role}`);
+  await assert.rejects(db.query('select * from study_paths'), /permission denied/); checks++;
+  await assert.rejects(db.query('select study_path_read($1,$2)', [user, path]), /permission denied/); checks++;
+}
+await db.exec('reset role; set role service_role');
+await db.query('delete from courses where id=$1', [course]);
+check(await read() === null, 'Course deletion cascades path and session links');
+check((await db.query('select count(*) n from study_path_sessions')).rows[0].n === 0, 'No orphan path-session links');
+await db.close();
+console.log(`Study paths PostgreSQL: ${checks} checks passed`);

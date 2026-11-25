@@ -1,3 +1,4 @@
+import { SourceCitationContext } from '../sources/citationContext';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -9,6 +10,7 @@ import type { MateScope } from '../../services/agent';
 export default function LearningMateHost() {
   const { user } = useAuth(); const { scope } = useContext(LearningScopeContext); const location = useLocation();
   const [open, setOpen] = useState(false); const [context, setContext] = useState<(MateScope & { title: string }) | null>(null);
+  const [citationCourseName, setCitationCourseName] = useState('');
   const [error, setError] = useState(''); const [retry, setRetry] = useState(0); const button = useRef<HTMLButtonElement>(null);
   const restricted = location.pathname.startsWith('/learn') || location.pathname === '/quiz';
   useEffect(() => {
@@ -16,10 +18,11 @@ export default function LearningMateHost() {
     if (!user || !open || !scope || restricted) return;
     let active = true;
     async function load() {
-      const courseId = scope!.courseId || (await fetchCourses()).find(c => c.name === scope!.courseName)?.id;
+      const course = (await fetchCourses()).find(c => scope!.courseId ? c.id === scope!.courseId : c.name === scope!.courseName);
+      const courseId = course?.id;
       if (!courseId) throw new Error('과목을 다시 선택하세요.');
       const value = await workflowRequest<MateScope & { title: string }>(`/learning-mate/context?${new URLSearchParams({ course_id: courseId, material_id: scope!.materialId })}`);
-      if (active) setContext(value);
+      if (active) { setContext(value); setCitationCourseName(course!.name); }
     }
     void load().catch(e => { if (active) setError(e.message); });
     return () => { active = false; };
@@ -33,8 +36,8 @@ export default function LearningMateHost() {
       {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 연결</button></p>
         : !scope ? <p>자료나 학습 이슈를 열고 질문하세요.</p>
           : !context ? <p role="status">자료를 확인하는 중…</p>
-            : <div className="learning-mate-chat"><AITutorDrawer key={`${context.courseId}:${context.materialId}:${context.sourceHash}`} scope={context} contextTitle={context.title}
-              materialId={context.materialId} contextMarkdown="현재 자료를 바탕으로 답변합니다." layout="embedded" fill open /></div>}
+            : <SourceCitationContext.Provider value={{ courseName: citationCourseName, materialIds: [context.materialId], materials: [{ id: context.materialId, name: context.title, updatedAt: 0 }], sourceHashes: { [context.materialId]: context.sourceHash } }}><div className="learning-mate-chat"><AITutorDrawer key={`${context.courseId}:${context.materialId}:${context.sourceHash}`} scope={context} contextTitle={context.title}
+              materialId={context.materialId} contextMarkdown="현재 자료를 바탕으로 답변합니다." layout="embedded" fill open /></div></SourceCitationContext.Provider>}
     </section>}
   </>;
 }

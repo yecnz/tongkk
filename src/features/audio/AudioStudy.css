@@ -1,0 +1,14 @@
+.audio-study-grid { display: grid; gap: 20px; grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr); align-items: start; }
+.audio-capture .learning-row { flex-wrap: wrap; }
+.audio-capture audio { display: block; width: 100%; margin: 12px 0; }
+.audio-capture .audio-preview { margin-top: 16px; overflow-wrap: anywhere; }
+.audio-file-button { display: inline-flex; align-items: center; padding: 10px 16px; border: 1px solid var(--color-border); border-radius: 10px; cursor: pointer; position: relative; overflow: hidden; }
+.audio-file-button input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.audio-file-button:focus-within { outline: 2px solid var(--color-text-strong); outline-offset: 2px; }
+.audio-file-button.is-disabled { opacity: .5; cursor: default; }
+.audio-recording { color: var(--color-danger); font-weight: 600; }
+.audio-answer { margin: 12px 0; }
+.audio-transcript textarea { display: block; width: 100%; min-height: 150px; resize: vertical; margin: 10px 0; }
+.audio-transcript .learning-field { margin-bottom: 14px; }
+.audio-search-result { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border-bottom: 1px solid var(--color-border); }
+@media (max-width: 800px) { .audio-study-grid { grid-template-columns: 1fr; } }

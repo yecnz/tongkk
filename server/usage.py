@@ -16,7 +16,8 @@ log = logging.getLogger('tongkk.usage')
 request_usage = ContextVar('request_usage', default=None)
 FEATURES = {'summarize': 'summary', 'quiz': 'quiz', 'grade': 'grading', 'wrong': 'wrong_analysis',
             'study-plan': 'planning', 'agent': 'tutor', 'convert': 'document_vision', 'preview': 'document_vision', 'vision': 'document_vision',
-            'learning-sessions': 'learning', 'reviews': 'review'}
+            'learning-sessions': 'learning', 'reviews': 'review', 'flashcards': 'flashcards',
+            'study-paths': 'study_path', 'audio': 'audio'}
 
 
 class UsageMiddleware:
@@ -136,7 +137,7 @@ def track_generation(function):
     async def tracked(self, *args, **kwargs):
         started, metrics, failed = time.monotonic(), {}, False
         context_feature = (request_usage.get() or {}).get('feature')
-        feature = 'review_question' if function.__name__ == 'review_question' else 'learning_prepare' if function.__name__ == 'prepare' else ('review_grade' if context_feature in {'review', 'learning_review'} else 'explanation_grade' if context_feature == 'learning_revision' else 'learning_grade')
+        feature = 'study_path' if context_feature == 'study_path' and function.__name__ == 'draft' else 'review_question' if function.__name__ == 'review_question' else 'learning_prepare' if function.__name__ == 'prepare' else ('review_grade' if context_feature in {'review', 'learning_review'} else 'explanation_grade' if context_feature == 'learning_revision' else 'learning_grade')
         try:
             result, metrics = await function(self, *args, **kwargs)
             return result, metrics

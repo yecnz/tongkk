@@ -1,3 +1,6 @@
+import { SourceCitationContext, useSourceCitationScope } from '../features/sources/citationContext';
+import { remarkSourceCitations } from '../features/sources/sourceNavigation';
+import { SourceCitationAnchor } from '../features/sources/SourceCitationAnchor';
 import BrandLogo from "../components/BrandLogo";
 import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
@@ -81,13 +84,14 @@ const quizMarkdownComponents: Components = {
   ),
 };
 
-const QuizText = ({ children }: { children?: string | null }) => {
+const QuizText = ({ children, sources = false }: { children?: string | null; sources?: boolean }) => {
+  const sourceScope = useSourceCitationScope();
   const text = (children ?? "").replace(/\r\n/g, "\n").trim();
   if (!text) return null;
   // 단일 '~'(예: 'p.8~p.9')를 취소선으로 오인하지 않도록 singleTilde:false.
   const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(text)));
   return (
-    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={quizMarkdownComponents}>
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, ...(sources ? [[remarkSourceCitations, sourceScope] as [typeof remarkSourceCitations, typeof sourceScope]] : [])]} rehypePlugins={[rehypeKatex]} components={{ ...quizMarkdownComponents, a: SourceCitationAnchor }}>
       {cleaned}
     </ReactMarkdown>
   );
@@ -1934,6 +1938,7 @@ export default function Quiz() {
   // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
   const currentCorrect = isQuestionCorrect(q, current, selected);
   return (
+    <SourceCitationContext.Provider value={{ courseName: selectedCourse, materials, materialIds: reviewAttempt?.materialIds || priorQuizSets.find(item => item.id === activeQuizSetId)?.materialIds || selectedMaterialIds }}>
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
       {examMode && <AssessmentLock />}
@@ -2028,7 +2033,7 @@ export default function Quiz() {
                     <span>정답: <strong style={{ color: PINK }}><QuizText>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</QuizText></strong></span>
                   )}
                   {isSubjective && subjectiveGrade && (
-                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · <QuizText>{subjectiveGrade.feedback}</QuizText></span>
+                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · <QuizText sources>{subjectiveGrade.feedback}</QuizText></span>
                   )}
                 </div>
               ) : (
@@ -2125,7 +2130,7 @@ export default function Quiz() {
                   fontSize: 13,
                   lineHeight: 1.6,
                 }}>
-                  <strong>{subjectiveGrade.score}점</strong> · <QuizText>{subjectiveGrade.feedback}</QuizText>
+                  <strong>{subjectiveGrade.score}점</strong> · <QuizText sources>{subjectiveGrade.feedback}</QuizText>
                   <div style={{ marginTop: 8, color: "var(--color-text)" }}>
                     모범답안: <QuizText>{subjectiveGrade.referenceAnswer}</QuizText>
                   </div>
@@ -2161,11 +2166,11 @@ export default function Quiz() {
           {showExplanation && (
             reviewMode ? (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                <strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText>{q.explanation}</QuizText>
+                <strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText sources>{q.explanation}</QuizText>
               </div>
             ) : (
               <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
-                <strong style={{ color: CYAN }}>해설:</strong> <QuizText>{q.explanation}</QuizText>
+                <strong style={{ color: CYAN }}>해설:</strong> <QuizText sources>{q.explanation}</QuizText>
               </div>
             )
           )}
@@ -2203,5 +2208,6 @@ export default function Quiz() {
         </button>
       </div>
     </div>
+    </SourceCitationContext.Provider>
   );
 }

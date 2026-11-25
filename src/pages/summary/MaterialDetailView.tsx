@@ -1,3 +1,4 @@
+import { SourceCitationContext } from "../../features/sources/citationContext";
 import PreparationPanel from "../../features/preparation/PreparationPanel";
 import { useLearningScope } from "../../features/learningMate/context";
 import { useState, useRef, useEffect, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
@@ -675,6 +676,7 @@ export const MaterialDetailView = ({
   };
 
   return (
+    <SourceCitationContext.Provider value={{ courseName: selectedCourse, materials: [material, ...relatedMaterials.filter(item => item.id !== material.id)], materialIds: activeTab === "summary" && activeSummary?.materialIds?.length ? activeSummary.materialIds : [material.id] }}>
     <div>
       <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
@@ -1251,5 +1253,6 @@ export const MaterialDetailView = ({
         </div>
       )}
     </div>
+    </SourceCitationContext.Provider>
   );
 };

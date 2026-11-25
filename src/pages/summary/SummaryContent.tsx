@@ -1,3 +1,6 @@
+import { useSourceCitationScope } from '../../features/sources/citationContext';
+import { remarkSourceCitations } from '../../features/sources/sourceNavigation';
+import { SourceCitationAnchor } from '../../features/sources/SourceCitationAnchor';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -8,6 +11,7 @@ import { parseMindmapJson } from "../../components/mindmapData";
 import { cheatSheetMarkdownComponents, collapseForLectureNote, hoistSourceToHeadings, markInlineExamPoints, markdownComponents, normalizeMarkdownContent, simplifySoleFileSources } from "./markdown";
 
 export const FormattedAiText = ({ content, template }: { content: string; template?: SummaryTemplate }) => {
+  const sourceScope = useSourceCitationScope();
   const normalized = markInlineExamPoints(normalizeMarkdownContent(content));
   const hoisted = template && template !== "MINDMAP" ? hoistSourceToHeadings(normalized) : normalized;
   // 강의 노트의 '핵심 개념'에서 라벨+단일 자식 글머리를 한 줄로 합쳐 글머리 중첩을 줄인다.
@@ -23,7 +27,7 @@ export const FormattedAiText = ({ content, template }: { content: string; templa
         columnGap: 34,
         columnRule: "1px solid var(--color-border-soft)",
       }}>
-        <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={cheatSheetMarkdownComponents}>
+        <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, [remarkSourceCitations, sourceScope]]} rehypePlugins={[rehypeKatex]} components={{ ...cheatSheetMarkdownComponents, a: SourceCitationAnchor }}>
           {cleaned}
         </ReactMarkdown>
       </div>
@@ -31,7 +35,7 @@ export const FormattedAiText = ({ content, template }: { content: string; templa
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, [remarkSourceCitations, sourceScope]]} rehypePlugins={[rehypeKatex]} components={{ ...markdownComponents, a: SourceCitationAnchor }}>
       {cleaned}
     </ReactMarkdown>
   );
