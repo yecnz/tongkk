@@ -179,7 +179,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       const analysis = await analyzeWrongAnswers(courseName, items);
       await saveWrongAnswerAnalysisToServer(courseName, analysis);
       setAnalyses(prev => new Map(prev).set(courseName, analysis));
-      showToast("오답 분석을 완료했어요.", "success");
+      showToast("오답 분석을 완료했습니다.", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "오답 분석에 실패했습니다.", "error");
     } finally {
@@ -202,7 +202,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       <div className={embedded ? undefined : "app-container narrow"}>
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>오답 노트</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.</p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>틀린 문제를 확인하고 다시 푸세요.</p>
         </div>
 
         {courseNames.length > 0 && (

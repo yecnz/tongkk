@@ -286,7 +286,7 @@ export default function Calendar() {
       <div className="app-container">
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>학습 캘린더</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>날짜별 페이스 학습 · D-day · 할 일을 한 화면에서 관리하세요.</p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>학습량·D-day·할 일을 관리하세요.</p>
         </div>
 
         <div className="grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_360px]">

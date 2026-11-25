@@ -1,0 +1,1828 @@
+문장형 UI 안내 문구 조사
+기준: main 332580f + 현재 로컬 수정
+
+긴 설명형 안내 후보: 149개
+전체 문장·상태·오류 후보: 553개 (중복 문구 통합)
+오류·주의: 153개
+안내·상태: 390개
+입력 안내: 10개
+
+범위: 프런트엔드 고정 문구. 테스트·주석·약관 본문·샘플 학습 내용은 제외.
+서버 응답과 AI 생성 문구, 실행 시 합쳐지는 문장 전체는 포함되지 않을 수 있음.
+${...}는 동적 값. 태그·조건문으로 나뉜 문구는 조각 단위이며 실제 화면과 대조 필요.
+UI 문구는 수정하지 않았음.
+
+1. 긴 설명형 안내 후보
+================================================================
+- 요약 생성 후 AI 튜터를 사용할 수 있습니다
+  위치: src/components/AITutorDrawer.tsx:203, src/pages/summary/MaterialDetailView.tsx:930, src/pages/summary/MaterialDetailView.tsx:1061, src/pages/summary/SummaryResultView.tsx:556
+
+- 이미지는 최대 ${MAX_TUTOR_IMAGES}장까지 첨부할 수 있습니다
+  위치: src/components/AITutorDrawer.tsx:1001
+
+- 메일이 안 보이면 스팸함이나 이메일 주소를 확인해주세요.
+  위치: src/components/LoginModal.tsx:202
+
+- 켜면 노드를 클릭해 AI 튜터에게 질문할 수 있어요
+  위치: src/components/MindmapView.tsx:555
+
+- 💡 노드를 클릭하면 그 주제에 집중하고, AI 튜터에게 바로 질문할 수 있어요.
+  위치: src/components/MindmapView.tsx:583
+
+- 마감일과 분량을 연결해서 오늘 할 양을 계산해요.
+  위치: src/components/PlannerModals.tsx:434
+
+- 먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있어요.
+  위치: src/components/PlannerModals.tsx:449
+
+- D-day 없이 14일 기준 페이스로 시작합니다.
+  위치: src/components/PlannerModals.tsx:473
+
+- 퀴즈 기준 플랜은 진행도가 퀴즈 응시에서 자동 집계돼요.
+  위치: src/components/PlannerModals.tsx:633
+
+- ⌃, ⌥, ⌘ 중 하나와 다른 키를 누르세요. Esc로 취소.
+  위치: src/components/PopoverShortcutControl.tsx:73
+
+- 현재 단축키를 사용할 수 없어요. 다른 조합을 선택하세요.
+  위치: src/components/PopoverShortcutControl.tsx:74
+
+- 로 만든 예시예요. 실제로는 내 강의 자료를 올려 만들어요.
+  위치: src/components/SampleDemo.tsx:175
+
+- 자료로 만든 샘플 퀴즈예요. 객관식·OX·단답형·주관식이 섞여 있고, 주관식은 AI가 채점해요.
+  위치: src/components/SampleDemo.tsx:236
+
+- 마음에 드세요? 내 강의 자료로 직접 만들어 보세요.
+  위치: src/components/SampleDemo.tsx:245
+
+- Google Calendar를 연결했어요. 마이페이지에서 일정을 가져올 수 있어요.
+  위치: src/features/integrations/CalendarCallback.tsx:16
+
+- 로그인 세션이 끝났어요. 로그인 후 마이페이지에서 연결을 다시 시작해주세요.
+  위치: src/features/integrations/CalendarCallback.tsx:20
+
+- 앱 연결을 해제했어요. Google의 접근 권한도 확인하려면 계정 권한 관리에서 해제해주세요.
+  위치: src/features/integrations/CalendarConnections.tsx:31
+
+- 읽기 전용으로 기본 캘린더의 지난 30일~앞으로 180일 일정을 가져와요. 원본 일정은 수정하지 않아요.
+  위치: src/features/integrations/CalendarConnections.tsx:42
+
+- 서버에 Google OAuth 앱과 암호화 키를 설정하면 연결할 수 있어요.
+  위치: src/features/integrations/CalendarConnections.tsx:45
+
+- 일정을 가져오려면 서버의 학습 워커를 켜야 해요.
+  위치: src/features/integrations/CalendarConnections.tsx:52
+
+- 이 날의 가져온 일정이 없어요. 마이페이지에서 캘린더를 연결하고 일정을 가져올 수 있어요.
+  위치: src/features/integrations/ExternalEvents.tsx:25
+
+- 자료 서비스를 연결했어요. 마이페이지에서 가져올 자료를 선택해주세요.
+  위치: src/features/integrations/SourceCallback.tsx:10
+
+- 로그인 세션을 확인해주세요. 로그인 후 연결을 다시 시작할 수 있어요.
+  위치: src/features/integrations/SourceCallback.tsx:11
+
+- 가져온 내용을 아래에서 확인하고 저장해주세요.
+  위치: src/features/integrations/SourceConnections.tsx:22
+
+- Google 문서·텍스트·PDF·PPTX·DOCX를 읽기 전용으로 가져와요.
+  위치: src/features/integrations/SourceConnections.tsx:26
+
+- 허용한 Notion 페이지의 본문을 읽어와요. 하위 페이지는 별도로 선택해요.
+  위치: src/features/integrations/SourceConnections.tsx:26
+
+- 원본은 수정하지 않으며, 변경된 내용은 새 자료 버전으로 저장해요.
+  위치: src/features/integrations/SourceConnections.tsx:26
+
+- 앱 연결을 해제했어요. 외부 서비스의 권한 관리에서도 접근 권한을 확인해주세요.
+  위치: src/features/integrations/SourceConnections.tsx:30
+
+- 가져올 자료가 없어요. 검색어와 서비스에서 허용한 페이지를 확인해주세요.
+  위치: src/features/integrations/SourceConnections.tsx:34
+
+- 로그인하면 여러 과목의 개념을 연결할 수 있어요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:18
+
+- 같은 뜻의 개념은 확인 후 연결하고, 먼저 공부할 개념에서 다음 개념으로 선수 관계를 연결하세요. 원문별 답변과 근거는 각각 보존해요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:20
+
+- 지도를 좌우로 움직여 개념과 선수 관계를 확인하세요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:28
+
+- 설명 학습을 완료하면 지도에 개념이 나타나요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:29
+
+- 같은 문제 반복, 피드백을 본 설명 수정, 독립 수행을 구분해요. 한 번의 정답으로 장기 이해를 확정하지 않아요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:25
+
+- 원문이 바뀌었어요. 이 기록은 이전 원문 버전의 학습이에요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:26
+
+- 로그인하면 개념별 학습 기록을 확인할 수 있어요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:44
+
+- 과목의 자료나 학습 이슈를 열고 궁금한 점을 질문해보세요.
+  위치: src/features/learningMate/LearningMateHost.tsx:34
+
+- 이번 설명·문제 결과예요. 장기 기억·응용 능력은 평가하지 않았어요.
+  위치: src/features/learningSession/LearningResults.tsx:18
+
+- 보완할 개념은 원문을 확인한 뒤 다시 설명해보세요.
+  위치: src/features/learningSession/LearningResults.tsx:27
+
+- 진행 중인 요청의 결과를 확인한 뒤 이동해주세요.
+  위치: src/features/learningSession/LearningRunner.tsx:52
+
+- 원문이 바뀌었어요. 시작 당시 원문으로 진행해요.
+  위치: src/features/learningSession/LearningRunner.tsx:90
+
+- 자기 점검 결과예요. AI 평가와 별도로 기록해요.
+  위치: src/features/learningSession/LearningRunner.tsx:115
+
+- 필요하면 도움을 확인한 뒤 문제를 풀어보세요.
+  위치: src/features/learningSession/LearningRunner.tsx:116
+
+- 자료를 보고 풀었다면 도움을 받은 학습이에요.
+  위치: src/features/learningSession/LearningRunner.tsx:141
+
+- 이번 학습을 취소할까요? 제출한 기록은 취소 상태로 보관합니다.
+  위치: src/features/learningSession/LearningRunner.tsx:152
+
+- 학습 시작 요청의 결과를 확인한 뒤 이동해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:74
+
+- 과목을 만들고 자료를 올리면 학습을 시작할 수 있어요.
+  위치: src/features/learningSession/LearningSetup.tsx:116
+
+- 강의자료를 올린 뒤 학습할 구간을 선택해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:118
+
+- 분량은 개념 수로 정해요. 목표 시간이 지나도 계속할 수 있어요.
+  위치: src/features/learningSession/LearningSetup.tsx:159
+
+- 학습 직후와 시간이 지난 뒤의 독립 수행을 따로 봐요.
+  위치: src/features/learningSession/ReviewOverview.tsx:29
+
+- 도움 없이 예정일 이후 설명·문제를 모두 제출한 기록이에요. 판단 보류와 변경된 원문은 제외해요.
+  위치: src/features/learningSession/ReviewOverview.tsx:36
+
+- 일시 정지한 복습이에요. 복습 관리에서 재개해주세요.
+  위치: src/features/learningSession/ReviewPractice.tsx:83
+
+- 원문이 바뀌었어요. 새 자료로 학습한 뒤 복습을 추가해주세요.
+  위치: src/features/learningSession/ReviewPractice.tsx:83
+
+- 서버 호출 기준이에요. 토큰이나 단가가 확인되지 않은 비용은 계산에서 제외해요. 실제 청구액과 다를 수 있어요.
+  위치: src/features/learningSession/UsageOverview.tsx:28
+
+- 요약·퀴즈·설명 학습을 준비하고 초안을 확인한 뒤 저장해요.
+  위치: src/features/preparation/PreparationPanel.tsx:50
+
+- 원문이 바뀌었어요. 새 원문으로 학습한 뒤 설명을 개선해주세요.
+  위치: src/features/review/ExplanationRevision.tsx:118
+
+- 피드백을 참고한 보완 수행으로 기록해요. 독립적인 기억 확인은 복습에서 진행해요.
+  위치: src/features/review/ExplanationRevision.tsx:124
+
+- 지금 이어갈 학습이 없어요. 새 학습을 시작해보세요.
+  위치: src/features/review/LearningBriefing.tsx:44
+
+- 보완 후 같은 문제를 맞힌 기록과 독립적인 이해 확인은 구분해요. 수동 종료는 이해 완료 판정이 아니에요.
+  위치: src/features/review/LearningIssues.tsx:35
+
+- 이전 원문 버전의 근거예요. 현재 자료로 새로 학습한 기록과 구분해요.
+  위치: src/features/review/LearningIssues.tsx:37
+
+- 아직 기록된 이슈가 없어요. 학습에서 보완할 개념이 나오면 이곳에 모여요.
+  위치: src/features/review/LearningIssues.tsx:69
+
+- 복습은 앱 안에서 확인해요. 자동 복습을 켜면 예정일에 새 사례의 복습 문제도 준비해요. 일시 정지·미루기는 복습 관리에서 변경할 수 있어요.
+  위치: src/features/review/LearningPreferences.tsx:26
+
+- 이 과목의 자료로 설명 학습을 하면 연결할 개념이 만들어져요.
+  위치: src/features/review/QuizIssueLink.tsx:20
+
+- 직접 연결한 오답은 확인 필요 근거로 기록해요.
+  위치: src/features/review/QuizIssueLink.tsx:22
+
+- 오늘의 복습과 보완할 개념을 한곳에서 확인하세요.
+  위치: src/features/review/ReviewHome.tsx:13
+
+- 로그인하면 복습과 학습 기록을 확인할 수 있어요.
+  위치: src/features/review/ReviewHome.tsx:18
+
+- 비밀번호를 변경했어요. 새 비밀번호로 로그인되었습니다.
+  위치: src/pages/Auth.tsx:60
+
+- 날짜별 페이스 학습 · D-day · 할 일을 한 화면에서 관리하세요.
+  위치: src/pages/Calendar.tsx:289
+
+- 강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.
+  위치: src/pages/Dashboard.tsx:300
+
+- 더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했어요. 잠깐이면 끝나니 아래 버튼으로 참여해 주시면 큰 도움이 됩니다.
+  위치: src/pages/Dashboard.tsx:469
+
+- 다음 기능은 아직 완성되지 않았어요: 다크모드(완벽 적용 전), AI 학습 계획 자동 생성, 학습 통계 탭, 로그인 기능. 순차적으로 업데이트할 예정이니 양해 부탁드려요.
+  위치: src/pages/Dashboard.tsx:483
+
+- 사이드바 하단의 '피드백 보내기' 또는 ${FEEDBACK_EMAIL}로 의견을 보내주시면 큰 힘이 됩니다.
+  위치: src/pages/Dashboard.tsx:489
+
+- 버그 제보, 기능 제안 등 어떤 의견이든 환영해요. 아래 주소로 메일을 보내주시면 큰 힘이 됩니다.
+  위치: src/pages/Dashboard.tsx:559
+
+- 자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.
+  위치: src/pages/Dashboard.tsx:862
+
+- ${parts.join("와 ")}만 가볍게 반영할게요.
+  위치: src/pages/Dashboard.tsx:863
+
+- ${parts.join("와 ")}를 조금 빡세게 반영할게요.
+  위치: src/pages/Dashboard.tsx:864
+
+- 과제 중심으로 ${parts.join("와 ")}를 골라뒀어요.
+  위치: src/pages/Dashboard.tsx:865
+
+- 일정 위주로 ${parts.join("와 ")}를 골라뒀어요.
+  위치: src/pages/Dashboard.tsx:866
+
+- ${parts.join("와 ")}를 반영할게요.
+  위치: src/pages/Dashboard.tsx:867
+
+- 조금 밀렸어요. ${stepView.plan.course}부터 시작해요.
+  위치: src/pages/Dashboard.tsx:1140
+
+- Tongkk는 무료! 사용료 대신 여러분의 피드백을 먹고 자랍니다 ^.^
+  위치: src/pages/Dashboard.tsx:1241
+
+- 더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했으니 오른쪽 공지사항을 참고해주세요.
+  위치: src/pages/Dashboard.tsx:1242
+
+- AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
+  위치: src/pages/Dashboard.tsx:1364
+
+- D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
+  위치: src/pages/Dashboard.tsx:1547
+
+- 직접 작성한 계획은 그대로 유지돼요. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
+  위치: src/pages/Dashboard.tsx:1628
+
+- 」 쉬운 5문제로 현재 수준을 먼저 확인해보세요.
+  위치: src/pages/Dashboard.tsx:1746
+
+- 알림 설정은 Tongkk 웹과 함께 저장돼요.
+  위치: src/pages/MenubarSettings.tsx:253
+
+- 할 일을 체크하면 Tongkk 웹에도 바로 반영돼요.
+  위치: src/pages/MenubarSettings.tsx:264
+
+- 선택한 자료의 본문이 없어 질문에 반영할 수 없어요.
+  위치: src/pages/MiniTutor.tsx:113
+
+- 선택한 자료를 바탕으로 답해요. 궁금한 걸 물어보세요.
+  위치: src/pages/MiniTutor.tsx:194
+
+- 사용하시다 불편한 점이나 "이런 기능이 있으면 좋겠다" 싶은 아이디어가 있다면 언제든 알려주세요. 여러분의 피드백이 Tongkk을 더 좋게 만듭니다..
+  위치: src/pages/MyPage.tsx:205
+
+- (으)로 변경했어요. 과목·자료·요약·퀴즈 기록은 그대로 유지됩니다.
+  위치: src/pages/MyPage.tsx:262
+
+- 튜토리얼을 초기화했어요. 각 화면에 다시 들어가면 사용법이 다시 떠요.
+  위치: src/pages/MyPage.tsx:320
+
+- 로그인하고 과목·자료·요약·퀴즈 기록을 계정에 저장하세요.
+  위치: src/pages/MyPage.tsx:476
+
+- 과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
+  위치: src/pages/MyPage.tsx:528
+
+- 아직 풀이 기록이 없어 기본 난이도로 시작합니다.
+  위치: src/pages/Quiz.tsx:191
+
+- 최근 평균 ${average}%라서 한 단계 높은 문제로 점검해도 좋습니다.
+  위치: src/pages/Quiz.tsx:194
+
+- 최근 평균 ${average}%라서 현재 수준을 유지하며 빈틈을 줄이는 흐름이 좋습니다.
+  위치: src/pages/Quiz.tsx:195
+
+- 최근 평균 ${average}%라서 쉬운 문제로 핵심 개념을 다시 잡는 편이 좋습니다.
+  위치: src/pages/Quiz.tsx:196
+
+- 저장된 풀이 기록에서 정답으로 채점되었습니다.
+  위치: src/pages/Quiz.tsx:228
+
+- 저장된 풀이 기록에서 오답으로 채점되었습니다.
+  위치: src/pages/Quiz.tsx:228
+
+- PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일만 업로드할 수 있습니다.
+  위치: src/pages/Quiz.tsx:649
+
+- 정답을 선택하지 않았습니다. 그래도 다음 문제로 이동할까요?
+  위치: src/pages/Quiz.tsx:957
+
+- 아직 풀지 않은 문제가 있습니다: ${numbers}번 해당 문제로 이동할까요? (취소를 누르면 그대로 제출합니다.)
+  위치: src/pages/Quiz.tsx:966
+
+- 퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다. 페이지를 떠나시겠습니까?
+  위치: src/pages/Quiz.tsx:1166
+
+- 퀴즈 풀이 중입니다. 나중에 이 과목 퀴즈 화면에서 이어서 풀 수 있어요. 페이지를 떠나시겠습니까?
+  위치: src/pages/Quiz.tsx:1167
+
+- 아직 저장된 자료가 없어요. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
+  위치: src/pages/Quiz.tsx:1295
+
+- 자료를 선택하면 페이지 범위를 지정할 수 있어요.
+  위치: src/pages/Quiz.tsx:1503, src/pages/Summary.tsx:1911
+
+- 자료 출처를 '원본'으로 두면 페이지를 고를 수 있어요. (요약은 페이지 정보가 없어요)
+  위치: src/pages/Quiz.tsx:1505
+
+- 선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요.
+  위치: src/pages/Quiz.tsx:1506, src/pages/Summary.tsx:1910
+
+- 모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.
+  위치: src/pages/ReviewNotes.tsx:205
+
+- ${templateLabels[selectedTemplate]} 요약 보는 중
+  위치: src/pages/Summary.tsx:631
+
+- 기존 자료를 확인하고, 원본 파일 연결이 없으면 다시 연결합니다.
+  위치: src/pages/Summary.tsx:703
+
+- 기존 자료에 원본 파일을 다시 연결하고 있습니다.
+  위치: src/pages/Summary.tsx:728
+
+- 이미 등록된 자료입니다. 기존 자료를 그대로 사용합니다.
+  위치: src/pages/Summary.tsx:749
+
+- 파일 정보를 읽고 저장 준비를 하고 있습니다.
+  위치: src/pages/Summary.tsx:770
+
+- 자료 내용을 Markdown으로 변환하고 있습니다.
+  위치: src/pages/Summary.tsx:795
+
+- 원본 파일이 ${(documentFile.size / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본은 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.
+  위치: src/pages/Summary.tsx:817
+
+- 추출된 텍스트와 원본 파일을 저장하고 있습니다.
+  위치: src/pages/Summary.tsx:824
+
+- ${message} 그래도 텍스트 추출 결과는 저장되어 요약과 퀴즈에 사용할 수 있습니다.
+  위치: src/pages/Summary.tsx:843
+
+- 원본까지 저장하려면 파일을 50MB 미만으로 줄이거나 나눠서 올려주세요.
+  위치: src/pages/Summary.tsx:1285
+
+- 요약 내용은 그대로 두고, 원본 미리보기에 필요한 파일만 연결했습니다.
+  위치: src/pages/Summary.tsx:1395
+
+- 기존 자료를 그대로 사용할게요. 원본 파일 연결이 없던 자료는 다시 연결을 시도합니다.
+  위치: src/pages/Summary.tsx:1396
+
+- 드래그해서 요약과 AI 튜터 비율을 조절하세요
+  위치: src/pages/summary/MaterialDetailView.tsx:137
+
+- DOCX 미리보기를 PDF로 변환하는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:579
+
+- PPT/PPTX 미리보기를 PDF로 변환하는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:579
+
+- 이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.
+  위치: src/pages/summary/MaterialDetailView.tsx:627
+
+- 이 자료는 원본 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 파일을 다시 업로드하면 다음부터 원본 보기로 열립니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:628
+
+- ${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.
+  위치: src/pages/summary/MaterialDetailView.tsx:651
+
+- 이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:947
+
+- 이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:1080
+
+- 인쇄 창에서 '대상'을 'PDF로 저장'으로 선택하세요.
+  위치: src/pages/summary/SummaryResultView.tsx:125, src/pages/summary/SummaryResultView.tsx:592
+
+- 기다리지 않고 다른 화면으로 이동해도 돼요. 완성되면 알려드릴게요.
+  위치: src/pages/summary/SummaryResultView.tsx:483
+
+- 반영할 범위와 집중할 내용을 정한 뒤, 요약 형식을 선택하세요
+  위치: src/pages/summary/TemplateSelectView.tsx:28
+
+- PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.
+  위치: src/pages/summary/utils.tsx:45
+
+- 파일을 50MB 미만으로 줄이거나 나눠 올리면 원본도 저장됩니다. 지금도 텍스트는 저장돼 요약·퀴즈엔 사용할 수 있어요.
+  위치: src/pages/summary/utils.tsx:57
+
+- 다시 로그인한 뒤 같은 파일을 재시도해주세요.
+  위치: src/pages/summary/utils.tsx:64
+
+- 원본 파일을 보관하고, 가능하면 텍스트 추출 결과나 텍스트 붙여넣기로 이어가세요.
+  위치: src/pages/summary/utils.tsx:71
+
+- 강의 자료(PDF·PPT·이미지·텍스트)를 올리면 AI가 강의 노트·치트시트·마인드맵으로 요약하고, 퀴즈까지 만들어줘요.
+  위치: src/tutorialContent.ts:35
+
+- ① 과목 만들기 → ② 자료 올리기 → ③ AI 요약으로 이해 → ④ 퀴즈로 점검. '자료 요약·퀴즈'는 과목 안에서 열려요.
+  위치: src/tutorialContent.ts:39
+
+- 과목을 추가하고 강의자료를 올리면 AI가 요약·퀴즈를 만들 준비를 해요. '추가하고 자료 올리기'를 누르면 바로 업로드로 이어져요.
+  위치: src/tutorialContent.ts:51
+
+- PDF·PPT·DOCX·TXT·이미지를 끌어다 놓거나 '파일 선택'으로 올리면 AI가 내용을 읽어요. 파일이 없으면 '텍스트 붙여넣기' 탭에 필기를 붙여넣어도 돼요.
+  위치: src/tutorialContent.ts:64
+
+- 기본은 가장 최근 자료 1개예요. 행을 눌러 여러 개를 함께 고를 수 있는데, 많이 묶을수록 AI가 내용을 줄여 요약해요. 한 강의에 집중하려면 1개만 두세요.
+  위치: src/tutorialContent.ts:68
+
+- 일반 요약·강의 노트·마인드맵·치트시트 중에 골라 '요약 생성하기'를 누르세요. 만드는 동안 다른 화면으로 가도 완료되면 알려드려요.
+  위치: src/tutorialContent.ts:72
+
+- 위쪽 '원본·요약·퀴즈' 탭으로 같은 자료를 여러 방식으로 살펴봐요. 요약을 읽다가 모르는 부분은 본문을 드래그하면 'AI 튜터에게 묻기'로 바로 질문할 수 있어요.
+  위치: src/tutorialContent.ts:86
+
+- '퀴즈' 탭에서 이 자료로 문제를 만들어 풀면 방금 이해한 내용을 곧장 확인할 수 있어요.
+  위치: src/tutorialContent.ts:90
+
+- PDF·PPT·이미지·문서를 올리면 그 자료 내용으로 문제를 만들어요. 반영할 자료를 골라야 생성할 수 있어요.
+  위치: src/tutorialContent.ts:104
+
+- '퀴즈 생성하기'를 누르면 AI가 자료를 읽고 문제를 만들어요. 이전에 푼 문제는 자동으로 빼 줘요.
+  위치: src/tutorialContent.ts:112
+
+- 객관식·OX는 보기를 누르면 바로 채점되고 다시 못 바꿔요. 단답형은 Enter나 '제출', 주관식은 제출하면 AI가 채점해요. 시험 모드는 결과에서 한꺼번에 확인돼요.
+  위치: src/tutorialContent.ts:124
+
+
+2. 전체 후보 / 안내·상태
+================================================================
+
+[src/components/AITutorDrawer.tsx]
+- 요약 생성 후 AI 튜터를 사용할 수 있습니다
+  위치: src/components/AITutorDrawer.tsx:203, src/pages/summary/MaterialDetailView.tsx:930, src/pages/summary/MaterialDetailView.tsx:1061, src/pages/summary/SummaryResultView.tsx:556
+- 저장된 대화가 없습니다
+  위치: src/components/AITutorDrawer.tsx:662
+- 기존 대화를 보존하고 새 대화를 시작합니다
+  위치: src/components/AITutorDrawer.tsx:737
+- 이전 AI 튜터 대화를 불러오는 중입니다.
+  위치: src/components/AITutorDrawer.tsx:850
+- 이미지는 최대 ${MAX_TUTOR_IMAGES}장까지 첨부할 수 있습니다
+  위치: src/components/AITutorDrawer.tsx:1001
+
+[src/components/LoginModal.tsx]
+- 재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인해주세요.
+  위치: src/components/LoginModal.tsx:88
+- 새 인증번호를 보냈어요. 메일함과 스팸함을 확인해주세요.
+  위치: src/components/LoginModal.tsx:126
+- 가입한 이메일로 재설정 링크를 받으세요
+  위치: src/components/LoginModal.tsx:157
+- ${email.trim()} 으로 보낸 ${CODE_LENGTH}자리 인증번호를 입력해주세요.
+  위치: src/components/LoginModal.tsx:157
+- 계정에 로그인하세요
+  위치: src/components/LoginModal.tsx:157
+- 비밀번호를 잊으셨나요?
+  위치: src/components/LoginModal.tsx:176
+- 인증 시간이 끝났어요. 인증번호를 다시 받아주세요.
+  위치: src/components/LoginModal.tsx:202
+- 메일이 안 보이면 스팸함이나 이메일 주소를 확인해주세요.
+  위치: src/components/LoginModal.tsx:202
+- 이미 계정이 있나요?
+  위치: src/components/LoginModal.tsx:216
+
+[src/components/MaterialDeleteConfirmModal.tsx]
+- 선택한 자료를 삭제할까요?
+  위치: src/components/MaterialDeleteConfirmModal.tsx:27
+- 자료를 삭제할까요?
+  위치: src/components/MaterialDeleteConfirmModal.tsx:27
+- 선택한 자료 ${materialCount}개와 이 자료들로 만든 ${summaryPhrase}AI 튜터 대화가 함께 삭제됩니다. 퀴즈와 풀이 기록은 남습니다. 삭제 후에는 되돌릴 수 없습니다.
+  위치: src/components/MaterialDeleteConfirmModal.tsx:31
+- '${materialName}' 자료와 이 자료로 만든 ${summaryPhrase}AI 튜터 대화가 함께 삭제됩니다. 퀴즈와 풀이 기록은 남습니다. 삭제 후에는 되돌릴 수 없습니다.
+  위치: src/components/MaterialDeleteConfirmModal.tsx:32
+
+[src/components/MindmapView.tsx]
+- 끌어 둔 노드 위치를 자동 정렬로 되돌립니다
+  위치: src/components/MindmapView.tsx:532
+- 켜면 노드를 클릭해 AI 튜터에게 질문할 수 있어요
+  위치: src/components/MindmapView.tsx:555
+- 💡 노드를 클릭하면 그 주제에 집중하고, AI 튜터에게 바로 질문할 수 있어요.
+  위치: src/components/MindmapView.tsx:583
+
+[src/components/PdfViewer.tsx]
+- 원본 PDF를 불러오는 중입니다.
+  위치: src/components/PdfViewer.tsx:119
+
+[src/components/PlannerModals.tsx]
+- 달력에서 날짜를 선택해주세요 (필수)
+  위치: src/components/PlannerModals.tsx:267
+- 기준을 선택하면 하루 권장량을 알려드려요.
+  위치: src/components/PlannerModals.tsx:409
+- 마감일과 분량을 연결해서 오늘 할 양을 계산해요.
+  위치: src/components/PlannerModals.tsx:434
+- 먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있어요.
+  위치: src/components/PlannerModals.tsx:449
+- D-day 없이 14일 기준 페이스로 시작합니다.
+  위치: src/components/PlannerModals.tsx:473
+- 무엇을 기준으로 끝낼까요?
+  위치: src/components/PlannerModals.tsx:478
+- 강의 콘텐츠 분량을 불러오는 중…
+  위치: src/components/PlannerModals.tsx:481
+- 퀴즈 기준 플랜은 진행도가 퀴즈 응시에서 자동 집계돼요.
+  위치: src/components/PlannerModals.tsx:633
+
+[src/components/PopoverShortcutControl.tsx]
+- ⌃, ⌥, ⌘ 중 하나와 다른 키를 누르세요. Esc로 취소.
+  위치: src/components/PopoverShortcutControl.tsx:73
+- 현재 단축키를 사용할 수 없어요. 다른 조합을 선택하세요.
+  위치: src/components/PopoverShortcutControl.tsx:74
+
+[src/components/SampleDemo.tsx]
+- 로 만든 예시예요. 실제로는 내 강의 자료를 올려 만들어요.
+  위치: src/components/SampleDemo.tsx:175
+- 자료로 만든 샘플 퀴즈예요. 객관식·OX·단답형·주관식이 섞여 있고, 주관식은 AI가 채점해요.
+  위치: src/components/SampleDemo.tsx:236
+- 마음에 드세요? 내 강의 자료로 직접 만들어 보세요.
+  위치: src/components/SampleDemo.tsx:245
+
+[src/features/integrations/CalendarCallback.tsx]
+- 캘린더 연결을 확인하는 중…
+  위치: src/features/integrations/CalendarCallback.tsx:9
+- Google Calendar를 연결했어요. 마이페이지에서 일정을 가져올 수 있어요.
+  위치: src/features/integrations/CalendarCallback.tsx:16
+- 로그인 세션이 끝났어요. 로그인 후 마이페이지에서 연결을 다시 시작해주세요.
+  위치: src/features/integrations/CalendarCallback.tsx:20
+
+[src/features/integrations/CalendarConnections.tsx]
+- 일정 가져오기를 예약했어요.
+  위치: src/features/integrations/CalendarConnections.tsx:28
+- 연결과 캘린더 접근 권한을 해제했어요.
+  위치: src/features/integrations/CalendarConnections.tsx:31
+- 앱 연결을 해제했어요. Google의 접근 권한도 확인하려면 계정 권한 관리에서 해제해주세요.
+  위치: src/features/integrations/CalendarConnections.tsx:31
+- 읽기 전용으로 기본 캘린더의 지난 30일~앞으로 180일 일정을 가져와요. 원본 일정은 수정하지 않아요.
+  위치: src/features/integrations/CalendarConnections.tsx:42
+- 연결을 확인하는 중…
+  위치: src/features/integrations/CalendarConnections.tsx:45, src/features/integrations/SourceConnections.tsx:28
+- 서버에 Google OAuth 앱과 암호화 키를 설정하면 연결할 수 있어요.
+  위치: src/features/integrations/CalendarConnections.tsx:45
+- 일정을 가져오는 중…
+  위치: src/features/integrations/CalendarConnections.tsx:49
+- 일정을 가져오려면 서버의 학습 워커를 켜야 해요.
+  위치: src/features/integrations/CalendarConnections.tsx:52
+
+[src/features/integrations/ExternalEvents.tsx]
+- 일정을 확인하는 중…
+  위치: src/features/integrations/ExternalEvents.tsx:25
+- 이 날의 가져온 일정이 없어요. 마이페이지에서 캘린더를 연결하고 일정을 가져올 수 있어요.
+  위치: src/features/integrations/ExternalEvents.tsx:25
+
+[src/features/integrations/SourceCallback.tsx]
+- 서비스 연결을 확인하는 중…
+  위치: src/features/integrations/SourceCallback.tsx:8
+- 자료 서비스를 연결했어요. 마이페이지에서 가져올 자료를 선택해주세요.
+  위치: src/features/integrations/SourceCallback.tsx:10
+- 로그인 세션을 확인해주세요. 로그인 후 연결을 다시 시작할 수 있어요.
+  위치: src/features/integrations/SourceCallback.tsx:11
+
+[src/features/integrations/SourceConnections.tsx]
+- 이미 같은 내용으로 저장한 자료예요.
+  위치: src/features/integrations/SourceConnections.tsx:22
+- 가져온 내용을 아래에서 확인하고 저장해주세요.
+  위치: src/features/integrations/SourceConnections.tsx:22
+- 과목에 새 자료 버전으로 저장했어요.
+  위치: src/features/integrations/SourceConnections.tsx:23
+- 초안을 폐기했어요.
+  위치: src/features/integrations/SourceConnections.tsx:23
+- Google 문서·텍스트·PDF·PPTX·DOCX를 읽기 전용으로 가져와요.
+  위치: src/features/integrations/SourceConnections.tsx:26
+- 허용한 Notion 페이지의 본문을 읽어와요. 하위 페이지는 별도로 선택해요.
+  위치: src/features/integrations/SourceConnections.tsx:26
+- 원본은 수정하지 않으며, 변경된 내용은 새 자료 버전으로 저장해요.
+  위치: src/features/integrations/SourceConnections.tsx:26
+- OAuth 앱 설정이 필요해요.
+  위치: src/features/integrations/SourceConnections.tsx:29
+- 서비스 권한과 앱 연결을 해제했어요.
+  위치: src/features/integrations/SourceConnections.tsx:30
+- 앱 연결을 해제했어요. 외부 서비스의 권한 관리에서도 접근 권한을 확인해주세요.
+  위치: src/features/integrations/SourceConnections.tsx:30
+- 자료를 저장하려면 과목을 먼저 만들어주세요.
+  위치: src/features/integrations/SourceConnections.tsx:31
+- 가져올 자료가 없어요. 검색어와 서비스에서 허용한 페이지를 확인해주세요.
+  위치: src/features/integrations/SourceConnections.tsx:34
+- 외부 자료를 처리하는 중…
+  위치: src/features/integrations/SourceConnections.tsx:36
+
+[src/features/learningHistory/ConceptGraph.tsx]
+- 로그인하면 여러 과목의 개념을 연결할 수 있어요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:18
+- 같은 뜻의 개념은 확인 후 연결하고, 먼저 공부할 개념에서 다음 개념으로 선수 관계를 연결하세요. 원문별 답변과 근거는 각각 보존해요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:20
+- 지도를 불러오는 중…
+  위치: src/features/learningHistory/ConceptGraph.tsx:22
+- 지도를 좌우로 움직여 개념과 선수 관계를 확인하세요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:28
+- 설명 학습을 완료하면 지도에 개념이 나타나요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:29
+- 같은 개념인지 확인해주세요
+  위치: src/features/learningHistory/ConceptGraph.tsx:34
+- 아직 연결한 관계가 없어요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:36
+
+[src/features/learningHistory/ConceptHistory.tsx]
+- 기록을 불러오는 중…
+  위치: src/features/learningHistory/ConceptHistory.tsx:22, src/features/learningHistory/ConceptHistory.tsx:48
+- 같은 문제 반복, 피드백을 본 설명 수정, 독립 수행을 구분해요. 한 번의 정답으로 장기 이해를 확정하지 않아요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:25
+- 원문이 바뀌었어요. 이 기록은 이전 원문 버전의 학습이에요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:26
+- 아직 평가 근거가 없어요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:29
+- 로그인하면 개념별 학습 기록을 확인할 수 있어요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:44
+- 개 · 자료 버전별로 기록해요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:49
+- 설명 학습을 시작하면 개념별 기록이 쌓여요.
+  위치: src/features/learningHistory/ConceptHistory.tsx:52
+
+[src/features/learningMate/LearningMateHost.tsx]
+- 과목을 다시 선택해주세요.
+  위치: src/features/learningMate/LearningMateHost.tsx:20
+- 자료를 열면 그 자료와 연결돼요.
+  위치: src/features/learningMate/LearningMateHost.tsx:32
+- 과목의 자료나 학습 이슈를 열고 궁금한 점을 질문해보세요.
+  위치: src/features/learningMate/LearningMateHost.tsx:34
+- 자료를 확인하는 중…
+  위치: src/features/learningMate/LearningMateHost.tsx:35
+- 현재 자료를 서버에서 확인해 답변해요.
+  위치: src/features/learningMate/LearningMateHost.tsx:37
+
+[src/features/learningSession/LearningHelp.tsx]
+- 힌트부터 확인하세요
+  위치: src/features/learningSession/LearningHelp.tsx:10
+- 도움 사용 여부가 기록돼요.
+  위치: src/features/learningSession/LearningHelp.tsx:12
+- 추가 확인이 필요해요
+  위치: src/features/learningSession/LearningHelp.tsx:23
+
+[src/features/learningSession/LearningHistory.tsx]
+- 완료한 학습이 없어요.
+  위치: src/features/learningSession/LearningHistory.tsx:28
+- 제출한 설명이 없어요.
+  위치: src/features/learningSession/LearningHistory.tsx:31
+
+[src/features/learningSession/LearningResults.tsx]
+- 이번 설명·문제 결과예요. 장기 기억·응용 능력은 평가하지 않았어요.
+  위치: src/features/learningSession/LearningResults.tsx:18
+- · 내용 확인 필요
+  위치: src/features/learningSession/LearningResults.tsx:25
+- 보완할 개념은 원문을 확인한 뒤 다시 설명해보세요.
+  위치: src/features/learningSession/LearningResults.tsx:27
+
+[src/features/learningSession/LearningResume.tsx]
+- 설명하고, 문제로 확인해요.
+  위치: src/features/learningSession/LearningResume.tsx:27
+- 진행 중인 학습을 불러오는 중…
+  위치: src/features/learningSession/LearningResume.tsx:30
+- 진행 중인 학습이 없어요.
+  위치: src/features/learningSession/LearningResume.tsx:32
+- 위에서 새 학습을 시작해보세요.
+  위치: src/features/learningSession/LearningResume.tsx:32
+- 새 학습을 시작해보세요.
+  위치: src/features/learningSession/LearningResume.tsx:32
+
+[src/features/learningSession/LearningRunner.tsx]
+- 진행 중인 요청의 결과를 확인한 뒤 이동해주세요.
+  위치: src/features/learningSession/LearningRunner.tsx:52
+- 학습 불러오는 중…
+  위치: src/features/learningSession/LearningRunner.tsx:74
+- 원문이 바뀌었어요. 시작 당시 원문으로 진행해요.
+  위치: src/features/learningSession/LearningRunner.tsx:90
+- 학습을 잠시 멈췄어요
+  위치: src/features/learningSession/LearningRunner.tsx:95
+- 저장한 단계부터 이어서 시작하세요.
+  위치: src/features/learningSession/LearningRunner.tsx:95
+- 개 개념을 준비해요.
+  위치: src/features/learningSession/LearningRunner.tsx:100
+- 준비되면 자동으로 시작해요.
+  위치: src/features/learningSession/LearningRunner.tsx:102
+- 설명을 덮고 직접 설명해보세요.
+  위치: src/features/learningSession/LearningRunner.tsx:106
+- 자기 점검 결과예요. AI 평가와 별도로 기록해요.
+  위치: src/features/learningSession/LearningRunner.tsx:115
+- 필요하면 도움을 확인한 뒤 문제를 풀어보세요.
+  위치: src/features/learningSession/LearningRunner.tsx:116
+- 모르겠어요 · 보완하기
+  위치: src/features/learningSession/LearningRunner.tsx:132
+- 자료를 보고 풀었다면 도움을 받은 학습이에요.
+  위치: src/features/learningSession/LearningRunner.tsx:141
+- 이번 학습을 취소할까요? 제출한 기록은 취소 상태로 보관합니다.
+  위치: src/features/learningSession/LearningRunner.tsx:152
+
+[src/features/learningSession/LearningSetup.tsx]
+- 학습 시작 요청의 결과를 확인한 뒤 이동해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:74
+- 자료를 고르고 학습을 시작하세요.
+  위치: src/features/learningSession/LearningSetup.tsx:102
+- 과목·자료와 범위를 선택하세요.
+  위치: src/features/learningSession/LearningSetup.tsx:107
+- 과목을 불러오는 중…
+  위치: src/features/learningSession/LearningSetup.tsx:114
+- 자료를 불러오는 중…
+  위치: src/features/learningSession/LearningSetup.tsx:114, src/pages/Mini.tsx:225
+- 학습 범위를 불러오는 중…
+  위치: src/features/learningSession/LearningSetup.tsx:114
+- 학습할 과목을 먼저 추가해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:115
+- 과목을 만들고 자료를 올리면 학습을 시작할 수 있어요.
+  위치: src/features/learningSession/LearningSetup.tsx:116
+- 아직 등록된 자료가 없어요.
+  위치: src/features/learningSession/LearningSetup.tsx:117
+- 강의자료를 올린 뒤 학습할 구간을 선택해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:118
+- 한 번에 학습할 범위를 줄여주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:129
+- 학습할 구간을 하나 이상 선택해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:130
+- 자료를 선택하면 학습 범위가 표시돼요.
+  위치: src/features/learningSession/LearningSetup.tsx:133
+- 기억에서 먼저 꺼내 설명해요
+  위치: src/features/learningSession/LearningSetup.tsx:140
+- 짧은 설명을 읽은 뒤 설명해요
+  위치: src/features/learningSession/LearningSetup.tsx:141
+- 분량은 개념 수로 정해요. 목표 시간이 지나도 계속할 수 있어요.
+  위치: src/features/learningSession/LearningSetup.tsx:159
+
+[src/features/learningSession/navigation.ts]
+- 학습 화면 안에서 이동해주세요.
+  위치: src/features/learningSession/navigation.ts:10
+
+[src/features/learningSession/RecallInput.tsx]
+- 답변 충돌 또는 입력을 먼저 마무리해주세요.
+  위치: src/features/learningSession/RecallInput.tsx:62
+- 이 기기의 초안과 서버 답변이 다릅니다.
+  위치: src/features/learningSession/RecallInput.tsx:92
+- 자료를 보지 않고 핵심을 설명해주세요.
+  위치: src/features/learningSession/RecallInput.tsx:99, src/features/learningSession/ReviewPractice.tsx:89
+
+[src/features/learningSession/ReviewOverview.tsx]
+- 학습 직후와 시간이 지난 뒤의 독립 수행을 따로 봐요.
+  위치: src/features/learningSession/ReviewOverview.tsx:29
+- 예정일에 다시 설명하고 문제로 확인해요.
+  위치: src/features/learningSession/ReviewOverview.tsx:29
+- 도움 없이 예정일 이후 설명·문제를 모두 제출한 기록이에요. 판단 보류와 변경된 원문은 제외해요.
+  위치: src/features/learningSession/ReviewOverview.tsx:36
+- 완료 학습에서 복습할 개념을 등록해보세요.
+  위치: src/features/learningSession/ReviewOverview.tsx:37
+- 지금 복습할 개념이 없어요.
+  위치: src/features/learningSession/ReviewOverview.tsx:37
+- 원문 변경 · 새 학습 필요
+  위치: src/features/learningSession/ReviewOverview.tsx:40
+- 복습 예정일 · 기억에서 다시 설명해보세요
+  위치: src/features/learningSession/ReviewOverview.tsx:40
+- 개는 새 학습이 필요해요.
+  위치: src/features/learningSession/ReviewOverview.tsx:42
+
+[src/features/learningSession/ReviewPractice.tsx]
+- 제출 결과를 확인한 뒤 이동해주세요.
+  위치: src/features/learningSession/ReviewPractice.tsx:57
+- 일시 정지한 복습이에요. 복습 관리에서 재개해주세요.
+  위치: src/features/learningSession/ReviewPractice.tsx:83
+- 원문이 바뀌었어요. 새 자료로 학습한 뒤 복습을 추가해주세요.
+  위치: src/features/learningSession/ReviewPractice.tsx:83
+- 새 사례로 확인하는 복습 문제예요.
+  위치: src/features/learningSession/ReviewPractice.tsx:87
+- 기존 학습 문제로 연습하고 있어요.
+  위치: src/features/learningSession/ReviewPractice.tsx:87
+- 새 복습 문제를 준비하는 중…
+  위치: src/features/learningSession/ReviewPractice.tsx:88
+- 자료를 보고 답했어요
+  위치: src/features/learningSession/ReviewPractice.tsx:92
+- 예정일 전 연습이라 복습 일정은 유지돼요.
+  위치: src/features/learningSession/ReviewPractice.tsx:108
+
+[src/features/learningSession/UsageOverview.tsx]
+- 서버 호출 기준이에요. 토큰이나 단가가 확인되지 않은 비용은 계산에서 제외해요. 실제 청구액과 다를 수 있어요.
+  위치: src/features/learningSession/UsageOverview.tsx:28
+
+[src/features/learningSession/useLearningSession.ts]
+- 학습을 먼저 불러와주세요.
+  위치: src/features/learningSession/useLearningSession.ts:70
+- 이전 요청 결과를 먼저 확인해주세요.
+  위치: src/features/learningSession/useLearningSession.ts:71
+
+[src/features/preparation/PreparationPanel.tsx]
+- 요약·퀴즈·설명 학습을 준비하고 초안을 확인한 뒤 저장해요.
+  위치: src/features/preparation/PreparationPanel.tsx:50
+
+[src/features/review/ExplanationRevision.tsx]
+- 평가 제출 결과를 확인한 뒤 이동해주세요.
+  위치: src/features/review/ExplanationRevision.tsx:85
+- 설명을 불러오는 중…
+  위치: src/features/review/ExplanationRevision.tsx:115
+- 서버와 다른 기기 초안이 남아 있어요.
+  위치: src/features/review/ExplanationRevision.tsx:117
+- 원문이 바뀌었어요. 새 원문으로 학습한 뒤 설명을 개선해주세요.
+  위치: src/features/review/ExplanationRevision.tsx:118
+- 피드백을 참고한 보완 수행으로 기록해요. 독립적인 기억 확인은 복습에서 진행해요.
+  위치: src/features/review/ExplanationRevision.tsx:124
+- 설명을 평가하는 중…
+  위치: src/features/review/ExplanationRevision.tsx:126
+
+[src/features/review/LearningBriefing.tsx]
+- 학습을 확인하는 중…
+  위치: src/features/review/LearningBriefing.tsx:37
+- 지금 이어갈 학습이 없어요. 새 학습을 시작해보세요.
+  위치: src/features/review/LearningBriefing.tsx:44
+
+[src/features/review/LearningIssues.tsx]
+- 이슈를 불러오는 중…
+  위치: src/features/review/LearningIssues.tsx:29, src/features/review/LearningIssues.tsx:67
+- 보완 후 같은 문제를 맞힌 기록과 독립적인 이해 확인은 구분해요. 수동 종료는 이해 완료 판정이 아니에요.
+  위치: src/features/review/LearningIssues.tsx:35
+- 이전 원문 버전의 근거예요. 현재 자료로 새로 학습한 기록과 구분해요.
+  위치: src/features/review/LearningIssues.tsx:37
+- 아직 기록된 이슈가 없어요. 학습에서 보완할 개념이 나오면 이곳에 모여요.
+  위치: src/features/review/LearningIssues.tsx:69
+
+[src/features/review/LearningPreferences.tsx]
+- 복습은 앱 안에서 확인해요. 자동 복습을 켜면 예정일에 새 사례의 복습 문제도 준비해요. 일시 정지·미루기는 복습 관리에서 변경할 수 있어요.
+  위치: src/features/review/LearningPreferences.tsx:26
+
+[src/features/review/QuizIssueLink.tsx]
+- 이 과목의 자료로 설명 학습을 하면 연결할 개념이 만들어져요.
+  위치: src/features/review/QuizIssueLink.tsx:20
+- 직접 연결한 오답은 확인 필요 근거로 기록해요.
+  위치: src/features/review/QuizIssueLink.tsx:22
+
+[src/features/review/ReviewHome.tsx]
+- 오늘의 복습과 보완할 개념을 한곳에서 확인하세요.
+  위치: src/features/review/ReviewHome.tsx:13
+- 로그인하면 복습과 학습 기록을 확인할 수 있어요.
+  위치: src/features/review/ReviewHome.tsx:18
+
+[src/features/review/ReviewQueue.tsx]
+- 원문이 바뀌었어요. 새 학습이 필요해요.
+  위치: src/features/review/ReviewQueue.tsx:20
+- 복습을 불러오는 중…
+  위치: src/features/review/ReviewQueue.tsx:41
+- 표시할 복습이 없어요.
+  위치: src/features/review/ReviewQueue.tsx:41
+
+[src/pages/Auth.tsx]
+- 비밀번호를 변경했어요. 새 비밀번호로 로그인되었습니다.
+  위치: src/pages/Auth.tsx:60
+- 로그인 상태를 확인하고 있어요…
+  위치: src/pages/Auth.tsx:108
+- 인증 링크를 확인해주세요
+  위치: src/pages/Auth.tsx:110
+- 새로 사용할 비밀번호를 입력해주세요
+  위치: src/pages/Auth.tsx:123
+- 로그인이 필요합니다
+  위치: src/pages/Auth.tsx:192
+- Tongkk를 이용하려면 로그인해주세요
+  위치: src/pages/Auth.tsx:195
+
+[src/pages/Calendar.tsx]
+- 날짜별 페이스 학습 · D-day · 할 일을 한 화면에서 관리하세요.
+  위치: src/pages/Calendar.tsx:289
+- 할 일을 추가하려면 로그인이 필요해요
+  위치: src/pages/Calendar.tsx:333
+- 페이스를 추가하려면 로그인이 필요해요
+  위치: src/pages/Calendar.tsx:334
+- 이 날의 할 일이 없습니다
+  위치: src/pages/Calendar.tsx:338
+- D-day를 추가하려면 로그인이 필요해요
+  위치: src/pages/Calendar.tsx:423, src/pages/Dashboard.tsx:1450
+- 이 날의 D-day가 없습니다
+  위치: src/pages/Calendar.tsx:426
+
+[src/pages/Dashboard.tsx]
+- 과목명을 입력하면 추가할 수 있어요.
+  위치: src/pages/Dashboard.tsx:118
+- 이미 등록된 강의 이름입니다.
+  위치: src/pages/Dashboard.tsx:166
+- 강의를 삭제할까요?
+  위치: src/pages/Dashboard.tsx:184
+- 의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
+  위치: src/pages/Dashboard.tsx:186
+- 아직 자료가 없습니다
+  위치: src/pages/Dashboard.tsx:245
+- 자료를 삭제했어요.
+  위치: src/pages/Dashboard.tsx:271, src/pages/Summary.tsx:969
+- 강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.
+  위치: src/pages/Dashboard.tsx:300
+- 사용자 설문에 참여해 주세요
+  위치: src/pages/Dashboard.tsx:468
+- 더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했어요. 잠깐이면 끝나니 아래 버튼으로 참여해 주시면 큰 도움이 됩니다.
+  위치: src/pages/Dashboard.tsx:469
+- 아직 준비 중인 기능이 있어요
+  위치: src/pages/Dashboard.tsx:482
+- 다음 기능은 아직 완성되지 않았어요: 다크모드(완벽 적용 전), AI 학습 계획 자동 생성, 학습 통계 탭, 로그인 기능. 순차적으로 업데이트할 예정이니 양해 부탁드려요.
+  위치: src/pages/Dashboard.tsx:483
+- 여러분의 의견을 기다립니다
+  위치: src/pages/Dashboard.tsx:488
+- 사이드바 하단의 '피드백 보내기' 또는 ${FEEDBACK_EMAIL}로 의견을 보내주시면 큰 힘이 됩니다.
+  위치: src/pages/Dashboard.tsx:489
+- 버그 제보, 기능 제안 등 어떤 의견이든 환영해요. 아래 주소로 메일을 보내주시면 큰 힘이 됩니다.
+  위치: src/pages/Dashboard.tsx:559
+- 강의 자료를 추가하려면 로그인이 필요해요
+  위치: src/pages/Dashboard.tsx:694
+- 자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.
+  위치: src/pages/Dashboard.tsx:862
+- ${parts.join("와 ")}만 가볍게 반영할게요.
+  위치: src/pages/Dashboard.tsx:863
+- ${parts.join("와 ")}를 조금 빡세게 반영할게요.
+  위치: src/pages/Dashboard.tsx:864
+- 과제 중심으로 ${parts.join("와 ")}를 골라뒀어요.
+  위치: src/pages/Dashboard.tsx:865
+- 일정 위주로 ${parts.join("와 ")}를 골라뒀어요.
+  위치: src/pages/Dashboard.tsx:866
+- ${parts.join("와 ")}를 반영할게요.
+  위치: src/pages/Dashboard.tsx:867
+- AI 학습 계획을 만들려면 로그인이 필요해요
+  위치: src/pages/Dashboard.tsx:904
+- 학습 계획을 삭제했어요.
+  위치: src/pages/Dashboard.tsx:1047
+- 추천할 과목이 아직 없어요.
+  위치: src/pages/Dashboard.tsx:1138
+- 조금 밀렸어요. ${stepView.plan.course}부터 시작해요.
+  위치: src/pages/Dashboard.tsx:1140
+- Tongkk는 무료! 사용료 대신 여러분의 피드백을 먹고 자랍니다 ^.^
+  위치: src/pages/Dashboard.tsx:1241
+- 더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했으니 오른쪽 공지사항을 참고해주세요.
+  위치: src/pages/Dashboard.tsx:1242
+- 오늘 챙길 것을 모아봤어요.
+  위치: src/pages/Dashboard.tsx:1286
+- 과목과 자료를 먼저 추가해보세요
+  위치: src/pages/Dashboard.tsx:1335
+- 아직 등록된 강의가 없습니다.
+  위치: src/pages/Dashboard.tsx:1362
+- 강의를 만들고 강의자료를 올려보세요.
+  위치: src/pages/Dashboard.tsx:1364
+- AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
+  위치: src/pages/Dashboard.tsx:1364
+- 강의를 추가하려면 로그인이 필요해요
+  위치: src/pages/Dashboard.tsx:1367, src/pages/Dashboard.tsx:1436
+- 설정된 D-day가 없습니다
+  위치: src/pages/Dashboard.tsx:1455
+- D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
+  위치: src/pages/Dashboard.tsx:1547
+- 학습 계획을 추가하려면 로그인이 필요해요
+  위치: src/pages/Dashboard.tsx:1583
+- 직접 작성한 계획은 그대로 유지돼요. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
+  위치: src/pages/Dashboard.tsx:1628
+- 」 쉬운 5문제로 현재 수준을 먼저 확인해보세요.
+  위치: src/pages/Dashboard.tsx:1746
+- 먼저 D-day에 과제나 일정을 추가해보세요
+  위치: src/pages/Dashboard.tsx:1793
+- 아직 생성된 계획이 없습니다
+  위치: src/pages/Dashboard.tsx:1797
+
+[src/pages/MenubarSettings.tsx]
+- 최신 웹 버전을 사용 중이에요.
+  위치: src/pages/MenubarSettings.tsx:198
+- 알림 설정은 Tongkk 웹과 함께 저장돼요.
+  위치: src/pages/MenubarSettings.tsx:253
+- 할 일을 체크하면 Tongkk 웹에도 바로 반영돼요.
+  위치: src/pages/MenubarSettings.tsx:264
+- 계정을 불러오는 중…
+  위치: src/pages/MenubarSettings.tsx:277
+- Tongkk에 로그인하세요.
+  위치: src/pages/MenubarSettings.tsx:277
+
+[src/pages/Mini.tsx]
+- 로그인하고 내 학습을 이어가세요.
+  위치: src/pages/Mini.tsx:149
+- 다가오는 D-day가 없어요.
+  위치: src/pages/Mini.tsx:162
+- 오늘 할 일이 없어요.
+  위치: src/pages/Mini.tsx:170
+- 아직 등록된 과목이 없어요.
+  위치: src/pages/Mini.tsx:220
+- 이 과목에 업로드된 자료가 없어요.
+  위치: src/pages/Mini.tsx:226, src/pages/MiniTutor.tsx:291
+- 다른 계정으로 학습을 이어가세요.
+  위치: src/pages/Mini.tsx:243, src/pages/MiniTutor.tsx:321
+
+[src/pages/MiniTutor.tsx]
+- 선택한 자료의 본문이 없어 질문에 반영할 수 없어요.
+  위치: src/pages/MiniTutor.tsx:113
+- 하면 튜터에게 물어볼 수 있어요.
+  위치: src/pages/MiniTutor.tsx:180
+- 아직 등록된 강의가 없어요
+  위치: src/pages/MiniTutor.tsx:189
+- 선택한 자료를 바탕으로 답해요. 궁금한 걸 물어보세요.
+  위치: src/pages/MiniTutor.tsx:194
+- 자료를 선택하거나 일반 질문을 해보세요.
+  위치: src/pages/MiniTutor.tsx:194
+- 과목이나 자료를 바꾸면 새 대화가 시작돼요.
+  위치: src/pages/MiniTutor.tsx:293
+
+[src/pages/MyPage.tsx]
+- 사용하시다 불편한 점이나 "이런 기능이 있으면 좋겠다" 싶은 아이디어가 있다면 언제든 알려주세요. 여러분의 피드백이 Tongkk을 더 좋게 만듭니다..
+  위치: src/pages/MyPage.tsx:205
+- 이 작업은 현재 계정의 과목, 자료, 요약, 퀴즈, 프로필 데이터를 삭제합니다.
+  위치: src/pages/MyPage.tsx:225
+- Supabase Auth 계정 자체 삭제는 관리자 권한이 필요한 별도 서버 기능입니다.
+  위치: src/pages/MyPage.tsx:228
+- (으)로 변경했어요. 과목·자료·요약·퀴즈 기록은 그대로 유지됩니다.
+  위치: src/pages/MyPage.tsx:262
+- 로그인에 쓰는 이메일을 바꿉니다.
+  위치: src/pages/MyPage.tsx:272
+- 튜토리얼을 초기화했어요. 각 화면에 다시 들어가면 사용법이 다시 떠요.
+  위치: src/pages/MyPage.tsx:320
+- 설정을 저장하려면 로그인이 필요해요
+  위치: src/pages/MyPage.tsx:386
+- 이메일을 변경하려면 로그인이 필요해요
+  위치: src/pages/MyPage.tsx:462
+- 로그인하고 과목·자료·요약·퀴즈 기록을 계정에 저장하세요.
+  위치: src/pages/MyPage.tsx:476
+- 과목, 자료, 요약, 퀴즈 기록은 계정별로 저장됩니다.
+  위치: src/pages/MyPage.tsx:528
+- 데이터를 관리하려면 로그인이 필요해요
+  위치: src/pages/MyPage.tsx:530
+- 삭제 후에는 복구할 수 없습니다.
+  위치: src/pages/MyPage.tsx:535
+
+[src/pages/Quiz.tsx]
+- 아직 풀이 기록이 없어 기본 난이도로 시작합니다.
+  위치: src/pages/Quiz.tsx:191
+- 최근 평균 ${average}%라서 한 단계 높은 문제로 점검해도 좋습니다.
+  위치: src/pages/Quiz.tsx:194
+- 최근 평균 ${average}%라서 현재 수준을 유지하며 빈틈을 줄이는 흐름이 좋습니다.
+  위치: src/pages/Quiz.tsx:195
+- 최근 평균 ${average}%라서 쉬운 문제로 핵심 개념을 다시 잡는 편이 좋습니다.
+  위치: src/pages/Quiz.tsx:196
+- 저장된 풀이 기록에서 정답으로 채점되었습니다.
+  위치: src/pages/Quiz.tsx:228
+- 저장된 풀이 기록에서 오답으로 채점되었습니다.
+  위치: src/pages/Quiz.tsx:228
+- 저장된 풀이 기록을 불러왔습니다.
+  위치: src/pages/Quiz.tsx:499
+- 퀴즈 결과 보는 중
+  위치: src/pages/Quiz.tsx:591
+- PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일만 업로드할 수 있습니다.
+  위치: src/pages/Quiz.tsx:649
+- 정답을 선택하지 않았습니다. 그래도 다음 문제로 이동할까요?
+  위치: src/pages/Quiz.tsx:957
+- 아직 풀지 않은 문제가 있습니다: ${numbers}번 해당 문제로 이동할까요? (취소를 누르면 그대로 제출합니다.)
+  위치: src/pages/Quiz.tsx:966
+- 풀이 기록이 저장되었습니다.
+  위치: src/pages/Quiz.tsx:1136
+- 퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다. 페이지를 떠나시겠습니까?
+  위치: src/pages/Quiz.tsx:1166
+- 퀴즈 풀이 중입니다. 나중에 이 과목 퀴즈 화면에서 이어서 풀 수 있어요. 페이지를 떠나시겠습니까?
+  위치: src/pages/Quiz.tsx:1167
+- 풀던 퀴즈가 있어요
+  위치: src/pages/Quiz.tsx:1212
+- 개가 퀴즈에 반영됩니다
+  위치: src/pages/Quiz.tsx:1287
+- 아직 저장된 자료가 없어요. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
+  위치: src/pages/Quiz.tsx:1295
+- 분석 완료 — 퀴즈에 반영됩니다
+  위치: src/pages/Quiz.tsx:1405
+- 자료를 선택하면 페이지 범위를 지정할 수 있어요.
+  위치: src/pages/Quiz.tsx:1503, src/pages/Summary.tsx:1911
+- 자료 출처를 '원본'으로 두면 페이지를 고를 수 있어요. (요약은 페이지 정보가 없어요)
+  위치: src/pages/Quiz.tsx:1505
+- 선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요.
+  위치: src/pages/Quiz.tsx:1506, src/pages/Summary.tsx:1910
+- 자료를 먼저 올려야 퀴즈를 만들 수 있어요.
+  위치: src/pages/Quiz.tsx:1524
+- 반영할 자료를 1개 이상 선택해주세요.
+  위치: src/pages/Quiz.tsx:1524
+- 시간이 종료되었습니다
+  위치: src/pages/Quiz.tsx:1724
+- 조금 더 노력해봐요!
+  위치: src/pages/Quiz.tsx:1724
+- 표시할 퀴즈가 없습니다.
+  위치: src/pages/Quiz.tsx:1924
+- 오답 확인 · 내 답과 정답을 확인하세요
+  위치: src/pages/Quiz.tsx:2007
+
+[src/pages/ReviewNotes.tsx]
+- 오답 분석을 완료했어요.
+  위치: src/pages/ReviewNotes.tsx:182
+- 모든 과목·회차에서 틀린 문항을 한곳에 모았습니다.
+  위치: src/pages/ReviewNotes.tsx:205
+- 아직 오답이 없습니다
+  위치: src/pages/ReviewNotes.tsx:230
+
+[src/pages/Stats.tsx]
+- 퀴즈를 풀면 이곳에 학습 흐름이 쌓입니다.
+  위치: src/pages/Stats.tsx:155
+- 연속 학습 중이에요
+  위치: src/pages/Stats.tsx:170
+- 아직 풀이 기록이 없습니다.
+  위치: src/pages/Stats.tsx:186, src/pages/Stats.tsx:269
+- 아직 과목별 기록이 없습니다.
+  위치: src/pages/Stats.tsx:226
+
+[src/pages/Summary.tsx]
+- 퀴즈 기록 보는 중
+  위치: src/pages/Summary.tsx:618
+- ${templateLabels[selectedTemplate]} 요약 보는 중
+  위치: src/pages/Summary.tsx:631
+- 지원하지 않는 파일 형식입니다.
+  위치: src/pages/Summary.tsx:659, src/services/materials.ts:152
+- 기존 자료를 확인하고, 원본 파일 연결이 없으면 다시 연결합니다.
+  위치: src/pages/Summary.tsx:703
+- 원본 다시 연결 중
+  위치: src/pages/Summary.tsx:727
+- 기존 자료에 원본 파일을 다시 연결하고 있습니다.
+  위치: src/pages/Summary.tsx:728
+- 기존 자료에 원본 파일만 다시 연결됐습니다.
+  위치: src/pages/Summary.tsx:737
+- 이미 등록된 자료입니다. 기존 자료를 그대로 사용합니다.
+  위치: src/pages/Summary.tsx:749
+- 파일 정보를 읽고 저장 준비를 하고 있습니다.
+  위치: src/pages/Summary.tsx:770
+- 자료 내용을 Markdown으로 변환하고 있습니다.
+  위치: src/pages/Summary.tsx:795
+- 원본 파일이 ${(documentFile.size / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본은 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.
+  위치: src/pages/Summary.tsx:817
+- 추출된 텍스트와 원본 파일을 저장하고 있습니다.
+  위치: src/pages/Summary.tsx:824
+- 업로드와 텍스트 추출이 완료됐습니다.
+  위치: src/pages/Summary.tsx:833
+- ${message} 그래도 텍스트 추출 결과는 저장되어 요약과 퀴즈에 사용할 수 있습니다.
+  위치: src/pages/Summary.tsx:843
+- 자료 ${deleted.length}개를 삭제했어요.
+  위치: src/pages/Summary.tsx:1024
+- 요약이 완성됐어요.
+  위치: src/pages/Summary.tsx:1120
+- 원본은 저장하지 않았어요
+  위치: src/pages/Summary.tsx:1272
+- 를 넘어 원본을 저장하지 않았어요.
+  위치: src/pages/Summary.tsx:1275
+- 원본까지 저장하려면 파일을 50MB 미만으로 줄이거나 나눠서 올려주세요.
+  위치: src/pages/Summary.tsx:1285
+- 이미 만든 요약이 있어요
+  위치: src/pages/Summary.tsx:1317
+- 에 만들었어요. 새로 생성하면
+  위치: src/pages/Summary.tsx:1321
+- 이전 요약도 그대로 보관돼요
+  위치: src/pages/Summary.tsx:1322
+- 기존 자료에 원본 파일을 다시 연결했어요
+  위치: src/pages/Summary.tsx:1382
+- 이미 등록된 파일입니다
+  위치: src/pages/Summary.tsx:1382
+- 요약 내용은 그대로 두고, 원본 미리보기에 필요한 파일만 연결했습니다.
+  위치: src/pages/Summary.tsx:1395
+- 기존 자료를 그대로 사용할게요. 원본 파일 연결이 없던 자료는 다시 연결을 시도합니다.
+  위치: src/pages/Summary.tsx:1396
+- 개가 요약에 반영됩니다
+  위치: src/pages/Summary.tsx:1712
+- 삭제할 자료를 먼저 선택하세요
+  위치: src/pages/Summary.tsx:1728
+- 요약 종류를 선택하세요
+  위치: src/pages/Summary.tsx:1940
+
+[src/pages/summary/MaterialDetailView.tsx]
+- 드래그해서 요약과 AI 튜터 비율을 조절하세요
+  위치: src/pages/summary/MaterialDetailView.tsx:137
+- 표시할 내용이 없습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:569
+- DOCX 미리보기를 PDF로 변환하는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:579
+- PPT/PPTX 미리보기를 PDF로 변환하는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:579
+- 원본 이미지를 불러오는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:580, src/pages/summary/MaterialDetailView.tsx:591
+- 원본 파일을 불러오는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:580
+- 이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.
+  위치: src/pages/summary/MaterialDetailView.tsx:627
+- 이 자료는 원본 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 파일을 다시 업로드하면 다음부터 원본 보기로 열립니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:628
+- ${previewFailure.label}: ${previewError} 아래에 텍스트 추출 결과를 대신 보여드릴게요.
+  위치: src/pages/summary/MaterialDetailView.tsx:651
+- 표시할 변환 내용이 없습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:671
+- 연결된 요약을 불러오는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:942
+- 아직 요약이 없습니다
+  위치: src/pages/summary/MaterialDetailView.tsx:946
+- 이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:947
+- 연결된 퀴즈를 불러오는 중입니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:1075
+- 아직 퀴즈가 없습니다
+  위치: src/pages/summary/MaterialDetailView.tsx:1079
+- 이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:1080
+- 요약을 삭제할까요?
+  위치: src/pages/summary/MaterialDetailView.tsx:1222
+- 퀴즈를 삭제할까요?
+  위치: src/pages/summary/MaterialDetailView.tsx:1222
+- '${templateLabels[pendingDelete.summary.template]}' 요약과 연결된 AI 튜터 대화가 함께 삭제됩니다. 삭제 후에는 되돌릴 수 없습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:1226
+- '${pendingDelete.quizSet.title}' 퀴즈가 삭제됩니다. 풀이 기록은 통계에 남습니다. 삭제 후에는 되돌릴 수 없습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:1227
+
+[src/pages/summary/SummaryResultView.tsx]
+- 인쇄 창에서 '대상'을 'PDF로 저장'으로 선택하세요.
+  위치: src/pages/summary/SummaryResultView.tsx:125, src/pages/summary/SummaryResultView.tsx:592
+- PDF를 다운로드했습니다.
+  위치: src/pages/summary/SummaryResultView.tsx:198, src/pages/summary/SummaryResultView.tsx:649
+- 요약본 전체를 클립보드에 복사했습니다.
+  위치: src/pages/summary/SummaryResultView.tsx:236, src/pages/summary/SummaryResultView.tsx:684
+- 을 선택하면 돼요.
+  위치: src/pages/summary/SummaryResultView.tsx:284, src/pages/summary/SummaryResultView.tsx:732
+- 기다리지 않고 다른 화면으로 이동해도 돼요. 완성되면 알려드릴게요.
+  위치: src/pages/summary/SummaryResultView.tsx:483
+
+[src/pages/summary/TemplateSelectView.tsx]
+- 반영할 범위와 집중할 내용을 정한 뒤, 요약 형식을 선택하세요
+  위치: src/pages/summary/TemplateSelectView.tsx:28
+
+[src/pages/summary/utils.tsx]
+- PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.
+  위치: src/pages/summary/utils.tsx:45
+- 파일을 50MB 미만으로 줄이거나 나눠 올리면 원본도 저장됩니다. 지금도 텍스트는 저장돼 요약·퀴즈엔 사용할 수 있어요.
+  위치: src/pages/summary/utils.tsx:57
+- 다시 로그인한 뒤 같은 파일을 재시도해주세요.
+  위치: src/pages/summary/utils.tsx:64
+- 원본 파일을 보관하고, 가능하면 텍스트 추출 결과나 텍스트 붙여넣기로 이어가세요.
+  위치: src/pages/summary/utils.tsx:71
+
+[src/services/authEmails.ts]
+- 이메일 주소를 다시 확인해주세요.
+  위치: src/services/authEmails.ts:19, src/services/authFlow.ts:30
+- 메일을 요청하고 있습니다. 잠시 기다려주세요.
+  위치: src/services/authEmails.ts:21
+- 잠시 후 메일을 다시 요청해주세요.
+  위치: src/services/authEmails.ts:22
+
+[src/services/authFlow.ts]
+- 인증 링크를 확인할 수 없습니다. 새 메일을 요청해주세요.
+  위치: src/services/authFlow.ts:21
+- 이메일 인증을 완료해주세요. 인증 메일을 다시 받을 수 있습니다.
+  위치: src/services/authFlow.ts:22
+- 기존 비밀번호와 다른 비밀번호를 입력해주세요.
+  위치: src/services/authFlow.ts:24
+- 메일 요청이 너무 많아요. ${retry}
+  위치: src/services/authFlow.ts:26
+- 요청이 너무 많아요. ${retry}
+  위치: src/services/authFlow.ts:27, src/services/authFlow.ts:42
+- 이미 가입된 이메일입니다. 로그인 또는 비밀번호 찾기를 이용해주세요.
+  위치: src/services/authFlow.ts:31
+- 이미 가입된 이메일이에요. 로그인 또는 비밀번호 찾기를 이용해주세요.
+  위치: src/services/authFlow.ts:32
+- 이 이메일로 메일을 보낼 수 없어요. 관리자에게 문의해주세요.
+  위치: src/services/authFlow.ts:33
+- 지금은 이메일 가입을 이용할 수 없어요. 관리자에게 문의해주세요.
+  위치: src/services/authFlow.ts:35
+- 이메일 형식과 비밀번호를 확인해주세요.
+  위치: src/services/authFlow.ts:63
+
+[src/services/documentPreview.ts]
+- 원본 미리보기 변환 시간이 초과되었습니다.
+  위치: src/services/documentPreview.ts:34
+
+[src/services/gpt.ts]
+- 퀴즈 데이터 형식이 올바르지 않습니다.
+  위치: src/services/gpt.ts:63, src/services/gpt.ts:74, src/services/gpt.ts:78, src/services/gpt.ts:90
+- 퀴즈 생성이 취소되었습니다.
+  위치: src/services/gpt.ts:98
+- 채점 결과를 확인했습니다.
+  위치: src/services/gpt.ts:149
+
+[src/services/learningSessions.ts]
+- 학습 세션을 아직 사용할 수 없어요. 관리자에게 문의해주세요.
+  위치: src/services/learningSessions.ts:52
+- 입력한 내용과 학습 범위를 확인해주세요.
+  위치: src/services/learningSessions.ts:53
+
+[src/services/preparation.ts]
+- 학습 자료 준비를 예약했어요. 자료 상세에서 결과를 확인할 수 있어요.
+  위치: src/services/preparation.ts:19
+
+[src/services/profile.ts]
+- 비어 있는 이미지는 업로드할 수 없습니다.
+  위치: src/services/profile.ts:34
+- 프로필 이미지는 5MB 이하만 업로드할 수 있습니다.
+  위치: src/services/profile.ts:35
+- JPG, PNG, WEBP, GIF 이미지 파일만 업로드할 수 있습니다.
+  위치: src/services/profile.ts:51
+
+[src/services/studyPlan.ts]
+- 오늘 할 일을 작게 나눠봤어요.
+  위치: src/services/studyPlan.ts:156
+
+[src/services/summaries.ts]
+- 빈 요약은 저장할 수 없어요.
+  위치: src/services/summaries.ts:203
+
+[src/services/summaryChats.ts]
+- AI 튜터 대화 저장 기준이 없습니다.
+  위치: src/services/summaryChats.ts:88
+
+[src/services/summaryStream.ts]
+- 요약 생성이 취소되었습니다.
+  위치: src/services/summaryStream.ts:414
+
+[src/services/supabase.ts]
+- Supabase 환경변수 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY가 필요합니다.
+  위치: src/services/supabase.ts:12
+- 로그인이 필요합니다.
+  위치: src/services/supabase.ts:46
+
+[src/tutorialContent.ts]
+- Tongkk가 뭐예요?
+  위치: src/tutorialContent.ts:34
+- 강의 자료(PDF·PPT·이미지·텍스트)를 올리면 AI가 강의 노트·치트시트·마인드맵으로 요약하고, 퀴즈까지 만들어줘요.
+  위치: src/tutorialContent.ts:35
+- ① 과목 만들기 → ② 자료 올리기 → ③ AI 요약으로 이해 → ④ 퀴즈로 점검. '자료 요약·퀴즈'는 과목 안에서 열려요.
+  위치: src/tutorialContent.ts:39
+- 여기서 강의를 만들고 자료를 올려요
+  위치: src/tutorialContent.ts:50
+- 과목을 추가하고 강의자료를 올리면 AI가 요약·퀴즈를 만들 준비를 해요. '추가하고 자료 올리기'를 누르면 바로 업로드로 이어져요.
+  위치: src/tutorialContent.ts:51
+- PDF·PPT·DOCX·TXT·이미지를 끌어다 놓거나 '파일 선택'으로 올리면 AI가 내용을 읽어요. 파일이 없으면 '텍스트 붙여넣기' 탭에 필기를 붙여넣어도 돼요.
+  위치: src/tutorialContent.ts:64
+- 기본은 가장 최근 자료 1개예요. 행을 눌러 여러 개를 함께 고를 수 있는데, 많이 묶을수록 AI가 내용을 줄여 요약해요. 한 강의에 집중하려면 1개만 두세요.
+  위치: src/tutorialContent.ts:68
+- 일반 요약·강의 노트·마인드맵·치트시트 중에 골라 '요약 생성하기'를 누르세요. 만드는 동안 다른 화면으로 가도 완료되면 알려드려요.
+  위치: src/tutorialContent.ts:72
+- 만든 요약으로 학습해요
+  위치: src/tutorialContent.ts:85
+- 위쪽 '원본·요약·퀴즈' 탭으로 같은 자료를 여러 방식으로 살펴봐요. 요약을 읽다가 모르는 부분은 본문을 드래그하면 'AI 튜터에게 묻기'로 바로 질문할 수 있어요.
+  위치: src/tutorialContent.ts:86
+- 퀴즈로 바로 점검해요
+  위치: src/tutorialContent.ts:89
+- '퀴즈' 탭에서 이 자료로 문제를 만들어 풀면 방금 이해한 내용을 곧장 확인할 수 있어요.
+  위치: src/tutorialContent.ts:90
+- 자료를 올려 퀴즈를 만들어요
+  위치: src/tutorialContent.ts:103
+- PDF·PPT·이미지·문서를 올리면 그 자료 내용으로 문제를 만들어요. 반영할 자료를 골라야 생성할 수 있어요.
+  위치: src/tutorialContent.ts:104
+- AI가 자료를 분석해 문제를 만들어요
+  위치: src/tutorialContent.ts:111
+- '퀴즈 생성하기'를 누르면 AI가 자료를 읽고 문제를 만들어요. 이전에 푼 문제는 자동으로 빼 줘요.
+  위치: src/tutorialContent.ts:112
+- 객관식·OX는 보기를 누르면 바로 채점되고 다시 못 바꿔요. 단답형은 Enter나 '제출', 주관식은 제출하면 AI가 채점해요. 시험 모드는 결과에서 한꺼번에 확인돼요.
+  위치: src/tutorialContent.ts:124
+
+[src/UpdatePrompt.tsx]
+- 새 버전이 있어요.
+  위치: src/UpdatePrompt.tsx:65, src/pages/MenubarSettings.tsx:198
+
+2. 전체 후보 / 입력 안내
+================================================================
+
+[src/components/LoginModal.tsx]
+- 이메일을 입력하세요
+  위치: src/components/LoginModal.tsx:167
+- 비밀번호를 입력하세요
+  위치: src/components/LoginModal.tsx:173
+
+[src/components/PlannerModals.tsx]
+- 학습 계획을 입력하세요
+  위치: src/components/PlannerModals.tsx:304
+
+[src/features/integrations/SourceConnections.tsx]
+- 가져올 자료의 제목을 입력하세요
+  위치: src/features/integrations/SourceConnections.tsx:32
+
+[src/pages/Auth.tsx]
+- 8자 이상 입력하세요
+  위치: src/pages/Auth.tsx:137
+- 다시 한 번 입력하세요
+  위치: src/pages/Auth.tsx:155
+
+[src/pages/Mini.tsx]
+- 과목 불러오는 중…
+  위치: src/pages/Mini.tsx:210
+- 먼저 과목을 선택하세요
+  위치: src/pages/Mini.tsx:222, src/pages/MiniTutor.tsx:283
+
+[src/pages/MiniTutor.tsx]
+- 자료 불러오는 중…
+  위치: src/pages/MiniTutor.tsx:283
+
+[src/pages/Quiz.tsx]
+- 근거와 함께 답안을 작성하세요
+  위치: src/pages/Quiz.tsx:2067
+
+2. 전체 후보 / 오류·주의
+================================================================
+
+[src/AuthContext.tsx]
+- 인증 링크를 확인할 수 없습니다. 새 메일을 요청해주세요.
+  위치: src/AuthContext.tsx:98
+- 로그인 상태를 확인하지 못했습니다. 다시 로그인해주세요.
+  위치: src/AuthContext.tsx:101
+- 재설정 세션이 만료되었습니다. 새 메일을 요청해주세요.
+  위치: src/AuthContext.tsx:104
+- 로그인 상태를 확인하지 못했습니다. 다시 시도해주세요.
+  위치: src/AuthContext.tsx:111
+
+[src/components/AITutorDrawer.tsx]
+- 이미지를 읽지 못했습니다.
+  위치: src/components/AITutorDrawer.tsx:82
+- 이미지를 불러오지 못했습니다.
+  위치: src/components/AITutorDrawer.tsx:85
+- 이미지 변환에 실패했습니다.
+  위치: src/components/AITutorDrawer.tsx:95
+- 이미지는 최대 ${MAX_TUTOR_IMAGES}장까지 첨부할 수 있습니다.
+  위치: src/components/AITutorDrawer.tsx:264, src/components/AITutorDrawer.tsx:272
+- 이미지 첨부에 실패했습니다.
+  위치: src/components/AITutorDrawer.tsx:275
+- AI 튜터 대화 목록을 불러오지 못했습니다.
+  위치: src/components/AITutorDrawer.tsx:425
+
+[src/components/LoginModal.tsx]
+- 이메일 주소를 다시 확인해주세요.
+  위치: src/components/LoginModal.tsx:77, src/components/LoginModal.tsx:119
+- 비밀번호를 8자 이상 입력해주세요.
+  위치: src/components/LoginModal.tsx:80, src/pages/Auth.tsx:48
+- 재설정 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.
+  위치: src/components/LoginModal.tsx:104
+- 인증하지 못했어요. 인증번호를 확인하고 다시 시도해주세요.
+  위치: src/components/LoginModal.tsx:105
+- 회원가입을 완료하지 못했어요. 입력한 정보를 확인하고 다시 시도해주세요.
+  위치: src/components/LoginModal.tsx:106
+- 로그인하지 못했어요. 입력한 정보를 확인하고 다시 시도해주세요.
+  위치: src/components/LoginModal.tsx:107, src/services/authFlow.ts:65
+- 인증번호가 맞지 않거나 만료됐어요. 다시 확인하거나 새 인증번호를 받아주세요.
+  위치: src/components/LoginModal.tsx:109
+- 인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.
+  위치: src/components/LoginModal.tsx:128
+- 메일을 받지 못했나요?
+  위치: src/components/LoginModal.tsx:222
+
+[src/components/MiniAccount.tsx]
+- 로그아웃하지 못했어요. 다시 시도해 주세요.
+  위치: src/components/MiniAccount.tsx:92
+
+[src/components/PdfViewer.tsx]
+- 원본 PDF를 불러오지 못했습니다.
+  위치: src/components/PdfViewer.tsx:123
+
+[src/components/PlannerModals.tsx]
+- ${ddayTypeLabels[type]}명을 입력해주세요.
+  위치: src/components/PlannerModals.tsx:226
+- 달력에서 날짜를 선택해주세요.
+  위치: src/components/PlannerModals.tsx:227
+- 학습 계획을 입력해주세요.
+  위치: src/components/PlannerModals.tsx:291
+- 강의 콘텐츠를 불러오지 못했어요.
+  위치: src/components/PlannerModals.tsx:381
+
+[src/features/integrations/CalendarCallback.tsx]
+- 연결을 취소했거나 권한을 받지 못했어요. 마이페이지에서 다시 연결해주세요.
+  위치: src/features/integrations/CalendarCallback.tsx:14, src/features/integrations/SourceCallback.tsx:9
+- 연결을 마치지 못했어요. 다시 연결해주세요.
+  위치: src/features/integrations/CalendarCallback.tsx:17
+
+[src/features/integrations/CalendarConnections.tsx]
+- 연결 주소를 확인하지 못했어요.
+  위치: src/features/integrations/CalendarConnections.tsx:24, src/features/integrations/SourceConnections.tsx:21
+- 연결 상태를 변경하지 못했어요.
+  위치: src/features/integrations/CalendarConnections.tsx:34
+- 자동 동기화를 설정하지 못했어요.
+  위치: src/features/integrations/CalendarConnections.tsx:37
+- 실패하면 간격을 늘려 다시 시도해요. 연결을 해제하면 자동 동기화도 중지돼요.
+  위치: src/features/integrations/CalendarConnections.tsx:46
+- 일정을 가져오지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.
+  위치: src/features/integrations/CalendarConnections.tsx:48
+
+[src/features/integrations/ExternalEvents.tsx]
+- 과목을 연결하지 못했어요.
+  위치: src/features/integrations/ExternalEvents.tsx:19
+
+[src/features/integrations/SourceConnections.tsx]
+- 자료 서비스를 이용하지 못했어요.
+  위치: src/features/integrations/SourceConnections.tsx:19
+
+[src/features/learningHistory/ConceptGraph.tsx]
+- 개념을 연결하지 못했어요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:16
+- 연결을 해제하지 못했어요.
+  위치: src/features/learningHistory/ConceptGraph.tsx:17
+
+[src/features/learningMate/AssessmentLock.tsx]
+- 시험 중 학습 도움 제한을 등록하지 못했어요. 연결을 확인해주세요.
+  위치: src/features/learningMate/AssessmentLock.tsx:11
+
+[src/features/learningSession/LearningHistory.tsx]
+- 기록을 불러오지 못했어요.
+  위치: src/features/learningSession/LearningHistory.tsx:18
+- 복습을 추가하지 못했어요.
+  위치: src/features/learningSession/LearningHistory.tsx:42
+
+[src/features/learningSession/LearningLayout.tsx]
+- 답변 저장을 확인한 뒤 다시 이동해주세요.
+  위치: src/features/learningSession/LearningLayout.tsx:22
+
+[src/features/learningSession/LearningResume.tsx]
+- 진행 중인 학습을 불러오지 못했어요.
+  위치: src/features/learningSession/LearningResume.tsx:20
+
+[src/features/learningSession/LearningRunner.tsx]
+- 진행을 저장하지 못했습니다.
+  위치: src/features/learningSession/LearningRunner.tsx:67
+- 준비하지 못했어요. 다시 시도해주세요.
+  위치: src/features/learningSession/LearningRunner.tsx:99
+- 평가가 중단됐어요. 재평가하거나 직접 점검해주세요.
+  위치: src/features/learningSession/LearningRunner.tsx:111
+- 평가하지 못했어요. 답변은 저장됐고 오답으로 처리하지 않았어요.
+  위치: src/features/learningSession/LearningRunner.tsx:114
+
+[src/features/learningSession/LearningSetup.tsx]
+- 과목을 불러오지 못했어요. 잠시 후 다시 열어주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:37
+- 자료를 불러오지 못했어요. 과목을 다시 선택해주세요.
+  위치: src/features/learningSession/LearningSetup.tsx:48
+- 범위를 불러오지 못했습니다.
+  위치: src/features/learningSession/LearningSetup.tsx:64
+- 학습을 시작하지 못했습니다.
+  위치: src/features/learningSession/LearningSetup.tsx:92
+
+[src/features/learningSession/RecallInput.tsx]
+- 서버 저장에 실패했습니다.
+  위치: src/features/learningSession/RecallInput.tsx:53
+- 이 기기에 임시 저장할 수 없습니다. 화면을 떠나기 전에 서버 저장을 확인해주세요.
+  위치: src/features/learningSession/RecallInput.tsx:78
+
+[src/features/learningSession/ReviewOverview.tsx]
+- 복습 기록을 불러오지 못했어요.
+  위치: src/features/learningSession/ReviewOverview.tsx:22
+
+[src/features/learningSession/ReviewPractice.tsx]
+- 복습을 불러오지 못했어요.
+  위치: src/features/learningSession/ReviewPractice.tsx:40
+- 새 문제를 준비하지 못했어요.
+  위치: src/features/learningSession/ReviewPractice.tsx:45
+- 기기에 저장할 수 없어요. 화면을 닫기 전에 답변을 제출해주세요.
+  위치: src/features/learningSession/ReviewPractice.tsx:54
+- 제출 결과를 확인하지 못했어요.
+  위치: src/features/learningSession/ReviewPractice.tsx:68, src/features/review/ExplanationRevision.tsx:110
+- 평가하지 못했어요. 답변은 보존됐고 일정은 그대로예요.
+  위치: src/features/learningSession/ReviewPractice.tsx:85
+
+[src/features/learningSession/UsageOverview.tsx]
+- 사용량을 불러오지 못했어요.
+  위치: src/features/learningSession/UsageOverview.tsx:23
+
+[src/features/learningSession/useLearningSession.ts]
+- 학습을 불러오지 못했습니다.
+  위치: src/features/learningSession/useLearningSession.ts:25
+- 요청 결과를 확인하지 못했습니다.
+  위치: src/features/learningSession/useLearningSession.ts:61
+
+[src/features/preparation/PreparationPanel.tsx]
+- 과목을 찾을 수 없어요.
+  위치: src/features/preparation/PreparationPanel.tsx:24, src/services/preparation.ts:9, src/services/summaries.ts:180, src/services/summaries.ts:191, src/services/summaries.ts:202
+- 준비를 시작하지 못했어요.
+  위치: src/features/preparation/PreparationPanel.tsx:36
+- 결과를 적용하지 못했어요.
+  위치: src/features/preparation/PreparationPanel.tsx:46
+
+[src/features/review/ExplanationRevision.tsx]
+- 설명 개선을 시작하지 못했어요.
+  위치: src/features/review/ExplanationRevision.tsx:32
+- 기기에 저장할 수 없어요. 화면을 닫기 전에 저장 상태를 확인해주세요.
+  위치: src/features/review/ExplanationRevision.tsx:75
+- 기기에 초안을 저장할 수 없어요.
+  위치: src/features/review/ExplanationRevision.tsx:98
+- 평가하지 못했어요. 답변은 보존됐어요.
+  위치: src/features/review/ExplanationRevision.tsx:127
+
+[src/features/review/LearningBriefing.tsx]
+- 정보를 불러오지 못했어요.
+  위치: src/features/review/LearningBriefing.tsx:46
+
+[src/features/review/LearningIssues.tsx]
+- 저장하지 못했어요.
+  위치: src/features/review/LearningIssues.tsx:23
+
+[src/features/review/LearningPreferences.tsx]
+- 설정을 저장하지 못했어요.
+  위치: src/features/review/LearningPreferences.tsx:18
+
+[src/features/review/QuizIssueLink.tsx]
+- 연결하지 못했어요.
+  위치: src/features/review/QuizIssueLink.tsx:15
+
+[src/features/review/ReviewQueue.tsx]
+- 변경하지 못했어요.
+  위치: src/features/review/ReviewQueue.tsx:16
+
+[src/pages/Auth.tsx]
+- 재설정 세션이 만료되었거나 유효하지 않습니다. 새 메일을 요청해주세요.
+  위치: src/pages/Auth.tsx:30
+- 비밀번호가 일치하지 않아요.
+  위치: src/pages/Auth.tsx:52
+- 비밀번호 변경에 실패했습니다. 로그인 상태를 확인하거나 새 재설정 메일을 요청해주세요.
+  위치: src/pages/Auth.tsx:64
+
+[src/pages/Dashboard.tsx]
+- 강의 상세 정보를 불러오지 못했습니다.
+  위치: src/pages/Dashboard.tsx:234
+- 강의자료 삭제에 실패했습니다.
+  위치: src/pages/Dashboard.tsx:274, src/pages/Summary.tsx:971
+- 현재 캡스톤 시연용 MVP 단계예요. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.
+  위치: src/pages/Dashboard.tsx:477
+- 일부 기능이 불완전하거나 오류가 있을 수 있습니다.
+  위치: src/pages/Dashboard.tsx:1240
+- 정보를 불러오지 못했습니다
+  위치: src/pages/Dashboard.tsx:1406
+
+[src/pages/MenubarSettings.tsx]
+- Mac 설정을 불러오지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:123
+- 계정 설정을 불러오지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:131
+- 알림 설정을 불러오지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:137
+- 알림 설정을 저장하지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:176, src/pages/MenubarSettings.tsx:185
+- 이 단축키를 등록하지 못했어요. 다른 조합을 눌러 보세요.
+  위치: src/pages/MenubarSettings.tsx:191
+- 버전을 확인하지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:199
+- 자동 실행 설정을 바꾸지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:242
+- 로그아웃하지 못했어요.
+  위치: src/pages/MenubarSettings.tsx:275
+
+[src/pages/Mini.tsx]
+- 과목을 불러오지 못했어요.
+  위치: src/pages/Mini.tsx:58
+- 자료를 불러오지 못했어요.
+  위치: src/pages/Mini.tsx:66
+
+[src/pages/MiniTutor.tsx]
+- 강의자료를 불러오지 못했어요. 과목을 다시 선택해 주세요.
+  위치: src/pages/MiniTutor.tsx:92
+- 튜터 응답을 받지 못했어요.
+  위치: src/pages/MiniTutor.tsx:125
+- 선택한 자료를 불러오지 못했어요. 자료를 다시 선택해 주세요.
+  위치: src/pages/MiniTutor.tsx:138
+- 답변을 받지 못했어요. 다시 질문해 주세요.
+  위치: src/pages/MiniTutor.tsx:216
+
+[src/pages/MyPage.tsx]
+- 이메일 변경에 실패했어요. 이미 사용 중인 이메일일 수 있어요.
+  위치: src/pages/MyPage.tsx:182
+- Tongkk는 현재 캡스톤 시연용 MVP 단계입니다. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.
+  위치: src/pages/MyPage.tsx:204
+- 오류 제보나 개선 요청은 팀 관리자에게 전달하세요.
+  위치: src/pages/MyPage.tsx:212
+
+[src/pages/Quiz.tsx]
+- 퀴즈 생성에 실패했습니다.
+  위치: src/pages/Quiz.tsx:907
+- 주관식 채점에 실패했습니다.
+  위치: src/pages/Quiz.tsx:947
+- 풀이 기록 저장에 실패했습니다.
+  위치: src/pages/Quiz.tsx:1139
+- 분석할 문항이 없습니다.
+  위치: src/pages/Quiz.tsx:1691
+- 오답 분석에 실패했습니다.
+  위치: src/pages/Quiz.tsx:1701, src/pages/ReviewNotes.tsx:184
+
+[src/pages/ReviewNotes.tsx]
+- 오답 노트를 불러오지 못했습니다.
+  위치: src/pages/ReviewNotes.tsx:63
+- 다시 풀 수 있는 오답을 찾지 못했습니다.
+  위치: src/pages/ReviewNotes.tsx:151
+- 오답 다시 풀기 준비에 실패했습니다.
+  위치: src/pages/ReviewNotes.tsx:159
+
+[src/pages/Stats.tsx]
+- 학습 통계를 불러오지 못했습니다.
+  위치: src/pages/Stats.tsx:92
+
+[src/pages/Summary.tsx]
+- 삭제에 실패했습니다.
+  위치: src/pages/Summary.tsx:1006, src/pages/summary/MaterialDetailView.tsx:499
+- 요약은 완성됐지만 저장하지 못했어요. 다시 시도하면 저장만 재시도해요.
+  위치: src/pages/Summary.tsx:1143
+- 요약을 저장하지 못했어요. 다시 시도해주세요.
+  위치: src/pages/Summary.tsx:1179
+
+[src/pages/summary/MaterialDetailView.tsx]
+- 원본 파일을 불러오지 못했습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:304
+- 원본 미리보기 변환에 실패했습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:350
+- 학습 기록을 불러오지 못했습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:441, src/services/learningSessions.ts:53
+- DOCX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:653
+- PPT 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:655
+- PPTX 원본 미리보기를 준비하지 못했습니다. 서버에 LibreOffice가 설치되어 있으면 PDF 미리보기로 변환해 볼 수 있습니다.
+  위치: src/pages/summary/MaterialDetailView.tsx:656
+
+[src/pages/summary/SummaryResultView.tsx]
+- PDF 다운로드에 실패했습니다.
+  위치: src/pages/summary/SummaryResultView.tsx:206, src/pages/summary/SummaryResultView.tsx:657
+- 전체 복사에 실패했습니다.
+  위치: src/pages/summary/SummaryResultView.tsx:238, src/pages/summary/SummaryResultView.tsx:686
+
+[src/pages/summary/utils.tsx]
+- 잠시 후 다시 시도해주세요. 큰 파일이면 페이지 수를 줄이면 성공률이 높아집니다.
+  위치: src/pages/summary/utils.tsx:78
+- 다시 시도하거나 텍스트만 붙여넣어 자료로 추가할 수 있습니다.
+  위치: src/pages/summary/utils.tsx:84
+
+[src/services/agent.ts]
+- Agent 요청 시간 초과. 다시 시도해주세요.
+  위치: src/services/agent.ts:74
+
+[src/services/authFlow.ts]
+- 인증 요청에 실패했습니다. 잠시 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:12
+- ${retryAfter >= 60 ? `${Math.ceil(retryAfter / 60)}분` : `${Math.ceil(retryAfter)}초`} 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:17
+- 잠시 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:18
+- 링크가 만료되었거나 이미 사용되었습니다. 새 메일을 요청해주세요.
+  위치: src/services/authFlow.ts:20
+- 이메일 또는 비밀번호가 맞지 않아요. 다시 확인해주세요.
+  위치: src/services/authFlow.ts:23
+- 비밀번호가 보안 기준에 맞지 않습니다. 더 길고 다양한 문자를 사용해주세요.
+  위치: src/services/authFlow.ts:25
+- 로그인 실패가 반복돼 잠시 잠겼어요. ${retry}
+  위치: src/services/authFlow.ts:28
+- 이 계정은 이용이 제한되어 있어요. 관리자에게 문의해주세요.
+  위치: src/services/authFlow.ts:29
+- 지금은 회원가입이 중단되어 있어요. 잠시 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:34
+- 인증 시간이 만료됐어요. 다시 로그인하거나 새 재설정 메일을 받아주세요.
+  위치: src/services/authFlow.ts:36, src/services/authFlow.ts:37, src/services/authFlow.ts:38
+- 로그인 응답을 확인하지 못했어요. 잠시 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:39
+- 인증 서비스에 문제가 생겼어요. 잠시 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:43
+- 요청 시간이 초과됐어요. 잠시 후 다시 시도해주세요.
+  위치: src/services/authFlow.ts:46
+- 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.
+  위치: src/services/authFlow.ts:49
+- 로그인 요청이 거부됐어요. 계정 상태를 확인해주세요.
+  위치: src/services/authFlow.ts:64
+- 인증 링크가 유효하지 않거나 만료되었습니다. 새 메일을 요청해주세요.
+  위치: src/services/authFlow.ts:79
+
+[src/services/backend.ts]
+- Cloudflare 터널에서 요청 시간이 초과되었습니다. 이미지가 많은 PDF라면 페이지 수를 줄이거나 잠시 후 다시 시도해주세요.
+  위치: src/services/backend.ts:71
+
+[src/services/gpt.ts]
+- 유효한 퀴즈 데이터를 받지 못했습니다.
+  위치: src/services/gpt.ts:58
+- 퀴즈 생성 시간 초과. 다시 시도해주세요.
+  위치: src/services/gpt.ts:100
+- 주관식 채점 시간이 초과되었습니다. 다시 시도해주세요.
+  위치: src/services/gpt.ts:154
+- 오답 분석 시간이 초과되었습니다. 다시 시도해주세요.
+  위치: src/services/gpt.ts:232
+- 요약 요청 시간 초과. Cloudflare 터널에서는 긴 요약 요청이 끊길 수 있어 페이지 수를 줄여 다시 시도해주세요.
+  위치: src/services/gpt.ts:287
+
+[src/services/materials.ts]
+- 원본 파일이 ${(file.size / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 초과해 원본은 저장하지 못했어요.
+  위치: src/services/materials.ts:149
+- 과목을 찾을 수 없습니다.
+  위치: src/services/materials.ts:154, src/services/quizAttempts.ts:130, src/services/quizSets.ts:134, src/services/wrongAnswerAnalyses.ts:21
+
+[src/services/pdfToMarkdown.ts]
+- 파일 변환 시간 초과. 이미지가 많은 PDF라면 잠시 후 다시 시도하거나 페이지 수를 줄여주세요.
+  위치: src/services/pdfToMarkdown.ts:35
+
+[src/services/preparation.ts]
+- ${failures.join(', ')} 자료는 자동 준비를 시작하지 못했어요. 자료 상세에서 범위와 준비 설정을 확인해주세요.
+  위치: src/services/preparation.ts:19
+
+[src/services/studyPlan.ts]
+- 유효한 학습 계획을 받지 못했습니다.
+  위치: src/services/studyPlan.ts:116, src/services/studyPlan.ts:149
+
+[src/services/subjectiveGrading.ts]
+- 채점 결과를 확인하지 못했어요. 다시 채점해주세요.
+  위치: src/services/subjectiveGrading.ts:4
+
+[src/services/summaryStream.ts]
+- 요약 스트림이 중간에 끊겼습니다. 다시 시도해주세요.
+  위치: src/services/summaryStream.ts:347
+- 요약 구간 생성 시간이 초과되었습니다. 다시 시도해주세요.
+  위치: src/services/summaryStream.ts:415
+- 요약 출력이 모델 한도에서 잘렸습니다. 페이지 범위를 줄여 다시 시도해주세요.
+  위치: src/services/summaryStream.ts:435
+- 요약 결과를 받지 못했습니다. 다시 시도해주세요.
+  위치: src/services/summaryStream.ts:445
+
+[src/tutorialContent.ts]
+- 켜면 정답·해설이 바로 안 보이고 제한 시간 안에 전체를 풀어요. 시간 버튼은 모드를 켜야 활성화돼요.
+  위치: src/tutorialContent.ts:108

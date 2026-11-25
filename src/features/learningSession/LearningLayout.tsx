@@ -19,7 +19,7 @@ export default function LearningLayout({ children, active = '학습 세션' }: {
       await beforeLeaveRef.current?.();
       setSidebar(false); navigate(to);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '답변 저장을 확인한 뒤 다시 이동해주세요.');
+      setError(e instanceof Error ? e.message : '답변 저장을 확인한 뒤 다시 이동하세요.');
     } finally { leaving.current = false; }
   }, [navigate]);
   const navigation = useMemo(() => ({ beforeLeaveRef, go }), [go]);

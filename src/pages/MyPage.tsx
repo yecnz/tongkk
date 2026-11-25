@@ -179,7 +179,7 @@ const SettingsModal = ({
       await onChangeEmail(trimmedEmail);
       setEmailDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "이메일 변경에 실패했어요. 이미 사용 중인 이메일일 수 있어요.");
+      setError(err instanceof Error ? err.message : "이메일 변경에 실패했어요. 이미 사용 중인 이메일일 수 있습니다.");
     } finally {
       setLoading(false);
     }
@@ -202,7 +202,7 @@ const SettingsModal = ({
         {type === "notice" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
             <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.</p>
-            <p style={{ margin: "0 0 10px" }}>사용하시다 불편한 점이나 "이런 기능이 있으면 좋겠다" 싶은 아이디어가 있다면 언제든 알려주세요. 여러분의 피드백이 Tongkk을 더 좋게 만듭니다..</p>
+            <p style={{ margin: "0 0 10px" }}>오류나 개선 의견을 보내주세요.</p>
             <p style={{ margin: 0 }}>문의 메일: tongkk.team@gmail.com</p>
           </div>
         )}
@@ -317,7 +317,7 @@ export default function MyPage() {
 
   const handleReopenTutorials = () => {
     resetAllTutorials();
-    showToast("튜토리얼을 초기화했어요. 각 화면에 다시 들어가면 사용법이 다시 떠요.");
+    showToast("튜토리얼을 초기화했습니다. 화면을 열면 사용법이 표시됩니다.");
   };
   const [sidebar, setSidebar] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -473,7 +473,7 @@ export default function MyPage() {
             ) : (
               <>
                 <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)", lineHeight: 1.6 }}>
-                  로그인하고 과목·자료·요약·퀴즈 기록을 계정에 저장하세요.
+                  로그인해 학습 기록을 저장하세요.
                 </p>
                 <button type="button" onClick={() => openLogin()} style={{
                   width: "100%", padding: "11px 0", borderRadius: 10,

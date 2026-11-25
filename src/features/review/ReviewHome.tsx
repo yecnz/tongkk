@@ -10,12 +10,12 @@ export default function ReviewHome() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = reviewTab(params.get('tab'));
-  return <LearningLayout active="오답 노트"><div className="workflow-page-heading"><h1>복습 관리</h1><p className="workflow-muted">오늘의 복습과 보완할 개념을 한곳에서 확인하세요.</p></div>
+  return <LearningLayout active="오답 노트"><div className="workflow-page-heading"><h1>복습 관리</h1><p className="workflow-muted">복습할 내용과 보완할 개념을 확인하세요.</p></div>
     <nav className="workflow-tabs" aria-label="복습 보기">
       {([['today', '오늘 복습'], ['issues', '학습 이슈'], ['wrong', '오답 문항']] as const).map(([id, label]) =>
         <button type="button" key={id} aria-pressed={tab === id} onClick={() => setParams({ tab: id })}>{label}</button>)}
     </nav>
-    {!user ? <p>로그인하면 복습과 학습 기록을 확인할 수 있어요.</p>
+    {!user ? <p>복습과 학습 기록을 보려면 로그인하세요.</p>
       : tab === 'issues' ? <LearningIssues key={user.id} /> : tab === 'wrong' ? <ReviewNotes key={user.id} embedded /> : <ReviewQueue key={user.id} />}
   </LearningLayout>;
 }

@@ -159,7 +159,7 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
               <p className="mini-countdown">{formatDdayLabel(nextDday.daysLeft)}</p>
               <p className="mini-date">{ddayTypeLabels[nextDday.type || "assignment"]} · {formatDate(nextDday.date)}</p>
             </>
-          ) : <p>다가오는 D-day가 없어요.</p>}
+          ) : <p>다가오는 D-day가 없습니다.</p>}
         </div>
         <section className="mini-tasks" aria-label="오늘 할 일">
           <div className="mini-tasks-heading">
@@ -167,7 +167,7 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
             {todayPlans.length > 0 && <span>{doneCount}/{todayPlans.length} 완료</span>}
           </div>
           <div className={`mini-task-list ${todayPlans.length ? "mini-task-list-filled" : ""}`}>
-            {todayPlans.length === 0 && <p>오늘 할 일이 없어요.</p>}
+            {todayPlans.length === 0 && <p>오늘 할 일이 없습니다.</p>}
             {todayPlans.map(({ plan, index }) => (
               <div key={plan.id || index} className={`mini-task ${plan.done ? "mini-task-done" : ""}`}>
                 <button type="button" onClick={() => togglePlan(index)} aria-label={plan.done ? "완료 취소" : "완료"} aria-pressed={plan.done} className="mini-task-check">
@@ -207,7 +207,7 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
             {selectorOpen && (
               <div className="mini-material-panel" role="region" aria-label="자료 선택" onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); setSelectorOpen(false); } }}>
                 <div className="mini-panel-heading"><h2>자료 선택</h2><button type="button" aria-label="자료 선택 닫기" onClick={() => setSelectorOpen(false)}>×</button></div>
-                <MiniSelect label="과목" placeholder={courseError ? "과목 불러오기 실패" : courses === null ? "과목 불러오는 중…" : courses.length ? "과목 선택" : "과목이 없어요"} value={course} options={(courses ?? []).map(name => ({ value: name, label: name }))} expanded={expandedList === "course"} onToggle={() => setExpandedList(expandedList === "course" ? null : "course")} onChange={next => {
+                <MiniSelect label="과목" placeholder={courseError ? "과목 불러오기 실패" : courses === null ? "과목 불러오는 중…" : courses.length ? "과목 선택" : "과목이 없습니다"} value={course} options={(courses ?? []).map(name => ({ value: name, label: name }))} expanded={expandedList === "course"} onToggle={() => setExpandedList(expandedList === "course" ? null : "course")} onChange={next => {
                   setExpandedList(null);
                   if (next === course) return;
                   setCourse(next);
@@ -217,13 +217,13 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
                   setMaterialLoading(Boolean(next));
                 }} />
                 {courses !== null && courses.length === 0 && !courseError ? (
-                  <div className="mini-panel-empty"><p>아직 등록된 과목이 없어요.</p><a href="/" target="_blank">Tongkk에서 강의 추가하기 ↗</a></div>
+                  <div className="mini-panel-empty"><p>등록된 과목이 없습니다.</p><a href="/" target="_blank">Tongkk에서 강의 추가하기 ↗</a></div>
                 ) : (
                   <MiniSelect label="강의자료" placeholder={!course ? "먼저 과목을 선택하세요" : "강의자료 선택"} value={materialId} options={materials.map(material => ({ value: material.id, label: material.name }))} disabled={!course || materialLoading} expanded={expandedList === "material"} onToggle={() => setExpandedList(expandedList === "material" ? null : "material")} onChange={next => { setMaterialId(next); setSelectorOpen(false); setExpandedList(null); }} />
                 )}
                 {courseError && <div role="alert" className="mini-panel-error"><p>{courseError}</p><button type="button" className="mini-retry" onClick={() => { setCourseError(""); setCourseRetry(value => value + 1); }}>다시 시도</button></div>}
                 {materialLoading && <p className="mini-panel-status">자료를 불러오는 중…</p>}
-                {course && !materialLoading && materials.length === 0 && !materialError && <p className="mini-panel-status">이 과목에 업로드된 자료가 없어요.</p>}
+                {course && !materialLoading && materials.length === 0 && !materialError && <p className="mini-panel-status">이 과목에 업로드된 자료가 없습니다.</p>}
                 {materialError && <div role="alert" className="mini-panel-error"><p>{materialError}</p><button type="button" className="mini-retry" onClick={() => { setMaterialError(""); setMaterialLoading(true); setMaterialRetry(value => value + 1); }}>다시 시도</button></div>}
               </div>
             )}

@@ -700,7 +700,7 @@ export default function Summary() {
     duplicateFiles.forEach(file => updateUploadStatus(file, {
       state: "duplicate",
       label: "이미 등록된 파일",
-      message: "기존 자료를 확인하고, 원본 파일 연결이 없으면 다시 연결합니다.",
+      message: "기존 자료 확인 및 원본 연결 중",
     }));
     if (duplicateFiles.length > 0) {
       const duplicatePageCounts = await Promise.all(duplicateFiles.map(async file => ({
@@ -725,7 +725,7 @@ export default function Summary() {
           updateUploadStatus(match.file, {
             state: "storing",
             label: "원본 다시 연결 중",
-            message: "기존 자료에 원본 파일을 다시 연결하고 있습니다.",
+            message: "원본 파일 연결 중",
             materialId: nextMaterial.id,
           });
           try {
@@ -746,7 +746,7 @@ export default function Summary() {
           updateUploadStatus(match.file, {
             state: "duplicate",
             label: "기존 자료 사용",
-            message: "이미 등록된 자료입니다. 기존 자료를 그대로 사용합니다.",
+            message: "이미 등록된 자료입니다. 기존 자료를 사용합니다.",
             materialId: nextMaterial.id,
           });
         }
@@ -767,7 +767,7 @@ export default function Summary() {
     newFiles.forEach(file => updateUploadStatus(file, {
       state: "uploading",
       label: "업로드 중",
-      message: "파일 정보를 읽고 저장 준비를 하고 있습니다.",
+      message: "파일 확인 중",
     }));
 
     const nf = await Promise.all(newFiles.map(async f => ({
@@ -792,7 +792,7 @@ export default function Summary() {
           updateUploadStatus(documentFile, {
             state: "extracting",
             label: "텍스트 추출 중",
-            message: "자료 내용을 Markdown으로 변환하고 있습니다.",
+            message: "자료 내용 추출 중",
           });
           const markdown = await extractMarkdownFromMaterialFile(documentFile);
           const uploadedMaterial = nf.find(f => f.rawFile === documentFile) || nf.find(f => f.name === documentFile.name);
@@ -821,7 +821,7 @@ export default function Summary() {
               updateUploadStatus(documentFile, {
                 state: "storing",
                 label: "원본 저장 중",
-                message: "추출된 텍스트와 원본 파일을 저장하고 있습니다.",
+                message: "자료 저장 중",
                 materialId: baseMaterial.id,
               });
               try {
@@ -830,7 +830,7 @@ export default function Summary() {
                 updateUploadStatus(documentFile, {
                   state: "done",
                   label: "완료",
-                  message: "업로드와 텍스트 추출이 완료됐습니다.",
+                  message: "자료를 업로드했습니다.",
                   materialId: savedMaterial.id,
                 });
               } catch (err) {
@@ -966,7 +966,7 @@ export default function Summary() {
         if (fromDashboardRef.current) navigate(pageRoutes["대시보드"]);
         else setView("upload");
       }
-      showToast("자료를 삭제했어요.", "info");
+      showToast("자료를 삭제했습니다.", "info");
     } catch (err) {
       setMaterialDeleteError(err instanceof Error ? err.message : "강의자료 삭제에 실패했습니다.");
     } finally {
@@ -1176,7 +1176,7 @@ export default function Summary() {
       pendingSummarySave.current = null;
       setActiveSummaryId(saved.id || null);
       setSummaries(previous => [saved, ...previous.filter(item => item.id !== saved.id)]);
-    } catch { setSummaryError('요약을 저장하지 못했어요. 다시 시도해주세요.'); }
+    } catch { setSummaryError('요약을 저장하지 못했어요. 다시 시도하세요.'); }
     finally { summaryCommandRef.current = false; setIsSummarizing(false); }
   };
 
@@ -1273,7 +1273,7 @@ export default function Summary() {
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text)" }}>
               아래 파일은 <b style={{ color: "var(--color-text-strong)" }}>50MB 저장 한도</b>를 넘어 원본을 저장하지 않았어요.{" "}
-              <b style={{ color: "var(--color-text-strong)" }}>텍스트는 저장돼 요약·퀴즈에 그대로 사용</b>할 수 있어요.
+              <b style={{ color: "var(--color-text-strong)" }}>텍스트는 저장돼 요약·퀴즈에 그대로 사용</b>할 수 있습니다.
             </p>
             <div style={{
               margin: "0 0 14px", padding: "10px 12px", borderRadius: 10, background: "var(--color-page)",
@@ -1282,7 +1282,7 @@ export default function Summary() {
               {sizeLimitNotice.names.join(", ")}
             </div>
             <p style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
-              원본까지 저장하려면 파일을 50MB 미만으로 줄이거나 나눠서 올려주세요.
+              원본을 저장하려면 50MB 미만으로 나눠 업로드하세요.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
@@ -1314,7 +1314,7 @@ export default function Summary() {
             boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
           }}>
             <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>
-              이미 만든 요약이 있어요
+              이미 만든 요약이 있습니다
             </h3>
             <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "var(--color-text)", wordBreak: "keep-all" }}>
               같은 자료·같은 설정의 <b style={{ color: "var(--color-text-strong)" }}>{templateLabels[duplicateSummaryPrompt.template]}</b> 요약을{" "}
@@ -1379,7 +1379,7 @@ export default function Summary() {
             }} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 800, color: "var(--color-text-strong)", marginBottom: 4 }}>
-                {duplicateNotice.reattached ? "기존 자료에 원본 파일을 다시 연결했어요" : "이미 등록된 파일입니다"}
+                {duplicateNotice.reattached ? "기존 자료에 원본 파일을 다시 연결했습니다" : "이미 등록된 파일입니다"}
               </div>
               <div style={{
                 fontSize: 12,
@@ -1392,7 +1392,7 @@ export default function Summary() {
               </div>
               <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.45, color: "var(--color-text-secondary)" }}>
                 {duplicateNotice.reattached
-                  ? "요약 내용은 그대로 두고, 원본 미리보기에 필요한 파일만 연결했습니다."
+                  ? "원본 파일을 연결했습니다. 요약은 유지됩니다."
                   : "기존 자료를 그대로 사용할게요. 원본 파일 연결이 없던 자료는 다시 연결을 시도합니다."}
               </div>
             </div>
@@ -1907,8 +1907,8 @@ export default function Summary() {
                   ) : (
                     <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
                       {selectedMaterials.length > 0
-                        ? "선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요."
-                        : "자료를 선택하면 페이지 범위를 지정할 수 있어요."}
+                        ? "페이지 정보가 없습니다. 파일을 다시 업로드하세요."
+                        : "자료를 선택해 페이지 범위를 지정하세요."}
                     </div>
                   )}
 

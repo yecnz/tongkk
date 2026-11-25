@@ -59,7 +59,7 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
 
   useEffect(() => {
     flushRef.current = async () => {
-      if (conflict || composing) throw new Error('답변 충돌 또는 입력을 먼저 마무리해주세요.');
+      if (conflict || composing) throw new Error('답변 충돌 또는 입력을 먼저 마무리하세요.');
       await save();
     };
     return () => { flushRef.current = null; };
@@ -75,7 +75,7 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
     latest.current = value;
     setText(value);
     if (!writeLocalDraft(userId, session.id, item.id, { text: value, revision: revision.current })) {
-      setSaveError('이 기기에 임시 저장할 수 없습니다. 화면을 떠나기 전에 서버 저장을 확인해주세요.');
+      setSaveError('이 기기에 임시 저장할 수 없습니다. 화면을 떠나기 전에 서버 저장을 확인하세요.');
     }
   }
 
@@ -96,7 +96,7 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
         <button type="button" onClick={() => { setConflict(false); edit(latest.current); }}>현재 초안 사용</button>
       </div>
     </div>}
-    <label htmlFor="recall-answer"><p>자료를 보지 않고 핵심을 설명해주세요.</p></label>
+    <label htmlFor="recall-answer"><p>자료를 보지 않고 핵심을 설명하세요.</p></label>
     <textarea id="recall-answer" value={text} maxLength={4000} disabled={busy || disabled}
       onChange={event => edit(event.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
     <p className="learning-muted" aria-live="polite" style={{ fontSize: 13 }}>

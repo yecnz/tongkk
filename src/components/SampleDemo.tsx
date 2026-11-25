@@ -233,7 +233,7 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
           {tab === "quiz" && (
             <>
               <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--color-muted)" }}>
-                자료로 만든 샘플 퀴즈예요. 객관식·OX·단답형·주관식이 섞여 있고, 주관식은 AI가 채점해요.
+                샘플 퀴즈입니다. 주관식은 AI가 채점합니다.
               </p>
               {sampleQuiz.map((q, i) => <QuizCard key={i} q={q} index={i} />)}
             </>
@@ -242,7 +242,7 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
 
         {/* 푸터 CTA */}
         <div className="sample-demo-footer">
-          <span style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>마음에 드세요? 내 강의 자료로 직접 만들어 보세요.</span>
+          <span style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>내 강의자료로 요약과 퀴즈를 만드세요.</span>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             <button type="button" onClick={onClose} style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: CARD_BACKGROUND, color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>닫기</button>
             <button type="button" onClick={onStart} style={{ padding: "10px 18px", borderRadius: 12, border: "none", background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>내 자료로 시작하기</button>

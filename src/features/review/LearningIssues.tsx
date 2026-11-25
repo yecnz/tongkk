@@ -34,7 +34,7 @@ function Issue({ id }: { id: string }) {
       </div>
       <p className="workflow-muted">보완 후 같은 문제를 맞힌 기록과 독립적인 이해 확인은 구분해요. 수동 종료는 이해 완료 판정이 아니에요.</p>
       {data.review_card_id && <Link to={`/learn/review/${data.review_card_id}`}>기존 문제로 다시 확인하기 →</Link>}
-      {data.source_changed && <p>이전 원문 버전의 근거예요. 현재 자료로 새로 학습한 기록과 구분해요.</p>}
+      {data.source_changed && <p>이전 자료의 학습 근거입니다.</p>}
       <h3>원문 근거</h3>{data.concept.source_refs.map((ref, i) => <blockquote key={i}>{ref.quote}</blockquote>)}
       <h3>학습 근거</h3>{data.evidence.map(e => <section className="workflow-item" key={e.id}>
         <p className="workflow-meta">{new Date(e.created_at).toLocaleString('ko-KR')} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움 사용' : ''}</p>
@@ -66,7 +66,7 @@ export default function LearningIssues() {
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
       : loading ? <p role="status">이슈를 불러오는 중…</p> : <>
         <p className="workflow-muted">학습 이슈 {total}개</p>
-        {!items.length && <p>아직 기록된 이슈가 없어요. 학습에서 보완할 개념이 나오면 이곳에 모여요.</p>}
+        {!items.length && <p>보완할 개념이 없습니다.</p>}
         {items.map(item => <Card key={item.id} className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{item.title}</h3><span className="workflow-badge" data-state={item.status}>{issueLabels[item.status]}</span></div>
           <button className="workflow-button" type="button" onClick={() => setParams({ tab: 'issues', issueId: item.id })}>근거·보완 기록 보기 →</button></Card>)}
         <div className="workflow-actions"><button type="button" disabled={page === 0} onClick={() => setPage(p => p - 1)}>이전</button><button type="button" disabled={(page + 1) * 30 >= total} onClick={() => setPage(p => p + 1)}>다음</button></div>

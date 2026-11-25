@@ -62,7 +62,7 @@ export default function UpdatePrompt() {
         fontWeight: 600,
       }}
     >
-      <span>새 버전이 있어요.</span>
+      <span>새 버전이 있습니다.</span>
       <button
         type="button"
         onClick={() => window.location.reload()}

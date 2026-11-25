@@ -27,7 +27,7 @@ export default function Auth() {
   const navigate = useNavigate();
   // 경로가 상태를 보존한다. SDK가 URL 토큰을 지운 후 새로고침해도 폼이 유지된다.
   const recoveryScreen = recoveryMode || pathname === RESET_PASSWORD_PATH;
-  const linkError = authCallbackError || (recoveryScreen && !loading && !user ? '재설정 세션이 만료되었거나 유효하지 않습니다. 새 메일을 요청해주세요.' : null);
+  const linkError = authCallbackError || (recoveryScreen && !loading && !user ? '재설정 세션이 만료되었거나 유효하지 않습니다. 새 메일을 요청하세요.' : null);
   const { showToast } = useToast();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [mode, setMode] = useState<AuthMode>("signIn");
@@ -45,7 +45,7 @@ export default function Auth() {
     event.preventDefault();
     if (pending.current || loading || !user || linkError) return;
     if (newPassword.length < 8) {
-      setRecoveryError("비밀번호를 8자 이상 입력해주세요.");
+      setRecoveryError("비밀번호를 8자 이상 입력하세요.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -61,7 +61,7 @@ export default function Auth() {
       endRecovery(); // recovery 종료 → 아래 리다이렉트 가드가 대시보드로 이동시킨다.
       navigate('/', { replace: true });
     } catch (err) {
-      setRecoveryError(authErrorMessage(err, '비밀번호 변경에 실패했습니다. 로그인 상태를 확인하거나 새 재설정 메일을 요청해주세요.'));
+      setRecoveryError(authErrorMessage(err, '비밀번호 변경에 실패했습니다. 로그인 상태를 확인하거나 새 재설정 메일을 요청하세요.'));
     } finally {
       setSubmitting(false);
       pending.current = false;
@@ -105,9 +105,9 @@ export default function Auth() {
           boxShadow: SOFT_SHADOW,
           boxSizing: "border-box",
         }}>
-          {loading ? <p role="status">로그인 상태를 확인하고 있어요…</p> : linkError ? (
+          {loading ? <p role="status">로그인 상태를 확인하고 있습니다…</p> : linkError ? (
             <div>
-              <h1 style={{ fontSize: 22 }}>인증 링크를 확인해주세요</h1>
+              <h1 style={{ fontSize: 22 }}>인증 링크를 확인하세요</h1>
               <p role="alert" style={{ lineHeight: 1.7, color: 'var(--color-text-secondary)' }}>{linkError}</p>
               <button type="button" onClick={() => { setModalView('reset'); setShowLoginModal(true); }}
                 style={{ ...recoveryInputStyle(false), cursor: 'pointer', marginBottom: 12 }}>재설정 메일 다시 받기</button>
@@ -120,7 +120,7 @@ export default function Auth() {
                 새 비밀번호 설정
               </h1>
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: "0 0 24px", textAlign: "center" }}>
-                새로 사용할 비밀번호를 입력해주세요
+                새로 사용할 비밀번호를 입력하세요
               </p>
 
               <label htmlFor={`${id}-password`} style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block", letterSpacing: 0.3 }}>
@@ -192,7 +192,7 @@ export default function Auth() {
                 로그인이 필요합니다
               </h1>
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>
-                Tongkk를 이용하려면 로그인해주세요
+                Tongkk를 이용하려면 로그인하세요
               </p>
               <button
                 type="button"

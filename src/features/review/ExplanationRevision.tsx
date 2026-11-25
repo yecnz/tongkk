@@ -72,7 +72,7 @@ function Editor({ id, userId }: { id: string; userId: string }) {
         expected_revision: current.revision.revision, answer: textRef.current, assisted: true });
       accept(value); setSaved(true);
       try { localStorage.setItem(key, JSON.stringify({ text: textRef.current, baseRevision: value.revision.revision, pending: pending.current })); }
-      catch { setError('기기에 저장할 수 없어요. 화면을 닫기 전에 저장 상태를 확인해주세요.'); }
+      catch { setError('기기에 저장할 수 없습니다. 화면을 닫기 전에 저장 상태를 확인하세요.'); }
     });
     queue.current = task; return task;
   }, [accept, id, key]);
@@ -82,7 +82,7 @@ function Editor({ id, userId }: { id: string; userId: string }) {
     return () => clearTimeout(timer);
   }, [text, composing, data, flush]);
   useEffect(() => {
-    beforeLeaveRef.current = async () => { if (busy || pending.current) throw new Error('평가 제출 결과를 확인한 뒤 이동해주세요.'); await flush(); };
+    beforeLeaveRef.current = async () => { if (busy || pending.current) throw new Error('평가 제출 결과를 확인한 뒤 이동하세요.'); await flush(); };
     return () => { beforeLeaveRef.current = null; };
   }, [beforeLeaveRef, busy, flush]);
   const polling = data?.evaluation?.status === 'pending';
@@ -95,7 +95,7 @@ function Editor({ id, userId }: { id: string; userId: string }) {
   function change(value: string) {
     textRef.current = value; setText(value); setSaved(false);
     try { localStorage.setItem(key, JSON.stringify({ text: value, baseRevision: dataRef.current?.revision.revision, pending: pending.current })); }
-    catch { setError('기기에 초안을 저장할 수 없어요.'); }
+    catch { setError('기기에 초안을 저장할 수 없습니다.'); }
   }
   async function submit() {
     if (busy) return;
@@ -114,8 +114,8 @@ function Editor({ id, userId }: { id: string; userId: string }) {
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>서버 기록 확인</button></p>}
     {!data ? <p role="status">설명을 불러오는 중…</p> : <>
       <h2>{data.title}</h2><p>{data.question}</p>
-      {conflictDraft !== null && <div role="alert"><p>서버와 다른 기기 초안이 남아 있어요.</p><button type="button" className="workflow-button" onClick={() => { change(conflictDraft); setConflictDraft(null); }}>기기 초안을 편집창으로 가져오기</button></div>}
-      {data.source_changed && <p role="alert">원문이 바뀌었어요. 새 원문으로 학습한 뒤 설명을 개선해주세요.</p>}
+      {conflictDraft !== null && <div role="alert"><p>서버와 다른 기기 초안이 남아 있습니다.</p><button type="button" className="workflow-button" onClick={() => { change(conflictDraft); setConflictDraft(null); }}>기기 초안을 편집창으로 가져오기</button></div>}
+      {data.source_changed && <p role="alert">원문이 변경되었습니다. 새 자료를 학습한 뒤 설명을 수정하세요.</p>}
       <Card className="workflow-panel workflow-stack"><h3>처음 제출한 설명</h3><p style={{ whiteSpace: 'pre-wrap' }}>{data.baseline}</p>{data.baseline_feedback && <LearningFeedback feedback={data.baseline_feedback} />}</Card>
       <Card className="workflow-panel workflow-stack"><h3>수정 설명</h3>
         <textarea aria-label="수정 설명" maxLength={4000} value={text} disabled={busy || data.revision.status !== 'draft' || data.source_changed}

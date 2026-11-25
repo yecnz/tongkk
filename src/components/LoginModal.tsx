@@ -74,10 +74,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     if (view === 'confirmation' && expired) { void resend(); return; }
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail)) {
-      setError("이메일 주소를 다시 확인해주세요."); return;
+      setError("이메일 주소를 다시 확인하세요."); return;
     }
     if (view === 'credentials' && mode === 'signUp' && password.length < 8) {
-      setError("비밀번호를 8자 이상 입력해주세요."); return;
+      setError("비밀번호를 8자 이상 입력하세요."); return;
     }
     if (view === 'reset' && emailWaitSeconds(kind, email) > 0) return;
     pending.current = true;
@@ -85,7 +85,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     try {
       if (view === 'reset') {
         await resetPassword(trimmedEmail);
-        setMessage('재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인해주세요.');
+        setMessage('재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인하세요.');
       } else if (view === 'confirmation') {
         await verifySignupCode(trimmedEmail, code);
         onAuthenticated();
@@ -101,10 +101,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
       }
     } catch (err) {
       if (err instanceof AuthActionError && err.code === 'email_not_confirmed') changeView('confirmation');
-      const fallback = view === 'reset' ? '재설정 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.'
-        : view === 'confirmation' ? '인증하지 못했어요. 인증번호를 확인하고 다시 시도해주세요.'
-        : mode === 'signUp' ? '회원가입을 완료하지 못했어요. 입력한 정보를 확인하고 다시 시도해주세요.'
-        : '로그인하지 못했어요. 입력한 정보를 확인하고 다시 시도해주세요.';
+      const fallback = view === 'reset' ? '재설정 메일을 보내지 못했어요. 잠시 후 다시 시도하세요.'
+        : view === 'confirmation' ? '인증하지 못했어요. 인증번호를 확인하고 다시 시도하세요.'
+        : mode === 'signUp' ? '회원가입을 완료하지 못했어요. 입력한 정보를 확인하고 다시 시도하세요.'
+        : '로그인하지 못했어요. 입력한 정보를 확인하고 다시 시도하세요.';
       const wrongCode = view === 'confirmation' && err && typeof err === 'object' && 'code' in err && err.code === 'otp_expired';
       setError(wrongCode ? '인증번호가 맞지 않거나 만료됐어요. 다시 확인하거나 새 인증번호를 받아주세요.' : authErrorMessage(err, fallback));
     } finally {
@@ -116,16 +116,16 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     if (pending.current || wait > 0) return;
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail)) {
-      setError("이메일 주소를 다시 확인해주세요."); return;
+      setError("이메일 주소를 다시 확인하세요."); return;
     }
     pending.current = true;
     setError(''); setMessage(''); setSubmitting(true);
     try {
       await resendConfirmation(trimmedEmail);
       setCode(''); setSentAt(Date.now());
-      setMessage('새 인증번호를 보냈어요. 메일함과 스팸함을 확인해주세요.');
+      setMessage('새 인증번호를 보냈어요. 메일함과 스팸함을 확인하세요.');
     } catch (err) {
-      setError(authErrorMessage(err, '인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.'));
+      setError(authErrorMessage(err, '인증 메일을 보내지 못했어요. 잠시 후 다시 시도하세요.'));
     } finally {
       pending.current = false; setSubmitting(false); setNow(Date.now());
     }
@@ -199,7 +199,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
         </div>}
         {confirming && !error && <p role="status" style={{ margin: '4px 0 12px', textAlign: 'center', fontSize: 12, lineHeight: 1.6,
           color: expired ? 'var(--color-danger)' : 'var(--color-text-secondary)' }}>
-          {expired ? '인증 시간이 끝났어요. 인증번호를 다시 받아주세요.' : message || '메일이 안 보이면 스팸함이나 이메일 주소를 확인해주세요.'}
+          {expired ? '인증 시간이 끝났어요. 인증번호를 다시 받아주세요.' : message || '메일이 안 보이면 스팸함이나 이메일 주소를 확인하세요.'}
         </p>}
         {!confirming && message && <p role="status" style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-secondary)' }}>{message}</p>}
         {error && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 12, lineHeight: 1.5, textAlign: confirming ? 'center' : undefined }}>{error}</p>}

@@ -224,7 +224,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const placeholder = `${ddayTypeLabels[type]}명`;
   const handleSubmit = () => {
     if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해주세요.`); return; }
-    if (!date) { setError("달력에서 날짜를 선택해주세요."); return; }
+    if (!date) { setError("달력에서 날짜를 선택하세요."); return; }
     onAdd(type, subj.trim(), date);
     onClose();
   };
@@ -264,7 +264,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         }}/>
         {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
         <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? PINK : "var(--color-muted)" }}>
-          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택해주세요 (필수)"}
+          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택하세요 (필수)"}
         </div>
         <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
         {error && (
@@ -288,7 +288,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   const [error, setError] = useState("");
   const handleAdd = () => {
     const planText = txt.trim();
-    if (!planText) { setError("학습 계획을 입력해주세요."); return; }
+    if (!planText) { setError("학습 계획을 입력하세요."); return; }
     onAdd(planText);
     onClose();
   };
@@ -406,7 +406,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
   const previewDaysLeft = rawDaysLeft !== null ? Math.max(rawDaysLeft, 1) : PACE_NO_DDAY_HORIZON_DAYS;
   const perDay = total > 0 ? Math.max(1, Math.ceil(total / Math.max(previewDaysLeft, 1))) : 0;
   const previewText = total <= 0
-    ? "기준을 선택하면 하루 권장량을 알려드려요."
+    ? "기준을 선택해 하루 학습량을 확인하세요."
     : rawDaysLeft === null
       ? `${PACE_NO_DDAY_HORIZON_DAYS}일 기준 → 하루 약 ${perDay}${unitLabel}`
       : rawDaysLeft > 0
@@ -431,7 +431,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
               </span>
               <h3 className="m-0 text-[19px] font-extrabold text-text-strong">페이스 플랜 만들기</h3>
               <p className="m-0 mt-1 text-sm leading-6 text-muted">
-                마감일과 분량을 연결해서 오늘 할 양을 계산해요.
+                마감일과 분량으로 하루 학습량을 계산합니다.
               </p>
             </div>
             <button
@@ -446,7 +446,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
           {courses.length === 0 ? (
             <div className="mb-5 rounded-[12px] border border-border bg-slate-50 px-4 py-4 dark:bg-slate-800/60">
               <p className="m-0 text-sm leading-6 text-muted">
-                먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있어요.
+                먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있습니다.
               </p>
             </div>
           ) : (
@@ -470,7 +470,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                   </select>
                 ) : (
                   <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
-                    D-day 없이 14일 기준 페이스로 시작합니다.
+                    마감일 미설정 시 14일 기준으로 계산합니다.
                   </div>
                 )}
               </div>
@@ -630,7 +630,7 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
 
         {isQuiz ? (
           <p style={{ margin: "0 0 14px", fontSize: 12, color: CYAN, fontWeight: 700 }}>
-            퀴즈 기준 플랜은 진행도가 퀴즈 응시에서 자동 집계돼요.
+            퀴즈 진행도는 풀이 기록으로 자동 계산됩니다.
           </p>
         ) : (
           <div style={{ marginBottom: 14 }}>

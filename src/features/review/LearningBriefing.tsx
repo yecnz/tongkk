@@ -41,7 +41,7 @@ export default function LearningBriefing() {
         {issues.filter(i => !cards.slice(0, 2).some(c => c.concept_id === i.concept_id)).slice(0, 1).map(i => <li key={i.id}><Link className="workflow-briefing-link" to={learningTargetUrl({ kind: 'issue', id: i.id })}><span><strong>{i.title}</strong><small>보완할 학습 이슈</small></span><span className="workflow-row-action">보완 근거 확인하기 →</span></Link></li>)}
         {prerequisites.slice(0,1).map(p=><li key={p.concept_id}><Link className="workflow-briefing-link" to={`/stats?view=concepts&conceptId=${p.concept_id}`}><span><strong>{p.title}</strong><small>{p.reason}</small></span><span className="workflow-row-action">먼저 보완하기 →</span></Link></li>)}
       </ul>
-      {!sessions.length && !cards.length && !issues.length && !prerequisites.length && !errors.length && <p>지금 이어갈 학습이 없어요. 새 학습을 시작해보세요.</p>}
+      {!sessions.length && !cards.length && !issues.length && !prerequisites.length && !errors.length && <p>이어갈 학습이 없습니다. 새 학습을 시작하세요.</p>}
       <div className="workflow-briefing-footer"><Link to="/review?tab=today">복습 전체 보기 →</Link></div>
       {errors.length > 0 && <p role="alert">{errors.join('·')} 정보를 불러오지 못했어요. <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>}
     </>}

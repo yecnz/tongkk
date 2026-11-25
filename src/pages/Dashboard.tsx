@@ -115,7 +115,7 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
         }}/>
         {/* 버튼이 비활성인 이유를 알 수 있게 안내한다(빈 값 제출이 조용히 막히면 고장으로 느껴짐). */}
         {!courseName && (
-          <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-muted)" }}>과목명을 입력하면 추가할 수 있어요.</p>
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-muted)" }}>과목명을 입력하면 추가할 수 있습니다.</p>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
@@ -268,7 +268,7 @@ const CourseDetailModal = ({
       // 자료와 함께 지워진 요약을 빼 "요약 N" 배지를 맞춘다.
       setSummaries(prev => prev.filter(summary => !summary.materialIds?.includes(material.id)));
       setPendingDelete(null);
-      showToast("자료를 삭제했어요.", "info");
+      showToast("자료를 삭제했습니다.", "info");
       onMaterialDeleted?.();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "강의자료 삭제에 실패했습니다.");
@@ -297,7 +297,7 @@ const CourseDetailModal = ({
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>자료를 선택하거나 요약·퀴즈를 만드세요.</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {/* 자료 목록에서 바로 강의 자료를 추가(요약 생성 화면으로 이동)할 수 있게 닫기 버튼 왼쪽에 둔다(이슈 #65). */}
@@ -465,8 +465,8 @@ const NOTICES: { date: string; tag: string; title: string; body: string; link?: 
   {
     date: "2026.06.11",
     tag: "설문",
-    title: "사용자 설문에 참여해 주세요",
-    body: "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했어요. 잠깐이면 끝나니 아래 버튼으로 참여해 주시면 큰 도움이 됩니다.",
+    title: "사용자 설문에 참여하세요",
+    body: "설문에 참여해 서비스 개선 의견을 남겨주세요.",
     link: "https://forms.gle/cDguG46mLHqSUmu7A",
     linkLabel: "설문 참여하기",
   },
@@ -479,7 +479,7 @@ const NOTICES: { date: string; tag: string; title: string; body: string; link?: 
   {
     date: "2026.06.11",
     tag: "개발 중",
-    title: "아직 준비 중인 기능이 있어요",
+    title: "아직 준비 중인 기능이 있습니다",
     body: "다음 기능은 아직 완성되지 않았어요: 다크모드(완벽 적용 전), AI 학습 계획 자동 생성, 학습 통계 탭, 로그인 기능. 순차적으로 업데이트할 예정이니 양해 부탁드려요.",
   },
   {
@@ -556,7 +556,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           }}>×</button>
         </div>
         <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
-          버그 제보, 기능 제안 등 어떤 의견이든 환영해요. 아래 주소로 메일을 보내주시면 큰 힘이 됩니다.
+          오류나 개선 의견을 아래 이메일로 보내주세요.
         </p>
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -859,7 +859,7 @@ export default function Dashboard() {
       eventCount ? `가까운 일정 ${eventCount}개` : "",
       reviewCount ? `복습 추천 ${reviewCount}개` : "",
     ].filter(Boolean);
-    if (parts.length === 0) return "자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.";
+    if (parts.length === 0) return "자동으로 고른 항목이 없습니다. 반영할 항목을 선택하세요.";
     if (mode === "lighter") return `${parts.join("와 ")}만 가볍게 반영할게요.`;
     if (mode === "harder") return `${parts.join("와 ")}를 조금 빡세게 반영할게요.`;
     if (mode === "assignment") return `과제 중심으로 ${parts.join("와 ")}를 골라뒀어요.`;
@@ -1044,7 +1044,7 @@ export default function Dashboard() {
     setPlans(prev => prev.filter((item, index) =>
       removed.id ? item.id !== removed.id : index !== removeIndex
     ));
-    showToast("학습 계획을 삭제했어요.", "info", {
+    showToast("학습 계획을 삭제했습니다.", "info", {
       duration: 6000,
       action: {
         label: "되돌리기",
@@ -1135,7 +1135,7 @@ export default function Dashboard() {
     )[0] ?? null;
   const recommendedCourse = stepView?.plan.course ?? null;
   const startHint = !stepView
-    ? "추천할 과목이 아직 없어요."
+    ? "추천할 과목이 없습니다."
     : stepView.status !== "on"
       ? `조금 밀렸어요. ${stepView.plan.course}부터 시작해요.`
       : stepView.dday
@@ -1238,8 +1238,8 @@ export default function Dashboard() {
         <NoticeBanner messages={[
           { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: PINK },
           "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",
-          "Tongkk는 무료! 사용료 대신 여러분의 피드백을 먹고 자랍니다 ^.^ ",
-          "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했으니 오른쪽 공지사항을 참고해주세요."
+          "Tongkk는 무료로 이용할 수 있습니다. ",
+          "설문 참여는 공지사항을 확인하세요."
 ,
         ]} />
         <button type="button"
@@ -1332,7 +1332,7 @@ export default function Dashboard() {
               <span className="text-base font-extrabold text-cyan">자료 복습하기</span>
               <span className="text-xs font-semibold text-cyan/80">
                 {!reviewCourse
-                  ? "과목과 자료를 먼저 추가해보세요"
+                  ? "과목과 자료를 먼저 추가하세요"
                   : (courseStats[reviewCourse]?.summaries ?? 0) > 0
                     ? `${reviewCourse} 최근 요약 보기`
                     : `${reviewCourse} 요약 만들러 가기`}
@@ -1361,7 +1361,7 @@ export default function Dashboard() {
               }}>
                 <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 850, color: "var(--color-text-strong)" }}>아직 등록된 강의가 없습니다.</h2>
                 <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.7, color: "var(--color-muted)" }}>
-                  강의를 만들고 강의자료를 올려보세요.<br />AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
+                  강의를 만들고 강의자료를 올려보세요.<br />AI로 요약·퀴즈·학습 계획을 만드세요.
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
                   <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
@@ -1544,7 +1544,7 @@ export default function Dashboard() {
                 </p>
               ) : (
                 <p style={{ margin: "0 0 12px", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
-                  D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
+                  D-day와 미완료 계획으로 오늘 할 일을 생성합니다.
                 </p>
               )}
               <div style={{ display: "flex", gap: 8, marginBottom: showStudyPlanOptions ? 8 : 14 }}>
@@ -1625,7 +1625,7 @@ export default function Dashboard() {
                     {planSourceMessage}
                   </p>
                   <p style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
-                    직접 작성한 계획은 그대로 유지돼요. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
+                    직접 작성한 계획은 그대로 유지됩니다. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
                   </p>
                   {([
                     { title: "D-day", sources: ddayPlanSources },
@@ -1743,7 +1743,7 @@ export default function Dashboard() {
                       background: "var(--color-card)", border: "1px solid var(--color-border-soft)",
                     }}>
                       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--color-text-secondary)" }}>
-                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인해보세요.
+                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인하세요.
                       </p>
                       <button
                         type="button"
@@ -1790,7 +1790,7 @@ export default function Dashboard() {
               )}
               {!canGenerateStudyPlan && (
                 <p style={{ color: "var(--color-muted)", fontSize: 13, textAlign: "center", padding: "6px 0 12px", margin: 0 }}>
-                  먼저 D-day에 과제나 일정을 추가해보세요
+                  먼저 D-day에 과제나 일정을 추가하세요
                 </p>
               )}
               {todayPlanEntries.length === 0 ? (

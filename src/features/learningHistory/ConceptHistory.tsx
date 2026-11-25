@@ -23,10 +23,10 @@ function ConceptDetail({ id }: { id: string }) {
       <div className="workflow-card-heading"><h2>{data.concept.title}</h2><span className="workflow-badge" data-state={data.concept.state}>{labels[data.concept.state]}</span></div>
       <dl className="workflow-metrics"><div><dt>수행 근거</dt><dd>{data.concept.evidence_count}개</dd></div><div><dt>도움 사용</dt><dd>{data.concept.assisted_count}회</dd></div><div><dt>독립 설명의 서로 다른 질문</dt><dd>{data.concept.independent_questions}개</dd></div><div><dt>예정일 이후 복습 성공</dt><dd>{data.concept.delayed_practice}회</dd></div></dl>
       <p className="workflow-muted">같은 문제 반복, 피드백을 본 설명 수정, 독립 수행을 구분해요. 한 번의 정답으로 장기 이해를 확정하지 않아요.</p>
-      {data.concept.source_changed && <p>원문이 바뀌었어요. 이 기록은 이전 원문 버전의 학습이에요.</p>}
+      {data.concept.source_changed && <p>원문이 변경되었습니다. 이전 자료의 학습 기록입니다.</p>}
       {data.issue_id && <Link to={`/review?tab=issues&issueId=${data.issue_id}`}>연결된 학습 이슈 →</Link>}
       <h3>최근 수행 기록</h3>{data.evidence.map(e => <section className="workflow-item" key={e.id}><p className="workflow-meta">{new Date(e.created_at).toLocaleString('ko-KR')} · {({ recall: '자기 설명', check: '기초 확인', review: '복습', revision: '설명 개선', quiz: '연결한 오답' } as Record<string, string>)[e.source_kind]} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움·사전 설명 있음' : ''}</p><Link to={`/learn/${e.session_id}`}>학습 답변·피드백 보기 →</Link></section>)}
-      {!data.evidence.length && <p>아직 평가 근거가 없어요.</p>}
+      {!data.evidence.length && <p>평가 근거가 없습니다.</p>}
       <h3>설명 개선 이력</h3>{data.revisions.map(r => <Link key={r.id} to={`/learn/${r.session_id}/revisions/${r.id}`}>{new Date(r.created_at).toLocaleString('ko-KR')} · 수정 설명과 평가 보기 →</Link>)}
     </>}
   </Card>;
@@ -41,7 +41,7 @@ export default function ConceptHistory() {
     workflowRequest<{ concepts: Concept[]; total: number }>(`/learning-concepts?offset=${page * 30}`, 'GET', undefined, controller.signal).then(setData).catch(e => { if (!controller.signal.aborted) setError(e.message); });
     return () => controller.abort();
   }, [user, selected, page, retry]);
-  if (!user) return <p className="workflow-muted">로그인하면 개념별 학습 기록을 확인할 수 있어요.</p>;
+  if (!user) return <p className="workflow-muted">개념별 학습 기록을 보려면 로그인하세요.</p>;
   if (selected) return <div className="workflow-surface workflow-stack"><button type="button" className="workflow-button" onClick={() => setParams({ view: 'concepts' })}>← 개념 목록</button><ConceptDetail key={selected} id={selected} /></div>;
   return <div className="workflow-surface workflow-stack"><h2 className="workflow-view-title">개념별 학습 기록</h2>
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
@@ -49,7 +49,7 @@ export default function ConceptHistory() {
         <p className="workflow-muted">학습한 개념 {data.total}개 · 자료 버전별로 기록해요.</p>
         {data.concepts.map(c => <Card key={c.id} className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{c.title}</h3><span className="workflow-badge" data-state={c.state}>{labels[c.state]}</span></div><p className="workflow-meta">수행 근거 {c.evidence_count}개</p>
           <button type="button" className="workflow-button" onClick={() => setParams({ view: 'concepts', conceptId: c.id })}>변화와 근거 보기 →</button></Card>)}
-        {!data.total && <p>설명 학습을 시작하면 개념별 기록이 쌓여요.</p>}
+        {!data.total && <p>학습한 개념이 없습니다. 설명 학습을 시작하세요.</p>}
         <div className="workflow-actions"><button type="button" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</button><button type="button" disabled={(page + 1) * 30 >= data.total} onClick={() => setPage(p => p + 1)}>다음</button></div>
       </>}
   </div>;
