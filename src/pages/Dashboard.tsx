@@ -47,7 +47,7 @@ import {
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 import LearningBriefing from "../features/review/LearningBriefing";
-import { learningTargetUrl } from "../services/learningTargets";
+import LearningRecommendations from "../features/review/LearningRecommendations";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void; onAddAndUpload: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -1475,28 +1475,7 @@ export default function Dashboard() {
               <section aria-labelledby="today-recommendations-heading" className="mb-5 border-b border-border-soft pb-4">
                 <h4 id="today-recommendations-heading" className="m-0 text-[13px] font-bold text-text-strong">오늘의 추천</h4>
                 {stepView && <p className="m-0 mt-1.5 text-xs leading-5 text-muted">{startHint}</p>}
-                {recommendations.length > 0 ? (
-                  <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
-                    {recommendations.map(item => (
-                      <li key={item.title}>
-                        <button
-                          type="button"
-                          onClick={() => item.target && navigate(learningTargetUrl(item.target))}
-                          className="flex w-full cursor-pointer items-start gap-2.5 rounded-[10px] border-0 bg-surface p-3 text-left hover:bg-muted-surface"
-                        >
-                          <span aria-hidden className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${item.urgent ? "bg-pink" : "bg-cyan"}`} />
-                          <span className="flex min-w-0 flex-1 flex-col gap-1">
-                            <span className="text-[13px] font-bold leading-5 break-words text-text-strong">{item.title}</span>
-                            <span className="text-xs leading-5 break-words text-text-secondary">{item.reason}</span>
-                          </span>
-                          <span aria-hidden className="shrink-0 text-text-secondary">→</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="m-0 mt-2 text-xs leading-5 text-muted">일정과 학습 기록이 쌓이면 오늘 챙길 것을 추천해드려요.</p>
-                )}
+                <LearningRecommendations key={user?.id || 'guest'} items={recommendations} />
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
                   <button
                     type="button"
