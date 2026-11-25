@@ -202,7 +202,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const buttonLabel = view === 'reset' ? '재설정 메일 보내기' : confirming ? (expired ? '인증번호 다시 받기' : '인증하기') : signingUp ? '다음' : title;
   const compactCredentials = compact && view === 'credentials';
   const codeError = wrongCode && !expired;
-  const confirmationNotice = error || (expired ? '인증 시간이 끝났어요.'
+  const confirmationNotice = error || (expired ? '인증번호가 만료되었습니다. 새 인증번호를 받아 주세요.'
     : codeError ? '인증번호가 틀렸어요. 다시 확인해주세요.' : message);
   const submitDisabled = submitting || (view === 'reset' && wait > 0)
     || (confirming && (expired ? wait > 0 : code.length < CODE_LENGTH));
