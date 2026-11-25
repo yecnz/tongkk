@@ -2,6 +2,7 @@ import BrandLogo from "../components/BrandLogo";
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import LegalLinks from "../components/LegalLinks";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
@@ -1892,6 +1893,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <LegalLinks style={{ justifyContent: "center", padding: "8px 0 24px" }} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import BrandLogo from "../components/BrandLogo";
+import LegalLinks from "../components/LegalLinks";
 import { useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, SOFT_SHADOW } from "../common";
@@ -214,6 +215,7 @@ export default function Auth() {
             </>
           )}
         </div>
+        <LegalLinks style={{ justifyContent: "center", marginTop: 20 }} />
       </div>
     </div>
   );
