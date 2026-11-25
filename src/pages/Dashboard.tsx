@@ -1328,26 +1328,31 @@ export default function Dashboard() {
                     <Card
                       key={course}
                       className="tongkk-hover-lift"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openCourseDetail(course)}
-                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCourseDetail(course); } }}
                       style={{
-                        minHeight: 120, padding: 20, cursor: "pointer", position: "relative",
+                        minHeight: 120, position: "relative",
                         // hover 시 transform이 쌓임 맥락을 만들어 메뉴 zIndex가 카드 안에 갇힌다 → 메뉴가 열린 카드 자체를 위로 올려 아래 카드에 가리지 않게.
                         zIndex: openCourseMenu === course ? 30 : undefined,
                         display: "flex", flexDirection: "column", justifyContent: "space-between",
                         transition: "transform 0.15s ease, box-shadow 0.15s ease",
                       }}
                     >
-                      <div>
-                        <h2 style={{ margin: "0 44px 10px 0", fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
+                      <button
+                        type="button"
+                        onClick={() => openCourseDetail(course)}
+                        aria-label={`${course} 강의 자료 보기`}
+                        style={{
+                          display: "flex", flex: 1, flexDirection: "column", gap: 10,
+                          width: "100%", padding: 20, border: "none", borderRadius: 18,
+                          background: "transparent", textAlign: "left", cursor: "pointer",
+                        }}
+                      >
+                        <span style={{ marginRight: 44, fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
                           {course}
-                        </h2>
-                        <p style={{ margin: 0, fontSize: 13, color: stats.error ? "var(--color-danger)" : "var(--color-text-secondary)", fontWeight: 700 }}>
+                        </span>
+                        <span style={{ fontSize: 13, color: stats.error ? "var(--color-danger)" : "var(--color-text-secondary)", fontWeight: 700 }}>
                           {stats.error ? "정보를 불러오지 못했습니다" : statsLabel}
-                        </p>
-                      </div>
+                        </span>
+                      </button>
                       <button
                         type="button"
                         className="tongkk-hover-dim"
