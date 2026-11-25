@@ -201,12 +201,24 @@ def _build_model(model: AgentModel, max_tokens: int | None = None, model_name: s
     )
 
 
+# 자료 없이 들어온 대화(예: 과목이 없는 메뉴바 튜터)에서 '업로드한 강의자료'를 근거로 내세우거나
+# 이 화면에 없는 첨부 기능을 안내하지 않게 한다.
+NO_REFERENCE_NOTE = """[자료 없음]
+이번 대화에는 강의자료가 제공되지 않았다. 위 우선순위 중 자료 근거 규칙(2, 3, 9)보다 아래 지시를 따른다.
+- 일반적인 대학 수준 지식으로 답하되, 확실하지 않은 내용은 단정하지 않는다.
+- `근거로 본 자료` 줄은 쓰지 않는다. 단, 사용자가 이미지를 첨부했다면 `근거로 본 자료: 첨부 이미지`라고 쓴다.
+- 이 대화창에는 파일 첨부 기능이 없다. 채팅창 첨부·드래그 앤 드롭·클립 아이콘 같은 방법을 안내하지 않는다.
+- 강의자료를 어떻게 추가하는지 물으면 아래 두 단계만 짧게 안내한다. 덧붙이는 설명은 하지 않는다.
+  1. Tongkk 대시보드에서 `+ 강의 추가하기`
+  2. `추가하고 자료 올리기` (PDF·PPT·이미지 등)"""
+
+
 def _agent_node(state: StudyAgentState):
     model = state["model"]
     llm = _build_model(model).bind_tools(TOOLS)
     # 자료 컨텍스트는 매 턴 SystemMessage에만 실어, 대화 이력(state["messages"])에는 누적되지 않게 한다.
     reference = (state.get("reference_context") or "").strip()
-    system_content = f"{SYSTEM_PROMPT}\n\n{reference}" if reference else SYSTEM_PROMPT
+    system_content = f"{SYSTEM_PROMPT}\n\n{reference}" if reference else f"{SYSTEM_PROMPT}\n\n{NO_REFERENCE_NOTE}"
     messages = [SystemMessage(content=system_content), *state["messages"]]
     response = llm.invoke(messages)
     return {"messages": [response], "model": model}

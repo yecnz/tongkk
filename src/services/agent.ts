@@ -35,15 +35,17 @@ export async function sendAgentMessage(
   sourceMarkdown?: string,
   pages?: string,
   scope?: MateScope,
+  signal?: AbortSignal,
 ): Promise<AgentResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
+  const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 
   try {
     if (scope) {
       const data = await workflowRequest<{ result: string; thread_id: string; messages: AgentMessage[]; citations: { label: string; quote: string }[] }>('/learning-mate', 'POST', {
         course_id: scope.courseId, material_id: scope.materialId, source_hash: scope.sourceHash, messages: messages.slice(-20),
-      }, controller.signal);
+      }, requestSignal);
       const citations = data.citations.length ? '\n\n근거로 본 자료: ' + data.citations.map(h => h.label).join(', ') : '';
       return { result: data.result + citations, threadId: data.thread_id, messages: data.messages };
     }
@@ -51,7 +53,7 @@ export async function sendAgentMessage(
       method: 'POST',
       headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ thread_id: threadId || undefined, messages, markdown, source_markdown: sourceMarkdown, pages }),
-      signal: controller.signal,
+      signal: requestSignal,
     });
 
     if (response.status === 409 && threadId) {
@@ -68,7 +70,7 @@ export async function sendAgentMessage(
       messages: data.messages || [],
     };
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (!signal?.aborted && err instanceof DOMException && err.name === 'AbortError') {
       throw new Error('Agent 요청 시간 초과. 다시 시도해주세요.');
     }
     throw err;

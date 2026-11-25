@@ -77,7 +77,7 @@ export async function loadUserProfile(): Promise<UserProfile> {
   if (error) throw new Error(formatSupabaseError(error));
   if (data) return toProfile(data);
 
-  return saveUserProfile({
+  return upsertUserProfile(user.id, {
     nickname: defaultNickname(user),
     avatarUrl: null,
     school: null,
@@ -90,10 +90,14 @@ export async function loadUserProfile(): Promise<UserProfile> {
 
 export async function saveUserProfile(profile: UserProfile): Promise<UserProfile> {
   const user = await requireSupabaseUser();
+  return upsertUserProfile(user.id, profile);
+}
+
+async function upsertUserProfile(userId: string, profile: UserProfile): Promise<UserProfile> {
   const { data, error } = await supabase
     .from('profiles')
     .upsert({
-      id: user.id,
+      id: userId,
       nickname: profile.nickname,
       avatar_url: profile.avatarUrl,
       school: profile.school,
@@ -109,6 +113,12 @@ export async function saveUserProfile(profile: UserProfile): Promise<UserProfile
 
   if (error) throw new Error(formatSupabaseError(error));
   return toProfile(data);
+}
+
+export async function updateNotificationsEnabled(enabled: boolean): Promise<void> {
+  const user = await requireSupabaseUser();
+  const { error } = await supabase.from('profiles').update({ notifications_enabled: enabled }).eq('id', user.id);
+  if (error) throw new Error(formatSupabaseError(error));
 }
 
 // '요약 안내 팝업 다시 보지 않기' 설정만 가볍게 갱신한다. (다른 프로필 필드는 건드리지 않음)

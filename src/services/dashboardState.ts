@@ -1,6 +1,6 @@
 import { formatSupabaseError, requireSupabaseUser, supabase } from './supabase';
 
-export type DashboardStateKey = 'ddays' | 'plans' | 'pacePlans' | 'paceLog' | 'resume' | `todayBudget:${string}`;
+export type DashboardStateKey = 'ddays' | 'plans' | 'pacePlans' | 'paceLog' | 'resume' | 'menubarReminders' | `todayBudget:${string}`;
 
 type DashboardStateRow<T> = {
   value: T;

@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', '.claude']),
+  globalIgnores(['dist', '.claude', 'src-tauri/target']),
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

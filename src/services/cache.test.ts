@@ -98,6 +98,28 @@ describe('readThroughCache', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it('무효화 전에 시작한 요청이 나중에 끝나도 새 계정의 캐시를 덮지 않는다', async () => {
+    const cache = createTtlCache<string[]>(1000);
+    let finishFirstRequest!: () => void;
+    const firstRequest = readThroughCache(cache, 'courses', async save => {
+      await new Promise<void>(resolve => { finishFirstRequest = resolve; });
+      const courses = ['이전 과목'];
+      save(courses);
+      return courses;
+    });
+
+    cache.invalidate();
+    await readThroughCache(cache, 'courses', async save => {
+      const courses = ['새 과목'];
+      save(courses);
+      return courses;
+    });
+    finishFirstRequest();
+    await firstRequest;
+
+    expect(cache.get('courses')).toEqual(['새 과목']);
+  });
+
   it('값이 0이어도 fresh로 취급한다(개수 캐시 정합성)', async () => {
     const cache = createTtlCache<number>(1000);
     cache.set('cnt', 0);

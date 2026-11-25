@@ -33,7 +33,7 @@ export function invalidateCoursesCache() {
   coursesCache.invalidate();
 }
 
-const fetchCoursesFromServer = async (): Promise<CourseRecord[]> => {
+const fetchCoursesFromServer = async (save: (courses: CourseRecord[]) => void): Promise<CourseRecord[]> => {
   // 로그아웃 직후의 백그라운드 revalidate에서는 이 호출이 throw할 수 있다 —
   // revalidate()가 에러를 삼키므로 그대로 둔다.
   await requireSupabaseUser();
@@ -44,7 +44,7 @@ const fetchCoursesFromServer = async (): Promise<CourseRecord[]> => {
 
   if (error) throw new Error(formatSupabaseError(error));
   const result = (data || []).map(toCourseRecord);
-  coursesCache.set(COURSES_CACHE_KEY, result);
+  save(result);
   return result;
 };
 

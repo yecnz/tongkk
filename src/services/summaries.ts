@@ -79,7 +79,7 @@ export async function loadSummariesFromServer(
 ): Promise<SavedSummary[]> {
   const cacheKey = `${course}::${options?.includeContent ? 'full' : 'light'}`;
 
-  const fetchList = async (): Promise<SavedSummary[]> => {
+  const fetchList = async (save: (items: SavedSummary[]) => void): Promise<SavedSummary[]> => {
     const courseId = await getCourseId(course);
     if (!courseId) return [];
 
@@ -98,7 +98,7 @@ export async function loadSummariesFromServer(
     if (error) throw new Error(formatSupabaseError(error));
 
     const summaries = (data || []).map(toSavedSummary);
-    summariesCache.set(cacheKey, summaries);
+    save(summaries);
     return summaries;
   };
 
@@ -120,7 +120,7 @@ export async function countSummariesFromServer(course: string): Promise<number> 
     return cachedList.length;
   }
 
-  const fetchCount = async (): Promise<number> => {
+  const fetchCount = async (save: (count: number) => void): Promise<number> => {
     const courseId = await getCourseId(course);
     if (!courseId) return 0;
 
@@ -132,7 +132,7 @@ export async function countSummariesFromServer(course: string): Promise<number> 
     if (error) throw new Error(formatSupabaseError(error));
 
     const total = count ?? 0;
-    summariesCountCache.set(cacheKey, total);
+    save(total);
     return total;
   };
 

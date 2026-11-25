@@ -1,0 +1,171 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap");
+
+/* 메뉴바는 Figma의 논리 px를 사용한다. 웹 앱의 사용자 배율은 다른 화면에 유지한다. */
+#root:has(.mini-stage) { zoom: 1; }
+.mini-stage {
+  --mini-border: light-dark(#e2e3e8, #333944);
+  --mini-divider: light-dark(#e6e6eb, #333944);
+  --mini-input-border: light-dark(#e4e4ea, #333944);
+  --mini-hover: light-dark(#efeff2, #2c313b);
+  --mini-panel: light-dark(#fbfcfe, #1d2027);
+  --mini-option: light-dark(#f7f8fb, #252932);
+  --mini-tutor-border: light-dark(#e4e3e0, #333944);
+  --mini-tutor-text: light-dark(#51514e, #c5cad3);
+  --mini-rose: light-dark(#b86f86, #e8a3c5);
+  --mini-send-muted: light-dark(#f3b4d5, #995574);
+  --mini-source-bg: light-dark(#e9f1f0, #18272e);
+  --mini-source-text: light-dark(#4f7f86, #7cc8de);
+  --mini-formula: light-dark(#f0f0ed, #252932);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100dvh;
+  padding: 24px;
+  font-family: "Noto Sans KR", sans-serif;
+  line-height: 1.5;
+}
+html.menubar-app .mini-stage { padding-top: 0; }
+.mini-stage[hidden] { display: none; }
+.mini-stage p, .mini-stage h2 { margin: 0; }
+.mini-stage button, .mini-stage input, .mini-stage select { font-family: inherit; }
+.mini-stage button { cursor: pointer; }
+.mini-stage button:disabled { cursor: default; }
+.mini-card {
+  position: relative;
+  flex: 0 0 300px;
+  width: 300px;
+  padding: 15px 17px;
+  border: 1px solid var(--mini-border);
+  border-radius: 16px;
+  background: var(--color-mini-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .16);
+  color: var(--color-text);
+}
+.mini-dday { height: 87px; }
+.mini-subject { margin-right: 34px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; color: var(--color-text-strong); line-height: 18px; }
+.mini-countdown { font-size: 32px; font-weight: 700; color: var(--color-text-strong); line-height: 38px; }
+.mini-date { margin-top: 6px !important; color: var(--color-muted); font-size: 11px; line-height: 17px; }
+.mini-dday-empty { height: 32px; color: var(--color-muted); font-size: 12px; }
+.mini-tasks { border-top: 1px solid var(--mini-divider); padding-top: 11px; }
+.mini-tasks-heading { display: flex; justify-content: space-between; align-items: center; height: 16px; color: var(--color-muted); }
+.mini-tasks-heading h2 { font-size: 11px; font-weight: 700; }
+.mini-tasks-heading > span { font-size: 10px; }
+.mini-task-list { height: 39px; margin-top: 6px; color: var(--color-muted); font-size: 12px; }
+.mini-task-list-filled { height: 91px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+.mini-task { display: flex; align-items: center; gap: 8px; min-height: 25px; font-size: 11px; }
+.mini-task-check { width: 12px; flex: 0 0 12px; padding: 0; border: 0; background: transparent; color: var(--color-muted); font-size: 14px; line-height: 1; }
+.mini-task-done .mini-task-check { color: var(--color-pink); }
+.mini-task a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); text-decoration: none; }
+.mini-task-done a { color: var(--color-muted); text-decoration: line-through; }
+.mini-open-app { display: flex; align-items: center; justify-content: space-between; height: 32px; margin: 0 -8px; padding: 0 8px; border-radius: 6px; color: var(--color-text); font-size: 12px; font-weight: 500; text-decoration: none; }
+.mini-open-app:hover, .mini-open-app:focus-visible { background: var(--mini-hover); }
+.mini-shortcut { color: var(--color-muted); font-size: 11px; font-weight: 400; }
+.mini-question { position: relative; display: flex; align-items: center; height: 32px; margin-top: 8px; padding: 0 10px; gap: 8px; border: 1px solid var(--mini-input-border); border-radius: 9px; background: var(--color-mini-input); }
+.mini-question:has(> .mini-question-input:focus) { border-color: var(--color-pink); }
+.mini-mascot { width: 15px; height: 15px; flex: 0 0 15px; object-fit: cover; }
+.mini-material-trigger { display: flex; align-items: center; flex: 0 0 65px; width: 65px; min-width: 0; gap: 2px; margin-left: -1px; padding: 0; border: 0; background: transparent; color: var(--color-muted); font-size: 10px; text-align: left; }
+.mini-material-trigger > span:first-child { max-width: 53px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-question-selected .mini-material-trigger { color: var(--color-pink-deep); }
+.mini-input-divider { flex: 0 0 1px; height: 14px; background: var(--mini-border); }
+:root .mini-stage .mini-question-input { flex: 1; width: 0; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--color-text-strong); font-size: 10px !important; line-height: 16px; }
+.mini-question-send { flex: 0 0 12px; padding: 0; border: 0; background: transparent; color: var(--color-muted); font-size: 12px; }
+.mini-question-send:not(:disabled):hover { color: var(--color-pink); }
+.mini-card-guest { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-color: var(--color-border); background: var(--color-card); }
+.mini-card-guest > p { color: var(--color-muted); font-size: 12px; line-height: 19px; }
+.mini-card-guest .mini-open-app { height: 26px; font-weight: 400; }
+.mini-guest-heading { display: flex; align-items: center; justify-content: space-between; }
+.mini-guest-heading > p { color: var(--color-text-strong); font-size: 13px; font-weight: 700; line-height: 20px; }
+.mini-guest-heading > button { height: 26px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--color-tint-pink); color: var(--color-pink-deep); font-size: 11px; font-weight: 500; }
+
+.mini-account { position: relative; flex: 0 0 24px; }
+.mini-card > .mini-account { position: absolute; top: 11px; right: 17px; }
+.mini-tutor-titlebar > .mini-account { margin-left: -8px; }
+.mini-account-trigger { display: block; padding: 0; border: 0; border-radius: 50%; background: transparent; }
+.mini-account-avatar { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; overflow: hidden; border-radius: 50%; background: var(--color-tint-cyan); color: var(--color-cyan); font-size: 9px; font-weight: 700; line-height: 17px; }
+.mini-account-avatar:has(img) { background: transparent; }
+.mini-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.mini-account-menu { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; display: flex; flex-direction: column; gap: 6px; width: 204px; padding: 12px 11px 8px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-card); box-shadow: 0 4px 6px rgb(0 0 0 / .14); }
+.mini-tutor-titlebar .mini-account-menu { top: calc(100% + 6px); }
+.mini-account-current { display: flex; align-items: center; gap: 8px; }
+.mini-account-current .mini-account-avatar { width: 28px; height: 28px; }
+.mini-account-info { min-width: 0; }
+.mini-account-info p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-account-info p:first-child { color: var(--color-text-strong); font-size: 11px; font-weight: 700; line-height: 16px; }
+.mini-account-info p + p { margin-top: 1px; color: var(--color-muted); font-size: 10px; font-weight: 500; line-height: 17px; }
+.mini-account-divider { height: 1px; background: var(--color-border); }
+.mini-account-menu > button { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text); font-size: 11px; text-align: left; }
+.mini-account-menu > button:hover:not(:disabled), .mini-account-menu > button:focus-visible { background: var(--mini-hover); }
+.mini-account-menu > button img { width: 14px; height: 14px; }
+.mini-account-error { color: var(--color-danger); font-size: 11px; }
+
+.mini-login-card { display: flex; flex-direction: column; gap: 14px; width: 300px; max-width: 100%; max-height: calc(100dvh - 48px); overflow-y: auto; padding: 16px 18px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: 0 8px 24px rgb(0 0 0 / .16); }
+.mini-login-card > * { flex-shrink: 0; }
+.mini-login-heading { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; row-gap: 14px; align-items: center; }
+.mini-login-heading > div { display: contents; }
+.mini-login-heading h2 { color: var(--color-text-strong); font-size: 15px; font-weight: 700; line-height: 23px; }
+.mini-login-heading p { grid-area: 2 / 1 / 3 / -1; color: var(--color-muted); font-size: 11px; line-height: 17px; white-space: pre-line; overflow-wrap: anywhere; }
+.mini-login-close { grid-area: 1 / 2; padding: 0; border: 0; background: transparent; }
+.mini-login-field { display: flex; flex-direction: column; gap: 5px; color: var(--color-text); font-size: 11px; font-weight: 500; line-height: 17px; }
+:root .mini-stage .mini-login-field input { width: calc(100% + 2px); height: 38px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-text-strong); font-size: 12px !important; font-weight: 400; }
+.mini-login-field input::placeholder { color: var(--color-muted); }
+:root .mini-stage .mini-login-field input:focus { outline: 1px solid var(--color-cyan); outline-offset: -1px; }
+.mini-login-reset, .mini-login-footer button { padding: 0; border: 0; background: transparent; }
+.mini-login-reset { align-self: flex-end; color: var(--color-muted); font-size: 10px; line-height: 16px; }
+.mini-login-submit { width: calc(100% + 2px); min-height: 36px; border: 0; border-radius: 10px; background: var(--color-pink); color: var(--color-on-brand); font-size: 12px; font-weight: 700; }
+.mini-login-submit:disabled { opacity: .55; }
+.mini-login-footer { display: flex; justify-content: center; gap: 8px; color: var(--color-muted); font-size: 11px; line-height: 17px; }
+.mini-login-footer button { color: var(--color-text-strong); font-size: inherit; font-weight: 500; }
+[data-theme="dark"] :is(.mini-login-close, .mini-account-menu > button) img { filter: invert(1); }
+.mini-material-panel { position: absolute; z-index: 10; bottom: calc(100% + 9px); left: -1px; width: calc(100% + 2px); min-height: 146px; padding: 9px 11px 19px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--mini-panel); box-shadow: 0 4px 12px rgb(0 0 0 / .14); }
+.mini-panel-heading { display: flex; align-items: center; justify-content: space-between; height: 16px; margin-bottom: 8px; }
+.mini-panel-heading h2 { font-size: 11px; font-weight: 700; color: var(--color-text-strong); }
+.mini-panel-heading button { padding: 0; border: 0; background: transparent; color: var(--color-muted); font-size: 13px; }
+.mini-select-field + .mini-select-field { margin-top: 6px; }
+.mini-select-label { display: block; margin-bottom: 3px; color: var(--color-muted); font-size: 10px; line-height: 13px; }
+.mini-select { overflow: hidden; border: 1px solid var(--color-border); border-radius: 6px; background: var(--mini-option); }
+.mini-select-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 25px; padding: 0 9px; border: 0; background: transparent; color: var(--color-text); font-size: 11px; text-align: left; }
+.mini-select-toggle > span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mini-select-toggle > span:last-child, .mini-select-placeholder { color: var(--color-muted); }
+.mini-select-toggle[aria-expanded="false"] > span:last-child { position: relative; top: -5px; flex-shrink: 0; line-height: 1; }
+.mini-select-options { height: 62px; max-height: 62px; overflow-y: auto; border-top: 1px solid var(--color-border); scrollbar-width: thin; scrollbar-color: var(--color-muted) transparent; }
+.mini-select-options button { display: block; width: 100%; height: 26px; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: transparent; color: var(--color-text); font-size: 11px; text-align: left; }
+.mini-select-options button:hover, .mini-select-options button:focus-visible { background: var(--mini-hover); }
+.mini-select-options button[aria-pressed="true"] { color: var(--color-pink-deep); }
+.mini-select-toggle > span:first-child:not(.mini-select-placeholder) { color: var(--color-text-strong); }
+.mini-panel-empty, .mini-panel-status, .mini-panel-error { font-size: 11px; color: var(--color-muted); margin-top: 8px !important; }
+.mini-panel-empty p { font-size: 10px; }
+.mini-panel-empty a { display: inline-block; margin-top: 8px; color: var(--color-pink); text-decoration: none; }
+.mini-panel-error { color: var(--color-pink); }
+
+.mini-tutor { display: flex; flex-direction: column; flex: 0 0 420px; width: 420px; height: 560px; overflow: hidden; border: 1px solid var(--mini-tutor-border); border-radius: 16px; background: var(--color-mini-card); box-shadow: 0 18px 44px rgb(0 0 0 / .22); }
+.mini-tutor-titlebar { position: relative; display: flex; align-items: center; gap: 18px; flex: 0 0 51px; padding: 0 14px 0 16px; border-bottom: 1px solid var(--mini-tutor-border); }
+.mini-window-back { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; margin-left: -6px; margin-right: -8px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--color-text); }
+.mini-window-back:hover, .mini-window-back:focus-visible { background: var(--mini-hover); color: var(--color-text-strong); }
+.mini-tutor-titlebar > p { flex: 1; font-size: 13px; font-weight: 700; color: var(--color-text-strong); }
+:root .mini-stage .mini-tutor-course { width: 73px; max-width: 100px; height: 24px; padding: 0 9px; border: 1px solid var(--mini-rose); border-radius: 999px; background: var(--color-mini-input); color: var(--mini-tutor-text); font-size: 10px !important; }
+.mini-tutor-materials { position: absolute; z-index: 10; top: 43px; right: 14px; width: 264px; padding: 12px; border: 1px solid var(--mini-border); border-radius: 10px; background: var(--mini-panel); box-shadow: 0 4px 12px rgb(0 0 0 / .14); }
+.mini-tutor-source { flex-shrink: 0; }
+.mini-tutor-source > summary { display: flex; align-items: center; justify-content: space-between; gap: 6px; cursor: pointer; list-style: none; }
+.mini-tutor-source > summary::-webkit-details-marker { display: none; }
+.mini-tutor-source > summary > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ⌄ 글리프는 기준선 아래에 그려지므로 버튼의 시각적 중앙으로 보정한다. */
+.mini-tutor-source > summary > span:last-child { position: relative; top: -4px; flex-shrink: 0; font-size: 11px; line-height: 1; }
+.mini-tutor-materials { display: flex; flex-direction: column; gap: 8px; }
+.mini-tutor-messages { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 12px; overflow-y: auto; padding: 16px; scrollbar-width: thin; }
+.mini-tutor-messages > * { flex-shrink: 0; }
+.mini-tutor-reply { border-color: var(--mini-tutor-border); background: var(--color-mini-input); color: var(--mini-tutor-text); }
+.mini-tutor-reply p + p { margin-top: 8px; }
+.mini-tutor-reply .katex-display { margin: 8px 0; padding: 6px 10px; border-radius: 8px; background: var(--mini-formula); }
+.mini-tutor-compose { display: flex; align-items: center; flex: 0 0 60px; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--mini-tutor-border); }
+:root .mini-stage .mini-tutor-input { flex: 1; min-width: 0; height: 38px; padding: 8px 12px; border: 1px solid var(--mini-tutor-border); border-radius: 10px; outline: none; background: var(--color-mini-input); color: var(--mini-tutor-text); font-size: 13px !important; }
+.mini-tutor-input:focus { border-color: var(--color-pink); }
+.mini-tutor-send { display: grid; place-items: center; flex: 0 0 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: var(--color-pink); color: var(--color-on-brand); font-size: 15px; font-weight: 700; }
+.mini-tutor-send:disabled { background: var(--mini-send-muted); }
+
+/* 펼친 목록이 짧은 D-day 빈 상태의 카드 위로 벗어나지 않게 공간을 확보한다. */
+.mini-card:has(.mini-select-options) .mini-dday-empty { height: 87px; }
+
+.mini-tutor-paragraph { line-height: 1.5; }
+.mini-tutor-source-note { display: table; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--mini-source-bg); color: var(--mini-source-text); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.mini-retry { margin-top: 6px; padding: 0; border: 0; background: transparent; color: var(--color-text); font-size: 10px; text-decoration: underline; text-underline-offset: 2px; }

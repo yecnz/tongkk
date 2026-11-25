@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { AuthGateProvider } from "./AuthGateContext";
 import { CourseProvider } from "./CourseContext";
@@ -16,6 +16,9 @@ import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import Legal from "./pages/Legal";
 import LearningSession from "./pages/LearningSession";
+import Mini from "./pages/Mini";
+import MiniTutor from "./pages/MiniTutor";
+import MenubarLayout from "./components/MenubarLayout";
 import SourceCallback from './features/integrations/SourceCallback';
 import CalendarCallback from "./features/integrations/CalendarCallback";
 import LearningContextProvider from "./features/learningMate/LearningContextProvider";
@@ -27,6 +30,8 @@ import { applyTheme } from "./services/theme";
 import UpdatePrompt from "./UpdatePrompt";
 import { RESET_PASSWORD_PATH } from "./services/authFlow";
 import AuthCallbackBoundary from "./components/AuthCallbackBoundary";
+
+const MenubarSettings = lazy(() => import("./pages/MenubarSettings"));
 
 function AppShell() {
   const { user, loading } = useAuth();
@@ -99,6 +104,11 @@ function App() {
                   <Routes>
                     <Route path="/auth" element={<Auth />} />
                     <Route path={RESET_PASSWORD_PATH} element={<Auth />} />
+                    <Route path="/mini" element={<MenubarLayout />}>
+                      <Route index element={<Mini />} />
+                      <Route path="tutor" element={<MiniTutor />} />
+                      <Route path="settings" element={<Suspense fallback={null}><MenubarSettings /></Suspense>} />
+                    </Route>
                     <Route path="/privacy" element={<Legal kind="privacy" />} />
                     <Route path="/terms" element={<Legal kind="terms" />} />
                     <Route path="/*" element={<AppShell />} />
