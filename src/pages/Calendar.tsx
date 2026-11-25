@@ -3,7 +3,7 @@ import ExternalEvents from '../features/integrations/ExternalEvents';
 import ReviewQueue from '../features/review/ReviewQueue';
 import { useState, useEffect, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card, useSidebarOpen } from "../common";
 import type { PageRouteLabel } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
@@ -66,7 +66,7 @@ export default function Calendar() {
   const { requireAuth } = useAuthGate();
   const { courses } = useCourses();
   const page: PageRouteLabel = "학습 캘린더";
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useSidebarOpen();
 
   const [ddays, setDdays] = useState<Dday[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -277,7 +277,7 @@ export default function Calendar() {
       )}
 
       <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-surface)" }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(!sidebar)} aria-label={sidebar ? "메뉴 닫기" : "메뉴 열기"} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>

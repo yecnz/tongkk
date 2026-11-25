@@ -126,6 +126,25 @@ export const PaperPlaneIcon = () => (
   </svg>
 );
 
+// 768px 이하는 사이드바가 본문을 덮는 overlay 모드(src/index.css)
+const isNarrowScreen = () => window.matchMedia("(max-width: 768px)").matches;
+const SIDEBAR_KEY = "tongkk-sidebar-open";
+let sidebarJustOpened = false;
+
+// 사이드바 열림 상태. PC에선 페이지를 옮겨도 열린 채로 이어지고(sessionStorage),
+// 좁은 화면에선 늘 닫힌 채로 시작한다.
+export const useSidebarOpen = () => {
+  const [open, setOpenState] = useState(() => {
+    try { return !isNarrowScreen() && sessionStorage.getItem(SIDEBAR_KEY) === "1"; } catch { return false; }
+  });
+  const setOpen = (next: boolean) => {
+    if (next && !open) sidebarJustOpened = true; // 직접 열 때만 슬라이드 애니메이션
+    setOpenState(next);
+    try { sessionStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch { /* 저장 못 해도 동작엔 문제없음 */ }
+  };
+  return [open, setOpen] as const;
+};
+
 export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
   // 사이드바가 열려 있는 동안 body에 클래스를 붙여, 본문(#root)을 오른쪽으로 밀어
   // 가리지 않고 폭이 줄어들게 한다(스타일 정의: src/index.css). 언마운트 시 원복.
@@ -134,6 +153,10 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
     return () => document.body.classList.remove("tongkk-sidebar-open");
   }, []);
   const [showMenubarGuide, setShowMenubarGuide] = useState(false);
+  const [animate] = useState(() => sidebarJustOpened);
+  useEffect(() => { sidebarJustOpened = false; }, []);
+  // 메뉴를 고르면 좁은 화면(overlay)에서만 닫는다. PC에선 열어 둔 채 이동.
+  const navTo = (item: PageRouteLabel) => { onNav(item); if (isNarrowScreen()) onClose(); };
 
   // height:100vh 대신 top/bottom 0 — #root에 zoom이 걸려 있어 100vh는 축소되지만
   // 뷰포트 모서리 기준 offset은 zoom과 무관하게 전체 높이를 채운다(정의: src/index.css).
@@ -141,20 +164,16 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
   return (
     <>
     <div className="tongkk-sidebar-backdrop" onClick={onClose} aria-hidden="true" />
-    <div className="tongkk-sidebar" style={{
+    <div className={animate ? "tongkk-sidebar tongkk-sidebar-animate" : "tongkk-sidebar"} style={{
       position: "fixed", top: 0, left: 0, bottom: 0, width: 240, maxWidth: "80vw",
       background: CARD_BACKGROUND, borderRight: `1px solid ${BORDER_COLOR}`, zIndex: 100,
       display: "flex", flexDirection: "column", padding: "24px 0",
       boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
     }}>
-      <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => { onNav("대시보드"); onClose(); }}><BrandLogo /></button>
-        <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="사이드바 닫기" style={{ background: "none", border: "none", borderRadius: 8, padding: "2px 8px", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
-      </div>
       {(Object.keys(pageRoutes) as PageRouteLabel[])
         .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
         .map(item => (
-        <button type="button" key={item} className={active === item ? undefined : "tongkk-hover-row"} onClick={() => { onNav(item); onClose(); }} style={{
+        <button type="button" key={item} className={active === item ? undefined : "tongkk-hover-row"} onClick={() => navTo(item)} style={{
           padding: "14px 24px", border: "none", background: active === item ? "color-mix(in srgb, var(--color-pink) 11%, transparent)" : "transparent",
           textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
           color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"

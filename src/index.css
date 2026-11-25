@@ -139,7 +139,7 @@ body {
 body.tongkk-sidebar-open #root {
   padding-left: 240px;
 }
-.tongkk-sidebar {
+.tongkk-sidebar-animate {
   animation: tongkk-sidebar-in 0.25s ease;
 }
 @keyframes tongkk-sidebar-in {

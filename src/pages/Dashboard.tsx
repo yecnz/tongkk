@@ -3,7 +3,7 @@ import BrandLogo from "../components/BrandLogo";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import LegalLinks from "../components/LegalLinks";
-import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner, useSidebarOpen } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
 import { useTutorial } from "../TutorialContext";
@@ -604,7 +604,7 @@ export default function Dashboard() {
   const { showToast } = useToast();
   const { ready: readyTutorial } = useTutorial();
   const { openSampleDemo } = useSampleDemo();
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useSidebarOpen();
 
   // 강의 목록 로딩이 끝난 뒤에 대시보드 튜토리얼을 띄운다(스켈레톤 위 노출 방지).
   useEffect(() => {
@@ -1231,7 +1231,7 @@ export default function Dashboard() {
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <div className="dashboard-header">
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(!sidebar)} aria-label={sidebar ? "메뉴 닫기" : "메뉴 열기"} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
