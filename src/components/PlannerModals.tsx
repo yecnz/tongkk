@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useId, useRef, type CSSProperties } from "react";
 import { PINK, CYAN, Card } from "../common";
+import ModalDialog from "./ModalDialog";
 import { loadCourseMaterialsFromServer } from "../services/materials";
 import { loadQuizSetsFromServer } from "../services/quizSets";
 import type { PacePlan } from "../services/pace";
@@ -216,6 +217,7 @@ type AddDdayModalProps = {
 };
 
 export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "assignment", initialSubj = "", heading = "D-day 추가", submitLabel = "추가" }: AddDdayModalProps) => {
+  const titleId = useId();
   const [type, setType] = useState<DdayType>(initialType);
   const [subj, setSubj] = useState(initialSubj);
   const [date, setDate] = useState(initialDate);
@@ -229,9 +231,9 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
     onClose();
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ width: "min(380px, 100%)", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
+    <ModalDialog labelledBy={titleId} onClose={onClose}>
+      <div style={{ width: "100%", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
+        <h3 id={titleId} style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
           {(["assignment", "event", "exam"] as const).map(item => {
             const selected = type === item;
@@ -277,13 +279,14 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
           }}>{submitLabel}</button>
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 
 type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
 
 export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
+  const titleId = useId();
   const [txt, setTxt] = useState("");
   const [error, setError] = useState("");
   const handleAdd = () => {
@@ -294,16 +297,17 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <Card style={{ padding: 28, width: "min(340px, 100%)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
+    <ModalDialog labelledBy={titleId} onClose={onClose} width={340}>
+      <Card style={{ padding: 28, width: "100%" }}>
+        <h3 id={titleId} style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
         <input
           value={txt}
           onChange={e => { setTxt(e.target.value); if (error) setError(""); }}
           onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
           placeholder="학습 계획을 입력하세요"
           aria-label="학습 계획"
-          autoFocus
+          name="study-plan"
+          autoComplete="off"
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
             fontSize: 14, boxSizing: "border-box", marginBottom: error ? 8 : 16
@@ -319,7 +323,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           }}>추가</button>
         </div>
       </Card>
-    </div>
+    </ModalDialog>
   );
 };
 
