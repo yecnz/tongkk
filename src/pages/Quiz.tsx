@@ -1,3 +1,5 @@
+import BrandLogo from "../components/BrandLogo";
+import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -260,10 +262,10 @@ type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => voi
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-      <button type="button" className="tongkk-hover-dim" onClick={onOpenSidebar} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+      <button type="button" className="tongkk-hover-dim" onClick={onOpenSidebar} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
-      <button type="button" className="tongkk-hover-fade" onClick={onHome} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+      <button type="button" className="brand-home tongkk-hover-fade" onClick={onHome}><BrandLogo /></button>
       <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ {label}</span>
     </div>
     {extra}
@@ -1105,6 +1107,8 @@ export default function Quiz() {
 
       return {
         question: quiz.question,
+        questionId: quiz.id,
+        questionVersion: quiz.version,
         type,
         studentAnswer,
         correctAnswer,
@@ -1932,6 +1936,7 @@ export default function Quiz() {
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
+      {examMode && <AssessmentLock />}
       <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
         extra={
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

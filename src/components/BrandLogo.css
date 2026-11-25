@@ -1,0 +1,5 @@
+.brand-logo { display: block; width: 108px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.brand-logo-large { width: 216px; height: 72px; margin-inline: auto; max-width: 100%; }
+[data-theme="dark"] .brand-logo { filter: brightness(0) invert(1); }
+.brand-home { display: inline-flex; align-items: center; flex-shrink: 0; min-height: 40px; border: 0; border-radius: 6px; padding: 0; background: transparent; cursor: pointer; text-decoration: none; }
+.brand-home:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 4px; }

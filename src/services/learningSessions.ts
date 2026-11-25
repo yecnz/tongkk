@@ -82,8 +82,8 @@ export function removeLocalDraft(user: string, session: string, item: string) {
 
 export function clearLearningDrafts(user: string) {
   try {
-    const prefix = `${DRAFT_PREFIX}${user}:`;
-    Object.keys(localStorage).filter(key => key.startsWith(prefix)).forEach(key => localStorage.removeItem(key));
+    const prefixes = [`${DRAFT_PREFIX}${user}:`, `tongkk:review:${user}:`, `tongkk:revision:${user}:`, `tongkk:revision-entry:${user}:`];
+    Object.keys(localStorage).filter(key => prefixes.some(prefix => key.startsWith(prefix))).forEach(key => localStorage.removeItem(key));
   } catch { /* Private mode may disable storage. Server records remain authoritative. */ }
 }
 

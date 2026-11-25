@@ -1,8 +1,9 @@
+import type { LearningTarget } from './learningTargets';
 import { ddayTypeLabels, formatDdayLabel, type DdayType } from "./studyPlanner";
 import type { PaceStatus } from "./pace";
 
 // 대시보드 "오늘의 브리핑": 이미 불러온 데이터만으로 오늘 할 일과 근거 한 줄을 만든다(LLM 없음).
-export type BriefingItem = { title: string; reason: string; urgent: boolean };
+export type BriefingItem = { title: string; reason: string; urgent: boolean; target?: LearningTarget };
 
 export type BriefingInput = {
   ddays: { subj: string; type?: DdayType; daysLeft: number }[];
@@ -36,7 +37,7 @@ export const buildBriefing = ({ ddays, paces, scores, todayPlansLeft }: Briefing
       items.push({
         title: `${dday.subj} ${label} ${formatDdayLabel(dday.daysLeft)}`,
         reason: score === null ? `${label} ${when}` : `${label} ${when} · 최근 정답률 ${score}%`,
-        urgent: dday.daysLeft <= 3,
+        urgent: dday.daysLeft <= 3, target: { kind: "calendar" },
       });
     });
 
@@ -48,7 +49,7 @@ export const buildBriefing = ({ ddays, paces, scores, todayPlansLeft }: Briefing
       items.push({
         title: `${pace.course} 진도 따라잡기`,
         reason: `진도 ${pace.progress}% · 오늘 ${pace.todayTarget}${pace.unitLabel}`,
-        urgent: pace.status === "behind",
+        urgent: pace.status === "behind", target: { kind: "calendar" },
       });
     });
 
@@ -59,11 +60,11 @@ export const buildBriefing = ({ ddays, paces, scores, todayPlansLeft }: Briefing
     .sort((a, b) => a.score - b.score)
     .slice(0, 1)
     .forEach(({ course, score }) => {
-      items.push({ title: `${course} 오답 복습`, reason: `최근 퀴즈 정답률 ${score}%`, urgent: false });
+      items.push({ title: `${course} 오답 복습`, reason: `최근 퀴즈 정답률 ${score}%`, urgent: false, target: { kind: "wrong" } });
     });
 
   if (todayPlansLeft > 0) {
-    items.push({ title: `오늘 계획 ${todayPlansLeft}개 남음`, reason: "학습 캘린더에서 정한 할 일", urgent: false });
+    items.push({ title: `오늘 계획 ${todayPlansLeft}개 남음`, reason: "학습 캘린더에서 정한 할 일", urgent: false, target: { kind: "calendar" } });
   }
 
   return items.slice(0, MAX_ITEMS);

@@ -1,11 +1,12 @@
+import BrandLogo from '../../components/BrandLogo';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sidebar, SidebarIcon, pageRoutes } from '../../common';
+import { Sidebar, SidebarIcon, pageRoutes, type PageRouteLabel } from '../../common';
 import { LearningNavigationContext } from './navigation';
 import LearningLink from './LearningLink';
 import './LearningSession.css';
 
-export default function LearningLayout({ children }: { children: ReactNode }) {
+export default function LearningLayout({ children, active = '학습 세션' }: { children: ReactNode; active?: PageRouteLabel }) {
   const navigate = useNavigate();
   const [sidebar, setSidebar] = useState(false);
   const [error, setError] = useState('');
@@ -24,11 +25,11 @@ export default function LearningLayout({ children }: { children: ReactNode }) {
   const navigation = useMemo(() => ({ beforeLeaveRef, go }), [go]);
   return <LearningNavigationContext.Provider value={navigation}>
     <div className="learning-page">
-      {sidebar && <Sidebar active="학습 세션" onNav={item => { void go(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
+      {sidebar && <Sidebar active={active} onNav={item => { void go(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
       <header className="learning-header">
         <button type="button" className="learning-menu-button" aria-label="메뉴 열기" onClick={() => setSidebar(true)}><SidebarIcon /></button>
-        <LearningLink to="/" className="learning-logo">Tongkk</LearningLink>
-        <span className="learning-header-label">학습 세션</span>
+        <LearningLink to="/" className="brand-home"><BrandLogo /></LearningLink>
+        <span className="learning-header-label">/ {active === '오답 노트' ? '복습 관리' : active}</span>
         <LearningLink to="/" className="learning-header-back">대시보드로</LearningLink>
       </header>
       <main className="app-container learning-main">

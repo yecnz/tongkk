@@ -32,6 +32,8 @@ class Repository:
         if res.is_error:
             # Never forward SQL parameters, answer text, or provider responses.
             message = res.json().get("message", "") if "json" in res.headers.get("content-type", "") else ""
+            if "LS_GRAPH_CYCLE" in message:
+                fail("GRAPH_CYCLE", "선수 관계가 순환하거나 같은 개념과 충돌해요. 연결을 확인해주세요.", 409)
             if "LS_CONFLICT" in message or res.status_code == 409:
                 raise WriteConflict()
             if "LS_BUSY" in message:
@@ -41,7 +43,8 @@ class Repository:
             if "LS_NOT_FOUND" in message:
                 fail("NOT_FOUND", "자료 또는 학습 세션을 찾을 수 없습니다.", 404)
             fail("DB_UNAVAILABLE", "학습 기록을 저장하지 못했습니다. DB 설정을 확인해주세요.", 503)
-        return res.json()
+        # returns void 함수(source_begin 등)는 204 빈 본문을 돌려준다.
+        return res.json() if res.content else None
 
     async def material(self, user: str, token: str, course: str, material: str):
         self.available()

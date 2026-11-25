@@ -282,7 +282,7 @@ export const deleteCourseMaterialFromServer = async (course: string, materialId:
 
   // 파생 데이터부터 지운다. 중간에 실패해도 자료 본체가 남아 있어 삭제를 다시 시도할 수 있다.
   await deleteSummariesByMaterialId(course, materialId);
-  await deleteChatSessionsByMaterialId(materialId);
+  await deleteChatSessionsByMaterialId(materialId, courseId);
 
   const { error } = await supabase
     .from('materials')

@@ -1,4 +1,7 @@
+import { workflowRequest } from './workflow';
 import { BACKEND_URL, getJsonRequestHeaders, parseApiError } from './backend';
+
+export type MateScope = { courseId: string; materialId: string; sourceHash: string };
 
 export type AgentRole = 'user' | 'assistant';
 
@@ -31,17 +34,26 @@ export async function sendAgentMessage(
   markdown?: string,
   sourceMarkdown?: string,
   pages?: string,
+  scope?: MateScope,
   signal?: AbortSignal,
 ): Promise<AgentResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 130_000);
+  const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
 
   try {
+    if (scope) {
+      const data = await workflowRequest<{ result: string; thread_id: string; messages: AgentMessage[]; citations: { label: string; quote: string }[] }>('/learning-mate', 'POST', {
+        course_id: scope.courseId, material_id: scope.materialId, source_hash: scope.sourceHash, messages: messages.slice(-20),
+      }, requestSignal);
+      const citations = data.citations.length ? '\n\n근거로 본 자료: ' + data.citations.map(h => h.label).join(', ') : '';
+      return { result: data.result + citations, threadId: data.thread_id, messages: data.messages };
+    }
     const response = await fetch(`${BACKEND_URL}/agent`, {
       method: 'POST',
       headers: await getJsonRequestHeaders(),
       body: JSON.stringify({ thread_id: threadId || undefined, messages, markdown, source_markdown: sourceMarkdown, pages }),
-      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
+      signal: requestSignal,
     });
 
     if (response.status === 409 && threadId) {

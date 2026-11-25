@@ -11,7 +11,7 @@ function createSupabaseClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase 환경변수 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY가 필요합니다.');
   }
-  return createClient(supabaseUrl, supabaseAnonKey);
+  return createClient(supabaseUrl, supabaseAnonKey, { auth: { detectSessionInUrl: typeof window === 'undefined' || !/^\/integrations\/(google-calendar|google-drive|notion)\/callback$/.test(window.location.pathname) } });
 }
 
 // 호출부가 기대하는 클라이언트 타입은 createClient(url, key) "호출 결과"에서 그대로 끌어온다.

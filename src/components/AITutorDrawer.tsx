@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { PINK, CYAN, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication, parseAiSuggestions } from "../common";
-import { AgentThreadExpiredError, sendAgentMessage, type AgentMessage } from "../services/agent";
+import { AgentThreadExpiredError, sendAgentMessage, type AgentMessage, type MateScope } from "../services/agent";
 import {
   createSummaryChatSession,
   createSummaryChatTitle,
@@ -15,6 +15,7 @@ import {
 } from "../services/summaryChats";
 
 type AITutorDrawerProps = {
+  scope?: MateScope;
   contextTitle: string;
   contextMarkdown: string;
   // 원본 강의자료 본문. 있으면 요약과 함께 보내 사실·근거의 우선 기준이 된다.
@@ -188,6 +189,7 @@ const formatSessionDate = (timestamp: number) =>
   }).format(new Date(timestamp));
 
 export const AITutorDrawer = ({
+  scope,
   contextMarkdown,
   sourceMarkdown,
   sourcePages,
@@ -235,7 +237,7 @@ export const AITutorDrawer = ({
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const canUseAgent = Boolean(contextMarkdown.trim());
   const canPersistChat = Boolean(summaryId || materialId);
-  const chatTarget = { summaryId, materialId };
+  const chatTarget = { summaryId, materialId, courseId: scope?.courseId, sourceHash: scope?.sourceHash };
   const isOpen = open ?? internalOpen;
   const isExpanded = (expanded ?? internalExpanded) && isOpen;
   const setOpen = useCallback((nextOpen: boolean) => {
@@ -293,9 +295,9 @@ export const AITutorDrawer = ({
 
   const refreshChatSessions = useCallback(async () => {
     if (!canPersistChat) return;
-    const sessions = await loadSummaryChatSessions({ summaryId, materialId });
+    const sessions = await loadSummaryChatSessions({ summaryId, materialId, courseId: scope?.courseId, sourceHash: scope?.sourceHash });
     setChatSessions(sessions);
-  }, [canPersistChat, summaryId, materialId]);
+  }, [canPersistChat, summaryId, materialId, scope?.courseId, scope?.sourceHash]);
 
   useEffect(() => {
     let ignore = false;
@@ -321,7 +323,7 @@ export const AITutorDrawer = ({
     }
 
     setChatLoading(true);
-    loadSummaryChatSessions({ summaryId, materialId })
+    loadSummaryChatSessions({ summaryId, materialId, courseId: scope?.courseId, sourceHash: scope?.sourceHash })
       .then(sessions => {
         if (ignore) return;
         setChatSessions(sessions);
@@ -352,7 +354,7 @@ export const AITutorDrawer = ({
     return () => {
       ignore = true;
     };
-  }, [summaryId, materialId, threadId, contextMarkdown, resetHistory, canPersistChat]);
+  }, [summaryId, materialId, threadId, contextMarkdown, resetHistory, canPersistChat, scope?.courseId, scope?.sourceHash]);
 
   useEffect(() => {
     if (skipNextScrollRef.current) {
@@ -492,8 +494,8 @@ export const AITutorDrawer = ({
       const sendableHistory = nextMessages.filter(
         m => m.content.trim().length > 0 || (m.images?.length ?? 0) > 0,
       );
-      const sendFullHistory = () => sendAgentMessage("", sendableHistory, contextMarkdown, sourceMarkdown, sourcePages);
-      const response = localThreadId
+      const sendFullHistory = () => sendAgentMessage("", sendableHistory, contextMarkdown, sourceMarkdown, sourcePages, scope);
+      const response = localThreadId && !scope
         ? await sendAgentMessage(localThreadId, [userMessage]).catch(err => {
           // 서버 재시작으로 대화 상태가 사라졌으면 자료와 지금까지의 대화를 다시 보내 이어간다.
           if (err instanceof AgentThreadExpiredError) return sendFullHistory();

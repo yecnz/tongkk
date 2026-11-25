@@ -1,7 +1,10 @@
+import BrandLogo from "../components/BrandLogo";
+import ConceptGraph from '../features/learningHistory/ConceptGraph';
+import ConceptHistory from '../features/learningHistory/ConceptHistory';
 import UsageOverview from "../features/learningSession/UsageOverview";
 import ReviewOverview from "../features/learningSession/ReviewOverview";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useToast } from "../ToastContext";
 import { useAuth } from "../AuthContext";
@@ -63,6 +66,9 @@ const CHART_TOP_PAD = 22;
 
 export default function Stats() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const showConcepts = params.get('view') === 'concepts';
+  const showGraph = params.get('view') === 'graph';
   const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "학습 통계";
@@ -132,14 +138,16 @@ export default function Stats() {
       {sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <span style={{ color: "var(--color-muted)", fontSize: 14 }}>/ 학습 통계</span>
       </div>
 
       <div className="stats-shell">
+        <nav className="workflow-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!showConcepts && !showGraph} onClick={() => setParams({})}>학습 통계</button><button type="button" aria-pressed={showConcepts} onClick={() => setParams({ view: 'concepts' })}>개념별 학습 기록</button><button type="button" aria-pressed={showGraph} onClick={() => setParams({ view: 'graph' })}>개념 지도</button></nav>
+        {showGraph ? <ConceptGraph key={user?.id || 'guest'} /> : showConcepts ? <ConceptHistory key={user?.id || 'guest'} /> : <>
         <div className="stats-hero">
           <div>
             <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900, color: "var(--color-text-strong)", letterSpacing: 0 }}>학습 통계</h2>
@@ -297,6 +305,7 @@ export default function Stats() {
             )}
           </Card>
         </div>
+        </>}
       </div>
     </div>
   );

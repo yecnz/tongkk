@@ -1,4 +1,5 @@
-import ReviewOverview from "../features/learningSession/ReviewOverview";
+import BrandLogo from "../components/BrandLogo";
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner } from "../common";
@@ -44,7 +45,8 @@ import {
   type PlanAction,
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
-import LearningResume from "../features/learningSession/LearningResume";
+import LearningBriefing from "../features/review/LearningBriefing";
+import { learningTargetUrl } from "../services/learningTargets";
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void; onAddAndUpload: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -1227,11 +1229,11 @@ export default function Dashboard() {
       {showNotice && <NoticeModal onClose={() => setShowNotice(false)} />}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-      <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid var(--color-border-soft)" }}>
+      <div className="dashboard-header">
         <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
-        <button type="button" className="tongkk-hover-fade" onClick={() => navigate("/")} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <NoticeBanner messages={[
           { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: PINK },
           "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",
@@ -1274,10 +1276,10 @@ export default function Dashboard() {
       </div>
 
       <div className="app-container">
-        <LearningResume key={user?.id || 'guest'} /><ReviewOverview key={`review-${user?.id || 'guest'}`} />
+        <LearningBriefing key={user?.id || 'guest'} />
         <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
           <h2 className="m-0 text-xl font-extrabold leading-7 text-text-strong">
-            공부 시작하기
+            오늘의 학습 브리핑
           </h2>
           <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
             {!stepView && briefing.length > 0 ? "오늘 챙길 것을 모아봤어요." : startHint}
@@ -1288,7 +1290,7 @@ export default function Dashboard() {
                 <li key={item.title} className="flex items-start gap-2.5 rounded-xl bg-white px-4 py-3 dark:bg-slate-900">
                   <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.urgent ? "bg-pink" : "bg-cyan"}`} />
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-sm font-extrabold text-text-strong">{item.title}</span>
+                    <button type="button" onClick={() => item.target && navigate(learningTargetUrl(item.target))} className="text-left text-sm font-extrabold text-text-strong cursor-pointer">{item.title} →</button>
                     <span className="text-xs font-semibold text-muted">{item.reason}</span>
                   </span>
                 </li>

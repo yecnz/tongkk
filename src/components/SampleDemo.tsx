@@ -241,9 +241,9 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
         </div>
 
         {/* 푸터 CTA */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 22px", borderTop: `1px solid ${BORDER_COLOR}`, background: MUTED_SURFACE }}>
+        <div className="sample-demo-footer">
           <span style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>마음에 드세요? 내 강의 자료로 직접 만들어 보세요.</span>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             <button type="button" onClick={onClose} style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: CARD_BACKGROUND, color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>닫기</button>
             <button type="button" onClick={onStart} style={{ padding: "10px 18px", borderRadius: 12, border: "none", background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>내 자료로 시작하기</button>
           </div>

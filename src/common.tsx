@@ -1,3 +1,4 @@
+import BrandLogo from "./components/BrandLogo";
 import { useEffect, useState } from "react";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
@@ -142,7 +143,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
       boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
     }}>
       <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button type="button" className="tongkk-hover-fade" onClick={() => { onNav("대시보드"); onClose(); }} style={{ background: "none", border: "none", padding: 0, fontWeight: 700, fontSize: 20, color: PINK, cursor: "pointer" }}>Tongkk</button>
+        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => { onNav("대시보드"); onClose(); }}><BrandLogo /></button>
         <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="사이드바 닫기" style={{ background: "none", border: "none", borderRadius: 8, padding: "2px 8px", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
       </div>
       {(Object.keys(pageRoutes) as PageRouteLabel[])
@@ -152,7 +153,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
           padding: "14px 24px", border: "none", background: active === item ? "color-mix(in srgb, var(--color-pink) 11%, transparent)" : "transparent",
           textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
           color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
-        }}>{item}</button>
+        }}>{item === "오답 노트" ? "복습 관리" : item}</button>
       ))}
 
       {/* 하단 피드백 — mailto로 메일 작성을 띄우고, 메일 클라이언트가 없는 사용자를 위해 주소도 노출 */}

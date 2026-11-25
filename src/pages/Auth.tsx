@@ -1,3 +1,4 @@
+import BrandLogo from "../components/BrandLogo";
 import { useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, SOFT_SHADOW } from "../common";
@@ -92,14 +93,7 @@ export default function Auth() {
 
       <div style={{ textAlign: "center" }}>
         <div style={{ marginBottom: 32 }}>
-          <div style={{
-            fontSize: 36,
-            fontWeight: 800,
-            color: PINK,
-            letterSpacing: 0,
-          }}>
-            Tongkk
-          </div>
+          <BrandLogo large />
         </div>
         <div style={{
           background: CARD_BACKGROUND,

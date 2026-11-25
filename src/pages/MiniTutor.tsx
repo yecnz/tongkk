@@ -111,9 +111,9 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
       const selectedMaterial = materials.find(material => material.id === materialId);
       const source = selectedMaterial?.markdown.trim();
       if (selectedMaterial && !source) throw new Error("선택한 자료의 본문이 없어 질문에 반영할 수 없어요.");
-      const sendFull = () => sendAgentMessage("", nextMessages, source ? `# ${selectedMaterial!.name}\n\n${source}` : undefined, undefined, undefined, request.signal);
+      const sendFull = () => sendAgentMessage("", nextMessages, source ? `# ${selectedMaterial!.name}\n\n${source}` : undefined, undefined, undefined, undefined, request.signal);
       const response = currentThread
-        ? await sendAgentMessage(currentThread, [userMessage], undefined, undefined, undefined, request.signal).catch(err => {
+        ? await sendAgentMessage(currentThread, [userMessage], undefined, undefined, undefined, undefined, request.signal).catch(err => {
           if (!request.signal.aborted && err instanceof AgentThreadExpiredError) return sendFull();
           throw err;
         })

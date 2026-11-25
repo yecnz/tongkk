@@ -34,7 +34,7 @@ const toSavedQuizSet = (row: QuizSetRow): SavedQuizSet => ({
   questionType: row.question_type,
   count: row.count,
   materialIds: row.material_ids || [],
-  questions: row.questions || [],
+  questions: (row.questions || []).map((q, index) => ({ ...q, id: q.id || `${row.id}:${index}`, version: q.version || 1 })),
   createdAt: new Date(row.created_at).getTime(),
   updatedAt: new Date(row.updated_at).getTime(),
 });

@@ -247,7 +247,7 @@ it('switches accounts from the tutor and aborts the previous account’s pending
   mocks.agent.mockReturnValue(new Promise(resolve => { resolveAgent = resolve; }));
   await render('/mini/tutor', { accountId: firstUser.id, question: '첫 계정 질문' });
   expect(mocks.agent).toHaveBeenCalledTimes(1);
-  const signal = mocks.agent.mock.calls[0][5] as AbortSignal;
+  const signal = mocks.agent.mock.calls[0][6] as AbortSignal;
   expect(container.textContent).toContain('첫 계정 질문');
   await click('.mini-account-trigger');
   await escape('.mini-account-menu button');

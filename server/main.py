@@ -119,6 +119,24 @@ from summary_identity import router as summary_identity_router
 app.include_router(summary_identity_router)
 from reviews import router as reviews_router
 app.include_router(reviews_router)
+from learning_issues import router as issues_router
+app.include_router(issues_router)
+from explanation_revisions import router as revisions_router
+app.include_router(revisions_router)
+from workflow import router as workflow_router
+app.include_router(workflow_router)
+from learning_mate import router as mate_router
+app.include_router(mate_router)
+from preparation import router as preparation_router
+app.include_router(preparation_router)
+from source_integrations import router as sources_router
+app.include_router(sources_router)
+from concept_graph import router as graph_router
+app.include_router(graph_router)
+from concept_history import router as concepts_router
+app.include_router(concepts_router)
+from calendar_integration import router as integrations_router
+app.include_router(integrations_router)
 
 logger = logging.getLogger("tongkk")
 
@@ -128,7 +146,7 @@ app.add_middleware(
     # 학습 세션의 초안 저장에 PATCH를 사용한다.
     # 프론트가 보내는 요청 헤더는 Authorization·Content-Type뿐(backend.ts getJsonRequestHeaders).
     # allow_credentials는 미설정(기본 False) 유지 — 쿠키가 아니라 Bearer 토큰 인증이라 불필요.
-    allow_methods=["POST", "GET", "PATCH", "OPTIONS"],
+    allow_methods=["POST", "GET", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -1313,6 +1331,14 @@ def _summary_chunk_instructions(req: SummarizeStreamRequest) -> str:
     ]
     if req.chunk_index == 1:
         lines.append("- 첫 구간이므로 문서 제목(# 수준)을 한 번만 만들고 시작해.")
+    elif req.template == "LECTURE_NOTE":
+        # 강의 노트 섹션 순서 규칙('# 강의 제목' → ...)이 '제목 만들지 마' 지시보다 강하게 먹혀
+        # 둘째 구간부터 '# 강의 제목'이라는 글자가 그대로 찍혔다. 구간마다 실제 단원명을 쓰게 한다.
+        lines.append(
+            "- 강의 노트 섹션 순서는 이 구간 안에서 그대로 지키되, 맨 위 '# 강의 제목' 자리에는 "
+            "'강의 제목'이라는 글자를 절대 그대로 쓰지 말고 이 구간이 다루는 실제 단원·주제 이름을 '# 단원명'으로 써라. "
+            "직전 구간 요약에 이미 있는 제목과 같은 이름은 쓰지 마."
+        )
     elif req.is_continuation:
         # 같은 원본 섹션이 길어서 쪼개진 '이어지는' 구간 → 직전에 만든 제목을 다시 만들면 안 된다.
         lines.append(
@@ -1374,6 +1400,9 @@ async def summarize_stream(req: SummarizeStreamRequest, _user=Depends(require_ap
 
 @app.post("/agent")
 async def agent(req: AgentRequest, user=Depends(require_api_user)):
+    from learning_mate import ensure_help_allowed
+    if user and user.get("id"):
+        await ensure_help_allowed(user["id"])
     # 이어지는 대화인데 체크포인트가 없으면(서버 재시작 등) 새 메시지만으로 답하면 자료·이전 대화를 모두 잃는다.
     # 409로 알려 프론트가 전체 히스토리와 자료를 다시 보내게 한다.
     if req.thread_id and not thread_exists((user or {}).get("id"), req.thread_id):

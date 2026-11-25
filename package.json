@@ -18,6 +18,7 @@
     "test:learning-db": "node scripts/test-learning-db.mjs",
     "test:watch": "vitest",
     "preview": "vite preview",
+    "test:workflow-db": "node scripts/test-workflow-schema.mjs",
     "menubar:dev": "tauri dev",
     "menubar:build": "tauri build"
   },

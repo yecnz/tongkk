@@ -18,7 +18,7 @@ describe('buildBriefing', () => {
       todayPlansLeft: 2,
     });
 
-    expect(items).toEqual([
+    expect(items.map(({ title, reason, urgent }) => ({ title, reason, urgent }))).toEqual([
       { title: '자료구조 시험 D-3', reason: '시험 3일 전 · 최근 정답률 40%', urgent: true },
       { title: '운영체제 진도 따라잡기', reason: '진도 50% · 오늘 2개', urgent: false },
       { title: '확률통계 오답 복습', reason: '최근 퀴즈 정답률 60%', urgent: false },

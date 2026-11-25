@@ -39,3 +39,10 @@ it('blocks stale-source practice and preserves ungraded answers for editing',asy
  await act(async()=>root.unmount());root=createRoot(container);response=initial();response.latest={id:'failed',answer:'원래 답변',status:'ungraded',assisted:false,feedback:null,check_result:null,eligible_for_schedule:true};
  await render();expect(container.querySelector('textarea')?.value).toBe('원래 답변');await type('');expect(container.querySelector('textarea')?.value).toBe('');
 });
+
+it('preserves the question identity of a saved answer when a new question becomes available',async()=>{
+ localStorage.setItem('tongkk:review:user:card',JSON.stringify({text:'이전 문제에 쓴 설명',assisted:false,newRound:false,pending:null,prompt:{id:'old-question',text:'이전 사례를 설명하세요'}}));
+ response.next_question='새 사례를 설명하세요';response.question_id='new-question';response.question_status='ready';
+ await render();expect(container.textContent).toContain('이전 사례를 설명하세요');expect(container.textContent).not.toContain('새 사례를 설명하세요');
+ await click('설명 제출');expect(request).toHaveBeenCalledWith('/card/answers','POST',expect.objectContaining({question_id:'old-question',answer:'이전 문제에 쓴 설명'}));
+});

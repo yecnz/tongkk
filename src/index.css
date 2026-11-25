@@ -1,4 +1,18 @@
 @import "tailwindcss";
+@import "./styles/learning-workflow.css";
+
+.dashboard-header { padding: 16px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--color-border-soft); }
+.sample-demo-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--color-border); background: var(--color-muted-surface); }
+@media (max-width: 480px) {
+  .dashboard-header { padding-inline: 16px; gap: 10px; }
+  .dashboard-header .tk-notice { display: none; }
+  .dashboard-header > button[aria-label="공지사항"] { margin-left: auto; }
+}
+@media (max-width: 640px) {
+  .sample-demo-footer { flex-direction: column; align-items: stretch; }
+  .sample-demo-footer > div { justify-content: flex-end; }
+  .sample-demo-footer button { white-space: nowrap; }
+}
 
 /* ── 디자인 토큰 ──
    각 토큰을 light-dark(라이트값, 다크값)로 한 곳에서 정의한다. 실제 적용 값은

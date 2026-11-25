@@ -1,6 +1,6 @@
 // Real PostgreSQL (WASM), isolated in memory. Never connects to the project database.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 
@@ -14,25 +14,41 @@ const hash = createHash('sha256').update(text).digest('hex');
 const migration = readFileSync(new URL('../supabase/migrations/202611220001_learning_sessions.sql', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 check(schema.includes(migration), 'Fresh schema and migration must agree');
+for (const file of readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter(name => /^2026112300(?:0[7-9]|1[0-8])_/.test(name))) {
+  check(schema.includes(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8')), `Fresh schema mirrors ${file}`);
+}
 
 await db.exec(`
   create role anon; create role authenticated; create role service_role bypassrls;
   create schema auth; create table auth.users(id uuid primary key);
-  create table public.courses(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+  create table public.courses(id uuid primary key,user_id uuid references auth.users(id) on delete cascade,name text default '과목');
   create table public.materials(course_id uuid references courses(id) on delete cascade,id text,
-    user_id uuid references auth.users(id) on delete cascade,markdown text, primary key(course_id,id));
+    user_id uuid references auth.users(id) on delete cascade,markdown text,name text default '자료',type text default 'file',mime_type text, primary key(course_id,id));
   grant usage on schema public,auth to service_role,anon,authenticated;
   grant select, update on courses,materials to service_role;
 `);
 await db.query('insert into auth.users values ($1),($2)', [user, other]);
 await db.query('insert into courses values ($1,$2)', [course, user]);
 await db.query('insert into materials values ($1,$2,$3,$4)', [course, 'lecture:100', user, text]);
+await db.exec('create table quiz_attempts(id uuid primary key,user_id uuid,course_id uuid,answers jsonb)');
 await db.exec(migration);
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230002_learning_history.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230003_learning_concepts.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230004_review_cards.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230005_review_submission.sql', import.meta.url), 'utf8'));
 await db.exec(readFileSync(new URL('../supabase/migrations/202611230006_review_stats.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230007_learning_issues.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230008_explanation_revisions.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230009_learning_worker.sql', import.meta.url), 'utf8'));
+await db.exec('create table summary_chat_sessions(id uuid primary key,user_id uuid,material_id text,updated_at timestamptz)');
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230010_learning_mate.sql', import.meta.url), 'utf8'));
+await db.exec(`create table summaries(id uuid primary key,user_id uuid,course_id uuid,template text,content text,material_ids text[],page_range text,source_hash text,request_key text,generation_config jsonb,generation_id uuid,created_at timestamptz default now());
+create table quiz_sets(id uuid primary key,user_id uuid,course_id uuid,title text,difficulty text,question_type text,count integer,material_ids text[],questions jsonb,created_at timestamptz default now());`);
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230011_preparation.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230012_concept_history.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230013_calendar_integration.sql', import.meta.url), 'utf8'));
+await db.exec(readFileSync(new URL('../supabase/migrations/202611230014_workflow_hardening.sql', import.meta.url), 'utf8'));
+for (const file of readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter(name => /^20261123001[5-8]_/.test(name)).sort()) await db.exec(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
 await db.exec('set role service_role');
 
 function bundle() {
@@ -127,6 +143,142 @@ const duplicateAnswer = structuredClone(stored);
 duplicateAnswer.attempts.push({ ...stored.attempts[0], id: randomUUID() });
 await rejects(() => write(duplicateAnswer, 2), /duplicate key/);
 
+// Evidence is captured atomically by the existing attempt write transaction.
+await db.query("update learning_session_attempts set status='graded', result=$1::jsonb where id=$2", [JSON.stringify({criteria:[{status:'missing'}]}),stored.attempts[0].id]);
+let issues=(await db.query('select learning_issue_list($1,30,0) as data',[user])).rows[0].data;
+check(issues.total===1,'A missing criterion creates one concept issue');
+await db.query("update learning_session_attempts set status=status where id=$1",[stored.attempts[0].id]);
+check(Number((await db.query('select count(*) from learning_evidence')).rows[0].count)===1,'Repeated save cannot duplicate evidence');
+check((await db.query('select learning_issue_list($1,30,0) as data',[other])).rows[0].data.total===0,'Issue lists are owner scoped');
+const issue=issues.issues[0], issueKey=randomUUID();
+await db.query('select learning_issue_action($1,$2,$3,$4,$5)',[user,issue.id,issue.revision,issueKey,'start']);
+await db.query('select learning_issue_action($1,$2,$3,$4,$5)',[user,issue.id,issue.revision,issueKey,'start']);
+check((await db.query('select learning_issue_detail($1,$2) as data',[user,issue.id])).rows[0].data.issue.revision===1,'Action replay changes status only once');
+await rejects(()=>db.query('select learning_issue_action($1,$2,$3,$4,$5)',[user,issue.id,0,randomUUID(),'close']),/LS_CONFLICT/);
+check((await db.query('select learning_issue_detail($1,$2) as data',[other,issue.id])).rows[0].data===null,'Issue detail hides other owner data');
+
+const quizAttemptId=randomUUID();
+await db.exec('reset role');
+await db.query('insert into quiz_attempts values($1,$2,$3,$4::jsonb)',[quizAttemptId,user,course,JSON.stringify([{studentAnswer:'내 답',isCorrect:false}])]);
+await db.exec('set role service_role');
+const linked=(await db.query('select learning_issue_from_quiz($1,$2,0,$3) as data',[user,quizAttemptId,conceptRows[0].id])).rows[0].data;
+check(linked.evidence.some(e=>e.source_kind==='quiz' && e.outcome==='uncertain' && e.answer==='내 답'),'Legacy quiz mapping preserves uncertain evidence and student answer');
+await rejects(()=>db.query('select learning_issue_from_quiz($1,$2,0,$3)',[other,quizAttemptId,conceptRows[0].id]),/LS_NOT_FOUND/);
+await db.exec('begin');
+await db.query("update learning_sessions set status='completed' where id=$1",[stored.session.id]);
+const revisionId=randomUUID(), evaluationKey=randomUUID();
+const revision=(await db.query('select explanation_create($1,$2,$3,$4,null) as data',[user,revisionId,stored.session.id,stored.items[0].id])).rows[0].data;
+check(revision.baseline==='고정 답안','Explanation revisions preserve the original submission');
+await db.query('select explanation_create($1,$2,$3,$4,null)',[user,revisionId,stored.session.id,stored.items[0].id]);
+check((await db.query('select explanation_read($1,$2) as data',[other,revisionId])).rows[0].data===null,'Revision reads are owner scoped');
+await db.query('select explanation_save($1,$2,0,$3,true)',[user,revisionId,'수정한 설명']);
+const reserved=(await db.query('select explanation_submit($1,$2,1,$3) as data',[user,revisionId,evaluationKey])).rows[0].data;
+check(reserved.claimed===true,'First revision submission reserves an evaluation');
+check((await db.query('select explanation_submit($1,$2,1,$3) as data',[user,revisionId,evaluationKey])).rows[0].data.claimed===false,'Evaluation replay does not duplicate calls');
+await db.query('select explanation_finish($1,$2,$3,$4::jsonb,$5::jsonb,null)',[user,revisionId,evaluationKey,JSON.stringify({criteria:[{status:'met'}]}),'{}']);
+const evaluated=(await db.query('select explanation_read($1,$2) as data',[user,revisionId])).rows[0].data;
+check(evaluated.revision.status==='graded' && evaluated.baseline==='고정 답안','Revision evaluation never overwrites the baseline');
+await db.exec('savepoint immutable_revision');
+await rejects(()=>db.query('select explanation_save($1,$2,1,$3,true)',[user,revisionId,'몰래 수정']),/LS_CONFLICT/);
+await db.exec('rollback to savepoint immutable_revision');
+await db.exec('rollback');
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const queuedJob=randomUUID();
+await db.query("insert into background_jobs(id,user_id,kind,target_id) values($1,$2,'calendar_sync',$3)",[queuedJob,user,randomUUID()]);
+const firstClaim=(await db.query('select workflow_claim() as data')).rows[0].data;
+check(firstClaim.id===queuedJob && firstClaim.attempts===1,'Worker claims durable jobs with a lease');
+check((await db.query('select workflow_claim() as data')).rows[0].data===null,'Unexpired work is not claimed twice');
+check((await db.query('select workflow_complete($1,$2,null,null,null) as done',[queuedJob,randomUUID()])).rows[0].done===false,'Wrong lease cannot commit results');
+await db.query("update background_jobs set lease_expires_at=now()-interval '1 second' where id=$1",[queuedJob]);
+const reclaimed=(await db.query('select workflow_claim() as data')).rows[0].data;
+check(reclaimed.attempts===2 && reclaimed.lease_token!==firstClaim.lease_token,'Worker restart reclaims expired work with a new lease');
+check((await db.query('select workflow_complete($1,$2,null,null,null) as done',[queuedJob,firstClaim.lease_token])).rows[0].done===false,'Late worker cannot overwrite a reclaimed job');
+await db.query("update background_jobs set lease_expires_at=now()-interval '1 second' where id=$1",[queuedJob]);
+await db.query('select workflow_claim()');
+check((await db.query('select status from background_jobs where id=$1',[queuedJob])).rows[0].status==='failed','Exhausted work fails visibly');
+await db.query('select learning_preferences_set($1,true,$2)',[user,'Asia/Seoul']);
+await db.query("update learning_sessions set status='completed' where id=$1",[stored.session.id]);
+const autoCards=(await db.query('select review_list($1,false,30) as data',[user])).rows[0].data;
+check(autoCards.length===1,'Opt-in completion automatically seeds one review card');
+const autoCard=autoCards[0], scheduleKey=randomUUID();
+await db.query('select workflow_review_action($1,$2,0,$3,$4,1)',[user,autoCard.id,scheduleKey,'pause']);
+await db.query('select workflow_review_action($1,$2,0,$3,$4,1)',[user,autoCard.id,scheduleKey,'pause']);
+check((await db.query('select revision from review_cards where id=$1',[autoCard.id])).rows[0].revision===1,'Schedule command replay changes state once');
+await db.exec('savepoint paused_attempt');
+await rejects(()=>db.query('select review_start($1,$2,$3,$4,false)',[user,autoCard.id,randomUUID(),'답변']),/LS_CONFLICT/);
+await db.exec('rollback to savepoint paused_attempt');
+await db.exec('rollback');
+await db.exec('begin');
+await db.query("update learning_sessions set status='paused' where user_id=$1",[user]);
+const lockToken=randomUUID();
+await db.query('select learning_assessment_lock($1,$2,true,1)',[user,lockToken]);
+check((await db.query('select learning_assessment_active($1) as active',[user])).rows[0].active===true,'Assessment locks block tutor access');
+await db.query('select learning_assessment_lock($1,$2,false,3)',[user,lockToken]);
+await db.query('select learning_assessment_lock($1,$2,true,2)',[user,lockToken]);
+check((await db.query('select learning_assessment_active($1) as active',[user])).rows[0].active===false,'Late lock renewal cannot resurrect an ended assessment');
+check((await db.query('select learning_assessment_active($1) as active',[other])).rows[0].active===false,'Assessment locks are scoped to the owner');
+await db.exec('rollback');
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const preparationId=randomUUID();
+const prepConfig={pages:'',material_name:'자료',summary_identity:{request_key:'summary-key',generation_config:{}}};
+const prep=(await db.query('select preparation_create($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::text[]) as data',[user,preparationId,course,'lecture:100',hash,'prepare-key',text,JSON.stringify(prepConfig),['summary']])).rows[0].data;
+check(prep.artifacts.length===1,'Preparation creates durable artifact work');
+const prepAgain=(await db.query('select preparation_create($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::text[]) as data',[user,randomUUID(),course,'lecture:100',hash,'prepare-key',text,JSON.stringify(prepConfig),['summary']])).rows[0].data;
+check(prepAgain.request.id===preparationId,'Same preparation conditions reuse the request');
+const prepJob=(await db.query('select workflow_claim() as data')).rows[0].data;
+await db.query('select workflow_complete($1,$2,$3::jsonb,$4::jsonb,null)',[prepJob.id,prepJob.lease_token,JSON.stringify({content:'생성한 요약'}),'{}']);
+const applied=(await db.query('select preparation_apply($1,$2) as data',[user,prep.artifacts[0].id])).rows[0].data;
+check(applied.status==='applied' && applied.applied_id,'Verified preparation can be applied');
+check((await db.query('select preparation_apply($1,$2) as data',[user,prep.artifacts[0].id])).rows[0].data.applied_id===applied.applied_id,'Duplicate approval preserves one result');
+check(Number((await db.query('select count(*) from summaries')).rows[0].count)===1,'Approval creates one summary without overwrites');
+check((await db.query('select preparation_read($1,$2) as data',[other,preparationId])).rows[0].data===null,'Other owner cannot read preparation drafts');
+await db.exec('rollback');
+await db.exec('begin');
+const conceptState=(await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data;
+check(conceptState.concept.evidence_count>=1 && conceptState.concept.state==='needs_review','Concept memory reflects actual missing criteria');
+check(conceptState.concept.independent_questions===0,'Legacy mapped quizzes and missing criteria cannot inflate independent performance');
+check((await db.query('select learning_concept_history_detail($1,$2) as data',[other,conceptRows[0].id])).rows[0].data===null,'Concept memory is owner scoped');
+await db.query("update learning_session_items set data=data||'{\"report\":{\"reason\":\"question\"}}'::jsonb where id=$1",[stored.items[0].id]);
+const reportedState=(await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data;
+check(reportedState.concept.evidence_count===0,'Reported material is excluded from mastery aggregation');
+await db.query('update materials set markdown=$1 where course_id=$2 and id=$3',[text+'수정',course,'lecture:100']);
+check((await db.query('select learning_concept_history_detail($1,$2) as data',[user,conceptRows[0].id])).rows[0].data.concept.state==='source_changed','Memory stays tied to its source version');
+await db.exec('rollback');
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const oauthState='state-hash', codeHash='code-hash';
+await db.query('select integration_begin($1,$2)',[user,oauthState]);
+await db.exec('savepoint wrong_oauth_owner');
+await rejects(()=>db.query('select integration_consume($1,$2,$3)',[other,oauthState,codeHash]),/LS_NOT_FOUND/);
+await db.exec('rollback to savepoint wrong_oauth_owner');
+await db.query('select integration_consume($1,$2,$3)',[user,oauthState,codeHash]);
+const connection=(await db.query('select integration_connect($1,$2,$3) as data',[user,oauthState,'encrypted-only'])).rows[0].data;
+check(connection.status==='connected' && connection.revision===1,'OAuth state is bound to the authenticated user');
+check((await db.query('select integration_consume($1,$2,$3) as data',[user,oauthState,codeHash])).rows[0].data.status==='done','Completed callback replay is idempotent');
+const sync=(await db.query('select integration_queue($1) as data',[user])).rows[0].data;
+check((await db.query('select integration_queue($1) as data',[user])).rows[0].data.id===sync.id,'Sync clicks share one active job');
+const syncClaim=(await db.query('select workflow_claim() as data')).rows[0].data;
+const sampleEvent={external_id:'event-one',title:'시험',all_day:false,start_value:'2026-11-23T10:00:00+09:00',end_value:'2026-11-23T11:00:00+09:00',start_at:'2026-11-23T01:00:00Z',end_at:'2026-11-23T02:00:00Z'};
+await db.query('select integration_sync_finish($1,$2,$3::jsonb,null)',[syncClaim.id,syncClaim.lease_token,JSON.stringify([sampleEvent])]);
+const imported=(await db.query('select integration_events($1,$2,$3) as data',[user,'2026-11-23T00:00:00Z','2026-11-24T00:00:00Z'])).rows[0].data;
+check(imported.length===1 && imported[0].title==='시험','Imported events are separate from manual plans');
+await db.query('select integration_event_course($1,$2,$3)',[user,imported[0].id,course]);
+check((await db.query('select integration_events($1,$2,$3) as data',[other,'2026-11-23T00:00:00Z','2026-11-24T00:00:00Z'])).rows[0].data.length===0,'Imported events are owner scoped');
+await db.query('select integration_queue($1)',[user]);
+const oldSync=(await db.query('select workflow_claim() as data')).rows[0].data;
+await db.query('select integration_disconnect($1,1,true)',[user]);
+check((await db.query('select integration_sync_finish($1,$2,$3::jsonb,null) as done',[oldSync.id,oldSync.lease_token,JSON.stringify([sampleEvent])])).rows[0].done===false,'Disconnected jobs cannot resurrect imported events');
+check((await db.query('select integration_connection($1) as data',[user])).rows[0].data.tokens_ciphertext===null,'Disconnect removes stored credentials');
+check(Number((await db.query('select count(*) from external_calendar_events')).rows[0].count)===0,'Disconnect honors imported event deletion');
+await db.exec('rollback');
+await db.exec('begin');
+await db.query('select learning_preferences_set($1,true,$2)',[other,'UTC']);
+await db.query('select learning_workflow_clear($1)',[user]);
+check(Number((await db.query('select count(*) from learning_session_packs where user_id=$1',[user])).rows[0].count)===0,'App data reset removes learning snapshots and linked records');
+check((await db.query('select learning_preferences_get($1) as data',[other])).rows[0].data.auto_review===true,'App data reset preserves other owners');
+await db.exec('rollback');
 const duplicateSession = bundle();
 duplicateSession.pack = structuredClone(stored.pack);
 duplicateSession.session.pack_id = stored.pack.id;
@@ -144,6 +296,13 @@ stored.operations.push({ ...stored.operations[0], id: randomUUID(), command_key:
   status: 'running', lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + 90000).toISOString() });
 stored.session.calls += 1;
 stored = await write(stored, 2);
+await db.exec('begin');
+await db.exec('delete from background_jobs');
+const oldGeneration=randomUUID(), activeOperation=stored.operations.at(-1);
+await db.query("insert into background_jobs(id,user_id,kind,target_id,generation,session_id,run_after) values($1,$2,'session',$3,0,$4,now()-interval '1 day')",[oldGeneration,user,activeOperation.id,stored.session.id]);
+check((await db.query('select workflow_claim() as data')).rows[0].data===null,'A queued job cannot execute a newer operation generation');
+check((await db.query('select status from background_jobs where id=$1',[oldGeneration])).rows[0].status==='succeeded','Superseded work is consumed without model execution');
+await db.exec('rollback');
 const simultaneous = bundle();
 simultaneous.operations[0] = { ...simultaneous.operations[0], kind: 'prepare', status: 'running', lease_token: randomUUID(),
   lease_expires_at: new Date(Date.now() + 90000).toISOString() };
@@ -159,7 +318,7 @@ await rejects(() => write(stored, stored.session.version), /LS_CONFLICT/);
 
 for (const role of ['anon', 'authenticated']) {
   await db.exec(`set role ${role}`);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'background_jobs', 'review_schedule_events', 'preparation_requests', 'preparation_artifacts', 'external_connections', 'integration_oauth_states', 'external_calendar_events', 'external_event_courses', 'learning_preferences', 'learning_assessment_locks', 'concept_learning_state', 'learning_concept_links', 'review_questions', 'external_material_drafts']) {
     await rejects(() => db.query(`select * from ${table}`), /permission denied/);
   }
   for (const statement of [
@@ -173,7 +332,7 @@ for (const role of ['anon', 'authenticated']) {
 }
 await db.exec('reset role');
 await db.query('delete from materials where course_id=$1', [course]);
-for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations']) {
+for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'preparation_requests', 'preparation_artifacts', 'learning_concepts', 'learning_item_concepts', 'review_cards', 'review_attempts']) {
   check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on material deletion`);
 }
 
@@ -186,7 +345,7 @@ for (const deletion of ['course', 'account']) {
   await db.exec('reset role');
   if (deletion === 'course') await db.query('delete from courses where id=$1', [course]);
   else await db.query('delete from auth.users where id=$1', [user]);
-  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations']) {
+  for (const table of ['learning_session_packs', 'learning_sessions', 'learning_session_items', 'learning_session_attempts', 'learning_session_operations', 'learning_evidence', 'learning_issues', 'learning_issue_events', 'explanation_revisions', 'explanation_evaluations', 'preparation_requests', 'preparation_artifacts', 'learning_concepts', 'learning_item_concepts', 'review_cards', 'review_attempts']) {
     check(Number((await db.query(`select count(*) from ${table}`)).rows[0].count) === 0, `${table} cascades on ${deletion} deletion`);
   }
 }

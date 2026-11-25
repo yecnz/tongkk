@@ -52,7 +52,7 @@ def _plain(text):
 def validate_refs(refs, source_units):
     mapping = {u["id"]: _plain(u["text"]) for u in source_units}
     for ref in refs:
-        if ref.unit_id not in mapping or _plain(ref.quote) not in mapping[ref.unit_id]:
+        if not _plain(ref.quote) or ref.unit_id not in mapping or _plain(ref.quote) not in mapping[ref.unit_id]:
             raise ValueError("Unsupported source reference")
 
 
@@ -172,5 +172,23 @@ class Generator:
         )
         try:
             return validate_feedback(raw, concept, pack["source_units"], answer), metrics
+        except ValueError:
+            raise GenerationError(metrics) from None
+
+    @track_generation
+    async def review_question(self, pack, original, previous):
+        raw, metrics = await self._call(
+            '주어진 개념의 복습용 새 문항 한 개를 작성하라. 개념 제목과 학습 범위는 유지하고 사례·조건·묻는 방식을 바꿔라. '
+            '이전 질문을 재사용하거나 단순히 어순만 바꾸지 마라. 원문에 없는 지식을 요구하지 마라. '
+            '회상 질문과 그 질문에 맞는 평가 기준, 힌트 2개, 모범 설명, 새로운 기초 확인 객관식을 함께 작성하라. '
+            '원문 근거는 정확한 부분 문자열을 인용하라. 설명과 기초 확인 해설은 최대 160자로 짧게 써라.',
+            {'source_units': pack['source_units'], 'original': original, 'previous_questions': previous[-20:]},
+            ConciseConcept.model_json_schema(), 60)
+        try:
+            validated = validate_pack({'concepts': [raw]}, pack['source_units'], 1)['concepts'][0]
+            if _plain(validated['question']).casefold() in {_plain(q).casefold() for q in [original['question'], *previous]}:
+                raise ValueError('Repeated question')
+            validated['title'] = original['title']
+            return validated, metrics
         except ValueError:
             raise GenerationError(metrics) from None
