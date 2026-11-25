@@ -183,14 +183,29 @@ describe('login, signup and reset email UI', () => {
     await render('/auth', { modal: true }); await click('비밀번호 찾기'); await input(0, 'ui-reset@example.test');
     expect(container.querySelector('button[type=submit]')?.hasAttribute('disabled')).toBe(true);
   });
+  it('uses inline signup validation and blocks invalid credentials before calling auth', async () => {
+    await render('/auth', { modal: true, signup: true });
+    expect(container.querySelector('form')?.noValidate).toBe(true);
+    await input(0, 'student@invalid!.test'); await input(1, 'ab'); await input(2, 'different'); await submit();
+    expect([...container.querySelectorAll('input[aria-invalid="true"]')].map(element => {
+      const description = element.getAttribute('aria-describedby')!;
+      return document.getElementById(description)?.textContent;
+    })).toEqual([
+      '올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해주세요.',
+      '비밀번호를 8자 이상 입력하세요.',
+      '비밀번호가 일치하지 않아요.',
+    ]);
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
   it('asks for the 6-digit signup code and signs in once it is verified', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
     auth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
     await render('/auth', { modal: true, signup: true });
-    await input(0, 'ui-signup@example.test'); await input(1, 'new-password'); await submit();
+    await input(0, 'ui-signup@example.test'); await input(1, 'new-password'); await input(2, 'new-password'); await submit();
     expect(closed).not.toHaveBeenCalled();
-    expect(container.textContent).toContain('6자리 인증번호');
+    expect(container.textContent).toContain('ui-signup@example.test 으로 인증번호를 보냈어요.');
+    expect(container.querySelector('input[autocomplete="one-time-code"]')?.getAttribute('aria-label')).toBe('인증번호 6자리');
     expect(container.textContent).toContain('남은 시간');
     expect(container.querySelector('input[type=password]')).toBeNull();
     expect(container.querySelector<HTMLButtonElement>('button[type=submit]')?.disabled).toBe(true);
@@ -202,7 +217,7 @@ describe('login, signup and reset email UI', () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     auth.signUp.mockResolvedValue({ data: { session }, error: null });
     await render('/auth', { modal: true, signup: true });
-    await input(0, 'instant@example.test'); await input(1, 'new-password'); await submit();
+    await input(0, 'instant@example.test'); await input(1, 'new-password'); await input(2, 'new-password'); await submit();
     expect(closed).toHaveBeenCalledTimes(1);
   });
   it('offers signup confirmation instead of treating an unconfirmed account as a wrong password', async () => {
