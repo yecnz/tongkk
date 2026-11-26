@@ -78,11 +78,11 @@
 }
 
 .auth-credential-input[aria-invalid="true"] {
-  border-color: var(--color-danger);
+  border-color: var(--color-error);
 }
 
 :root .mini-stage .auth-signup input.auth-credential-input[aria-invalid="true"]:focus {
-  outline-color: var(--color-danger);
+  outline-color: var(--color-error);
 }
 
 .auth-password-control {
@@ -126,7 +126,7 @@
 }
 
 .auth-signup-hint[role="alert"] {
-  color: var(--color-danger);
+  color: var(--color-error);
 }
 
 .auth-signup.mini-login-card .auth-credential-input {
@@ -195,7 +195,7 @@
 
 .auth-form-error {
   margin: 0;
-  color: var(--color-danger);
+  color: var(--color-error);
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
@@ -221,7 +221,7 @@
 }
 
 .auth-recovery-description.auth-form-error {
-  color: var(--color-danger);
+  color: var(--color-error);
 }
 
 .auth-recovery-link {
@@ -313,7 +313,7 @@
 }
 
 .auth-code-cells[data-invalid="true"] .auth-code-cell {
-  border-color: var(--color-danger);
+  border-color: var(--color-error);
 }
 
 .auth-code-cells[data-expired="true"] {
@@ -351,7 +351,7 @@
 
 .auth-code-timer strong,
 .auth-confirmation-status [data-danger="true"] {
-  color: var(--color-danger);
+  color: var(--color-error);
 }
 
 .auth-confirmation :is(.auth-dialog-submit, .mini-login-submit) {
