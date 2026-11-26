@@ -10,7 +10,7 @@
     "predev": "node scripts/copy-pdfjs-assets.mjs",
     "dev": "vite",
     "prebuild": "node scripts/copy-pdfjs-assets.mjs",
-    "build": "vite build",
+    "build": "vite build && node scripts/copy-promo.mjs",
     "lint": "eslint . && node scripts/check-inline-hex.mjs",
     "audit": "npm audit --audit-level=high",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
