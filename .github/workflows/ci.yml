@@ -20,12 +20,23 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: Lint (eslint + check-inline-hex)
         run: npm run lint
+      - name: Standalone promo demo
+        run: |
+          node promo/build-demo.mjs
+          node promo/test-demo.mjs
+          node promo/test-flow.mjs
+          node promo/build-features.mjs
+          node promo/test-features.mjs
       - name: Unit tests
         run: npm test
       - name: Learning workflow PostgreSQL integration
         run: npm run test:learning-db
       - name: Fresh workflow schema
         run: npm run test:workflow-db
+      - name: Flashcard ownership and review scheduling
+        run: npm run test:flashcards-db
+      - name: Study path ownership and chapter progress
+        run: npm run test:study-paths-db
       - name: Build
         run: npm run build
 

@@ -38,7 +38,7 @@
 .review-question-footer { padding-top: 14px; margin-top: 16px; border-top: 1px solid var(--color-border-soft); }
 .review-question-footer .workflow-button { font-size: 12px; }
 .review-question-footer label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
-.review-question-footer select { min-width: 0; max-width: 100%; }
+.review-question-footer .tongkk-select-trigger { min-width: 0; max-width: 100%; }
 .review-notes .review-empty { display: grid; justify-items: center; gap: 12px; padding: 36px 20px; text-align: center; }
 .review-notes .review-empty h3 { margin: 0; color: var(--color-text-strong); font-size: 16px; }
 .review-notes .review-empty p { margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.75; }

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff4f8">
+  <meta name="description" content="강의자료를 요약하고, 질문하고, 퀴즈로 확인하세요. 자료 확인부터 복습까지 이어지는 통크크의 실제 학습 흐름을 만나보세요.">
+  <title>통크크 — 내 공부가, 내 지식이 되는 곳</title>
+  <link rel="icon" href="assets/mascot.png" type="image/png">
+  <link rel="stylesheet" href="styles.css?v=feature-gallery-1">
+  <link rel="stylesheet" href="demo.css?v=learning-flow-3">
+  <script src="script.js?v=feature-gallery-1" defer></script>
+  <script src="demo.js?v=learning-flow-3" defer></script>
+</head>
+<body class="landing-page" id="top">
+  <svg class="lp-icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7V5Z"/></symbol>
+    <symbol id="icon-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6ZM14 3v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Zm8-1 .6 1.4L22 4l-1.4.6L20 6l-.6-1.4L18 4l1.4-.6L20 2Z"/></symbol>
+    <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 18 0ZM7 10h8M7 14h5"/></symbol>
+    <symbol id="icon-quiz" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6m-6 4 2 2 4-4"/></symbol>
+    <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18m-13 5 2 2 5-4"/></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="icon-book" viewBox="0 0 24 24"><path d="M12 5v16M12 5C9 2 5 3 2 4v15c3-1 7-2 10 1 3-3 7-2 10-1V4c-3-1-7-2-10 1Z"/></symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  </svg>
+
+  <a class="lp-skip-link" href="#landing-main">본문으로 바로가기</a>
+  <header class="lp-header">
+    <div class="lp-nav-wrap">
+      <a class="lp-brand" href="#top" aria-label="통크크 소개 홈"><img class="brand-logo" src="assets/logo.png" alt="통크크" width="114" height="38"></a>
+      <nav class="lp-nav" id="landing-navigation" aria-label="소개 페이지 메뉴">
+        <a href="#preview" data-flow-start>학습 흐름</a><a href="#features">기능 소개</a><a href="#faq">자주 묻는 질문</a>
+      </nav>
+      <div class="lp-nav-actions">
+        <a class="lp-login" href="https://tongkk.com/auth">로그인</a>
+        <a class="lp-button lp-button-small" href="https://tongkk.com/">시작하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+        <button class="lp-menu-toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" aria-controls="landing-navigation"><svg class="lp-icon" aria-hidden="true"><use href="#icon-menu"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="landing-main">
+    <section class="lp-hero" aria-labelledby="landing-title">
+      <div class="lp-hero-copy">
+        <div class="lp-eyebrow"><span></span><span>나의 공부에, 든든한 한 편</span></div>
+        <h1 id="landing-title">쌓여 있는 강의자료,<br><span class="lp-hero-highlight">내 지식이 되는 순간<svg viewBox="0 0 620 20" preserveAspectRatio="none" aria-hidden="true"><path d="M5 14Q295-1 610 11"/></svg></span></h1>
+        <p class="lp-hero-description">요약하고, 질문하고, 직접 풀어보세요.<br>통크크가 흩어진 공부를 하나의 흐름으로 이어줍니다.</p>
+        <div class="lp-hero-actions">
+          <a class="lp-button" href="https://tongkk.com/">내 자료로 시작하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+          <a class="lp-button lp-button-secondary" href="#preview" data-flow-start><span class="lp-play-circle"><svg class="lp-icon" aria-hidden="true"><use href="#icon-play"/></svg></span>학습 흐름 보기</a>
+        </div>
+        <p class="lp-hero-hint">자료를 이해하는 순간부터, 스스로 기억하는 순간까지</p>
+      </div>
+      <div class="lp-floating-note" aria-hidden="true"><span class="lp-note-pin"></span><span class="lp-float-label">오늘의 공부</span><strong>어려운 개념도<br><em>하나씩, 차근차근</em></strong><span class="lp-float-check"><svg class="lp-icon"><use href="#icon-check"/></svg> 이해 완료!</span></div>
+      <div class="lp-floating-mascot" aria-hidden="true"><span>이번 학기도 같이 해요!</span><img src="assets/mascot.png" alt="" width="160" height="160"></div>
+      <div class="lp-hero-spark lp-hero-spark-one" aria-hidden="true"><svg class="lp-icon"><use href="#icon-sparkles"/></svg></div>
+      <div class="lp-hero-spark lp-hero-spark-two" aria-hidden="true"><svg class="lp-icon"><use href="#icon-sparkles"/></svg></div>
+
+      <div class="lp-product" id="preview">
+        <div class="lp-flow-intro"><span class="lp-section-kicker">FROM YOUR MATERIALS TO YOUR KNOWLEDGE</span><h2>직접 눌러보는 학습 흐름</h2><p>요약으로 연결하고, 퀴즈로 확인하고, 튜터에게 이유를 물어보세요.</p></div>
+        <div class="lp-product-window" aria-label="통크크 예시 체험">
+          <div class="lp-app-header">
+            <div><div class="lp-app-title"><span class="lp-app-badge">예시</span><h2>시간 복잡도와 정렬 알고리즘</h2></div><p>샘플 자료 <strong>알고리즘 3주차 강의자료.pdf</strong>로 만든 예시예요. 실제로는 내 강의 자료를 올려 만들어요.</p></div>
+            <button class="lp-app-close" type="button" aria-label="예시 닫기" data-demo-close>✕</button>
+          </div>
+          <div class="lp-product-tabs" role="tablist" aria-label="통크크 학습 흐름" aria-orientation="horizontal">
+            <button id="flow-tab-original" type="button" role="tab" aria-selected="true" aria-controls="flow-original" tabindex="0">원본</button>
+            <button id="flow-tab-summary" type="button" role="tab" aria-selected="false" aria-controls="flow-summary" tabindex="-1">요약</button>
+            <button id="flow-tab-quiz" type="button" role="tab" aria-selected="false" aria-controls="flow-quiz" tabindex="-1">퀴즈</button>
+            <button id="flow-tab-tutor" type="button" role="tab" aria-selected="false" aria-controls="flow-tutor" tabindex="-1">튜터</button>
+          </div>
+          <section class="lp-flow-panel" id="flow-original" role="tabpanel" aria-labelledby="flow-tab-original" tabindex="0"><div id="demo-original"></div></section>
+          <section class="lp-flow-panel" id="flow-summary" role="tabpanel" aria-labelledby="flow-tab-summary" tabindex="0" hidden><div id="demo-summary"></div></section>
+          <section class="lp-flow-panel" id="flow-quiz" role="tabpanel" aria-labelledby="flow-tab-quiz" tabindex="0" hidden><div id="demo-quiz"></div></section>
+          <section class="lp-flow-panel" id="flow-tutor" role="tabpanel" aria-labelledby="flow-tab-tutor" tabindex="0" hidden><div id="demo-tutor"></div></section>
+          <div class="lp-app-footer"><span>내 강의자료로 요약과 퀴즈를 만드세요.</span><div><button type="button" class="lp-app-button" data-demo-close>닫기</button><a class="lp-app-button lp-app-button-primary" href="https://tongkk.com/">내 자료로 시작하기</a></div></div>
+        </div>
+        <div class="lp-demo-guidance" aria-label="다음 학습 단계"><p data-demo-guidance>원본에서 다룬 개념을 요약으로 연결해 보세요.</p><button type="button" data-demo-next>요약으로 연결하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button></div>
+        <div class="lp-demo-reopen" hidden><p>예시 자료를 다시 살펴볼까요?</p><button type="button" class="lp-button" data-demo-open>예시 다시 열기</button></div>
+        <p class="lp-product-caption">통크크의 공개 샘플 자료로 체험해 보세요 · 로그인 없이 시작할 수 있어요</p>
+        <noscript><p class="lp-product-caption">JavaScript를 켜면 원본·요약·퀴즈·튜터를 체험할 수 있어요. <a href="https://tongkk.com/">통크크로 이동하기</a></p><style>.lp-product-window,.lp-demo-guidance{display:none}</style></noscript>
+      </div>
+    </section>
+
+    <section class="lp-formats lp-container" aria-label="지원하는 자료 형식"><p>공부하던 자료 그대로 가져오세요</p><div><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>PDF</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>PPT · PPTX</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>이미지</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>Word (.docx)</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>텍스트 · Markdown</span></div></section>
+
+    <section class="lp-features lp-container lp-section-reveal" id="features" aria-labelledby="features-title">
+      <div class="lp-section-heading"><span class="lp-section-kicker">LESS OVERWHELM, MORE UNDERSTANDING</span><h2 id="features-title">읽는 공부에서,<br><span>이해하는 공부로</span></h2><p>개념을 연결하고, 헷갈리는 지점을 찾고, 이유를 설명해 보세요.<br>같은 자료 안에서 네 단계가 하나의 학습으로 이어집니다.</p></div>
+      <nav class="lp-learning-route" aria-label="이해하는 공부 단계 선택" role="tablist"><button type="button" id="journey-tab-0" role="tab" aria-controls="learn-summary" aria-selected="true" tabindex="0"><span>01</span>요약으로 연결</button><button type="button" id="journey-tab-1" role="tab" aria-controls="learn-quiz" aria-selected="false" tabindex="-1"><span>02</span>퀴즈로 발견</button><button type="button" id="journey-tab-2" role="tab" aria-controls="learn-tutor" aria-selected="false" tabindex="-1"><span>03</span>튜터에게 질문</button><button type="button" id="journey-tab-3" role="tab" aria-controls="learn-retry" aria-selected="false" tabindex="-1"><span>04</span>다시 풀어 확인</button></nav>
+      <p class="lp-journey-context">하나의 개념을 따라가 보세요 <strong>“퀵 정렬은 언제 빠르고, 언제 느려질까?”</strong></p>
+      <ol class="lp-learning-journey">
+        <li id="learn-summary" class="lp-learning-step lp-learning-pink" role="tabpanel" aria-labelledby="journey-tab-0" tabindex="0">
+          <div class="lp-learning-copy"><span class="lp-learning-number">01 <span>요약</span></span><h3>흩어진 개념을<br>서로 연결해요</h3><p>핵심과 세부 내용을 나눠 읽고, 개념의 관계와 차이를 비교해요. 어디에 쓰이는 개념인지 맥락을 잡습니다.</p><blockquote><span>이렇게 이해해요</span>퀵 정렬은 평균 O(n log n).<br>하지만 분할이 치우치면 최악 O(n²).</blockquote></div>
+          <div class="lp-learning-details"><h4>공부하는 방식에 맞춘 네 가지 요약</h4><ul><li><strong>일반 요약</strong><span>핵심 개념과 전체 흐름을 빠르게 파악</span></li><li><strong>강의 노트</strong><span>설명·예시·주의점을 차근차근 정리</span></li><li><strong>마인드맵</strong><span>개념을 펼치고 접으며 관계를 시각적으로 확인</span></li><li><strong>치트시트</strong><span>정의·공식·비교표를 한눈에 찾아보기</span></li></ul><details class="lp-feature-extra" open><summary>요약에서 더 할 수 있는 일</summary><p>여러 자료·페이지 범위·집중할 내용을 선택해 요약하고, 마인드맵의 개념을 튜터 질문으로 이어갈 수 있어요. 체험에서는 펼치기·접기·확대·축소·PNG 저장도 사용할 수 있어요.</p></details><a class="lp-text-button" href="#preview" data-demo-step="1">네 가지 요약 체험하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div>
+        </li>
+        <li id="learn-quiz" class="lp-learning-step lp-learning-blue" role="tabpanel" aria-labelledby="journey-tab-1" tabindex="0" hidden inert aria-hidden="true">
+          <div class="lp-learning-copy"><span class="lp-learning-number">02 <span>퀴즈</span></span><h3>헷갈리는 부분이<br>답을 고를 때 드러나요</h3><p>읽었던 내용을 직접 떠올려 답해 보세요. 정답과 내 답을 비교하면 어떤 조건을 놓쳤는지 알 수 있어요.</p><blockquote><span>이렇게 발견해요</span>“퀵 정렬은 항상 O(n log n)이다.”<br>평균과 최악을 구분해서 답할 수 있나요?</blockquote></div>
+          <div class="lp-learning-details"><h4>자료를 바탕으로, 내 수준에 맞게</h4><ul><li><strong>문제 유형 선택</strong><span>객관식·OX·단답형·주관식으로 확인</span></li><li><strong>범위와 난이도 설정</strong><span>공부한 자료와 필요한 수준에 맞춰 문제 생성</span></li><li><strong>채점과 해설</strong><span>내 답·정답·이유를 함께 살펴보기</span></li><li><strong>문항별 이동</strong><span>이전 문제와 풀이 결과를 다시 확인</span></li></ul><details class="lp-feature-extra" open><summary>퀴즈에서 더 할 수 있는 일</summary><p>실제 서비스에서는 문항 수(5·10·15·20개), 출제 페이지와 집중할 내용을 고를 수 있어요. 주관식 모범답안·피드백과 시간 제한 시험 모드도 제공해요.</p></details><p class="lp-feature-note">이 페이지에서는 객관식·OX 예시 3문제를 직접 풀어볼 수 있어요.</p><a class="lp-text-button" href="#preview" data-demo-step="2" data-quiz-question="1">평균과 최악 구분해 보기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div>
+        </li>
+        <li id="learn-tutor" class="lp-learning-step lp-learning-violet" role="tabpanel" aria-labelledby="journey-tab-2" tabindex="0" hidden inert aria-hidden="true">
+          <div class="lp-learning-copy"><span class="lp-learning-number">03 <span>튜터</span></span><h3>왜 그런지 묻고,<br>내 말로 설명해요</h3><p>해설에서 막힌 부분을 질문하고, 예시를 바꿔가며 이유를 확인해요. 답을 아는 데서 한 걸음 더 나아갑니다.</p><blockquote><span>이렇게 질문해요</span>“분할이 한쪽으로 치우치면<br>왜 O(n²)가 되는지 예로 설명해줘.”</blockquote></div>
+          <div class="lp-learning-details"><h4>내 자료에 대해 이어서 질문하기</h4><ul><li><strong>개념 설명</strong><span>어려운 용어를 쉬운 말과 예시로 풀어보기</span></li><li><strong>비교와 추가 질문</strong><span>비슷한 개념의 차이를 대화로 좁혀가기</span></li><li><strong>오답에서 이어가기</strong><span>틀린 이유를 묻고 다음 확인 질문으로 연결</span></li><li><strong>수식과 표</strong><span>설명 속 수식·목록·비교 내용을 읽기 쉽게 확인</span></li></ul><details class="lp-feature-extra" open><summary>튜터에서 더 할 수 있는 일</summary><p>실제 서비스에서는 원본·요약 문맥을 바탕으로 질문해요. 본문 선택·마인드맵·오답에서 질문을 연결하고, 이미지 첨부·답변 복사·대화 기록도 이용할 수 있어요.</p></details><p class="lp-feature-note">튜터 체험은 샘플 자료에 맞춰 준비한 예시 답변으로 동작해요.</p><a class="lp-text-button" href="#preview" data-demo-step="3" data-tutor-question="퀵 정렬의 최악 시간 복잡도는 왜 O(n²)인가요?">튜터에게 이유 물어보기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div>
+        </li>
+        <li id="learn-retry" class="lp-learning-step lp-learning-mint" role="tabpanel" aria-labelledby="journey-tab-3" tabindex="0" hidden inert aria-hidden="true">
+          <div class="lp-learning-copy"><span class="lp-learning-number">04 <span>재확인</span></span><h3>다시 풀면서<br>이해했는지 확인해요</h3><p>설명을 읽은 뒤 다시 답해 보세요. 맞혔는지와 함께 왜 그 답인지 설명할 수 있는지도 확인합니다.</p><blockquote><span>이렇게 내 지식으로 남겨요</span>“항상은 아니야. 균형 잡힌 분할은 빠르지만,<br>치우친 분할이 반복되면 O(n²)가 돼.”</blockquote></div>
+          <div class="lp-learning-details"><h4>한 번의 풀이에서 다음 복습까지</h4><ul><li><strong>결과와 풀이 확인</strong><span>점수와 문항별 정답·오답을 함께 확인</span></li><li><strong>다시 풀기</strong><span>답을 새로 고르며 이해한 내용을 재확인</span></li><li><strong>오답 노트</strong><span>실제 서비스에서 틀린 문제를 모아 복습</span></li><li><strong>요약으로 돌아가기</strong><span>남은 빈틈을 같은 자료에서 다시 연결</span></li></ul><details class="lp-feature-extra" open><summary>복습에서 더 할 수 있는 일</summary><p>실제 서비스에서는 과목별 오답을 모아 다시 풀고, 취약점·더 공부할 내용·암기 포인트·공부 방법을 분석해요. 오답을 튜터에게 보내 설명과 확인 질문을 이어갈 수 있어요.</p></details><a class="lp-text-button" href="#preview" data-demo-step="2" data-quiz-retry>예시 퀴즈 다시 풀기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div>
+        </li>
+      </ol>
+      <div class="lp-learning-loop"><svg class="lp-icon" aria-hidden="true"><use href="#icon-book"/></svg><p><strong>아직 헷갈리면, 필요한 단계로 돌아가세요.</strong><span>요약에서 다시 연결하고 → 튜터에게 묻고 → 퀴즈로 확인해요.</span></p><a href="#preview" data-demo-step="1">요약으로 돌아가기 <span aria-hidden="true">↗</span></a></div>
+      <a class="lp-text-button" href="#more-features">설명 학습부터 계획까지, 더 살펴보기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+    </section>
+
+    <section class="lp-more-features" id="more-features" aria-labelledby="more-features-title"><div class="lp-container">
+      <div class="lp-section-heading"><span class="lp-section-kicker">MAKE IT PART OF YOUR STUDY</span><h2 id="more-features-title">이해한 내용을,<br><span>내 공부로 쌓아가요</span></h2><p>내 말로 설명하고, 필요한 때 다시 떠올리고, 다음 공부를 정하세요.<br>자료 하나에서 시작한 공부가 기록과 계획으로 이어집니다.</p></div>
+      <p class="lp-feature-demo-note">기능을 고르면 설명과 실제 화면이 한자리에서 바뀌어요. 예시 데이터를 바로 눌러보세요.<br><span>변경은 이 체험에만 적용되며, AI 답변과 외부 연동 결과는 준비된 예시입니다.</span></p>
+      <div class="lp-feature-gallery"><aside class="lp-feature-menu"><p class="lp-picker-caption">지금 필요한 기능을 골라보세요</p><div class="lp-feature-picker" role="tablist" aria-label="통크크 기능 선택" aria-orientation="vertical"><div class="lp-feature-choice-group" id="features-understand" role="presentation"><p>01 / 이해·복습</p><button type="button" role="tab" id="feature-tab-explain" aria-controls="feature-explain" aria-selected="true" tabindex="0"><span>설명 학습</span><span aria-hidden="true">↗</span></button><button type="button" role="tab" id="feature-tab-cards" aria-controls="feature-cards" aria-selected="false" tabindex="-1"><span>암기 카드</span><span aria-hidden="true">↗</span></button><button type="button" role="tab" id="feature-tab-issues" aria-controls="feature-issues" aria-selected="false" tabindex="-1"><span>학습 이슈</span><span aria-hidden="true">↗</span></button></div><div class="lp-feature-choice-group" id="features-organize" role="presentation"><p>02 / 흐름·계획</p><button type="button" role="tab" id="feature-tab-courses" aria-controls="feature-courses" aria-selected="false" tabindex="-1"><span>학습 코스</span><span aria-hidden="true">↗</span></button><button type="button" role="tab" id="feature-tab-resume" aria-controls="feature-resume" aria-selected="false" tabindex="-1"><span>학습 이어가기</span><span aria-hidden="true">↗</span></button><button type="button" role="tab" id="feature-tab-plan" aria-controls="feature-plan" aria-selected="false" tabindex="-1"><span>학습 계획</span><span aria-hidden="true">↗</span></button></div><div class="lp-feature-choice-group" id="features-connect" role="presentation"><p>03 / 기록·연결</p><button type="button" role="tab" id="feature-tab-stats" aria-controls="feature-stats" aria-selected="false" tabindex="-1"><span>학습 통계</span><span aria-hidden="true">↗</span></button><button type="button" role="tab" id="feature-tab-integrations" aria-controls="feature-integrations" aria-selected="false" tabindex="-1"><span>외부 연동</span><span aria-hidden="true">↗</span></button><button type="button" role="tab" id="feature-tab-menubar" aria-controls="feature-menubar" aria-selected="false" tabindex="-1"><span>Mac 메뉴바</span><span aria-hidden="true">↗</span></button></div></div><p class="lp-picker-footnote">선택한 기능의 실제 화면이<br>이 자리에서 바로 펼쳐져요</p></aside><div class="lp-feature-stage"><article class="lp-explain-feature lp-feature-panel" aria-labelledby="feature-tab-explain" id="feature-explain" role="tabpanel" tabindex="0" data-group="0">
+          <div class="lp-explain-intro lp-feature-copy"><span class="lp-feature-label">설명 학습</span><h3 id="explain-feature-title">내 말로 설명해 보면<br>빈틈이 보여요</h3><p>자료를 보지 않고 개념을 설명해 보세요. 내 설명과 원문 근거를 함께 살펴보며, 빠진 내용과 고쳐야 할 부분을 확인합니다.</p><p class="lp-feature-example">예를 들어, “퀵 정렬이 느려지는 조건”을<br>누군가에게 알려주듯 설명하는 거예요.</p><details class="lp-explain-more"><summary>설명 학습의 네 단계 살펴보기</summary><ol class="lp-explain-process" aria-label="설명 학습 과정">
+            <li><span>1</span><div><strong>범위를 정하고, 직접 설명</strong><p>처음 배우기·수업 후 회상 중 방식을 고르고, 자료 범위와 목표 시간에 맞춰 시작해요.</p></div></li>
+            <li><span>2</span><div><strong>평가와 근거 확인</strong><p>평가 기준별로 확인됨·빠짐·수정 필요·판단 보류를 살피고, 내 설명과 원문을 비교해요.</p></div></li>
+            <li><span>3</span><div><strong>막히면 힌트로 보완</strong><p>단계별 힌트와 모범 설명을 참고하고, 수정한 설명을 다시 평가받을 수 있어요.</p></div></li>
+            <li><span>4</span><div><strong>확인 문제, 그리고 다음 복습</strong><p>설명 뒤에는 문제로 확인해요. 도움을 받은 보완과 시간이 지난 뒤 혼자 떠올린 기록을 구분해요.</p></div></li>
+          </ol></details></div>
+
+        <figure class="lp-inline-example" data-feature-example="explain"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>설명 학습 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="explain" aria-label="설명 학습 예시 초기화">초기화</button></figcaption><iframe src="features.html?feature=explain&amp;v=feature-gallery-1" title="설명 학습 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680"></iframe><p class="lp-inline-hint">내 설명을 적고, 피드백과 확인 문제까지 이어가 보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-cards" role="tabpanel" aria-labelledby="feature-tab-cards" tabindex="0" data-group="0" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">암기 카드</span><h3>짧게 떠올리고,<br>기억에 맞춰 다시 만나요</h3><p>정의와 공식처럼 자주 확인할 내용을 질문과 답으로 만들어요.</p><ul><li>자료에서 카드 초안을 만들거나 직접 작성</li><li>틀린 퀴즈를 카드로 저장해 복습</li><li>답을 확인하고 ‘다시·어려움·알겠음·쉬움’을 골라 다음 복습 일정 조정</li></ul><p class="lp-feature-condition">카드 일정은 내가 평가한 기억 정도를 기준으로 정해져요.</p></div><figure class="lp-inline-example" data-feature-example="cards"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>암기 카드 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="cards" aria-label="암기 카드 예시 초기화">초기화</button></figcaption><iframe title="암기 카드 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=cards&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">답을 떠올린 뒤 펼쳐 보고 기억 정도를 골라보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-issues" role="tabpanel" aria-labelledby="feature-tab-issues" tabindex="0" data-group="0" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">학습 이슈 · 복습 관리</span><h3>헷갈린 개념을<br>다음 공부의 출발점으로</h3><p>어떤 개념을 보완해야 하는지 근거와 함께 모아두고, 해결 과정을 이어가요.</p><ul><li>퀴즈 오답을 관련 개념에 연결</li><li>복습 중·다시 확인 예정으로 표시하고, 확인한 개념은 직접 완료 표시</li><li>완료한 설명 학습을 오늘 복습에 추가하고, 새 사례와 확인 문제로 재점검</li></ul><p class="lp-feature-condition">복습은 자동 추가하거나, 일정을 미루고 정지·재개할 수 있어요.</p></div><figure class="lp-inline-example" data-feature-example="issues"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>학습 이슈 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="issues" aria-label="학습 이슈 예시 초기화">초기화</button></figcaption><iframe title="학습 이슈 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=issues&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">헷갈린 개념의 근거와 보완 과정을 확인해 보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-courses" role="tabpanel" aria-labelledby="feature-tab-courses" tabindex="0" data-group="1" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">학습 코스</span><h3>여러 강의자료를<br>하나의 순서로</h3><p>흩어진 자료를 챕터로 묶고, 공부할 순서를 직접 다듬어요.</p><ul><li>최대 6개 자료로 AI 코스 초안 생성</li><li>챕터 제목·순서·포함 여부 편집</li><li>활동 완료 진도와 다음 챕터 확인</li></ul></div><figure class="lp-inline-example" data-feature-example="courses"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>학습 코스 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="courses" aria-label="학습 코스 예시 초기화">초기화</button></figcaption><iframe title="학습 코스 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=courses&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">챕터와 진도를 확인하고 공부할 순서를 바꿔보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-resume" role="tabpanel" aria-labelledby="feature-tab-resume" tabindex="0" data-group="1" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">학습 이어가기</span><h3>잠시 멈췄어도<br>하던 곳에서 다시</h3><p>마지막 공부를 찾아 헤매지 않고, 저장된 흐름을 이어가요.</p><ul><li>설명 초안 저장과 중단한 학습 재개</li><li>풀던 퀴즈와 최근 학습 기록 확인</li><li>예정 복습·보완할 개념·임박 일정에 따른 다음 공부 추천</li></ul></div><figure class="lp-inline-example" data-feature-example="resume"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>학습 이어가기 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="resume" aria-label="학습 이어가기 예시 초기화">초기화</button></figcaption><iframe title="학습 이어가기 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=resume&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">멈춘 학습과 오늘 이어갈 내용을 확인해 보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-plan" role="tabpanel" aria-labelledby="feature-tab-plan" tabindex="0" data-group="1" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">학습 계획</span><h3>내 시간에 맞춰<br>오늘 할 만큼만</h3><p>목표와 현재 익숙한 정도, 하루 공부 시간을 바탕으로 계획해요.</p><ul><li>AI 학습 계획 생성과 남은 계획 이월</li><li>시험 D-day와 페이지·퀴즈 분량에 맞춘 페이스 설정</li><li>캘린더에서 할 일·권장 분량·완료 상태 관리</li></ul></div><figure class="lp-inline-example" data-feature-example="plan"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>학습 계획 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="plan" aria-label="학습 계획 예시 초기화">초기화</button></figcaption><iframe title="학습 계획 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=plan&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">오늘 할 일을 수정하거나 캘린더로 전환해 보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-stats" role="tabpanel" aria-labelledby="feature-tab-stats" tabindex="0" data-group="2" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">학습 통계 · 개념 지도</span><h3>얼마나 했는지에서<br>무엇을 보완할지까지</h3><p>풀이 결과와 개념별 기록을 보고, 다음에 돌아볼 내용을 찾아요.</p><ul><li>점수 추이·연속 학습일·과목별 성취 확인</li><li>설명·도움 사용·시간을 둔 복습 기록 비교</li><li>자료 사이의 같은 개념과 선수 개념을 연결하고 보완할 개념 확인</li></ul><p class="lp-feature-condition">학습시간·연속 학습일 통계는 퀴즈 풀이 기록을 기준으로 해요.</p></div><figure class="lp-inline-example" data-feature-example="stats"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>학습 통계 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="stats" aria-label="학습 통계 예시 초기화">초기화</button></figcaption><iframe title="학습 통계 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=stats&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">점수 추이와 개념별 학습 기록을 살펴보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-integrations" role="tabpanel" aria-labelledby="feature-tab-integrations" tabindex="0" data-group="2" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">외부 연동</span><h3>쓰던 자료와 일정을<br>공부에 연결해요</h3><p>Notion 자료와 Google Calendar 일정을 가져올 수 있어요.</p><ul><li>자료 제목 검색 후 가져온 본문 검토</li><li>이전 본문과 비교해 새 자료 버전 저장</li><li>캘린더 일정을 읽기 전용으로 가져오고, 자동 가져오기 간격 설정</li></ul><p class="lp-feature-condition">계정 연결과 접근 권한이 필요해요. 연동 기능이 활성화된 서비스 환경에서 이용하며, 외부 원본은 변경하지 않아요.</p></div><figure class="lp-inline-example" data-feature-example="integrations"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>외부 연동 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="integrations" aria-label="외부 연동 예시 초기화">초기화</button></figcaption><iframe title="외부 연동 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=integrations&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">예시 계정의 자료를 검색하고 가져올 내용을 비교해 보세요.</p></figure></article>
+<article class="lp-detail-feature lp-feature-panel" id="feature-menubar" role="tabpanel" aria-labelledby="feature-tab-menubar" tabindex="0" data-group="2" hidden="" inert="" aria-hidden="true"><div class="lp-feature-copy"><span class="lp-feature-label">Mac 메뉴바</span><h3>작은 창에서<br>오늘 공부를 가까이</h3><p>Mac 메뉴바에서 오늘 할 일을 확인하고, 자료에 대해 바로 질문해요.</p><ul><li>D-day·오늘 할 일 확인과 완료 처리</li><li>자료를 선택해 튜터에게 질문</li><li>단축키·자동 실행·테마와 알림 시간 설정</li></ul><p class="lp-feature-condition">메뉴바·자동 실행·알림은 Mac 앱 기능이에요. 할 일과 시험·과제 하루 전 알림은 앱이 실행 중일 때 제공돼요.</p></div><figure class="lp-inline-example" data-feature-example="menubar"><figcaption><div><span class="lp-example-dot" aria-hidden="true"></span><strong>Mac 메뉴바 예시</strong><span class="lp-example-status">직접 눌러보세요</span></div><button type="button" data-feature-reset="menubar" aria-label="Mac 메뉴바 예시 초기화">초기화</button></figcaption><iframe title="Mac 메뉴바 실제 UI와 샘플 데이터" loading="lazy" sandbox="allow-scripts allow-same-origin allow-modals" height="680" data-src="features.html?feature=menubar&amp;v=feature-gallery-1"></iframe><p class="lp-inline-hint">오늘 할 일을 완료하거나 작은 창에서 튜터에게 질문해 보세요.</p></figure></article></div></div>
+
+      <details class="lp-supporting-features"><summary>자료 준비부터 화면 설정까지, 더 편하게 공부해요<svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></summary><div>
+        <p><strong>자료와 학습 초안 준비</strong>여러 파일을 올리거나 텍스트를 붙여넣고, 요약·퀴즈·설명 학습 초안을 검토해 저장해요.</p>
+        <p><strong>원문 확인과 내보내기</strong>출처 정보가 있는 설명은 원문 페이지로 돌아가 확인해요. 요약은 전체 복사·PDF 저장, 마인드맵은 PNG 저장을 지원해요.</p>
+        <p><strong>필요할 때 학습 메이트</strong>연결된 자료에 대해 다른 화면에서도 질문해요. 퀴즈 풀이와 설명 학습 중에는 별도 메이트 패널이 숨겨져요.</p>
+        <p><strong>나에게 맞는 공부 환경</strong>다크모드·화면 크기·복습 시간대를 설정하고, 프로필과 AI 사용량을 확인해요.</p>
+      </div></details>
+      <div class="lp-feature-start"><p>소개한 기능은 내 자료와 학습 기록으로 이어져요.<br><span>로그인 후 통크크에서 이용할 수 있습니다.</span></p><a class="lp-button" href="https://tongkk.com/">내 공부에 적용하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div>
+    </div></section>
+
+    <section class="lp-how lp-section-reveal" id="how-it-works" aria-labelledby="how-title"><div class="lp-container">
+      <div class="lp-section-heading"><span class="lp-section-kicker">A LITTLE START, A BETTER STUDY</span><h2 id="how-title">시작은 가볍게<br><span>공부는 차근차근</span></h2><p>지금 가지고 있는 강의자료 한 개면 충분해요.</p></div>
+      <div class="lp-steps">
+        <article><div class="lp-step-visual lp-step-upload" aria-hidden="true"><svg class="lp-icon"><use href="#icon-upload"/></svg></div><div class="lp-step-heading"><span>01</span><h3>자료를 올리고</h3></div><p>과목을 만들고 강의자료를 추가하세요.<br>공부의 시작점을 한곳에 모아드려요.</p></article>
+        <article><div class="lp-step-visual lp-step-understand" aria-hidden="true"><svg class="lp-icon"><use href="#icon-book"/></svg></div><div class="lp-step-heading"><span>02</span><h3>내 방식으로 이해하고</h3></div><p>요약으로 흐름을 잡고, 튜터에게 질문하며<br>어려운 개념을 하나씩 풀어가세요.</p></article>
+        <article><div class="lp-step-visual lp-step-review" aria-hidden="true"><svg class="lp-icon"><use href="#icon-check"/></svg></div><div class="lp-step-heading"><span>03</span><h3>확인하고, 다시 기억하기</h3></div><p>퀴즈와 설명으로 이해를 확인하세요.<br>헷갈린 부분은 다음 복습으로 이어져요.</p></article>
+      </div>
+      <a class="lp-text-button" href="#preview" data-flow-start>실제 학습 흐름 다시 보기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+    </div></section>
+
+    <section class="lp-faq lp-container lp-section-reveal" id="faq" aria-labelledby="faq-title">
+      <div class="lp-faq-heading"><span class="lp-section-kicker">GOOD QUESTIONS</span><h2 id="faq-title">궁금한 게<br>있으신가요?</h2><p>시작하기 전에 알아두면 좋은 이야기</p></div>
+      <div class="lp-faq-list">
+        <details name="tongkk-promo-faq"><summary>통크크는 어떤 서비스인가요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>내 강의자료로 요약·질문·퀴즈·설명 학습을 하고, 암기 카드와 복습으로 다시 확인하는 AI 학습 도우미예요. 학습 코스·계획·통계로 다음 공부까지 이어갈 수 있어요.</p></details>
+        <details name="tongkk-promo-faq"><summary>설명 학습과 튜터는 어떻게 다른가요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>튜터는 내 자료에 대해 질문하며 설명을 듣는 대화예요. 설명 학습에서는 내가 먼저 개념을 설명하고, 평가 기준과 원문 근거에 따라 피드백을 받아요. 힌트로 보완하고 확인 문제를 풀며 이해한 내용을 점검합니다.</p></details>
+        <details name="tongkk-promo-faq"><summary>어떤 자료를 올릴 수 있나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>PDF, PPT·PPTX, 이미지, Word(.docx) 문서와 텍스트·Markdown 자료를 사용할 수 있어요. 글자가 흐리거나 복잡한 표·수식이 많은 자료는 변환 결과를 원본과 함께 확인해 주세요.</p></details>
+        <details name="tongkk-promo-faq"><summary>이 페이지에서 학습을 시작할 수 있나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>원본·요약·퀴즈·튜터부터 설명 학습, 카드, 코스, 계획, 통계, 외부 연동, 메뉴바까지 실제 UI와 예시 데이터로 둘러볼 수 있어요. 각 기능 설명 아래에서 바로 조작해 보세요. 변경 내용은 이 체험에만 적용되고, AI 답변과 외부 연동 결과는 준비된 예시예요. 내 자료와 학습 기록을 저장하려면 ‘내 자료로 시작하기’로 이동해 로그인해 주세요.</p></details>
+        <details name="tongkk-promo-faq"><summary>요약과 퀴즈는 어떻게 연결되나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>강의자료를 올려 요약을 만든 뒤 같은 자료로 퀴즈를 생성할 수 있어요. 틀린 문제는 오답 노트에 모아 다시 풀고, 학습 캘린더와 계획으로 다음 공부를 이어갈 수 있어요.</p></details>
+        <details name="tongkk-promo-faq"><summary>AI가 만든 내용을 그대로 믿어도 되나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>AI가 생성한 요약이나 답변에는 오류가 있을 수 있어요. 중요한 개념과 수치는 원본 강의자료와 비교하고, 이해가 잘 되지 않는 부분은 튜터에게 추가로 질문해 보세요.</p></details>
+      </div>
+    </section>
+
+    <section class="lp-final-cta lp-container lp-section-reveal"><div class="lp-cta-inner"><div><span class="lp-section-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h2>공부가 조금 더<br><span>가벼워지는 시작</span></h2><p>첫 강의자료부터, 통크크와 함께해요.</p><a class="lp-button" href="https://tongkk.com/">내 자료로 시작하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div><div class="lp-cta-art" aria-hidden="true"><span class="lp-cta-orbit lp-cta-orbit-one"></span><span class="lp-cta-orbit lp-cta-orbit-two"></span><img src="assets/mascot.png" alt="" width="238" height="238" loading="lazy"><span class="lp-cta-sticker"><svg class="lp-icon"><use href="#icon-check"/></svg>오늘도 한 걸음!</span></div></div></section>
+  </main>
+
+  <footer class="lp-footer lp-container">
+    <div class="lp-footer-top"><div><a href="#top" aria-label="통크크 소개 홈"><img class="brand-logo" src="assets/logo.png" alt="통크크" width="105" height="35" loading="lazy"></a><p>내 공부가, 내 지식이 되는 곳</p></div><nav aria-label="하단 메뉴"><a href="#features">기능 소개</a><a href="#how-it-works">이용 방법</a><a href="#preview" data-flow-start>학습 흐름</a></nav></div>
+    <div class="lp-footer-bottom"><small>© <span data-year>2026</span> Tongkk. All rights reserved.</small><div><a href="https://tongkk.com/terms">이용약관</a><a href="https://tongkk.com/privacy">개인정보처리방침</a></div></div>
+  </footer>
+
+</body>
+</html>

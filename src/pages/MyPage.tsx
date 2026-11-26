@@ -4,7 +4,7 @@ import CalendarConnections from '../features/integrations/CalendarConnections';
 import LearningPreferences from '../features/review/LearningPreferences';
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card } from "../common";
+import { PINK, CYAN, PAGE_BACKGROUND, pageRoutes, SidebarIcon, Sidebar, Card, useSidebarOpen } from "../common";
 import { useAuth } from "../AuthContext";
 import { useAuthGate } from "../AuthGateContext";
 import { useToast } from "../ToastContext";
@@ -202,14 +202,14 @@ const SettingsModal = ({
         {type === "notice" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
             <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.</p>
-            <p style={{ margin: "0 0 10px" }}>오류나 개선 의견을 보내주세요.</p>
+            <p style={{ margin: "0 0 10px" }}>오류나 개선 의견을 보내 주세요.</p>
             <p style={{ margin: 0 }}>문의 메일: tongkk.team@gmail.com</p>
           </div>
         )}
 
         {type === "contact" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
-            <p style={{ margin: "0 0 12px" }}>오류 제보나 개선 요청은 팀 관리자에게 전달하세요.</p>
+            <p style={{ margin: "0 0 12px" }}>오류 제보나 개선 요청은 팀 관리자에게 전달해 주세요.</p>
             <a
               href="mailto:tongkk.team@gmail.com?subject=Tongkk%20문의"
               style={{ color: CYAN, fontWeight: 800, textDecoration: "none" }}
@@ -229,7 +229,7 @@ const SettingsModal = ({
             </p>
             {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
             <label style={{ display: "block", marginBottom: 6, fontSize: 12.5, fontWeight: 700, color: "var(--color-text-secondary)" }}>
-              계속하려면 <strong style={{ color: "var(--color-danger)" }}>삭제</strong>를 입력하세요
+              계속하려면 <strong style={{ color: "var(--color-danger)" }}>삭제</strong>를 입력해 주세요
             </label>
             <input
               value={confirmText}
@@ -319,7 +319,7 @@ export default function MyPage() {
     resetAllTutorials();
     showToast("튜토리얼을 초기화했습니다. 화면을 열면 사용법이 표시됩니다.");
   };
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useSidebarOpen();
   const [showEdit, setShowEdit] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialog>(null);
   const [profile, setProfile] = useState<UserProfile>({
@@ -414,7 +414,7 @@ export default function MyPage() {
       <SettingsModal type={settingsDialog} onClose={() => setSettingsDialog(null)} onDeleteData={handleDeleteData} currentEmail={user?.email} onChangeEmail={updateEmail} />
 
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(!sidebar)} aria-label={sidebar ? "메뉴 닫기" : "메뉴 열기"} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>

@@ -17,6 +17,6 @@
 
 ## 적용
 
-프런트엔드·서버 배포 전에 `supabase/migrations/202611260001_connected_learning.sql`을 적용해야 한다. 새 설치용 `supabase/schema.sql`에도 동일한 정의를 포함했다. 새 테이블과 RPC는 서버 역할만 접근할 수 있다.
+프런트엔드·서버 배포 전에 `supabase/migrations/202611260004_connected_learning.sql`을 적용해야 한다. 새 설치용 `supabase/schema.sql`에도 동일한 정의를 포함했다. 새 테이블과 RPC는 서버 역할만 접근할 수 있다.
 
 브라우저 QA는 `scripts/learning-guide-preview`의 명시된 예시 데이터로 진행한다. 실제 DB 규칙은 PGlite 격리 PostgreSQL 검사, 서버 동작은 Python 테스트로 확인한다. 운영 DB에 마이그레이션을 적용하거나 실제 사용자 기록을 바꾸는 작업은 이 변경에 포함하지 않는다.

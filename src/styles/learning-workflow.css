@@ -64,7 +64,7 @@
 }
 .workflow-surface a:not([class]), .workflow-link { color: var(--color-pink-deep); font-size: 13px; font-weight: 600; text-decoration: none; }
 .workflow-surface a:not([class]):hover, .workflow-link:hover { text-decoration: underline; }
-.workflow-surface :is(input:not([type]), input[type="text"], select, textarea) {
+.workflow-surface :is(input:not([type]), input[type="text"], .tongkk-select-trigger, textarea) {
   min-width: 0; max-width: 100%; min-height: 40px; padding: 10px 14px;
   border: 1px solid var(--color-border); border-radius: 10px;
   background: var(--color-card); color: var(--color-text);
@@ -73,7 +73,8 @@
 .workflow-surface .workflow-panel textarea { width: 100%; min-height: 180px; resize: vertical; line-height: 1.8; }
 .workflow-surface input::placeholder, .workflow-surface textarea::placeholder { color: var(--color-muted); }
 .workflow-field { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
-.workflow-field :is(select, input) { width: 100%; }
+.workflow-field :is(.tongkk-select-trigger, input) { width: 100%; }
+.workflow-surface .tongkk-select-trigger { justify-content: space-between; text-align: left; }
 .workflow-setting-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, 220px); align-items: center; gap: 16px; font-size: 14px; color: var(--color-text); }
 .workflow-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .workflow-form-grid .workflow-span-full { grid-column: 1 / -1; }
@@ -83,6 +84,46 @@
 .workflow-check, .workflow-options label { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: 400; color: var(--color-text); cursor: pointer; }
 .workflow-surface :is(input[type="checkbox"], input[type="radio"]), .workflow-options input {
   width: 16px; height: 16px; margin: 3px 0 0; flex-shrink: 0; accent-color: var(--color-cyan);
+}
+/* Keep a white check on the brand background instead of the browser's dark glyph.
+   Persistent on/off settings retain their separate switch appearance. */
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input) {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border: 1.5px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-card);
+  cursor: pointer;
+}
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input)::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid var(--color-on-brand);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+  visibility: hidden;
+}
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):checked {
+  border-color: var(--checkbox-accent, var(--color-cyan));
+  background: var(--checkbox-accent, var(--color-cyan));
+}
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):checked::after { visibility: visible; }
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):disabled { cursor: default; opacity: .5; }
+@media (forced-colors: active) {
+  :is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input),
+  :is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):checked {
+    appearance: auto;
+    background: revert;
+    border: revert;
+  }
+  :is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input)::after { display: none; }
 }
 .workflow-options { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; font-family: inherit; font-size: 14px; }
 .workflow-toggle { display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 14px; color: var(--color-text); cursor: pointer; }

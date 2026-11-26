@@ -1,7 +1,7 @@
-import SelectField from '../../components/SelectField';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
+import CustomSelect from '../../components/CustomSelect';
 import { fetchCourses, type CourseRecord } from '../../services/courses';
 import { workflowRequest } from '../../services/workflow';
 type Event = { id: string; title: string; all_day: boolean; start_value: string; end_value: string; start_at: string; course_id: string | null };
@@ -23,9 +23,8 @@ export default function ExternalEvents({ day }: { day: string }) {
   if (!user) return null;
   return <Card className="workflow-surface workflow-panel workflow-stack"><h2 className="workflow-panel-title">가져온 캘린더 일정</h2>
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
-      : !data ? <p role="status">일정을 확인하는 중…</p> : !data.events.length ? <p>가져온 일정이 없습니다. 마이페이지에서 캘린더를 연결하세요.</p>
+      : !data ? <p role="status">일정을 확인하는 중…</p> : !data.events.length ? <p>가져온 일정이 없습니다. 마이페이지에서 캘린더를 연결해 주세요.</p>
         : data.events.map(event => <section className="workflow-item" key={event.id}><h3>{event.title}</h3><p className="workflow-meta">{event.all_day ? `종일 · ${event.start_value}부터 ${event.end_value} 전날까지` : new Date(event.start_at).toLocaleTimeString('ko-KR', { timeZone: data.timezone, hour: '2-digit', minute: '2-digit' })} · 읽기 전용</p>
-          <SelectField label="연결 과목" layout="row" value={event.course_id || ''} placeholder="연결하지 않음" disabled={busy}
-        options={courses.map(c => ({ value: c.id, label: c.name }))} onChange={course => { void link(event.id, course); }} /></section>)}
+          <label className="workflow-setting-row">연결 과목 <CustomSelect value={event.course_id || ''} disabled={busy} onChange={value => { void link(event.id, value); }} options={[{ value: '', label: '연결하지 않음' }, ...courses.map(c => ({ value: c.id, label: c.name }))]} aria-label="연결 과목" /></label></section>)}
   </Card>;
 }

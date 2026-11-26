@@ -1,7 +1,7 @@
 import BrandLogo from "../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import { pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel, useSidebarOpen } from "../common";
 import { useToast } from "../ToastContext";
 import { useAuth } from "../AuthContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
@@ -10,11 +10,13 @@ import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer }
 import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type WrongAnswerAnalysis, type WrongAnalysisItem } from "../services/gpt";
 
 import QuizIssueLink from '../features/review/QuizIssueLink';
+import SaveWrongCard from '../features/flashcards/SaveWrongCard';
 import './ReviewNotes.css';
 
 const ALL = "전체";
 
 type WrongEntry = {
+  materialIds: string[];
   attemptId: string;
   questionIndex: number;
   courseName: string;
@@ -33,7 +35,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
   const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "오답 노트";
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useSidebarOpen();
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
   const [analyses, setAnalyses] = useState<Map<string, WrongAnswerAnalysis>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -88,6 +90,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
         if (seen.has(key)) continue;
         seen.add(key);
         result.push({
+          materialIds: attempt.materialIds,
           attemptId: attempt.id, questionIndex,
           courseName: attempt.courseName,
           quizSetId: attempt.quizSetId,
@@ -205,7 +208,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       {!embedded && sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       {!embedded && <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(!sidebar)} aria-label={sidebar ? "메뉴 닫기" : "메뉴 열기"} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
@@ -337,6 +340,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
                         <p>{entry.feedback || entry.explanation || "등록된 해설이 없습니다."}</p>
                       </div>
                       <div className="review-question-footer">
+                        <SaveWrongCard {...entry} />
                         <QuizIssueLink attemptId={entry.attemptId} questionIndex={entry.questionIndex} />
                       </div>
                     </Card>

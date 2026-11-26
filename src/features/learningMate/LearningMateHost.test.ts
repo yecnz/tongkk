@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ user: { id: 'user' }, request: vi.fn() }));
 vi.mock('../../AuthContext', () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock('../../services/workflow', () => ({ workflowRequest: mocks.request }));
-vi.mock('../../services/courses', () => ({ fetchCourses: async () => [] }));
+vi.mock('../../services/courses', () => ({ fetchCourses: async () => [{ id: 'course', name: '운영체제' }] }));
 vi.mock('../../components/AITutorDrawer', () => ({
   AITutorDrawer: ({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) =>
     h('button', { type: 'button', 'aria-label': 'AI 튜터 닫기', onClick: () => onOpenChange?.(false) }, '닫기'),

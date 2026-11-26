@@ -274,7 +274,7 @@ function SettingsWindow({ userId, email, loading, signOut }: {
                   <button className="menubar-settings-button" type="button" disabled={pending}
                     onClick={() => void runAction(signOut, "로그아웃하지 못했어요.")}>로그아웃</button>
                 </> : <>
-                  <span>{loading ? "계정을 불러오는 중…" : "Tongkk에 로그인하세요."}</span>
+                  <span>{loading ? "계정을 불러오는 중…" : "Tongkk에 로그인해 주세요."}</span>
                   {!loading && <button className="menubar-settings-button" type="button" onClick={() => setShowLogin(true)}>로그인</button>}
                 </>}
               </div>

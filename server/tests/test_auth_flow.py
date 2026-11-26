@@ -35,16 +35,20 @@ def failures():
     return login_attempts.retry_after_seconds(login_attempts.account_key('student@example.test'))
 
 
-def test_unconfirmed_email_is_actionable_and_never_locks(login_client):
+@pytest.mark.parametrize('error_payload', [
+    lambda code: {'code': code},
+    lambda code: {'code': 400, 'error_code': code},
+])
+def test_unconfirmed_email_is_actionable_and_never_locks(login_client, error_payload):
     client, upstream = login_client
-    upstream.return_value = httpx.Response(400, json={'code': 'email_not_confirmed'})
+    upstream.return_value = httpx.Response(400, json=error_payload('email_not_confirmed'))
     for _ in range(7):
         response = login(client)
         assert response.status_code == 403
         assert response.json()['error_code'] == 'email_not_confirmed'
     assert failures() == 0
     # 이후 실제 비밀번호 실패를 처음부터 센다.
-    upstream.return_value = httpx.Response(400, json={'code': 'invalid_credentials'})
+    upstream.return_value = httpx.Response(400, json=error_payload('invalid_credentials'))
     assert [login(client).status_code for _ in range(5)] == [401, 401, 401, 401, 429]
 
 

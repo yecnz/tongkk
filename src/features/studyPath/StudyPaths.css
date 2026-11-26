@@ -1,0 +1,46 @@
+.study-paths-surface .study-path-progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-muted-surface);
+  color: var(--color-pink);
+  accent-color: var(--color-pink);
+}
+
+.study-paths-surface .study-path-progress::-webkit-progress-bar {
+  border-radius: inherit;
+  background: var(--color-muted-surface);
+}
+
+.study-paths-surface .study-path-progress::-webkit-progress-value {
+  border-radius: inherit;
+  background: var(--color-pink);
+}
+
+.study-paths-surface .study-path-progress::-moz-progress-bar {
+  border-radius: inherit;
+  background: var(--color-pink);
+}
+
+.study-paths-surface .study-path-completion {
+  background: var(--color-tint-pink);
+  color: var(--color-pink-deep);
+}
+
+@media (forced-colors: active) {
+  .study-paths-surface .study-path-progress {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: Highlight;
+    accent-color: Highlight;
+  }
+
+  .study-paths-surface .study-path-progress::-webkit-progress-bar { background: Canvas; }
+  .study-paths-surface .study-path-progress::-webkit-progress-value { background: Highlight; }
+  .study-paths-surface .study-path-progress::-moz-progress-bar { background: Highlight; }
+}

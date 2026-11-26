@@ -6,7 +6,7 @@ import { workflowRequest } from '../../services/workflow';
 import { useLearningScope } from '../learningMate/context';
 type Concept = { id: string; title: string; state: string; source_changed: boolean; course_id: string; material_id: string;
   evidence_count: number; independent_questions: number; assisted_count: number; delayed_practice: number; last_evaluated_at: string | null; policy_version: string };
-const labels: Record<string, string> = { unassessed: '미평가', needs_confirmation: '확인 필요', needs_review: '보완 필요', awaiting_reassessment: '재평가 대기', recent_stable: '최근 안정', source_changed: '원문 변경' };
+const labels: Record<string, string> = { unassessed: '미평가', needs_confirmation: '확인 필요', needs_review: '보완 필요', awaiting_reassessment: '다시 확인 예정', recent_stable: '최근 안정', source_changed: '원문 변경' };
 type Detail = { concept: Concept; evidence: { id: string; source_kind: string; outcome: string; assisted: boolean; independent: boolean; session_id: string; created_at: string }[];
   revisions: { id: string; session_id: string; status: string; created_at: string }[]; issue_id: string | null };
 function ConceptDetail({ id }: { id: string }) {
@@ -43,7 +43,7 @@ export default function ConceptHistory() {
     workflowRequest<{ concepts: Concept[]; total: number }>(`/learning-concepts?offset=${page * 30}`, 'GET', undefined, controller.signal).then(setData).catch(e => { if (!controller.signal.aborted) setError(e.message); });
     return () => controller.abort();
   }, [user, selected, page, retry]);
-  if (!user) return <p className="workflow-muted">개념별 학습 기록을 보려면 로그인하세요.</p>;
+  if (!user) return <p className="workflow-muted">개념별 학습 기록을 보려면 로그인해 주세요.</p>;
   if (selected) return <div className="workflow-surface workflow-stack"><button type="button" className="workflow-button" onClick={() => setParams({ view: 'concepts' })}>← 개념 목록</button><ConceptDetail key={selected} id={selected} /></div>;
   return <div className="workflow-surface workflow-stack"><h2 className="workflow-view-title">개념별 학습 기록</h2>
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
@@ -51,7 +51,7 @@ export default function ConceptHistory() {
         <p className="workflow-muted">학습한 개념 {data.total}개 · 자료 버전별로 기록해요.</p>
         {data.concepts.map(c => <Card key={c.id} className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{c.title}</h3><span className="workflow-badge" data-state={c.state}>{labels[c.state]}</span></div><p className="workflow-meta">수행 근거 {c.evidence_count}개</p>
           <button type="button" className="workflow-button" onClick={() => setParams({ view: 'concepts', conceptId: c.id })}>변화와 근거 보기 →</button></Card>)}
-        {!data.total && <p>학습한 개념이 없습니다. 설명 학습을 시작하세요.</p>}
+        {!data.total && <p>학습한 개념이 없습니다. 설명 학습을 시작해 주세요.</p>}
         <div className="workflow-actions"><button type="button" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</button><button type="button" disabled={(page + 1) * 30 >= data.total} onClick={() => setPage(p => p + 1)}>다음</button></div>
       </>}
   </div>;

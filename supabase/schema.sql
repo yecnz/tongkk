@@ -2418,6 +2418,235 @@ begin
 end; $$;
 commit;
 
+
+-- Flashcards use self-assessed recall; they do not change assessed concept mastery.
+create table public.study_flashcards (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  course_id uuid not null references public.courses(id) on delete cascade,
+  material_id text,
+  front text not null check (length(trim(front)) between 1 and 2000),
+  back text not null check (length(trim(back)) between 1 and 8000),
+  source_page integer check (source_page between 1 and 100000),
+  origin_key text not null check (length(origin_key) between 1 and 300),
+  due_at timestamptz not null default now(),
+  interval_days double precision not null default 0 check (interval_days between 0 and 365),
+  ease double precision not null default 2.5 check (ease between 1.3 and 3),
+  reviews integer not null default 0,
+  revision integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique(user_id, origin_key),
+  foreign key(course_id, material_id, user_id) references public.materials(course_id,id,user_id) on delete cascade
+);
+create index study_flashcards_due on public.study_flashcards(user_id,due_at);
+alter table public.study_flashcards enable row level security;
+create policy flashcards_read on public.study_flashcards for select to authenticated using(user_id=auth.uid());
+create policy flashcards_delete on public.study_flashcards for delete to authenticated using(user_id=auth.uid());
+revoke all on public.study_flashcards from public,anon,authenticated;
+grant select,delete on public.study_flashcards to authenticated;
+grant all on public.study_flashcards to service_role;
+
+create table public.study_flashcard_reviews (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  request_id uuid not null,
+  card_id uuid not null references public.study_flashcards(id) on delete cascade,
+  rating text not null,
+  result jsonb not null,
+  created_at timestamptz not null default now(),
+  primary key(user_id,request_id)
+);
+alter table public.study_flashcard_reviews enable row level security;
+revoke all on public.study_flashcard_reviews from public,anon,authenticated;
+grant all on public.study_flashcard_reviews to service_role;
+
+create function public.study_flashcard_create(p_course uuid,p_material text,p_front text,p_back text,p_page integer,p_origin text)
+returns jsonb language plpgsql security definer set search_path=pg_catalog,public,pg_temp as $$
+declare owner uuid:=auth.uid(); card study_flashcards;
+begin
+  if owner is null then raise exception 'FLASHCARD_AUTH'; end if;
+  if not exists(select 1 from courses where id=p_course and user_id=owner) then raise exception 'FLASHCARD_SOURCE'; end if;
+  if p_material is not null and not exists(select 1 from materials where course_id=p_course and id=p_material and user_id=owner) then raise exception 'FLASHCARD_SOURCE'; end if;
+  insert into study_flashcards(user_id,course_id,material_id,front,back,source_page,origin_key)
+  values(owner,p_course,p_material,trim(p_front),trim(p_back),p_page,p_origin)
+  on conflict(user_id,origin_key) do nothing returning * into card;
+  if card.id is null then select * into card from study_flashcards where user_id=owner and origin_key=p_origin; end if;
+  return to_jsonb(card);
+end $$;
+
+create function public.study_flashcard_rate(p_card uuid,p_rating text,p_revision integer,p_key uuid)
+returns jsonb language plpgsql security definer set search_path=pg_catalog,public,pg_temp as $$
+declare owner uuid:=auth.uid(); card study_flashcards; previous study_flashcard_reviews; days double precision; factor double precision;
+begin
+  if owner is null then raise exception 'FLASHCARD_AUTH'; end if;
+  if p_key is null or p_revision is null or p_rating is null or p_rating not in ('again','hard','good','easy') then raise exception 'FLASHCARD_INVALID'; end if;
+  -- A per-request lock also serializes retries sent for different cards by mistake.
+  perform pg_advisory_xact_lock(hashtextextended(owner::text||p_key::text,0));
+  select * into previous from study_flashcard_reviews where user_id=owner and request_id=p_key;
+  if found then
+    if previous.card_id<>p_card or previous.rating<>p_rating then raise exception 'FLASHCARD_CONFLICT'; end if;
+    return previous.result;
+  end if;
+  select * into card from study_flashcards where id=p_card and user_id=owner for update;
+  if not found then raise exception 'FLASHCARD_NOT_FOUND'; end if;
+  if card.revision<>p_revision then raise exception 'FLASHCARD_CONFLICT'; end if;
+  factor:=greatest(1.3,least(3,card.ease+case p_rating when 'again' then -0.2 when 'hard' then -0.15 when 'easy' then 0.15 else 0 end));
+  days:=case p_rating
+    when 'again' then 0.006944444444444444 -- ten minutes
+    when 'hard' then greatest(1,card.interval_days*1.2)
+    when 'good' then case when card.interval_days<1 then 1 else card.interval_days*factor end
+    when 'easy' then case when card.interval_days<1 then 4 else card.interval_days*factor*1.3 end end;
+  days:=least(365,days);
+  update study_flashcards set interval_days=days,ease=factor,due_at=now()+days*interval '1 day',reviews=reviews+1,revision=revision+1
+    where id=card.id returning * into card;
+  insert into study_flashcard_reviews(user_id,request_id,card_id,rating,result) values(owner,p_key,card.id,p_rating,to_jsonb(card));
+  return to_jsonb(card);
+end $$;
+revoke all on function public.study_flashcard_create(uuid,text,text,text,integer,text),public.study_flashcard_rate(uuid,text,integer,uuid) from public,anon;
+grant execute on function public.study_flashcard_create(uuid,text,text,text,integer,text),public.study_flashcard_rate(uuid,text,integer,uuid) to authenticated;
+
+
+-- Server-only, owner-scoped RPCs. Apply after the existing learning workflow migrations.
+begin;
+create table public.study_paths (
+ id uuid primary key,
+ user_id uuid not null references auth.users(id) on delete cascade,
+ course_id uuid not null,
+ title text not null check(length(trim(title)) between 1 and 100),
+ chapters jsonb not null check(jsonb_typeof(chapters)='array' and jsonb_array_length(chapters) between 1 and 12),
+ revision integer not null default 0,
+ created_at timestamptz not null default now(),
+ updated_at timestamptz not null default now(),
+ unique(id,user_id),
+ foreign key(course_id,user_id) references public.courses(id,user_id) on delete cascade
+);
+create index study_paths_owner on public.study_paths(user_id,updated_at desc);
+create table public.study_path_sessions (
+ path_id uuid not null, user_id uuid not null, chapter_id uuid not null, session_id uuid not null,
+ primary key(path_id,chapter_id),
+ foreign key(path_id,user_id) references public.study_paths(id,user_id) on delete cascade,
+ foreign key(session_id,user_id) references public.learning_sessions(id,user_id) on delete cascade
+);
+alter table public.study_paths enable row level security;
+alter table public.study_path_sessions enable row level security;
+revoke all on public.study_paths,public.study_path_sessions from public,anon,authenticated;
+grant select,insert,update,delete on public.study_paths,public.study_path_sessions to service_role;
+
+create function public.study_path_read(p_user uuid,p_id uuid) returns jsonb
+language sql stable security invoker set search_path=public,pg_catalog as $$
+ select to_jsonb(p) || jsonb_build_object('chapters',(
+  select jsonb_agg(c || jsonb_build_object(
+    'source_changed',m.id is null or c->>'source_hash'<>encode(sha256(convert_to(m.markdown,'UTF8')),'hex'),
+    'session_id',s.id,'session_status',s.status,
+    'completed',coalesce(s.status='completed' and jsonb_array_length(s.result)>0 and not exists(
+      select 1 from jsonb_array_elements(s.result) r where coalesce((r->>'skipped')::boolean,false)
+        or coalesce(r->>'check','ungraded')='ungraded'),false)) order by ord)
+  from jsonb_array_elements(p.chapters) with ordinality x(c,ord)
+  left join materials m on m.course_id=p.course_id and m.id=c->>'material_id' and m.user_id=p_user
+  left join study_path_sessions l on l.path_id=p.id and l.chapter_id=(c->>'id')::uuid and l.user_id=p_user
+  left join learning_sessions s on s.id=l.session_id and s.user_id=p_user))
+ from study_paths p where p.id=p_id and p.user_id=p_user;
+$$;
+
+create function public.study_path_list(p_user uuid) returns jsonb
+language sql stable security invoker set search_path=public,pg_catalog as $$
+ select coalesce(jsonb_agg(study_path_read(p_user,id) order by updated_at desc),'[]'::jsonb)
+ from study_paths where user_id=p_user;
+$$;
+
+create function public.study_path_create(p_user uuid,p_id uuid,p_course uuid,p_title text,p_chapters jsonb) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare chapter jsonb; old study_paths;
+begin
+ perform pg_advisory_xact_lock(hashtextextended(p_user::text,260002));
+ select * into old from study_paths where id=p_id;
+ if found then
+  if old.user_id<>p_user then raise exception 'LS_NOT_FOUND'; end if;
+  return study_path_read(p_user,p_id);
+ end if;
+ if (select count(*) from study_paths where user_id=p_user)>=30 then raise exception 'LS_BUSY'; end if;
+ if jsonb_typeof(p_chapters)<>'array' or jsonb_array_length(p_chapters) not between 1 and 12
+   or (select count(distinct c->>'id') from jsonb_array_elements(p_chapters)c)<>jsonb_array_length(p_chapters)
+   then raise exception 'LS_CONFLICT'; end if;
+ for chapter in select value from jsonb_array_elements(p_chapters) loop
+  perform 1 from materials m where m.course_id=p_course and m.id=chapter->>'material_id' and m.user_id=p_user for share;
+  if not found then raise exception 'LS_NOT_FOUND'; end if;
+  if not exists(select 1 from materials m where m.course_id=p_course and m.id=chapter->>'material_id'
+    and m.user_id=p_user and chapter->>'source_hash'=encode(sha256(convert_to(m.markdown,'UTF8')),'hex'))
+    then raise exception 'LS_SOURCE_CHANGED'; end if;
+ end loop;
+ insert into study_paths(id,user_id,course_id,title,chapters) values(p_id,p_user,p_course,p_title,p_chapters);
+ return study_path_read(p_user,p_id);
+end; $$;
+
+create function public.study_path_edit(p_user uuid,p_id uuid,p_revision integer,p_title text,p_chapters jsonb) returns jsonb
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare old study_paths; edits jsonb; chapter jsonb; original jsonb; changed jsonb:='[]';
+begin
+ select * into old from study_paths where id=p_id and user_id=p_user for update;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ if old.revision<>p_revision or jsonb_typeof(p_chapters)<>'array' or jsonb_array_length(p_chapters)<>jsonb_array_length(old.chapters)
+   or (select count(distinct c->>'id') from jsonb_array_elements(p_chapters)c)<>jsonb_array_length(p_chapters)
+   or not exists(select 1 from jsonb_array_elements(p_chapters)c where c->>'included'='true')
+   then raise exception 'LS_CONFLICT'; end if;
+ for edits in select value from jsonb_array_elements(p_chapters) loop
+  select c into original from jsonb_array_elements(old.chapters)c where c->>'id'=edits->>'id';
+  if original is null or length(trim(edits->>'title')) not between 1 and 100
+    or jsonb_typeof(edits->'included')<>'boolean' then raise exception 'LS_CONFLICT'; end if;
+  chapter:=original||jsonb_build_object('title',edits->>'title','included',edits->'included');
+  changed:=changed||jsonb_build_array(chapter);
+ end loop;
+ update study_paths set title=p_title,chapters=changed,revision=revision+1,updated_at=now() where id=p_id;
+ return study_path_read(p_user,p_id);
+end; $$;
+
+create function public.study_path_link_session(p_user uuid,p_id uuid,p_chapter uuid,p_session uuid) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+declare path study_paths; chapter jsonb;
+begin
+ select * into path from study_paths where id=p_id and user_id=p_user for update;
+ if not found then raise exception 'LS_NOT_FOUND'; end if;
+ select c into chapter from jsonb_array_elements(path.chapters)c where c->>'id'=p_chapter::text and c->>'included'='true';
+ if chapter is null then raise exception 'LS_CONFLICT'; end if;
+ if not exists(select 1 from learning_sessions s join learning_session_packs p on p.id=s.pack_id and p.user_id=p_user
+    where s.id=p_session and s.user_id=p_user and s.course_id=path.course_id
+      and p.material_id=chapter->>'material_id' and p.source_hash=chapter->>'source_hash'
+      and p.selected_scope->'unit_ids'=chapter->'unit_ids') then raise exception 'LS_NOT_FOUND'; end if;
+ insert into study_path_sessions(path_id,user_id,chapter_id,session_id) values(p_id,p_user,p_chapter,p_session)
+ on conflict(path_id,chapter_id) do update set session_id=excluded.session_id
+ where study_path_sessions.session_id=excluded.session_id or exists(select 1 from learning_sessions old
+   where old.id=study_path_sessions.session_id and old.user_id=p_user and old.status in ('completed','abandoned'));
+ if not found then raise exception 'LS_CONFLICT'; end if;
+ update study_paths set updated_at=now() where id=p_id;
+ return true;
+end; $$;
+
+revoke all on function study_path_read(uuid,uuid),study_path_list(uuid),study_path_create(uuid,uuid,uuid,text,jsonb),
+ study_path_edit(uuid,uuid,integer,text,jsonb),study_path_link_session(uuid,uuid,uuid,uuid) from public,anon,authenticated;
+grant execute on function study_path_read(uuid,uuid),study_path_list(uuid),study_path_create(uuid,uuid,uuid,text,jsonb),
+ study_path_edit(uuid,uuid,integer,text,jsonb),study_path_link_session(uuid,uuid,uuid,uuid) to service_role;
+commit;
+
+
+begin;
+create or replace function public.learning_workflow_clear(p_user uuid) returns boolean
+language plpgsql security invoker set search_path=public,pg_catalog as $$
+begin
+ delete from study_paths where user_id=p_user;
+ delete from study_flashcards where user_id=p_user;
+ delete from background_jobs where user_id=p_user;
+ delete from external_connections where user_id=p_user;
+ delete from preparation_requests where user_id=p_user;
+ delete from learning_session_packs where user_id=p_user;
+ delete from learning_concepts where user_id=p_user;
+ delete from learning_preferences where user_id=p_user;
+ delete from learning_assessment_locks where user_id=p_user;
+ delete from summary_chat_sessions where user_id=p_user;
+ return true;
+end; $$;
+revoke all on function public.learning_workflow_clear(uuid) from public,anon,authenticated;
+grant execute on function public.learning_workflow_clear(uuid) to service_role;
+commit;
+
 begin;
 -- References are used on the server to discover related concepts, never grading data.
 create or replace function public.learning_graph_read(p_user uuid) returns jsonb

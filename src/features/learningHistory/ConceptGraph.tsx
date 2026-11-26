@@ -9,12 +9,12 @@ type Graph = { groups: { id: string; title: string; evidence_count: number; memb
   recommendations: { concept_id: string; title: string; reason: string }[];
   connections: { source: string; target: string }[]; study_target_id: string | null;
   study_plan: { concept_id: string; title: string; course_name: string; reason: string }[] };
-const labels: Record<string,string> = { needs_review: '보완 필요', needs_confirmation: '확인 필요', recent_stable: '최근 안정', unassessed: '미평가', awaiting_reassessment: '재평가 대기', source_changed: '원문 변경' };
+const labels: Record<string,string> = { needs_review: '보완 필요', needs_confirmation: '확인 필요', recent_stable: '최근 안정', unassessed: '미평가', awaiting_reassessment: '다시 확인 예정', source_changed: '원문 변경' };
 export default function ConceptGraph() {
   const { user } = useAuth(); const [data,setData] = useState<Graph|null>(null); const [error,setError] = useState('');
   const [retry,setRetry] = useState(0);
   useEffect(() => { if (!user) return; const c = new AbortController(); workflowRequest<Graph>('/learning-graph','GET',undefined,c.signal).then(setData).catch(e => { if (!c.signal.aborted) setError(e.message); }); return () => c.abort(); },[user,retry]);
-  if (!user) return <p className="workflow-muted">개념을 연결하려면 로그인하세요.</p>;
+  if (!user) return <p className="workflow-muted">개념을 연결하려면 로그인해 주세요.</p>;
   const members = data?.groups.flatMap(g => g.members) || [];
   return <div className="workflow-surface workflow-stack"><h2 className="workflow-view-title">개념 지도</h2><p className="workflow-muted">자료에서 관련 개념을 찾아, 이해가 필요한 순서로 학습을 안내해요.</p>
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError('');setRetry(n=>n+1); }}>다시 확인</button></p>}
@@ -31,7 +31,7 @@ export default function ConceptGraph() {
         {(data.connections || []).map(e=>{const a=data.groups.findIndex(g=>g.id===e.source),b=data.groups.findIndex(g=>g.id===e.target);return <path key={`related:${e.source}:${e.target}`} d={`M 490 ${a*84+35} C 620 ${a*84+35},620 ${b*84+35},490 ${b*84+35}`} fill="none" stroke="var(--color-border)" strokeDasharray="5 5"/>;})}
         {data.groups.map((g,i)=><g key={g.id}><rect x="12" y={i*84+8} width="475" height="62" rx="10" fill="var(--color-card)" stroke="var(--color-border)"/><text x="28" y={i*84+33} fill="var(--color-text)" fontSize="15">{g.title.slice(0,35)}</text><text x="28" y={i*84+54} fill="var(--color-muted)" fontSize="12">{new Set(g.members.map(m=>m.course_name)).size}개 과목 · {g.members.length}개 원문 개념 · 근거 {g.evidence_count}개</text></g>)}
       </svg></div>}
-      {data.groups.length > 0 && <p className="workflow-map-hint workflow-meta">좌우로 움직여 개념과 학습 순서를 확인하세요.</p>}
+      {data.groups.length > 0 && <p className="workflow-map-hint workflow-meta">좌우로 움직여 개념과 학습 순서를 확인해 주세요.</p>}
       {!members.length ? <p>자료로 학습을 시작하면 관련 개념을 찾아드려요.</p> : <>
         {data.groups.map(g=><Card className="workflow-panel workflow-stack concept-record-card" key={g.id}>
           <div className="workflow-card-heading"><h3>{g.title}</h3>{g.members.length > 1 && <span className="workflow-meta">{g.members.length}개 자료의 학습 기록</span>}</div>

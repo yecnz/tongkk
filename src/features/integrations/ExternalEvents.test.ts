@@ -29,9 +29,9 @@ it.each([
   });
   await act(async () => root.render(h(ExternalEvents, { day: '2026-11-23' })));
   await act(async () => container.querySelector<HTMLButtonElement>('[role=combobox]')!.click());
-  const choice = Array.from(container.querySelectorAll<HTMLElement>('[role=option]')).find(item => item.textContent?.startsWith(option))!;
+  const choice = Array.from(document.querySelectorAll<HTMLElement>('[role=option]')).find(item => item.textContent?.startsWith(option))!;
   await act(async () => choice.click());
   expect(mocks.request).toHaveBeenCalledWith('/integrations/events/event-1/course', 'PUT', { course_id: expected });
   expect(container.querySelector('[role=combobox]')?.textContent).toContain(option);
-  expect(container.querySelector('[role=listbox]')).toBeNull();
+  expect(document.querySelector('[role=listbox]')).toBeNull();
 });

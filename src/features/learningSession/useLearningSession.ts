@@ -67,8 +67,8 @@ export function useLearningSession(id: string | undefined, userId: string | unde
   }, [accept, id]);
 
   const command = useCallback((suffix: string, body: Record<string, unknown> = {}) => {
-    if (!id || !current.current) return Promise.reject(new Error('학습을 먼저 불러와주세요.'));
-    if (pending.current) return Promise.reject(new Error('이전 요청 결과를 먼저 확인해주세요.'));
+    if (!id || !current.current) return Promise.reject(new Error('학습을 먼저 불러와 주세요.'));
+    if (pending.current) return Promise.reject(new Error('이전 요청 결과를 먼저 확인해 주세요.'));
     return send({ path: `/${id}/${suffix}`, body: {
       ...body, expected_revision: current.current.revision, idempotency_key: crypto.randomUUID(),
     } });

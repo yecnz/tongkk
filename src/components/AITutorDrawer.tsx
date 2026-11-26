@@ -1,3 +1,6 @@
+import { useSourceCitationScope } from '../features/sources/citationContext';
+import { remarkSourceCitations } from '../features/sources/sourceNavigation';
+import { SourceCitationAnchor } from '../features/sources/SourceCitationAnchor';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -110,7 +113,7 @@ const markdownComponents: Components = {
   p: ({ children }) => {
     const text = nodeToText(children);
     // 출처 줄은 내부 굵게·코드 스타일이 흐린 톤을 깨지 않도록 순수 텍스트로만 렌더한다.
-    if (isSourceNoteText(text)) return <p style={markdownStyles.sourceNote}>{text.replace(/\*\*/g, "")}</p>;
+    if (isSourceNoteText(text)) return <p style={markdownStyles.sourceNote}>{children}</p>;
     return <p style={markdownStyles.paragraph}>{children}</p>;
   },
   ul: ({ children }) => <ul style={{ ...markdownStyles.list, listStyleType: "disc" }}>{children}</ul>,
@@ -163,18 +166,19 @@ const miniMarkdownComponents: Components = {
   ...markdownComponents,
   p: ({ children }) => {
     const text = nodeToText(children);
-    if (isSourceNoteText(text)) return <p className="mini-tutor-source-note">{text.replace(/^근거(?:로)?\s*본\s*자료\s*[:：]?\s*/, "").replace(/\*\*/g, "")}</p>;
+    if (isSourceNoteText(text)) return <p className="mini-tutor-source-note">{children}</p>;
     return <p className="mini-tutor-paragraph">{children}</p>;
   },
 };
 
 export const FormattedTutorText = ({ content, compact = false }: { content: string; compact?: boolean }) => {
+  const sourceScope = useSourceCitationScope();
   const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(content.replace(/\r\n/g, "\n").trim())));
   if (!cleaned) return null;
 
   return (
     // 단일 '~'(예: 'p.8~p.9' 페이지 범위)를 취소선으로 오인하지 않도록 singleTilde:false. '~~'만 취소선.
-    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={compact ? miniMarkdownComponents : markdownComponents}>
+    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath, [remarkSourceCitations, sourceScope]]} rehypePlugins={[rehypeKatex]} components={{ ...(compact ? miniMarkdownComponents : markdownComponents), a: SourceCitationAnchor }}>
       {cleaned}
     </ReactMarkdown>
   );
@@ -200,7 +204,7 @@ export const AITutorDrawer = ({
   initialQuestion,
   onInitialQuestionConsumed,
   pendingQuestion,
-  disabledReason = "요약을 생성한 뒤 질문하세요",
+  disabledReason = "요약을 생성한 뒤 질문해 주세요",
   resetHistory = false,
   layout = "drawer",
   fill = false,

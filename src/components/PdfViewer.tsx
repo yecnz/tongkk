@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import {
   getDocument,
@@ -23,6 +23,7 @@ const PDFJS_FONTS_URL = `${import.meta.env.BASE_URL}pdfjs/standard_fonts/`;
 type PdfViewerProps = {
   url: string;
   title?: string;
+  initialPage?: number;
   // 같은 파일이면 항상 동일한 캐시 키(원본 filePath). 서명 URL은 토큰이 매번 바뀌어 캐시 키로 못 쓴다.
   // 지정 시 Cache Storage에 저장해 새로고침·재방문 때 재다운로드(Egress)를 막는다. blob: 미리보기엔 생략.
   cacheKey?: string | null;
@@ -33,12 +34,28 @@ const RENDER_ROOT_MARGIN = "600px 0px";
 // 페이지 크기를 아직 모를 때 쓰는 임시 종횡비(스크롤바 추정용). 측정되면 실제 비율로 대체된다.
 const FALLBACK_RATIO = 1.3;
 
-export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
+export function PdfViewer({ url, title, cacheKey, initialPage = 1 }: PdfViewerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [pageWidth, setPageWidth] = useState(0);
+  const [sizedPages, setSizedPages] = useState<Set<number>>(new Set());
+  const onPageSized = useCallback((page: number) => setSizedPages(previous => {
+    if (previous.has(page)) return previous;
+    return new Set([...previous, page]);
+  }), []);
+  useEffect(() => { setSizedPages(new Set()); }, [pdf, pageWidth]);
+  const validInitialPage = Number.isInteger(initialPage) && initialPage > 0 && (!pdf || initialPage <= pdf.numPages);
+  useEffect(() => {
+    if (!pdf || !pageWidth || sizedPages.size < pdf.numPages) return;
+    const page = validInitialPage ? initialPage : 1;
+    const target = scrollRef.current?.querySelector<HTMLElement>(`[data-pdf-page="${page}"]`);
+    if (target && scrollRef.current) {
+      scrollRef.current.scrollTop += target.getBoundingClientRect().top - scrollRef.current.getBoundingClientRect().top - 16;
+      if (initialPage > 1) target.focus({ preventScroll: true });
+    }
+  }, [pdf, pageWidth, sizedPages, initialPage, validInitialPage]);
 
   // 문서 로드: signed URL(만료 1h)·blob URL 모두 fetch→arrayBuffer로 읽어 차이를 없앤다.
   // url이 바뀌거나 언마운트되면 진행 중 요청·문서를 취소/해제한다.
@@ -116,6 +133,7 @@ export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
         boxSizing: "border-box",
       }}
     >
+      {pdf && !validInitialPage && <p role="alert">인용된 페이지가 원문 범위(1–{pdf.numPages})를 벗어나 첫 페이지를 표시합니다.</p>}
       {status === "loading" && <div style={messageStyle}>원본 PDF를 불러오는 중…</div>}
       {status === "error" && (
         <div style={messageStyle}>
@@ -138,7 +156,7 @@ export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
         pdf &&
         pageWidth > 0 &&
         Array.from({ length: pdf.numPages }, (_, i) => (
-          <PdfPageView key={i + 1} pdf={pdf} pageNumber={i + 1} pageWidth={pageWidth} scrollRef={scrollRef} />
+          <PdfPageView key={i + 1} pdf={pdf} pageNumber={i + 1} pageWidth={pageWidth} scrollRef={scrollRef} onPageSized={onPageSized} />
         ))}
     </div>
   );
@@ -160,9 +178,10 @@ type PdfPageViewProps = {
   pageNumber: number;
   pageWidth: number;
   scrollRef: RefObject<HTMLDivElement | null>;
+  onPageSized: (page: number) => void;
 };
 
-function PdfPageView({ pdf, pageNumber, pageWidth, scrollRef }: PdfPageViewProps) {
+function PdfPageView({ pdf, pageNumber, pageWidth, scrollRef, onPageSized }: PdfPageViewProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -198,6 +217,7 @@ function PdfPageView({ pdf, pageNumber, pageWidth, scrollRef }: PdfPageViewProps
       const viewport = page.getViewport({ scale: nextScale });
       setScale(nextScale);
       setSize({ w: viewport.width, h: viewport.height });
+      onPageSized(pageNumber);
 
       const container = textRef.current;
       if (!container) return;
@@ -212,7 +232,7 @@ function PdfPageView({ pdf, pageNumber, pageWidth, scrollRef }: PdfPageViewProps
       cancelled = true;
       textLayer?.cancel();
     };
-  }, [pdf, pageNumber, pageWidth]);
+  }, [pdf, pageNumber, pageWidth, onPageSized]);
 
   // canvas 렌더: 화면에 보이고 스케일이 정해졌을 때. 레티나 선명도를 위해 dpr을 반영한다.
   useEffect(() => {
@@ -245,7 +265,7 @@ function PdfPageView({ pdf, pageNumber, pageWidth, scrollRef }: PdfPageViewProps
   const cssVars = { "--total-scale-factor": String(scale || 1) } as CSSProperties;
 
   return (
-    <div ref={wrapRef} className="pdf-page" style={{ width: size.w, height: size.h, ...cssVars }}>
+    <div ref={wrapRef} className="pdf-page" data-pdf-page={pageNumber} tabIndex={-1} aria-label={`${pageNumber}페이지`} style={{ width: size.w, height: size.h, ...cssVars }}>
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
       <div ref={textRef} className="textLayer" />
     </div>

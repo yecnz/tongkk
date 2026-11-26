@@ -1,9 +1,13 @@
 import BrandLogo from "./components/BrandLogo";
+import { MenubarDownloadModal } from "./components/MenubarDownloadModal";
 import { useEffect, useState } from "react";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 // 피드백을 받을 팀 메일 (사이드바 하단·문의 메일 공통)
 export const FEEDBACK_EMAIL = "tongkk.team@gmail.com";
+
+// GitHub Releases 최신 릴리스의 Tongkk.dmg를 항상 가리키는 고정 링크 (메뉴바 앱)
+export const MENUBAR_DMG_URL = "https://github.com/yecnz/tongkk/releases/latest/download/Tongkk.dmg";
 
 // 색상은 모두 CSS 변수를 가리켜 라이트/다크 토큰을 자동으로 따른다(정의: src/index.css).
 // 브랜드색 PINK·CYAN도 다크에서 채도를 낮춘 값으로 전환되며, 투명도를 섞을 때는
@@ -86,6 +90,8 @@ export const pageRoutes = {
   "대시보드": "/",
   "학습 캘린더": "/calendar",
   "학습 세션": "/learn",
+  "학습 코스": "/study-paths",
+  "암기 카드": "/flashcards",
   "자료 요약": "/summary",
   "퀴즈 생성": "/quiz",
   "오답 노트": "/review",
@@ -122,6 +128,25 @@ export const PaperPlaneIcon = () => (
   </svg>
 );
 
+// 768px 이하는 사이드바가 본문을 덮는 overlay 모드(src/index.css)
+const isNarrowScreen = () => window.matchMedia("(max-width: 768px)").matches;
+const SIDEBAR_KEY = "tongkk-sidebar-open";
+let sidebarJustOpened = false;
+
+// 사이드바 열림 상태. PC에선 페이지를 옮겨도 열린 채로 이어지고(sessionStorage),
+// 좁은 화면에선 늘 닫힌 채로 시작한다.
+export const useSidebarOpen = () => {
+  const [open, setOpenState] = useState(() => {
+    try { return !isNarrowScreen() && sessionStorage.getItem(SIDEBAR_KEY) === "1"; } catch { return false; }
+  });
+  const setOpen = (next: boolean) => {
+    if (next && !open) sidebarJustOpened = true; // 직접 열 때만 슬라이드 애니메이션
+    setOpenState(next);
+    try { sessionStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch { /* 저장 못 해도 동작엔 문제없음 */ }
+  };
+  return [open, setOpen] as const;
+};
+
 export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
   // 사이드바가 열려 있는 동안 body에 클래스를 붙여, 본문(#root)을 오른쪽으로 밀어
   // 가리지 않고 폭이 줄어들게 한다(스타일 정의: src/index.css). 언마운트 시 원복.
@@ -129,6 +154,11 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
     document.body.classList.add("tongkk-sidebar-open");
     return () => document.body.classList.remove("tongkk-sidebar-open");
   }, []);
+  const [showMenubarGuide, setShowMenubarGuide] = useState(false);
+  const [animate] = useState(() => sidebarJustOpened);
+  useEffect(() => { sidebarJustOpened = false; }, []);
+  // 메뉴를 고르면 좁은 화면(overlay)에서만 닫는다. PC에선 열어 둔 채 이동.
+  const navTo = (item: PageRouteLabel) => { onNav(item); if (isNarrowScreen()) onClose(); };
 
   // height:100vh 대신 top/bottom 0 — #root에 zoom이 걸려 있어 100vh는 축소되지만
   // 뷰포트 모서리 기준 offset은 zoom과 무관하게 전체 높이를 채운다(정의: src/index.css).
@@ -136,20 +166,16 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
   return (
     <>
     <div className="tongkk-sidebar-backdrop" onClick={onClose} aria-hidden="true" />
-    <div className="tongkk-sidebar" style={{
+    <div className={animate ? "tongkk-sidebar tongkk-sidebar-animate" : "tongkk-sidebar"} style={{
       position: "fixed", top: 0, left: 0, bottom: 0, width: 240, maxWidth: "80vw",
       background: CARD_BACKGROUND, borderRight: `1px solid ${BORDER_COLOR}`, zIndex: 100,
       display: "flex", flexDirection: "column", padding: "24px 0",
       boxShadow: "10px 0 30px rgba(15, 23, 42, 0.045)"
     }}>
-      <div style={{ padding: "0 20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button type="button" className="brand-home tongkk-hover-fade" onClick={() => { onNav("대시보드"); onClose(); }}><BrandLogo /></button>
-        <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="사이드바 닫기" style={{ background: "none", border: "none", borderRadius: 8, padding: "2px 8px", cursor: "pointer", fontSize: 18, color: "var(--color-muted)" }}>✕</button>
-      </div>
       {(Object.keys(pageRoutes) as PageRouteLabel[])
         .filter(item => item !== "자료 요약" && item !== "퀴즈 생성")
         .map(item => (
-        <button type="button" key={item} className={active === item ? undefined : "tongkk-hover-row"} onClick={() => { onNav(item); onClose(); }} style={{
+        <button type="button" key={item} className={active === item ? undefined : "tongkk-hover-row"} onClick={() => navTo(item)} style={{
           padding: "14px 24px", border: "none", background: active === item ? "color-mix(in srgb, var(--color-pink) 11%, transparent)" : "transparent",
           textAlign: "left", fontSize: 15, fontWeight: active === item ? 600 : 400,
           color: active === item ? PINK : "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.2s"
@@ -158,6 +184,21 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
 
       {/* 하단 피드백 — mailto로 메일 작성을 띄우고, 메일 클라이언트가 없는 사용자를 위해 주소도 노출 */}
       <div style={{ marginTop: "auto", padding: "16px 20px 4px", borderTop: `1px solid ${BORDER_COLOR}` }}>
+        {/* 메뉴바 앱 받기 — 다운로드를 시작하면서 설치 안내 모달을 띄운다 */}
+        <a
+          href={MENUBAR_DMG_URL}
+          download
+          onClick={() => setShowMenubarGuide(true)}
+          className="tongkk-hover-fade"
+          style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 4px 16px", textDecoration: "none" }}
+        >
+          <img src="/favicon.svg" alt="" width={26} height={26} style={{ borderRadius: 6, filter: "grayscale(1)", opacity: 0.75 }} />
+          <span style={{ flex: 1, display: "flex", flexDirection: "column", lineHeight: 1.35 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-strong)" }}>메뉴바 앱</span>
+            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>macOS</span>
+          </span>
+          <span style={{ padding: "4px 10px", borderRadius: 999, background: "color-mix(in srgb, var(--color-pink) 12%, transparent)", color: PINK, fontSize: 13, fontWeight: 700 }}>받기</span>
+        </a>
         <a
           href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Tongkk 피드백")}`}
           style={{
@@ -175,6 +216,7 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
         </p>
       </div>
     </div>
+    {showMenubarGuide && <MenubarDownloadModal onClose={() => setShowMenubarGuide(false)} />}
     </>
   );
 };

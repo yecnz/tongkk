@@ -89,7 +89,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
       })
       .catch(err => {
         console.warn("강의자료 불러오기 실패", err);
-        if (!ignore) setMaterialsError("강의자료를 불러오지 못했어요. 과목을 다시 선택하세요.");
+        if (!ignore) setMaterialsError("강의자료를 불러오지 못했어요. 과목을 다시 선택해 주세요.");
       })
       .finally(() => { if (!ignore) setMaterialsLoading(false); });
     return () => { ignore = true; };
@@ -135,7 +135,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
     firstQuestionSent.current = true;
     if (initialMaterialId && (materialsError || !materials.some(material => material.id === initialMaterialId))) {
       setInput(question);
-      setError("선택한 자료를 불러오지 못했어요. 자료를 다시 선택하세요.");
+      setError("선택한 자료를 불러오지 못했어요. 자료를 다시 선택해 주세요.");
       return;
     }
     void ask(question, [], "");
@@ -191,7 +191,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
             </div>
           ) : (
             <p className="text-[13px] text-muted">
-              {materialId ? `현재 자료에 대해 질문하세요.` : "자료를 선택하거나 일반 질문을 하세요."}
+              {materialId ? `현재 자료에 대해 질문해 주세요.` : "자료를 선택하거나 일반 질문을 해 주세요."}
             </p>
           )
         )}
@@ -213,7 +213,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   {(visibleContent || !suggestions.length) && (
                     <div className="mini-tutor-reply rounded-[14px] rounded-tl-[4px] border px-3 py-[10px] text-[13px] leading-normal">
-                      {visibleContent ? <FormattedTutorText content={visibleContent} compact /> : "답변을 받지 못했어요. 다시 질문하세요."}
+                      {visibleContent ? <FormattedTutorText content={visibleContent} compact /> : "답변을 받지 못했어요. 다시 질문해 주세요."}
                     </div>
                   )}
                   {showSuggestions && (
@@ -280,7 +280,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
                   />
                   <MiniSelect
                     label="강의자료"
-                    placeholder={materialsLoading ? "자료 불러오는 중…" : !course ? "먼저 과목을 선택하세요" : "강의자료 선택"}
+                    placeholder={materialsLoading ? "자료 불러오는 중…" : !course ? "먼저 과목을 선택해 주세요" : "강의자료 선택"}
                     value={materialId}
                     options={materials.map(material => ({ value: material.id, label: material.name }))}
                     disabled={!course || materialsLoading || sending}

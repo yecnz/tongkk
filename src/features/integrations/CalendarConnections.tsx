@@ -1,7 +1,7 @@
-import SelectField from '../../components/SelectField';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
+import CustomSelect from '../../components/CustomSelect';
 import { workflowRequest } from '../../services/workflow';
 import type { CalendarIntegration } from '../../services/calendarIntegration';
 export default function CalendarConnections() {
@@ -29,7 +29,7 @@ export default function CalendarConnections() {
         setNotice('일정 가져오기를 예약했어요.'); setRetry(n => n + 1);
       } else {
         const value = await workflowRequest<{ provider_revoked: boolean }>('/integrations/google-calendar/disconnect', 'POST', { revision: data?.connection?.revision, delete_events: deleteEvents });
-        setNotice(value.provider_revoked ? '연결과 캘린더 접근 권한을 해제했습니다.' : '앱 연결을 해제했습니다. Google의 접근 권한도 확인하려면 계정 권한 관리에서 해제하세요.');
+        setNotice(value.provider_revoked ? '연결과 캘린더 접근 권한을 해제했습니다.' : '앱 연결을 해제했습니다. Google의 접근 권한도 확인하려면 계정 권한 관리에서 해제해 주세요.');
         setRetry(n => n + 1);
       }
     } catch (e) { setError(e instanceof Error ? e.message : '연결 상태를 변경하지 못했어요.'); }
@@ -43,16 +43,14 @@ export default function CalendarConnections() {
     <p className="workflow-muted">지난 30일~향후 180일의 기본 캘린더 일정을 가져옵니다. 원본은 유지됩니다.</p>
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 확인</button></p>}
     {notice && <p role="status">{notice}</p>}
-    {!data ? <p role="status">연결을 확인하는 중…</p> : !data.configured ? <p>캘린더 연결 설정이 필요합니다. 관리자에게 문의하세요.</p> : <>
-      {connected && <div className="workflow-subsection"><label className="workflow-toggle"><span>일정을 자동으로 동기화</span><input type="checkbox" checked={data.connection?.sync_enabled||false} disabled={busy||!data.worker_enabled} onChange={e=>{void scheduling(e.target.checked,data.connection?.sync_interval_minutes||30);}}/></label><SelectField label="가져오기 간격" layout="row" disabled={busy} value={String(data.connection?.sync_interval_minutes||30)}
-        options={[15,30,60,360,1440].map(n=>({value:String(n),label:n<60?`${n}분`:`${n/60}시간`}))}
-        onChange={minutes=>{void scheduling(Boolean(data.connection?.sync_enabled),Number(minutes));}} />{data.connection?.next_sync_at&&<p className="workflow-meta">다음 확인: {new Date(data.connection.next_sync_at).toLocaleString('ko-KR')}</p>}<p className="workflow-muted">실패 시 재시도 간격이 늘어납니다. 연결 해제 시 동기화가 중지됩니다.</p></div>}
+    {!data ? <p role="status">연결을 확인하는 중…</p> : !data.configured ? <p>캘린더 연결 설정이 필요합니다. 관리자에게 문의해 주세요.</p> : <>
+      {connected && <div className="workflow-subsection"><label className="workflow-toggle"><span>일정을 자동으로 동기화</span><input type="checkbox" checked={data.connection?.sync_enabled||false} disabled={busy||!data.worker_enabled} onChange={e=>{void scheduling(e.target.checked,data.connection?.sync_interval_minutes||30);}}/></label><label className="workflow-setting-row">가져오기 간격<CustomSelect disabled={busy} value={data.connection?.sync_interval_minutes||30} onChange={value=>{void scheduling(Boolean(data.connection?.sync_enabled),Number(value));}} options={[15,30,60,360,1440].map(n=>({value:n,label:n<60?`${n}분`:`${n/60}시간`}))} aria-label="가져오기 간격" /></label>{data.connection?.next_sync_at&&<p className="workflow-meta">다음 확인: {new Date(data.connection.next_sync_at).toLocaleString('ko-KR')}</p>}<p className="workflow-muted">실패 시 재시도 간격이 늘어납니다. 연결 해제 시 동기화가 중지됩니다.</p></div>}
       {data.connection?.last_synced_at && <p className="workflow-meta">최근 가져오기: {new Date(data.connection.last_synced_at).toLocaleString('ko-KR')}</p>}
-      {(data.job?.status === 'failed' || data.connection?.last_error) && <p role="alert">일정을 가져오지 못했어요. 연결 상태를 확인하고 다시 시도하세요.</p>}
+      {(data.job?.status === 'failed' || data.connection?.last_error) && <p role="alert">일정을 가져오지 못했어요. 연결 상태를 확인하고 다시 시도해 주세요.</p>}
       {polling && <p role="status">일정을 가져오는 중…</p>}
       <div className="workflow-actions"><button type="button" disabled={busy} onClick={() => { void action('connect'); }}>{connected ? '다른 계정으로 다시 연결' : 'Google Calendar 연결'}</button>
         {connected && <button type="button" className="workflow-primary" disabled={busy || polling || !data.worker_enabled} onClick={() => { void action('sync'); }}>일정 가져오기</button>}</div>
-      {!data.worker_enabled && <p>일정 가져오기를 사용할 수 없습니다. 관리자에게 문의하세요.</p>}
+      {!data.worker_enabled && <p>일정 가져오기를 사용할 수 없습니다. 관리자에게 문의해 주세요.</p>}
       {data.connection && data.connection.status !== 'disconnected' && <div className="workflow-subsection"><label className="workflow-check"><input type="checkbox" checked={deleteEvents} onChange={e => setDeleteEvents(e.target.checked)} />연결 해제 시 가져온 일정도 삭제</label>
         <button type="button" className="workflow-button workflow-danger" disabled={busy} onClick={() => { void action('disconnect'); }}>연결 해제</button></div>}
     </>}

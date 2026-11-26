@@ -1,0 +1,388 @@
+@import "@fontsource-variable/noto-sans-kr";
+
+.auth-overlay {
+  --auth-gutter: clamp(12px, 5vw, 24px);
+  padding: var(--auth-gutter);
+}
+
+.auth-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(380px, 100%);
+  max-height: calc(100dvh - 2 * var(--auth-gutter));
+  overflow-y: auto;
+  padding: 36px min(32px, 8vw) 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-card);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, .09);
+  font-family: "Noto Sans KR Variable", sans-serif;
+}
+
+/* 웹 폰트(fontsource 가변)의 띄어쓰기가 Figma의 Noto Sans KR보다 0.055em 넓다. 디자인과 같은 줄바꿈을 위해 맞춘다.
+   em은 상속 전에 px로 굳으므로 요소마다 자기 글자 크기로 계산되게 전체에 건다. */
+.auth-dialog,
+.auth-dialog * {
+  word-spacing: -0.055em;
+}
+
+.auth-dialog > * {
+  flex-shrink: 0;
+}
+
+.auth-dialog-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.auth-dialog-heading > div {
+  min-width: 0;
+}
+
+.auth-dialog :is(h1, h2) {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 26px;
+}
+
+.auth-dialog-close {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 19px;
+  cursor: pointer;
+}
+
+.auth-credential-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-credential-input,
+.auth-dialog .auth-credential-input {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-muted-surface);
+  color: var(--color-text-strong);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.auth-dialog .auth-credential-input:autofill {
+  box-shadow: 0 0 0 1000px var(--color-muted-surface) inset;
+  -webkit-text-fill-color: var(--color-text-strong);
+  caret-color: var(--color-text-strong);
+}
+
+.auth-credential-input[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+
+:root .mini-stage .auth-signup input.auth-credential-input[aria-invalid="true"]:focus {
+  outline-color: var(--color-error);
+}
+
+.auth-password-control {
+  position: relative;
+}
+
+.auth-password-control input.auth-credential-input {
+  min-height: 49px;
+  padding-inline-end: 44px;
+}
+
+.auth-password-control button {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 8px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.auth-signup-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 14px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.auth-signup-hint svg {
+  flex: 0 0 auto;
+}
+
+/* 회색 체계에서 통과가 눈에 띄도록 기본 안내(muted)보다 확실히 진하게 한다. */
+.auth-signup-hint[data-valid="true"] {
+  color: var(--color-text-strong);
+}
+
+.auth-signup-hint[role="alert"] {
+  color: var(--color-error);
+}
+
+.auth-signup.mini-login-card .auth-credential-input {
+  min-height: 0;
+}
+
+:root .mini-stage .auth-signup .auth-password-control input.auth-credential-input {
+  padding-inline-end: 44px;
+}
+
+.auth-signup.mini-login-card .auth-signup-hint {
+  margin-top: 0;
+}
+
+.auth-dialog-submit {
+  width: 100%;
+  padding: 14px 8px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--color-pink);
+  color: var(--color-on-brand);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.auth-dialog-submit:disabled {
+  cursor: default;
+}
+
+.auth-dialog-submit:is(:disabled, [data-incomplete="true"]),
+.auth-signup .mini-login-submit[data-incomplete="true"] {
+  opacity: .5;
+}
+
+.auth-dialog-footer {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.auth-dialog-footer > button:not(.auth-recovery-link),
+.auth-confirmation .auth-confirmation-resend button {
+  margin-inline-start: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-strong);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-login-reset {
+  justify-self: end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.auth-form-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.auth-recovery-page {
+  width: min(380px, 100%);
+}
+
+.auth-recovery-card {
+  max-height: none;
+  text-align: left;
+}
+
+.auth-recovery-description {
+  margin: 6px 0 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.auth-recovery-description.auth-form-error {
+  color: var(--color-error);
+}
+
+.auth-recovery-link {
+  align-self: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+[data-theme="dark"] .auth-recovery {
+  box-shadow: 0 18px 48px rgba(15, 23, 42, .4);
+}
+
+.auth-recovery .auth-dialog-submit {
+  color: light-dark(var(--color-on-brand), var(--color-card));
+}
+
+.auth-recovery .auth-dialog-submit[data-cooldown="true"] {
+  background: var(--color-muted-surface);
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+.auth-signup-legal {
+  margin: 0;
+  color: var(--color-text-secondary);
+  text-align: center;
+  font-size: 10.6px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.auth-signup-legal a {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.auth-dialog.auth-confirmation {
+  gap: 24px;
+  padding-block-end: 36px;
+  border-radius: 16px;
+}
+
+.auth-confirmation .auth-dialog-close {
+  font-size: 18px;
+  line-height: 22px;
+}
+
+[data-theme="dark"] .auth-dialog.auth-confirmation {
+  box-shadow: 0 18px 48px rgba(15, 23, 42, .4);
+}
+
+.auth-confirmation-description {
+  margin: 6px 0 0;
+  color: light-dark(var(--color-text), var(--color-text-secondary));
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.auth-code-cells {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7.6px;
+}
+
+.auth-code-cell {
+  display: grid;
+  place-items: center;
+  height: 56px;
+  border: 1.5px solid light-dark(var(--color-border), #6b7280);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text-strong);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.auth-code-cell[data-active="true"] {
+  border-color: var(--color-cyan);
+}
+
+.auth-code-cells[data-invalid="true"] .auth-code-cell {
+  border-color: var(--color-error);
+}
+
+.auth-code-cells[data-expired="true"] {
+  opacity: .4;
+}
+
+.auth-code-cells[data-expired="true"] .auth-code-cell {
+  border-color: var(--color-border);
+}
+
+.auth-code-caret {
+  width: 1.5px;
+  height: 22px;
+  background: var(--color-text-strong);
+}
+
+.auth-confirmation-status {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  color: light-dark(var(--color-muted), var(--color-text-secondary));
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.auth-code-timer {
+  font-size: 13px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-code-timer strong {
+  margin-inline-start: 3px;
+}
+
+.auth-code-timer strong,
+.auth-confirmation-status [data-danger="true"] {
+  color: var(--color-error);
+}
+
+.auth-confirmation :is(.auth-dialog-submit, .mini-login-submit) {
+  border-radius: 8px;
+  color: light-dark(var(--color-on-brand), #1d2027);
+}
+
+[data-theme="dark"] .auth-confirmation .auth-dialog-submit:is(:not(:disabled), [data-incomplete="true"]) {
+  opacity: 1;
+}
+
+.auth-confirmation-resend {
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.auth-confirmation-resend span {
+  margin-inline-start: 6px;
+  color: light-dark(#aaa, var(--color-muted));
+  font-weight: 500;
+}
+
+.auth-confirmation .auth-confirmation-resend button {
+  text-decoration: underline;
+}

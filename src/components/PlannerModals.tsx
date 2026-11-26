@@ -1,6 +1,7 @@
 import { useState, useEffect, useId, useRef, type CSSProperties } from "react";
 import { PINK, CYAN, Card } from "../common";
 import ModalDialog from "./ModalDialog";
+import CustomSelect from "./CustomSelect";
 import { loadCourseMaterialsFromServer } from "../services/materials";
 import { loadQuizSetsFromServer } from "../services/quizSets";
 import type { PacePlan } from "../services/pace";
@@ -225,8 +226,8 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const [error, setError] = useState("");
   const placeholder = `${ddayTypeLabels[type]}명`;
   const handleSubmit = () => {
-    if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해주세요.`); return; }
-    if (!date) { setError("달력에서 날짜를 선택하세요."); return; }
+    if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해 주세요.`); return; }
+    if (!date) { setError("달력에서 날짜를 선택해 주세요."); return; }
     onAdd(type, subj.trim(), date);
     onClose();
   };
@@ -266,7 +267,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         }}/>
         {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
         <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? "var(--color-pink-deep)" : "var(--color-muted)" }}>
-          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택하세요 (필수)"}
+          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택해 주세요 (필수)"}
         </div>
         <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
         {error && (
@@ -291,7 +292,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   const [error, setError] = useState("");
   const handleAdd = () => {
     const planText = txt.trim();
-    if (!planText) { setError("학습 계획을 입력하세요."); return; }
+    if (!planText) { setError("학습 계획을 입력해 주세요."); return; }
     onAdd(planText);
     onClose();
   };
@@ -304,7 +305,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           value={txt}
           onChange={e => { setTxt(e.target.value); if (error) setError(""); }}
           onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
-          placeholder="학습 계획을 입력하세요"
+          placeholder="학습 계획을 입력해 주세요"
           aria-label="학습 계획"
           name="study-plan"
           autoComplete="off"
@@ -336,7 +337,7 @@ type AddPaceModalProps = {
 
 export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => {
   const selectableDdays = [...ddays]
-    .filter(dday => Boolean(dday.id))
+    .filter((dday): dday is Dday & { id: string } => Boolean(dday.id))
     .sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const [course, setCourse] = useState(courses[0] ?? "");
   // 기본은 "연결 안 함"(14일 기준). 마감일은 과목과 무관할 수 있어 사용자가 직접 고르게 둔다.
@@ -410,7 +411,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
   const previewDaysLeft = rawDaysLeft !== null ? Math.max(rawDaysLeft, 1) : PACE_NO_DDAY_HORIZON_DAYS;
   const perDay = total > 0 ? Math.max(1, Math.ceil(total / Math.max(previewDaysLeft, 1))) : 0;
   const previewText = total <= 0
-    ? "기준을 선택해 하루 학습량을 확인하세요."
+    ? "기준을 선택해 하루 학습량을 확인해 주세요."
     : rawDaysLeft === null
       ? `${PACE_NO_DDAY_HORIZON_DAYS}일 기준 → 하루 약 ${perDay}${unitLabel}`
       : rawDaysLeft > 0
@@ -423,6 +424,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
     onClose();
   };
   const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-card text-sm text-text-strong outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10";
+  const selectStyle: CSSProperties = { padding: "12px 14px", fontSize: 14, color: "var(--color-text-strong)" };
   const labelClass = "block mb-2 text-xs font-extrabold text-text-secondary";
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4 py-6">
@@ -457,21 +459,33 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
             <>
               <div className="mb-4">
                 <label className={labelClass}>과목</label>
-                <select value={course} onChange={e => setCourse(e.target.value)} className={fieldClass}>
-                  {courses.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
+                <CustomSelect
+                  value={course}
+                  onChange={setCourse}
+                  options={courses.map(name => ({ value: name, label: name }))}
+                  aria-label="과목"
+                  className={fieldClass}
+                  style={selectStyle}
+                />
               </div>
               <div className="mb-4">
                 <label className={labelClass}>연결할 D-day</label>
                 {selectableDdays.length > 0 ? (
-                  <select value={ddayId} onChange={e => setDdayId(e.target.value)} className={fieldClass}>
-                    <option value="">연결 안 함</option>
-                    {selectableDdays.map(dday => {
-                      const left = getDaysLeft(dday.date);
-                      const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
-                      return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
-                    })}
-                  </select>
+                  <CustomSelect
+                    value={ddayId}
+                    onChange={setDdayId}
+                    options={[
+                      { value: "", label: "연결 안 함" },
+                      ...selectableDdays.map(dday => {
+                        const left = getDaysLeft(dday.date);
+                        const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
+                        return { value: dday.id, label: `${dday.subj} · ${label} (${dday.date})` };
+                      }),
+                    ]}
+                    aria-label="연결할 D-day"
+                    className={fieldClass}
+                    style={selectStyle}
+                  />
                 ) : (
                   <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
                     마감일 미설정 시 14일 기준으로 계산합니다.
@@ -574,7 +588,7 @@ type EditPaceModalProps = {
 
 export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalProps) => {
   const selectableDdays = [...ddays]
-    .filter(dday => Boolean(dday.id))
+    .filter((dday): dday is Dday & { id: string } => Boolean(dday.id))
     .sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const isQuiz = plan.basis === "quiz";
   const unit = plan.unitLabel ?? "개";
@@ -610,14 +624,20 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
 
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>연결할 D-day</label>
-          <select value={ddayId} onChange={e => setDdayId(e.target.value)} style={inputStyle}>
-            <option value="">연결 안 함</option>
-            {selectableDdays.map(dday => {
-              const left = getDaysLeft(dday.date);
-              const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
-              return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
-            })}
-          </select>
+          <CustomSelect
+            value={ddayId}
+            onChange={setDdayId}
+            options={[
+              { value: "", label: "연결 안 함" },
+              ...selectableDdays.map(dday => {
+                const left = getDaysLeft(dday.date);
+                const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
+                return { value: dday.id, label: `${dday.subj} · ${label} (${dday.date})` };
+              }),
+            ]}
+            aria-label="연결할 D-day"
+            style={inputStyle}
+          />
         </div>
 
         <div style={{ marginBottom: 14 }}>

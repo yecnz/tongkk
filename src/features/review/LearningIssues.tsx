@@ -3,6 +3,22 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card } from '../../common';
 import { workflowRequest, issueLabels, type LearningIssue, type IssueDetail } from '../../services/workflow';
+import './LearningIssues.css';
+
+const eventLabels: Record<string, string> = {
+  evidence: '확인할 근거 추가', practice: '학습 근거 추가', start: '복습 중으로 표시',
+  reassess: '다시 확인 예정', close: '직접 확인함', reopen: '확인 필요로 변경',
+  resolved: '평가로 확인됨', quality_report: '문항 신고로 다시 확인',
+};
+
+function EventRows({ events }: { events: IssueDetail['events'] }) {
+  return <ul className="learning-issue-events">{events.map(event => <li key={event.id}>
+    <span>{eventLabels[event.action] || event.action}</span>
+    <time dateTime={event.created_at} title={new Date(event.created_at).toLocaleString('ko-KR')}>
+      {new Date(event.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+    </time>
+  </li>)}</ul>;
+}
 
 function Issue({ id }: { id: string }) {
   const [data, setData] = useState<IssueDetail | null>(null);
@@ -24,26 +40,41 @@ function Issue({ id }: { id: string }) {
     finally { setBusy(false); }
   }
   useLearningScope(data ? { courseId: data.concept.course_id, materialId: data.concept.material_id, title: data.concept.title } : null);
-  return <Card className="workflow-panel workflow-stack">
+  return <Card className="workflow-panel workflow-stack learning-issue-detail">
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setPending(null); setRetry(n => n + 1); }}>새로 불러오기</button></p>}
     {!data ? <p role="status">이슈를 불러오는 중…</p> : <>
       <div className="workflow-card-heading"><h2>{data.concept.title}</h2><span className="workflow-badge" data-state={data.issue.status}>{issueLabels[data.issue.status]}</span></div>
-      <div className="workflow-actions">
-        {(data.issue.status === 'closed' || data.issue.status === 'resolved' ? [['reopen', '다시 열기']] : [['start', '보완 시작'], ['reassess', '재평가 대기'], ['close', '수동 종료']]).map(([action, label]) =>
-          <button type="button" disabled={busy || Boolean(pending && pending.action !== action)} key={action} onClick={() => { void act(action); }}>{pending?.action === action ? '이전 저장 결과 확인' : label}</button>)}
+      <div className="learning-issue-status">
+        <div className="learning-issue-section-heading"><h3>상태 표시</h3><p className="workflow-meta">직접 확인한 표시는 AI 평가 결과와 구분해요.</p></div>
+        <div className="workflow-actions">
+          {(data.issue.status === 'closed' || data.issue.status === 'resolved' ? [['reopen', '다시 확인하기']] : [['start', '복습 중으로 표시'], ['reassess', '다시 확인할 항목으로'], ['close', '확인 완료로 표시']]).map(([action, label]) =>
+            <button type="button" disabled={busy || Boolean(pending && pending.action !== action)} key={action} onClick={() => { void act(action); }}>{pending?.action === action ? '이전 저장 결과 확인' : label}</button>)}
+        </div>
       </div>
-      <details className="workflow-details"><summary>이슈 종료·평가 기준</summary>
-        <p>수동 종료는 이해 완료를 뜻하지 않습니다. 같은 문제를 다시 맞힌 기록과 도움 없이 이해를 확인한 기록은 구분됩니다.</p>
-      </details>
-      {data.review_card_id && <Link to={`/learn/review/${data.review_card_id}`}>기존 문제로 다시 확인하기 →</Link>}
-      {data.source_changed && <p>이전 자료의 학습 근거입니다.</p>}
-      <h3>원문 근거</h3>{data.concept.source_refs.map((ref, i) => <blockquote key={i}>{ref.quote}</blockquote>)}
-      <h3>학습 근거</h3>{data.evidence.map(e => <section className="workflow-item" key={e.id}>
-        <p className="workflow-meta">{new Date(e.created_at).toLocaleString('ko-KR')} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움 사용' : ''}</p>
-        {e.answer !== null && <p>{String(e.answer)}</p>}
-        <Link to={`/learn/${encodeURIComponent(e.session_id)}`}>답변·피드백과 설명 개선 보기 →</Link>
-      </section>)}
-      <details className="workflow-details"><summary>상태 변경 이력</summary>{data.events.map(e => <p key={e.id}>{new Date(e.created_at).toLocaleString('ko-KR')} · {({ evidence: '보완 근거 추가', practice: '학습 근거 추가', start: '보완 시작', reassess: '재평가 대기', close: '수동 종료', reopen: '다시 열기' } as Record<string, string>)[e.action] || e.action}</p>)}</details>
+      {data.review_card_id && <Link className="workflow-button workflow-primary" to={`/learn/review/${data.review_card_id}`}>기존 문제로 다시 확인하기 →</Link>}
+      {data.source_changed && <p className="workflow-muted">이전 자료의 학습 근거입니다.</p>}
+      <section className="learning-issue-section" aria-label="원문 근거">
+        <div className="learning-issue-section-heading"><h3>원문 근거</h3><p className="workflow-meta">자료에서 가져온 내용</p></div>
+        {data.concept.source_refs.map((ref, i) => <blockquote key={i}>{ref.quote}</blockquote>)}
+        {!data.concept.source_refs.length && <p className="workflow-muted">연결된 원문이 없습니다.</p>}
+      </section>
+      <section className="learning-issue-section" aria-label="학습 근거">
+        <div className="learning-issue-section-heading"><h3>학습 근거</h3><p className="workflow-meta">내 답변과 확인 결과</p></div>
+        {data.evidence.map(e => <article className="workflow-item learning-issue-evidence" key={e.id}>
+          <p className="workflow-meta">{new Date(e.created_at).toLocaleString('ko-KR')} · {e.outcome === 'met' ? '확인됨' : e.outcome === 'uncertain' ? '판단 보류' : '보완 필요'}{e.assisted ? ' · 도움 사용' : ''}</p>
+          {e.answer !== null && <p className="learning-issue-answer">{String(e.answer)}</p>}
+          <Link to={`/learn/${encodeURIComponent(e.session_id)}`}>답변·피드백 보기 →</Link>
+        </article>)}
+        {!data.evidence.length && <p className="workflow-muted">아직 학습 근거가 없습니다.</p>}
+      </section>
+      {data.events.length > 0 && <section className="learning-issue-history" aria-label="상태 변경 이력">
+        <h3>최근 상태 변경</h3>
+        <EventRows events={data.events.slice(0, 2)} />
+        {data.events.length > 2 && <details className="learning-issue-older-events">
+          <summary>이전 변경 {data.events.length - 2}개</summary>
+          <EventRows events={data.events.slice(2)} />
+        </details>}
+      </section>}
     </>}
   </Card>;
 }

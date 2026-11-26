@@ -16,5 +16,5 @@ export async function prepareUploadedMaterials(course: string, materials: { id: 
     try { await queuePreparation(course, material.id, kinds); }
     catch { failures.push(material.name); }
   }
-  return failures.length ? `${failures.join(', ')} 자료는 자동 준비를 시작하지 못했어요. 자료 상세에서 범위와 준비 설정을 확인해주세요.` : '학습 자료 준비를 예약했어요. 자료 상세에서 결과를 확인할 수 있어요.';
+  return failures.length ? `${failures.join(', ')} 자료는 자동 준비를 시작하지 못했어요. 자료 상세에서 범위와 준비 설정을 확인해 주세요.` : '학습 자료 준비를 예약했어요. 자료 상세에서 결과를 확인할 수 있어요.';
 }
