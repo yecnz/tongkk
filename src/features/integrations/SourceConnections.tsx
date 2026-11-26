@@ -44,4 +44,4 @@ export function SourceProvider({provider}:{provider:Provider}) {
     </>}
   </Card>;
 }
-export default function SourceConnections(){return <div className="workflow-stack"><SourceProvider provider="google-drive"/><SourceProvider provider="notion"/></div>;}
+export default function SourceConnections(){return <div className="workflow-stack"><SourceProvider provider="notion"/></div>;}
