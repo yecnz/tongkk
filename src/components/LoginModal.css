@@ -20,6 +20,13 @@
   font-family: "Noto Sans KR Variable", sans-serif;
 }
 
+/* 웹 폰트(fontsource 가변)의 띄어쓰기가 Figma의 Noto Sans KR보다 0.055em 넓다. 디자인과 같은 줄바꿈을 위해 맞춘다.
+   em은 상속 전에 px로 굳으므로 요소마다 자기 글자 크기로 계산되게 전체에 건다. */
+.auth-dialog,
+.auth-dialog * {
+  word-spacing: -0.055em;
+}
+
 .auth-dialog > * {
   flex-shrink: 0;
 }
@@ -115,6 +122,8 @@
   color: var(--color-muted);
   font-size: 12px;
   line-height: 14px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .auth-signup-hint img {
@@ -255,7 +264,6 @@
   color: var(--color-text-secondary);
   text-align: center;
   font-size: 10.6px;
-  letter-spacing: -.12px;
   line-height: 1.5;
   word-break: keep-all;
   overflow-wrap: anywhere;
