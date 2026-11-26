@@ -16,6 +16,7 @@ import MyPage from "./pages/MyPage";
 import Auth from "./pages/Auth";
 import Legal from "./pages/Legal";
 import LearningSession from "./pages/LearningSession";
+import ConnectedLearning from './features/learningHistory/ConnectedLearning';
 import Mini from "./pages/Mini";
 import MiniTutor from "./pages/MiniTutor";
 import MenubarLayout from "./components/MenubarLayout";
@@ -76,6 +77,7 @@ function AppShell() {
         <Route path="/summary" element={<Summary />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/learn" element={<LearningSession />} />
+        <Route path="/learn/connected/:conceptId" element={<ConnectedLearning />} />
         <Route path="/learn/review/:cardId" element={<ReviewPractice />} />
         <Route path="/learn/:sessionId/revisions/:revisionId" element={<ExplanationRevision />} />
         <Route path="/learn/:sessionId" element={<LearningSession />} />

@@ -6,7 +6,7 @@ import { Card } from '../../common';
 import { fetchCourses, type CourseRecord } from '../../services/courses';
 import { loadCourseMaterialsFromServer, type CourseMaterial } from '../../services/materials';
 import { learningRequest, type LearningSession as Session, type Scopes } from '../../services/learningSessions';
-import LearningSelect from './LearningSelect';
+import SelectField from '../../components/SelectField';
 import LearningResume from './LearningResume';
 import LearningLink from './LearningLink';
 import { useLearningNavigation } from './navigation';
@@ -106,9 +106,9 @@ export default function LearningSetup() {
         <div className="learning-section-heading"><div><h2 id="learning-material-title">학습 자료</h2>
           <p className="learning-caption">과목·자료와 범위를 선택하세요.</p></div><span className="learning-badge">자료 선택</span></div>
         <div className="learning-fields">
-          <LearningSelect label="과목" value={course} placeholder="과목 선택" options={courses.map(c => ({ value: c.name, label: c.name }))}
+          <SelectField label="과목" value={course} placeholder="과목 선택" options={courses.map(c => ({ value: c.name, label: c.name }))}
             disabled={settingsDisabled || coursesLoading || !courses.length} onChange={value => { setCourse(value); setMaterial(''); setError(''); }} />
-          <LearningSelect key={course} label="자료" value={material} placeholder="자료 선택" options={materials.map(m => ({ value: m.id, label: m.name }))}
+          <SelectField key={course} label="자료" value={material} placeholder="자료 선택" options={materials.map(m => ({ value: m.id, label: m.name }))}
             disabled={settingsDisabled || materialsLoading || !course || !materials.length} onChange={setMaterial} />
         </div>
         {loading && <p className="learning-caption" role="status">{coursesLoading ? '과목을 불러오는 중…' : materialsLoading ? '자료를 불러오는 중…' : '학습 범위를 불러오는 중…'}</p>}

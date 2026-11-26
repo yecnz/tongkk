@@ -19,7 +19,7 @@ grant usage on schema public,auth to service_role,authenticated,anon;
 // PGlite already provides the built-in UUID/SHA256 functions used here; its optional
 // pgcrypto extension is unavailable. Supabase supplies pgcrypto in deployment.
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8').replace('create extension if not exists pgcrypto;', '');
-for(const file of readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(name=>/^20261123001[5-8]_/.test(name))) check(schema.includes(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8')),`Fresh schema mirrors ${file}`);
+for(const file of readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(name=>/^(20261123001[5-8]_|202611260001_)/.test(name))) check(schema.includes(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8')),`Fresh schema mirrors ${file}`);
 await db.exec(schema);
 check(true, 'Full fresh schema applies with Auth/Storage infrastructure stubs');
 const user = randomUUID(), other = randomUUID(), course = randomUUID();
@@ -80,12 +80,48 @@ await assert.rejects(db.query("select learning_graph_link($1,$2,$3,$4,'prerequis
 await assert.rejects(db.query("select learning_graph_link($1,$2,$3,$4,'equivalent')",[user,randomUUID(),a,c]),/LS_GRAPH_CYCLE/);check(true,'Merging a prerequisite with its dependent is rejected');
 await assert.rejects(db.query("select learning_graph_link($1,$2,$3,$4,'equivalent')",[other,randomUUID(),a,b]),/LS_NOT_FOUND/);check(true,'Graph links cannot reference another owner');
 check((await db.query('select learning_graph_read($1) as data',[user])).rows[0].data.nodes.length===3,'Graph exposes every source node');
+// Automatic study paths are private, resumable and cannot skip an unfinished step.
+const pathKey=randomUUID();
+const pathSteps=[{concept_id:a,title:'기초 개념',reason:'먼저 학습'},{concept_id:c,title:'다음 개념',reason:'이어서 학습'}];
+const started=(await db.query('select learning_graph_path_begin($1,$2,$3,$4::jsonb) as data',[user,pathKey,c,JSON.stringify(pathSteps)])).rows[0].data;
+check(started.position===0&&started.steps.length===2,'Study path persists its automatic order');
+check((await db.query('select learning_graph_path_begin($1,$2,$3,$4::jsonb) as data',[user,randomUUID(),c,JSON.stringify(pathSteps)])).rows[0].data.id===pathKey,'Starting again resumes the same open path');
+check((await db.query('select learning_graph_path_read($1,$2) as data',[other,pathKey])).rows[0].data===null,'Another user cannot read the learning path');
+await assert.rejects(db.query('select learning_graph_path_begin($1,$2,$3,$4::jsonb)',[other,randomUUID(),c,JSON.stringify(pathSteps)]),/LS_NOT_FOUND/);check(true,'Another user cannot start a path from private concepts');
+await assert.rejects(db.query('select learning_graph_path_advance($1,$2,0)',[user,pathKey]),/LS_CONFLICT/);check(true,'A path cannot skip an unfinished concept');
+check(!(await db.query("select has_table_privilege('authenticated','learning_study_paths','SELECT,INSERT,UPDATE,DELETE') as allowed")).rows[0].allowed,'Browser roles cannot read study paths');
+check(!(await db.query("select has_table_privilege('authenticated','learning_study_path_steps','SELECT,INSERT,UPDATE,DELETE') as allowed")).rows[0].allowed,'Browser roles cannot alter path progress');
+await db.exec('begin');
+await db.query('delete from learning_concepts where id=$1',[a]);
+check((await db.query('select learning_graph_path_read($1,$2) as data',[user,pathKey])).rows[0].data===null,'Deleting any source removes paths that reference it');
+await db.exec('rollback');
 // Seed a completed learning item using the real ownership constraints.
 const session=randomUUID(),item=randomUUID();
 await db.query("insert into learning_sessions(id,user_id,course_id,pack_id,status,familiarity,target_minutes,revision,version,calls) values($1,$2,$3,$4,'completed','attended',15,0,0,0)",[session,user,course,pack.applied_id]);
 await db.query("update learning_session_packs set status='ready' where id=$1",[pack.applied_id]);
 await db.query("insert into learning_session_items(id,user_id,session_id,position,phase,data,revision) values($1,$2,$3,0,'done','{}',0)",[item,user,session]);
 const card=(await db.query('select review_seed($1,$2,$3) as data',[user,session,item])).rows[0].data;
+const sourceConcept=(await db.query('select concept_id from learning_item_concepts where item_id=$1',[item])).rows[0].concept_id;
+const savedSource=(await db.query('select learning_graph_concept_source($1,$2) as data',[user,sourceConcept])).rows[0].data;
+check(savedSource?.concept.title==='복구한 개념','Connected learning loads the exact saved source concept');
+check(savedSource?.repeated===false,'A concept without prior answers starts as a first learning attempt');
+check((await db.query('select learning_graph_concept_source($1,$2) as data',[other,sourceConcept])).rows[0].data===null,'Source content stays private');
+await db.exec('begin');
+await db.query("update learning_session_packs set content=jsonb_set(content,'{concepts,0,title}','\"다른 개념\"') where id=$1",[pack.applied_id]);
+check((await db.query('select learning_graph_concept_source($1,$2) as data',[user,sourceConcept])).rows[0].data===null,'A regenerated pack cannot substitute a different concept at the same position');
+await db.exec('rollback');
+const realPath=(await db.query('select learning_graph_path_begin($1,$2,$3,$4::jsonb) as data',[user,randomUUID(),sourceConcept,JSON.stringify([{concept_id:sourceConcept,title:'복구한 개념',reason:'학습'}])])).rows[0].data;
+const attached=(await db.query('select learning_graph_path_attach($1,$2,0,$3) as data',[user,realPath.id,session])).rows[0].data;
+check(attached.steps[0].session_id===session,'A step is bound to its owned concept session');
+await db.query("update learning_session_items set phase='recall_answering' where id=$1",[item]);
+await assert.rejects(db.query('select learning_graph_path_advance($1,$2,0)',[user,realPath.id]),/LS_CONFLICT/);check(true,'Finishing early cannot mark the concept as learned');
+await db.query("update learning_session_items set phase='done' where id=$1",[item]);
+check((await db.query('select learning_graph_path_advance($1,$2,0) as data',[user,realPath.id])).rows[0].data.status==='completed','Completing every phase completes the path');
+check((await db.query('select learning_graph_path_advance($1,$2,0) as data',[user,realPath.id])).rows[0].data.position===1,'Retrying completion cannot advance twice');
+await db.exec('begin');
+await db.query("update materials set markdown='새 자료' where user_id=$1 and course_id=$2",[user,course]);
+check((await db.query('select learning_graph_concept_source($1,$2) as data',[user,sourceConcept])).rows[0].data===null,'Changed source versions are excluded from connected learning');
+await db.exec('rollback');
 await db.query("update review_cards set due_at=now()-interval '1 day' where id=$1",[card.id]);
 const question=(await db.query('select review_question_queue($1,$2,false) as data',[user,card.id])).rows[0].data;
 check((await db.query('select review_question_queue($1,$2,false) as data',[user,card.id])).rows[0].data.id===question.id,'Question generation is deduplicated per scheduled round');

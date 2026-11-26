@@ -14,6 +14,7 @@ import LearningPreferences from '../../../src/features/review/LearningPreference
 import ExplanationRevision from '../../../src/features/review/ExplanationRevision';
 import ConceptHistory from '../../../src/features/learningHistory/ConceptHistory';
 import ConceptGraph from '../../../src/features/learningHistory/ConceptGraph';
+import ConnectedLearning from '../../../src/features/learningHistory/ConnectedLearning';
 import PreparationPanel from '../../../src/features/preparation/PreparationPanel';
 import CalendarConnections from '../../../src/features/integrations/CalendarConnections';
 import ExternalEvents from '../../../src/features/integrations/ExternalEvents';
@@ -64,6 +65,7 @@ function App() {
     <Route path="/learn/:sessionId/revisions/:revisionId" element={<ExplanationRevision />} />
     <Route path="/summary" element={<Material />} />
     <Route path="/stats" element={<Stats />} />
+    <Route path="/learn/connected/:conceptId" element={<ConnectedLearning />} />
     <Route path="/mypage" element={<Settings />} />
     <Route path="/calendar" element={<HostLayout active="학습 캘린더"><h1 className="guide-host-title">2026년 11월 23일</h1><div className="workflow-stack"><ExternalEvents day="2026-11-23" /><ReviewQueue day="2026-11-23" /></div></HostLayout>} />
     <Route path="*" element={<LearningLayout><h1>화면 설명용 미리보기</h1><p>안내에 포함된 기능 주소로 이동해주세요.</p></LearningLayout>} />

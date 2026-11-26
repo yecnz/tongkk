@@ -510,3 +510,32 @@ def test_history_is_owner_scoped_and_does_not_disclose_unseen_questions():
         with pytest.raises(HTTPException):
             await service.repo.load(OTHER,b['session']['id'])
     asyncio.run(scenario())
+
+
+def test_connected_study_reuses_the_exact_concept_and_starts_with_an_introduction():
+    async def scenario():
+        service, original = await ready()
+        selected = original['pack']['content']['concepts'][1]
+        async def rpc(name, payload):
+            assert name == 'learning_graph_concept_source'
+            return {'pack': copy.deepcopy(original['pack']), 'concept': copy.deepcopy(selected)} if payload['p_user'] == USER else None
+        service.repo._rpc = rpc
+        key = uuid4()
+        value = await service.create_concept(USER, 'concept-two', key)
+        assert value['pack']['id'] != original['pack']['id']
+        assert value['pack']['content']['concepts'] == [selected]
+        assert value['pack']['source_units'] == original['pack']['source_units']
+        assert value['pack']['source_hash'] == original['pack']['source_hash']
+        assert value['session']['familiarity'] == 'new' and value['session']['calls'] == 0
+        assert value['session']['repeated'] is False
+        assert public_view(value)['current']['introduction'] == selected['introduction']
+        assert len(value['items']) == 1
+        replay = await service.create_concept(USER, 'concept-two', key)
+        assert replay['session']['id'] == value['session']['id']
+        resumed = await service.create_concept(USER, 'concept-two', uuid4())
+        assert resumed['session']['id'] == value['session']['id']
+        assert len(original['pack']['content']['concepts']) == 2
+        with pytest.raises(HTTPException) as error:
+            await service.create_concept(OTHER, 'concept-two', uuid4())
+        assert error.value.detail['error_code'] == 'SOURCE_CHANGED'
+    asyncio.run(scenario())

@@ -34,7 +34,8 @@ export default function LearningMateHost() {
         : !scope ? <p>자료나 학습 이슈를 열고 질문하세요.</p>
           : !context ? <p role="status">자료를 확인하는 중…</p>
             : <div className="learning-mate-chat"><AITutorDrawer key={`${context.courseId}:${context.materialId}:${context.sourceHash}`} scope={context} contextTitle={context.title}
-              materialId={context.materialId} contextMarkdown="현재 자료를 바탕으로 답변합니다." layout="embedded" fill open /></div>}
+              materialId={context.materialId} contextMarkdown="현재 자료를 바탕으로 답변합니다." layout="embedded" fill open
+              onOpenChange={nextOpen => { if (!nextOpen) close(); }} /></div>}
     </section>}
   </>;
 }

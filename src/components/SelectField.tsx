@@ -1,24 +1,28 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import './SelectField.css';
 
 type Props = {
   label: string;
   value: string;
   options: { value: string; label: string }[];
-  placeholder: string;
+  placeholder?: string;
+  layout?: 'stacked' | 'row';
+  className?: string;
   disabled?: boolean;
   onChange: (value: string) => void;
 };
 
-export default function LearningSelect({ label, value, options, placeholder, disabled, onChange }: Props) {
+export default function SelectField({ label, value, options, placeholder, disabled, layout = 'stacked', className = '', onChange }: Props) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const search = useRef({ text: '', at: 0 });
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const items = [{ value: '', label: placeholder }, ...options];
+  const items = placeholder === undefined ? options : [{ value: '', label: placeholder }, ...options];
+  const unavailable = disabled || items.length === 0;
   const selected = items.findIndex(item => item.value === value);
-  const expanded = open && !disabled;
+  const expanded = open && !unavailable;
 
   useEffect(() => {
     if (!expanded) return;
@@ -43,7 +47,7 @@ export default function LearningSelect({ label, value, options, placeholder, dis
     onChange(item.value); setOpen(false); trigger.current?.focus();
   }
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.nativeEvent.isComposing) return;
+    if (unavailable || event.nativeEvent.isComposing) return;
     if (event.key === 'Tab') { setOpen(false); return; }
     if (event.key === 'Escape') { event.preventDefault(); setOpen(false); return; }
     if (event.key === 'Enter' || event.key === ' ') {
@@ -70,23 +74,25 @@ export default function LearningSelect({ label, value, options, placeholder, dis
     }
   }
 
-  return <div ref={root} className="learning-field learning-select" onBlur={event => {
+  return <div ref={root} className={`select-field${layout === 'row' ? ' select-field--row' : ''} ${className}`.trim()} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
   }}>
-    <span id={`${id}-label`}>{label}</span>
-    <button ref={trigger} type="button" role="combobox" className="learning-select-trigger" disabled={disabled}
-      aria-labelledby={`${id}-label ${id}-value`} aria-haspopup="listbox" aria-expanded={expanded}
-      aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined}
-      onKeyDown={onKeyDown} onClick={() => expanded ? setOpen(false) : show()}>
-      <span id={`${id}-value`} className={!value ? 'learning-muted' : undefined}>{items[selected]?.label || placeholder}</span>
-      <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-    </button>
-    {expanded && <ul id={`${id}-list`} className="learning-select-menu" role="listbox" aria-labelledby={`${id}-label`}>
-      {items.map((item, index) => <li key={item.value} id={`${id}-option-${index}`} role="option" aria-selected={item.value === value}
-        className={`learning-select-option${active === index ? ' is-active' : ''}`}
-        onMouseDown={event => event.preventDefault()} onPointerMove={() => setActive(index)} onClick={() => choose(index)}>
-        <span>{item.label}</span><span aria-hidden="true" className="learning-select-check">{item.value === value ? '✓' : ''}</span>
-      </li>)}
-    </ul>}
+    <label id={`${id}-label`} htmlFor={`${id}-trigger`}>{label}</label>
+    <div className="select-field-control">
+      <button id={`${id}-trigger`} ref={trigger} type="button" role="combobox" className="select-field-trigger" disabled={unavailable}
+        aria-labelledby={`${id}-label ${id}-value`} aria-haspopup="listbox" aria-expanded={expanded}
+        aria-controls={expanded ? `${id}-list` : undefined} aria-activedescendant={expanded ? `${id}-option-${active}` : undefined}
+        onKeyDown={onKeyDown} onClick={() => { if (!unavailable) { if (expanded) setOpen(false); else show(); } }}>
+        <span id={`${id}-value`} title={items[selected]?.label} className={!value ? 'select-field-placeholder' : undefined}>{items[selected]?.label || placeholder || '선택할 항목이 없습니다'}</span>
+        <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
+      {expanded && <ul id={`${id}-list`} className="select-field-menu" role="listbox" aria-labelledby={`${id}-label`}>
+        {items.map((item, index) => <li key={item.value} id={`${id}-option-${index}`} role="option" aria-selected={item.value === value}
+          className={`select-field-option${active === index ? ' is-active' : ''}`}
+          onMouseDown={event => event.preventDefault()} onPointerMove={() => setActive(index)} onClick={() => choose(index)}>
+          <span>{item.label}</span><span aria-hidden="true" className="select-field-check">{item.value === value ? '✓' : ''}</span>
+        </li>)}
+      </ul>}
+    </div>
   </div>;
 }

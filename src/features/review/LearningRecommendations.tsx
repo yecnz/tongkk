@@ -35,7 +35,7 @@ export default function LearningRecommendations({ items }: { items: BriefingItem
       setLearning([
         ...cards.map(card => ({ title: card.title, reason: '예정된 복습 · 기억에서 다시 설명하기', urgent: false, href: learningTargetUrl({ kind: 'review', id: card.id }) })),
         ...issues.map(issue => ({ title: issue.title, reason: '보완할 학습 이슈', urgent: false, href: learningTargetUrl({ kind: 'issue', id: issue.id }) })),
-        ...prerequisites.map(item => ({ title: item.title, reason: item.reason, urgent: false, href: `/stats?view=concepts&conceptId=${encodeURIComponent(item.concept_id)}` })),
+        ...prerequisites.map(item => ({ title: item.title, reason: item.reason, urgent: false, href: `/learn/connected/${encodeURIComponent(item.concept_id)}` })),
       ]);
       setErrors([...(reviews.status === 'rejected' ? ['복습'] : []), ...(concepts.status === 'rejected' ? ['학습 이슈'] : [])]);
       setLoading(false);

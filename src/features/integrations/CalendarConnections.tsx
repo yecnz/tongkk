@@ -1,3 +1,4 @@
+import SelectField from '../../components/SelectField';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
@@ -43,7 +44,9 @@ export default function CalendarConnections() {
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 확인</button></p>}
     {notice && <p role="status">{notice}</p>}
     {!data ? <p role="status">연결을 확인하는 중…</p> : !data.configured ? <p>캘린더 연결 설정이 필요합니다. 관리자에게 문의하세요.</p> : <>
-      {connected && <div className="workflow-subsection"><label className="workflow-toggle"><span>일정을 자동으로 동기화</span><input type="checkbox" checked={data.connection?.sync_enabled||false} disabled={busy||!data.worker_enabled} onChange={e=>{void scheduling(e.target.checked,data.connection?.sync_interval_minutes||30);}}/></label><label className="workflow-setting-row">가져오기 간격<select disabled={busy} value={data.connection?.sync_interval_minutes||30} onChange={e=>{void scheduling(Boolean(data.connection?.sync_enabled),Number(e.target.value));}}>{[15,30,60,360,1440].map(n=><option key={n} value={n}>{n<60?`${n}분`:`${n/60}시간`}</option>)}</select></label>{data.connection?.next_sync_at&&<p className="workflow-meta">다음 확인: {new Date(data.connection.next_sync_at).toLocaleString('ko-KR')}</p>}<p className="workflow-muted">실패 시 재시도 간격이 늘어납니다. 연결 해제 시 동기화가 중지됩니다.</p></div>}
+      {connected && <div className="workflow-subsection"><label className="workflow-toggle"><span>일정을 자동으로 동기화</span><input type="checkbox" checked={data.connection?.sync_enabled||false} disabled={busy||!data.worker_enabled} onChange={e=>{void scheduling(e.target.checked,data.connection?.sync_interval_minutes||30);}}/></label><SelectField label="가져오기 간격" layout="row" disabled={busy} value={String(data.connection?.sync_interval_minutes||30)}
+        options={[15,30,60,360,1440].map(n=>({value:String(n),label:n<60?`${n}분`:`${n/60}시간`}))}
+        onChange={minutes=>{void scheduling(Boolean(data.connection?.sync_enabled),Number(minutes));}} />{data.connection?.next_sync_at&&<p className="workflow-meta">다음 확인: {new Date(data.connection.next_sync_at).toLocaleString('ko-KR')}</p>}<p className="workflow-muted">실패 시 재시도 간격이 늘어납니다. 연결 해제 시 동기화가 중지됩니다.</p></div>}
       {data.connection?.last_synced_at && <p className="workflow-meta">최근 가져오기: {new Date(data.connection.last_synced_at).toLocaleString('ko-KR')}</p>}
       {(data.job?.status === 'failed' || data.connection?.last_error) && <p role="alert">일정을 가져오지 못했어요. 연결 상태를 확인하고 다시 시도하세요.</p>}
       {polling && <p role="status">일정을 가져오는 중…</p>}

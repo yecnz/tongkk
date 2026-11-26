@@ -1,3 +1,4 @@
+import SelectField from '../../components/SelectField';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
@@ -24,6 +25,7 @@ export default function ExternalEvents({ day }: { day: string }) {
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
       : !data ? <p role="status">일정을 확인하는 중…</p> : !data.events.length ? <p>가져온 일정이 없습니다. 마이페이지에서 캘린더를 연결하세요.</p>
         : data.events.map(event => <section className="workflow-item" key={event.id}><h3>{event.title}</h3><p className="workflow-meta">{event.all_day ? `종일 · ${event.start_value}부터 ${event.end_value} 전날까지` : new Date(event.start_at).toLocaleTimeString('ko-KR', { timeZone: data.timezone, hour: '2-digit', minute: '2-digit' })} · 읽기 전용</p>
-          <label className="workflow-setting-row">연결 과목 <select value={event.course_id || ''} disabled={busy} onChange={e => { void link(event.id, e.target.value); }}><option value="">연결하지 않음</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label></section>)}
+          <SelectField label="연결 과목" layout="row" value={event.course_id || ''} placeholder="연결하지 않음" disabled={busy}
+        options={courses.map(c => ({ value: c.id, label: c.name }))} onChange={course => { void link(event.id, course); }} /></section>)}
   </Card>;
 }

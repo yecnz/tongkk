@@ -125,6 +125,27 @@
 .concept-map { min-width: 0; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
 .concept-map svg { display: block; width: 760px; max-width: none; margin-inline: auto; font-family: inherit; }
 .workflow-map-hint { display: none; }
+.workflow-surface .concept-record-card h3 { font-size: 18px; }
+.concept-record-list { list-style: none; margin: 0; padding: 0; }
+.concept-record-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.concept-record-row + .concept-record-row { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border-soft); }
+.concept-record-copy { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.concept-record-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.concept-record-course { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.concept-record-material { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.concept-record-material > span { flex-shrink: 0; color: var(--color-muted); }
+.concept-record-action { flex-shrink: 0; touch-action: manipulation; }
+.concept-record-action svg { flex-shrink: 0; }
+.concept-study-plan { display: flex; flex-direction: column; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.concept-study-context { margin-bottom: 24px; scroll-margin-top: 16px; }
+.concept-study-plan li { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.concept-study-plan li > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.concept-study-plan strong { font-size: 14px; color: var(--color-text-strong); }
+.concept-study-number { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: var(--color-muted-surface); color: var(--color-text-secondary); font-size: 12px; font-weight: 600; }
+.concept-study-plan.is-compact { flex-direction: row; flex-wrap: wrap; gap: 10px 20px; }
+.concept-study-plan.is-compact li { align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
+.concept-study-plan [aria-current="step"] { color: var(--color-text-strong); font-weight: 600; }
+.concept-study-plan [aria-current="step"] .concept-study-number { background: var(--color-tint-pink); color: var(--color-pink-deep); }
 
 .learning-mate-launch {
   position: fixed; right: 24px; bottom: 24px; z-index: 150; padding: 11px 18px;

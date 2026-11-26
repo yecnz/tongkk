@@ -2,7 +2,7 @@
 import { act, createElement as h, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import LearningSelect from './LearningSelect';
+import SelectField from './SelectField';
 
 let root: Root;
 let container: HTMLDivElement;
@@ -11,7 +11,7 @@ const options = [{ value: 'a', label: '8장_판다스.pdf' }, { value: 'b', labe
   { value: 'c', label: '10장_타이타닉데이터를분석하자.pdf' }];
 function Field({ disabled = false }: { disabled?: boolean }) {
   const [value, setValue] = useState('');
-  return h(LearningSelect, { label: '자료', value, options, placeholder: '자료 선택', disabled,
+  return h(SelectField, { label: '자료', value, options, placeholder: '자료 선택', disabled,
     onChange: (next: string) => { changed(next); setValue(next); } });
 }
 const trigger = () => container.querySelector('[role=combobox]') as HTMLButtonElement;
@@ -69,4 +69,27 @@ it('prevents opening while disabled', async () => {
   expect(trigger().disabled).toBe(true);
   expect(container.querySelector('[role=listbox]')).toBeNull();
   expect(changed).not.toHaveBeenCalled();
+});
+
+it('keeps required selections limited to their real options', async () => {
+  await act(async () => root.render(h(SelectField, { label: '가져오기 간격', value: 'b', options, onChange: changed })));
+  trigger().focus(); await key('Home');
+  expect(container.querySelectorAll('[role=option]')).toHaveLength(3);
+  expect(container.querySelector('[aria-selected=true]')?.textContent).toContain('9장_');
+  await key('Enter');
+  expect(changed).toHaveBeenCalledWith('a');
+});
+
+it('allows clearing optional selections through their placeholder', async () => {
+  await act(async () => root.render(h(SelectField, { label: '연결 과목', value: 'b', options, placeholder: '연결하지 않음', onChange: changed })));
+  trigger().focus(); await key('Home'); await key('Enter');
+  expect(changed).toHaveBeenCalledWith('');
+});
+
+it('shows an unavailable empty state when there are no options', async () => {
+  await act(async () => root.render(h(SelectField, { label: '저장할 과목', value: '', options: [], onChange: changed })));
+  expect(trigger().disabled).toBe(true);
+  expect(trigger().textContent).toContain('선택할 항목이 없습니다');
+  await act(async () => trigger().click());
+  expect(container.querySelector('[role=listbox]')).toBeNull();
 });

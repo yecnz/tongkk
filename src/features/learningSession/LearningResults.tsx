@@ -1,10 +1,11 @@
 import { Card } from '../../common';
+import type { ReactNode } from 'react';
 import type { SessionResult } from '../../services/learningSessions';
 import LearningLink from './LearningLink';
 
 const recallLabels = { sufficient: '확인됨', needs_review: '보완 필요', uncertain: '추가 확인', ungraded: '미평가', self_report: '자기 점검' };
 const checkLabels = { correct: '맞힘', incorrect: '다시 확인', ungraded: '미평가' };
-export default function LearningResults({ results }: { results: SessionResult[] }) {
+export default function LearningResults({ results, actions }: { results: SessionResult[]; actions?: ReactNode }) {
   const evaluated = results.filter(r => ['sufficient', 'needs_review', 'uncertain'].includes(r.recall)).length;
   const review = results.filter(r => ['needs_review', 'uncertain'].includes(r.recall) || r.check === 'incorrect').length;
   const checked = results.filter(r => r.check !== 'ungraded').length;
@@ -26,10 +27,10 @@ export default function LearningResults({ results }: { results: SessionResult[] 
           <div><dt>확인 문제</dt><dd>{checkLabels[result.check]}</dd></div></dl>
         <p className="learning-caption">{result.assisted ? '도움 사용' : '앱 내 도움 미사용'}{result.prior_instruction ? ' · 설명·보완 후 수행' : ''}{result.repeated ? ' · 이전에 학습한 내용' : ''}{result.reported ? ' · 내용 확인 필요' : ''}</p>
       </section>)}</div>
-      <div className="learning-notice">원문을 확인하고 다시 설명하세요.</div>
-      <div className="learning-actions"><LearningLink to="/learn" className="learning-button primary">다른 범위 학습하기 →</LearningLink>
+      {!actions && <div className="learning-notice">원문을 확인하고 다시 설명하세요.</div>}
+      {actions || <div className="learning-actions"><LearningLink to="/learn" className="learning-button primary">다른 범위 학습하기 →</LearningLink>
         <LearningLink to="/review?tab=issues" className="learning-button">학습 이슈 보기</LearningLink>
-        <LearningLink to="/" className="learning-button">대시보드로 돌아가기</LearningLink></div>
+        <LearningLink to="/" className="learning-button">대시보드로 돌아가기</LearningLink></div>}
     </Card>
   </>;
 }

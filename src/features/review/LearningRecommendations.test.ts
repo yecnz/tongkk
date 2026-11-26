@@ -39,7 +39,7 @@ it('prioritizes urgent schedules, limits the list, and excludes changed or dupli
   ] }))));
   expect(container.querySelectorAll('li')).toHaveLength(4);
   expect(container.querySelector('li')!.textContent).toContain('임박한 시험');
-  expect(Array.from(container.querySelectorAll('a'), link => link.getAttribute('href'))).toContain('/stats?view=concepts&conceptId=prior');
+  expect(Array.from(container.querySelectorAll('a'), link => link.getAttribute('href'))).toContain('/learn/connected/prior');
   expect(container.textContent).not.toContain('바뀐 원문');
   expect(container.textContent).not.toContain('중복 이슈');
 });

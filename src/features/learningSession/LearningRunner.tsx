@@ -1,5 +1,6 @@
+import SelectField from '../../components/SelectField';
 import LearningHistory from './LearningHistory';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Card } from '../../common';
 import { fetchCourses } from '../../services/courses';
 import { removeLocalDraft } from '../../services/learningSessions';
@@ -18,7 +19,11 @@ function readIntroduction(key: string) {
   try { return sessionStorage.getItem(key) === 'read'; } catch { return false; }
 }
 
-export default function LearningRunner({ id, userId }: { id: string; userId: string }) {
+export default function LearningRunner({ id, userId, onCompletedChange, introContextRef, completionActions }: {
+  id: string; userId: string; onCompletedChange?: (completed: boolean) => void;
+  introContextRef?: RefObject<HTMLDivElement | null>;
+  completionActions?: ReactNode;
+}) {
   const { session, error, busy, pendingRetry, command, retryPending, refresh, accept } = useLearningSession(id, userId);
   const { beforeLeaveRef } = useLearningNavigation();
   const [selected, setSelected] = useState<number | null>(null);
@@ -36,6 +41,10 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
   const introKey = `tongkk:learning-introduction:${userId}:${id}:${item?.id}`;
   const reading = Boolean(item?.introduction && item.phase === 'recall_answering' && !item.draft.trim() && !readItems.has(item.id) && !readIntroduction(introKey));
   const status = session?.status;
+
+  useEffect(() => {
+    onCompletedChange?.(status === 'completed' && session?.completed_count === session?.concept_count);
+  }, [status, session?.completed_count, session?.concept_count, onCompletedChange]);
 
   useEffect(() => { setSelected(null); setReport(false); setReportText(''); setReportReason('question'); }, [item?.id]);
   useEffect(() => {
@@ -56,8 +65,9 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
   }, [beforeLeaveRef, blocked]);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
-    heading.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' });
-  }, [item?.id, item?.phase, reading, status]);
+    const target = reading && introContextRef?.current ? introContextRef.current : heading.current;
+    target?.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+  }, [item?.id, item?.phase, reading, status, introContextRef]);
 
   async function act(action: string, extra: Record<string, unknown> = {}) {
     setDraftError('');
@@ -144,7 +154,7 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
             onHelp={type => { void command('help', { item_id: item.id, help_type: type }).catch(() => undefined); }} onSelfCheck={value => { void act('self_check', { self_check: value }); }} />}
         </aside>
       </div>}
-    {ended && <><LearningResults results={session.result} /><LearningHistory sessionId={id} /></>}
+    {ended && <><LearningResults results={session.result} actions={completionActions} /><LearningHistory sessionId={id} /></>}
     {!ended && <details className="learning-session-menu"><summary>학습 관리</summary><div className="learning-row">
       {permits('pause') && <button type="button" disabled={blocked} onClick={() => { void act('pause'); }}>저장하고 잠시 중단</button>}
       {permits('finish') && <button type="button" disabled={blocked} onClick={() => { void act('finish'); }}>여기까지 학습 마치기</button>}
@@ -153,8 +163,8 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
       <LearningLink to="/learn" className="learning-button">학습 설정으로</LearningLink>
     </div></details>}
     {report && item && !ended && <Card className="learning-card"><h2>오류 알리기</h2>
-      <label className="learning-field">오류 유형<select aria-label="오류 유형" value={reportReason} onChange={e => setReportReason(e.target.value)}>
-        <option value="question">질문</option><option value="answer">정답</option><option value="feedback">피드백</option><option value="source">원문 근거</option></select></label>
+      <SelectField label="오류 유형" value={reportReason} onChange={setReportReason} disabled={blocked}
+        options={[{ value: 'question', label: '질문' }, { value: 'answer', label: '정답' }, { value: 'feedback', label: '피드백' }, { value: 'source', label: '원문 근거' }]} />
       <p><textarea aria-label="오류 설명 (선택)" maxLength={1000} value={reportText} onChange={e => setReportText(e.target.value)} /></p>
       <button type="button" className="primary" disabled={blocked} onClick={() => { void command(`items/${item.id}/report`, { reason: reportReason, description: reportText }).then(() => setReport(false)).catch(() => undefined); }}>기록하기</button>
     </Card>}

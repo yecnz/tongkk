@@ -161,6 +161,55 @@ class Service:
         self.repo = repository or Repository()
         self.generator = generator or Generator()
 
+    async def create_concept(self, user, concept_id, command_key):
+        """Start the exact saved concept, with its own source and beginner introduction."""
+        if os.getenv('LEARNING_SESSION_ENABLED', 'true').lower() in {'false', '0', 'off'}:
+            fail('START_DISABLED', '새 학습 시작이 잠시 중단됐습니다.', 503)
+        key = str(command_key)
+        input_hash = digest(['connected-concept-v1', concept_id])
+        previous = await self.repo.command(user, key)
+        if previous:
+            self.replay(previous, input_hash)
+            return await self.repo.load(user, previous['session_id'])
+        source = await self.repo._rpc('learning_graph_concept_source', {'p_user': user, 'p_concept': concept_id})
+        if not source or not source.get('concept'):
+            fail('SOURCE_CHANGED', '이 개념의 자료가 변경되었거나 사용할 수 없어요. 새 자료로 학습해주세요.')
+        original = source['pack']
+        prep_key = digest(['connected-concept-v1', user, concept_id, original['source_hash']])
+        for _ in range(4):
+            existing = await self.repo.open_pack(user, prep_key)
+            if existing:
+                previous = next((o for o in existing['operations'] if o['command_key'] == key), None)
+                if previous:
+                    self.replay(previous, input_hash)
+                    return existing
+                existing['operations'].append(self.operation('create', key, input_hash))
+                try:
+                    return await self.repo.save(user, existing, existing['session']['version'])
+                except WriteConflict:
+                    continue
+            cached = await self.repo.cached_pack(user, prep_key)
+            pack = cached or {k: copy.deepcopy(original[k]) for k in (
+                'course_id', 'material_id', 'material_name', 'source_hash', 'selected_scope', 'source_snapshot', 'source_units')}
+            if not cached:
+                pack.update(id=uid(), user_id=user, preparation_key=prep_key, concept_count=1,
+                            content_version='connected-concept-v1', content={'concepts': [source['concept']]}, status='ready')
+            session = {'id': uid(), 'user_id': user, 'course_id': pack['course_id'], 'pack_id': pack['id'],
+                       'status': 'active', 'revision': 0, 'version': 0, 'familiarity': 'new', 'target_minutes': 5,
+                       'calls': 0, 'current_item_id': None, 'result': [], 'repeated': bool(source.get('repeated', False)),
+                       'created_at': now().isoformat(), 'completed_at': None}
+            bundle = {'pack': pack, 'session': session, 'items': [], 'attempts': [],
+                      'operations': [self.operation('create', key, input_hash)]}
+            self.populate(bundle)
+            try:
+                return await self.repo.save(user, bundle, -1)
+            except WriteConflict:
+                previous = await self.repo.command(user, key)
+                if previous:
+                    self.replay(previous, input_hash)
+                    return await self.repo.load(user, previous['session_id'])
+        fail('ACTIVE_SESSION', '진행 중인 학습을 확인한 뒤 다시 시도해주세요.')
+
     async def scopes(self, user, token, course, material):
         row = await self.repo.material(user, token, course, material)
         text = row["markdown"]

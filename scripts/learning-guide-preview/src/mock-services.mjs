@@ -56,6 +56,7 @@ export async function workflowRequest(path, method = 'GET', body = {}) {
     return copy({ cards });
   }
   if (p.startsWith('/explanation-revisions')) { if (p.endsWith('/draft')) revision.revision = { ...revision.revision, answer: body.answer, revision: revision.revision.revision + 1 }; if (p.endsWith('/submit')) { revision.revision.status = 'graded'; revision.evaluation = { id: body.command_key, status: 'graded', feedback, error_code: null }; } return copy(revision); }
+  if (p.startsWith('/learning-graph/paths')) return guideStudyPath(p, method, body);
   if (p.startsWith('/learning-graph')) return copy(graph);
   if (p.startsWith('/preparation-requests/artifacts/')) { const a = preparations[0].artifacts.find(a => a.id === p.split('/')[3]); a.status = body.action === 'apply' ? 'applied' : 'discarded'; a.applied_id = 'summary-guide'; return { applied_id: a.applied_id }; }
   if (p === '/preparation-requests') return copy({ requests: preparations });
@@ -76,3 +77,58 @@ export const createSummaryChatSession = async () => copy(chatSession);
 export const createSummaryChatTitle = text => text.slice(0, 20);
 export const saveSummaryChatMessage = async () => {};
 export const sendAgentMessage = async () => ({ result: messages[1].content, threadId: 'thread-guide' });
+
+// Reuse the production storage helpers. The guide replaces the network transport only.
+export { LearningApiError, shouldAcceptSession, draftKey, readLocalDraft, writeLocalDraft, removeLocalDraft } from '../../../src/services/learningSessions.ts?guide-pure-helpers';
+graph.study_target_id = 'concept-deadlock';
+graph.study_plan = [
+  { concept_id: 'concept-resource', title: '자원 할당', course_name: '운영체제', reason: '다음 개념에 필요한 기초부터 확인해요.' },
+  { concept_id: 'concept-deadlock', title: '교착 상태', course_name: '운영체제', reason: '관련 개념을 설명하고 이해를 확인해요.' },
+];
+graph.connections = [];
+const studySessions = new Map();
+let guidePath = null;
+function prepareGuideSession(step) {
+  const title = step.title;
+  const introduction = step.concept_id === 'concept-resource' ? '자원 할당은 프로세스가 실행에 필요한 자원을 받아 사용하는 과정입니다. 자원을 기다리면서 다른 자원을 가진 상태가 이어지면 교착 상태를 살펴볼 필요가 있습니다.' : '교착 상태는 여러 프로세스가 서로 가진 자원을 기다리면서 진행하지 못하는 상태입니다. 자원 보유와 대기 관계를 함께 확인해야 합니다.';
+  return { id: step.session_id, course_id: 'course-os', material_id: 'material-process', material_name: title, status: 'active', revision: 0, target_minutes: 5, concept_count: 1, completed_count: 0, source_changed: false, operation: null, result: [], allowed_actions: ['submit','unknown','help','pause','finish','abandon'], current: { id: 'item-'+step.session_id, title, position: 0, phase: 'recall_answering', revision: 0, question: title+'의 핵심을 자기 말로 설명해주세요.', introduction, draft: '', help: {}, feedback: null, evaluation_error: false, self_check: null, reported: false, check: null, check_result: null } };
+}
+function guideStudyPath(p, method, body) {
+  if (method === 'POST' && p === '/learning-graph/paths' && guidePath?.id !== body.idempotency_key
+    && (!guidePath || guidePath.status !== 'active' || guidePath.target_id !== body.concept_id)) {
+    const steps = body.concept_id === 'concept-resource' ? graph.study_plan.slice(0,1) : graph.study_plan;
+    guidePath = { id: body.idempotency_key, target_id: body.concept_id, status: 'active', position: 0,
+      steps: steps.map((s, position) => ({ ...s, position, session_id: body.idempotency_key+'-'+position, session_status: 'active', session_complete: false, source_changed: false })) };
+  }
+  if (!guidePath) throw new Error('로컬 미리보기를 새로 열었어요. 개념 지도에서 학습을 시작해주세요.');
+  if (p.endsWith('/next')) {
+    const current = guidePath.steps[body.position];
+    if (!current.session_complete) throw new Error('현재 개념을 먼저 마쳐주세요.');
+    guidePath.position = Math.max(guidePath.position, body.position+1);
+    if (guidePath.position >= guidePath.steps.length) guidePath.status = 'completed';
+  }
+  for (const step of guidePath.steps) if (!studySessions.has(step.session_id)) studySessions.set(step.session_id, prepareGuideSession(step));
+  return copy(guidePath);
+}
+export async function learningRequest(path, method='GET', body={}) {
+  const id = path.split('/')[1];
+  if (path.endsWith('/history')) return { items: [] };
+  const session = studySessions.get(id);
+  if (!session) throw new Error('안내용 학습을 찾을 수 없어요. 개념 지도에서 시작해주세요.');
+  const item = session.current;
+  if (method === 'PUT' && path.endsWith('/draft')) { item.draft=body.text;item.revision++; }
+  if (method === 'POST') {
+    session.revision++;
+    if (path.endsWith('/answers') && body.kind==='recall') {
+      item.draft=body.answer;item.phase='recall_feedback';item.feedback={criteria:[{criterion_id:'핵심 설명',status:'met',student_quote:body.answer,reason:'원문의 핵심을 설명했어요.',source_refs:[]}]};session.allowed_actions=['advance','help','finish','pause','abandon'];
+    } else if (path.endsWith('/answers') && body.kind==='check') {
+      session.allowed_actions=['advance','help','finish','pause','abandon'];item.phase='check_feedback';item.check_result={selected:body.answer,answer_index:0,correct:body.answer===0,explanation:'자원을 기다리는 관계를 확인하면 진행이 멈춘 이유를 설명할 수 있어요.'};
+    } else if (body.action==='advance' && item.phase==='recall_feedback') {
+      item.phase='check_answering';item.check={question:'진행이 멈춘 원인을 확인할 때 먼저 볼 것은 무엇인가요?',options:['프로세스의 자원 보유와 대기 관계','화면의 색상']};session.allowed_actions=['submit','help','finish','pause','abandon'];
+    } else if (body.action==='advance' && item.phase==='check_feedback') {
+      session.completed_count=1;session.status='completed';session.current=null;session.allowed_actions=[];session.result=[{title:item.title,recall:'sufficient',check:'correct',assisted:false,prior_instruction:true,repeated:false,reported:false}];
+      const step=guidePath.steps.find(s=>s.session_id===id);step.session_complete=true;step.session_status='completed';
+    }
+  }
+  return copy(session);
+}
