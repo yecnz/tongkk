@@ -88,9 +88,25 @@ graph.study_plan = [
 graph.connections = [];
 const studySessions = new Map();
 let guidePath = null;
+const guideLessonContent = {
+  '자원 할당': {
+    introduction: '자원 할당은 프로세스가 실행에 필요한 자원을 받아 사용하는 과정입니다. 자원을 기다리면서 다른 자원을 가진 상태가 이어지면 교착 상태를 살펴볼 필요가 있습니다.',
+    hint1: '프로세스가 실행할 때 필요한 자원이 무엇인지 먼저 떠올려 보세요.',
+    hint2: '프로세스가 자원을 요청하고, 사용한 뒤 반납하는 흐름과 자원이 부족할 때의 대기를 연결해 보세요.',
+    reference: '자원 할당은 운영체제가 프로세스에 실행에 필요한 자원을 배정하는 과정입니다. 프로세스는 필요한 자원을 요청하고 사용한 뒤 반납합니다. 자원이 부족하면 대기할 수 있으며, 다른 자원을 보유한 채 기다리는 관계는 교착 상태를 이해하는 기초가 됩니다.',
+    source: '프로세스는 실행에 필요한 자원을 요청하고 할당받아 사용한 뒤 반납한다. 자원이 부족하면 대기하며, 자원 보유와 대기 관계가 순환하면 교착 상태가 발생할 수 있다.',
+  },
+  '교착 상태': {
+    introduction: '교착 상태는 여러 프로세스가 서로 가진 자원을 기다리면서 진행하지 못하는 상태입니다. 자원 보유와 대기 관계를 함께 확인해야 합니다.',
+    hint1: '각 프로세스가 가진 자원과 기다리는 자원을 따로 적어 보세요.',
+    hint2: '프로세스 A가 B의 자원을 기다리고, B도 A의 자원을 기다릴 때 누가 먼저 진행할 수 있는지 생각해 보세요.',
+    reference: '교착 상태는 여러 프로세스가 서로가 보유한 자원을 기다리며 진행하지 못하는 상태입니다. 예를 들어 A가 자원 1을 보유한 채 자원 2를 기다리고, B는 자원 2를 보유한 채 자원 1을 기다리면 둘 다 진행하지 못할 수 있습니다.',
+    source: '교착 상태에서는 프로세스가 다른 프로세스가 가진 자원을 기다리며 진행하지 못한다. 자원의 보유 관계와 대기 관계를 함께 확인해야 한다.',
+  },
+};
 function prepareGuideSession(step) {
   const title = step.title;
-  const introduction = step.concept_id === 'concept-resource' ? '자원 할당은 프로세스가 실행에 필요한 자원을 받아 사용하는 과정입니다. 자원을 기다리면서 다른 자원을 가진 상태가 이어지면 교착 상태를 살펴볼 필요가 있습니다.' : '교착 상태는 여러 프로세스가 서로 가진 자원을 기다리면서 진행하지 못하는 상태입니다. 자원 보유와 대기 관계를 함께 확인해야 합니다.';
+  const introduction = guideLessonContent[title].introduction;
   return { id: step.session_id, course_id: 'course-os', material_id: 'material-process', material_name: title, status: 'active', revision: 0, target_minutes: 5, concept_count: 1, completed_count: 0, source_changed: false, operation: null, result: [], allowed_actions: ['submit','unknown','help','pause','finish','abandon'], current: { id: 'item-'+step.session_id, title, position: 0, phase: 'recall_answering', revision: 0, question: title+'의 핵심을 자기 말로 설명해주세요.', introduction, draft: '', help: {}, feedback: null, evaluation_error: false, self_check: null, reported: false, check: null, check_result: null } };
 }
 function guideStudyPath(p, method, body) {
@@ -116,17 +132,27 @@ export async function learningRequest(path, method='GET', body={}) {
   const session = studySessions.get(id);
   if (!session) throw new Error('안내용 학습을 찾을 수 없어요. 개념 지도에서 시작해주세요.');
   const item = session.current;
-  if (method === 'PUT' && path.endsWith('/draft')) { item.draft=body.text;item.revision++; }
+  if (method === 'PATCH' && path.endsWith('/draft') && item) { item.draft=body.text;item.revision++; }
   if (method === 'POST') {
+    if (path.endsWith('/help')) {
+      const content = item && guideLessonContent[item.title];
+      if (session.status !== 'active' || !content || !['hint1','hint2','reference','source'].includes(body.help_type)) throw new Error('현재 단계에서 요청할 수 없는 도움입니다.');
+      item.help[body.help_type] = content[body.help_type];
+      if (body.help_type === 'hint2') item.help.hint1 = content.hint1;
+      item.revision++;session.revision++;
+      return copy(session);
+    }
     session.revision++;
     if (path.endsWith('/answers') && body.kind==='recall') {
       item.draft=body.answer;item.phase='recall_feedback';item.feedback={criteria:[{criterion_id:'핵심 설명',status:'met',student_quote:body.answer,reason:'원문의 핵심을 설명했어요.',source_refs:[]}]};session.allowed_actions=['advance','help','finish','pause','abandon'];
     } else if (path.endsWith('/answers') && body.kind==='check') {
       session.allowed_actions=['advance','help','finish','pause','abandon'];item.phase='check_feedback';item.check_result={selected:body.answer,answer_index:0,correct:body.answer===0,explanation:'자원을 기다리는 관계를 확인하면 진행이 멈춘 이유를 설명할 수 있어요.'};
-    } else if (body.action==='advance' && item.phase==='recall_feedback') {
+    } else if (body.action==='unknown' && item) {
+      item.phase='repair';session.allowed_actions=['advance','help','finish','pause','abandon'];
+    } else if (body.action==='advance' && ['recall_feedback','repair'].includes(item?.phase)) {
       item.phase='check_answering';item.check={question:'진행이 멈춘 원인을 확인할 때 먼저 볼 것은 무엇인가요?',options:['프로세스의 자원 보유와 대기 관계','화면의 색상']};session.allowed_actions=['submit','help','finish','pause','abandon'];
     } else if (body.action==='advance' && item.phase==='check_feedback') {
-      session.completed_count=1;session.status='completed';session.current=null;session.allowed_actions=[];session.result=[{title:item.title,recall:'sufficient',check:'correct',assisted:false,prior_instruction:true,repeated:false,reported:false}];
+      session.completed_count=1;session.status='completed';session.current=null;session.allowed_actions=[];session.result=[{title:item.title,recall:item.feedback?'sufficient':'ungraded',check:item.check_result.correct?'correct':'incorrect',assisted:Object.keys(item.help).length>0,prior_instruction:true,repeated:false,reported:false}];
       const step=guidePath.steps.find(s=>s.session_id===id);step.session_complete=true;step.session_status='completed';
     }
   }
