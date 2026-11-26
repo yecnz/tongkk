@@ -11,7 +11,7 @@
     "dev": "vite",
     "prebuild": "node scripts/copy-pdfjs-assets.mjs",
     "build": "vite build",
-    "lint": "eslint . && node scripts/check-inline-hex.mjs",
+    "lint": "eslint . && node scripts/check-inline-hex.mjs && node scripts/check-custom-dropdowns.mjs",
     "audit": "npm audit --audit-level=high",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "test": "vitest run",

@@ -5,25 +5,32 @@ import Markdown from './LearningMarkdown';
 type Props = { item: NonNullable<LearningSession['current']>; blocked: boolean; selfCheck: boolean;
   onHelp: (type: string) => void; onSelfCheck: (value: string) => void };
 export default function LearningHelp({ item, blocked, selfCheck, onHelp, onSelfCheck }: Props) {
-  return <Card className="learning-card learning-help-card">
-    <details className="learning-help-disclosure">
-      <summary><span><strong>도움 받기</strong><small>힌트부터 확인해 주세요</small></span><span className="learning-disclosure-arrow" aria-hidden="true">⌄</span></summary>
-      <div className="learning-help-content">
-        <p className="learning-caption">도움 사용 여부가 기록됩니다.</p>
-        {!item.help.hint1 ? <button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('hint1')}>첫 힌트</button>
-          : <section><h3>첫 힌트</h3><Markdown text={item.help.hint1} /></section>}
-        {item.help.hint1 && (!item.help.hint2 ? <button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('hint2')}>다음 힌트</button>
-          : <section><h3>추가 힌트</h3><Markdown text={item.help.hint2} /></section>)}
-        {(item.help.hint2 || selfCheck) && !item.help.reference && <button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('reference')}>모범 설명</button>}
-        {item.help.reference && <section><h3>모범 설명</h3><Markdown text={item.help.reference} /></section>}
-        <details className="learning-source"><summary>관련 원문 확인</summary>
-          {item.help.source ? <Markdown text={item.help.source} /> : <button type="button" disabled={blocked} onClick={() => onHelp('source')}>관련 원문 불러오기</button>}
-        </details>
-        {selfCheck && item.help.reference && <fieldset className="learning-self-check" disabled={blocked}><legend>직접 점검하기</legend>
-          {[['understood', '설명을 이해했어요'], ['needs_review', '추가 확인이 필요해요'], ['unknown', '아직 모르겠어요']].map(([value, label]) =>
-            <button type="button" key={value} onClick={() => onSelfCheck(value)}>{label}</button>)}
-        </fieldset>}
-      </div>
-    </details>
+  const steps = [
+    { type: 'hint1', title: '첫 힌트', number: 1 },
+    { type: 'hint2', title: '추가 힌트', number: 2 },
+    { type: 'reference', title: '모범 설명', number: 3 },
+  ];
+  const revealed = steps.filter(step => item.help[step.type]);
+  const next = !item.help.hint1 ? { type: 'hint1', label: '첫 힌트' }
+    : !item.help.hint2 ? { type: 'hint2', label: '다음 힌트' }
+      : !item.help.reference ? { type: 'reference', label: '모범 설명' } : null;
+  return <Card className="learning-card learning-help-card" role="region" aria-label="도움 받기">
+    <div className="learning-section-heading"><h2>도움 받기</h2><span className="learning-badge is-pink">필요할 때</span></div>
+    <p className="learning-caption learning-help-intro">힌트부터 차근차근 확인해 보세요.</p>
+    <div className="learning-help-content" aria-live="polite">
+      {revealed.length > 0 && <ol className="learning-help-steps">{revealed.map(step => <li key={step.type}>
+        <span className="learning-help-number" aria-hidden="true">{step.number}</span><section><h3>{step.title}</h3><Markdown text={item.help[step.type]!} /></section>
+      </li>)}</ol>}
+      {next && <button type="button" className="workflow-primary learning-full-button" disabled={blocked} onClick={() => onHelp(next.type)}>{next.label}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
+      {selfCheck && !item.help.reference && next?.type !== 'reference' && <button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('reference')}>모범 설명</button>}
+      <section className="learning-source" aria-label="원문 근거"><h3>원문 근거</h3>
+        {item.help.source ? <Markdown text={item.help.source} /> : <button type="button" className="learning-button learning-source-button" disabled={blocked} onClick={() => onHelp('source')}>관련 원문 보기</button>}
+      </section>
+      {selfCheck && item.help.reference && <fieldset className="learning-self-check" disabled={blocked}><legend>직접 점검하기</legend>
+        {[['understood', '설명을 이해했어요'], ['needs_review', '추가 확인이 필요해요'], ['unknown', '아직 모르겠어요']].map(([value, label]) =>
+          <button type="button" key={value} onClick={() => onSelfCheck(value)}>{label}</button>)}
+      </fieldset>}
+    </div>
+    <p className="learning-caption learning-help-policy">도움 사용 여부가 학습 기록에 남아요.</p>
   </Card>;
 }

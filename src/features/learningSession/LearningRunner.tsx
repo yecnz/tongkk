@@ -145,10 +145,11 @@ export default function LearningRunner({ id, userId, onCompletedChange, introCon
           </>}
         </Card>
         <aside className="learning-aside" aria-label="학습 도움과 자료">
-          <Card className="learning-card learning-context"><h2>이번 학습</h2><p>{session.material_name}</p>
-            <dl className="learning-context-details"><div><dt>현재 개념</dt><dd>{item.position + 1} / {session.concept_count}</dd></div><div><dt>현재 단계</dt><dd>{stage}</dd></div></dl>
-            {materialUrl && <LearningLink to={materialUrl} className="learning-context-link">선택한 자료 보기 ↗</LearningLink>}
-            <p className="learning-caption">자료를 참고한 풀이는 도움 사용으로 기록됩니다.</p>
+          <Card className="learning-card learning-context" role="region" aria-label="이번 학습">
+            <div className="learning-section-heading"><h2>이번 학습</h2><span className="learning-caption">개념 {item.position + 1} / {session.concept_count}</span></div>
+            <p className="learning-context-title">{item.title}</p><span className="learning-badge">{stage}</span>
+            {session.material_name !== item.title && <p className="learning-context-material"><span>자료</span>{session.material_name}</p>}
+            {materialUrl && <LearningLink to={materialUrl} className="learning-button learning-context-link">선택한 자료 보기 ↗</LearningLink>}
           </Card>
           {!reading && permits('help') && <LearningHelp key={item.id} item={item} blocked={blocked} selfCheck={permits('self_check')}
             onHelp={type => { void command('help', { item_id: item.id, help_type: type }).catch(() => undefined); }} onSelfCheck={value => { void act('self_check', { self_check: value }); }} />}

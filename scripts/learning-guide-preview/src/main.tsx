@@ -1,4 +1,5 @@
 import BrandLogo from '../../../src/components/BrandLogo';
+import CustomSelect from '../../../src/components/CustomSelect';
 /* eslint-disable react-refresh/only-export-components -- Standalone documentation preview entry point. */
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -37,7 +38,7 @@ function HostLayout({ active, narrow = false, children }: { active: PageRouteLab
 function PreviewBanner() {
   const [theme, setTheme] = useState('light');
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
-  return <div className="guide-banner"><span>화면 설명용 예시 학습 데이터 · 외부 계정에 연결하지 않는 로컬 미리보기</span><label>화면 테마 <select value={theme} onChange={event => setTheme(event.target.value)}><option value="light">라이트</option><option value="dark">다크</option></select></label></div>;
+  return <div className="guide-banner"><span>화면 설명용 예시 학습 데이터 · 외부 계정에 연결하지 않는 로컬 미리보기</span><label>화면 테마 <CustomSelect aria-label="화면 테마" value={theme} onChange={setTheme} options={[{ value: 'light', label: '라이트' }, { value: 'dark', label: '다크' }]} /></label></div>;
 }
 
 function Material() {

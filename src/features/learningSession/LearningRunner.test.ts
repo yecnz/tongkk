@@ -44,9 +44,6 @@ async function render(value: Session) {
       h(Route, { path: '/', element: h('p', null, '대시보드 도착') }),
       h(Route, { path: '/summary', element: h('p', null, '자료 상세 도착') })))));
 }
-async function openHelp() {
-  await act(async () => (container.querySelector('.learning-help-disclosure > summary') as HTMLElement).click());
-}
 beforeEach(() => {
   vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); localStorage.clear(); sessionStorage.clear();
   request.mockReset(); request.mockImplementation(async () => structuredClone(response));
@@ -67,7 +64,7 @@ it('runs preparation, recall, feedback, hints, check, next concept and results',
   const feedback = state('recall_feedback'); feedback.current!.draft = '내 설명입니다.';
   feedback.current!.feedback = { criteria: [{ criterion_id: 'criterion', status: 'missing', student_quote: '', reason: '원인 설명이 빠졌어요.', source_refs: [{ unit_id: 'u0', quote: '원문 근거' }] }] };
   next(feedback); await poll(); expect(container.textContent).toContain('빠짐');
-  await openHelp(); expect(container.textContent).not.toContain('모범 설명');
+  expect(container.textContent).not.toContain('모범 설명');
   const help = structuredClone(response); help.current!.help.hint1 = '첫 단계 힌트입니다.'; next(help); await click('첫 힌트');
   expect(container.textContent).toContain('첫 단계 힌트입니다.'); expect(button('다음 힌트').disabled).toBe(false);
   const hint2 = structuredClone(response); hint2.current!.help.hint2 = '두 번째 힌트입니다.'; next(hint2); await click('다음 힌트');
@@ -109,9 +106,21 @@ it('pauses and resumes at the saved answer screen', async () => {
   const resumed = state(); resumed.current!.draft = '저장한 설명'; next(resumed); await click('이어서 학습 →'); expect(container.querySelector('textarea')?.value).toBe('저장한 설명');
 });
 
+it('shows help immediately and reveals the source with one click, without an accordion', async () => {
+  await render(state());
+  const help = container.querySelector('[aria-label="도움 받기"]')!;
+  expect(help.querySelector('details')).toBeNull();
+  expect(button('첫 힌트').disabled).toBe(false);
+  const source = structuredClone(response); source.current!.help.source = '확인할 원문 근거입니다.'; next(source);
+  await click('관련 원문 보기');
+  expect(request.mock.calls.at(-1)?.[2]).toMatchObject({ help_type: 'source', item_id: 'item-1' });
+  expect(help.querySelector('[aria-label="원문 근거"]')?.textContent).toContain('확인할 원문 근거입니다.');
+  expect(help.querySelector('[aria-label="원문 근거"]')?.querySelector('details')).toBeNull();
+});
+
 it('lets a failed evaluation use reference and self check without claiming AI grading', async () => {
   const failed = state('recall_feedback'); failed.current!.evaluation_error = true; failed.allowed_actions.push('self_check'); await render(failed);
-  expect(container.textContent).toContain('오답으로 처리하지 않았어요'); await openHelp();
+  expect(container.textContent).toContain('오답으로 처리하지 않았어요');
   const reference = structuredClone(response); reference.current!.help.reference = '모범 설명 본문'; next(reference); await click('모범 설명');
   const self = structuredClone(response); self.current!.phase = 'repair'; self.current!.self_check = 'needs_review'; next(self); await click('추가 확인이 필요해요');
   expect(container.textContent).toContain('AI 평가와 별도로'); expect(request.mock.calls.at(-1)?.[2]).toMatchObject({ action: 'self_check', self_check: 'needs_review' });
