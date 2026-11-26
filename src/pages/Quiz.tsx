@@ -188,7 +188,7 @@ function getRecommendedDifficulty(attempts: SavedQuizAttempt[]): QuizDifficulty 
 }
 
 const getDifficultyReason = (attempts: SavedQuizAttempt[]) => {
-  if (attempts.length === 0) return "아직 풀이 기록이 없어 기본 난이도로 시작합니다.";
+  if (attempts.length === 0) return "풀이 기록이 없어 기본 난이도로 시작합니다.";
   const recent = attempts.slice(0, 3);
   const average = Math.round(recent.reduce((sum, attempt) => sum + attempt.scorePercent, 0) / recent.length);
   if (average >= 80) return `최근 평균 ${average}%라서 한 단계 높은 문제로 점검해도 좋습니다.`;
@@ -1164,7 +1164,7 @@ export default function Quiz() {
       // 일반 풀이는 스냅샷이 남아 "이어서 풀기"로 복구되지만, 오답 다시 풀기는 스냅샷 대상이 아니다.
       const message = reviewActiveRef.current
         ? "퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다.\n페이지를 떠나시겠습니까?"
-        : "퀴즈 풀이 중입니다. 나중에 이 과목 퀴즈 화면에서 이어서 풀 수 있어요.\n페이지를 떠나시겠습니까?";
+        : "퀴즈 풀이 중입니다. 나중에 이 과목 퀴즈 화면에서 이어서 풀 수 있습니다.\n페이지를 떠나시겠습니까?";
       if (!window.confirm(message)) return;
     }
     navigate(pageRoutes[item]);
@@ -1206,7 +1206,7 @@ export default function Quiz() {
             <Card style={{ padding: "16px 20px", marginBottom: 16, border: `1px solid ${CYAN}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
-                  <p style={{ margin: "0 0 3px", fontSize: 14, fontWeight: 800, color: "var(--color-text-strong)" }}>풀던 퀴즈가 있어요</p>
+                  <p style={{ margin: "0 0 3px", fontSize: 14, fontWeight: 800, color: "var(--color-text-strong)" }}>풀던 퀴즈가 있습니다</p>
                   <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-text-secondary)" }}>
                     {resumableDraft.openedQuizTitle || `${resumableDraft.course} 퀴즈`} · {Object.keys(resumableDraft.answers || {}).length}/{resumableDraft.quizzes.length}문항 응답
                   </p>
@@ -1289,7 +1289,7 @@ export default function Quiz() {
                 padding: "12px 16px", borderRadius: 10, background: "var(--color-surface)",
                 fontSize: 13, color: "var(--color-muted)", marginBottom: 14
               }}>
-                아직 저장된 자료가 없어요. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
+                저장된 자료가 없습니다. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
               </div>
             )}
 
@@ -1497,10 +1497,10 @@ export default function Quiz() {
             ) : (
               <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
                 {selectedMaterials.length === 0
-                  ? "자료를 선택하면 페이지 범위를 지정할 수 있어요."
+                  ? "자료를 선택해 페이지 범위를 지정하세요."
                   : selectedRawHasPageMarkers
-                    ? "자료 출처를 '원본'으로 두면 페이지를 고를 수 있어요. (요약은 페이지 정보가 없어요)"
-                    : "선택한 자료에는 페이지 정보가 없어 페이지 선택을 쓸 수 없어요. 파일을 다시 업로드하면 페이지를 고를 수 있어요."}
+                    ? "페이지를 선택하려면 자료 출처를 원본으로 변경하세요."
+                    : "페이지 정보가 없습니다. 파일을 다시 업로드하세요."}
               </div>
             )}
 
@@ -1518,7 +1518,7 @@ export default function Quiz() {
 
           {!isExtracting && selectedMaterials.length === 0 && (
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--color-muted)", textAlign: "center" }}>
-              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있어요." : "반영할 자료를 1개 이상 선택해주세요."}
+              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있습니다." : "반영할 자료를 1개 이상 선택하세요."}
             </p>
           )}
           <button type="button" onClick={generate} disabled={!canGenerate} style={{

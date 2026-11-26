@@ -21,8 +21,8 @@ it('shows loading until the request completes instead of showing an empty list',
   let finish!: (value: { sessions: [] }) => void;
   mocks.list.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })); await render();
   expect(container.querySelector('[role="status"]')?.textContent).toContain('불러오는 중');
-  expect(container.textContent).not.toContain('진행 중인 학습이 없어요');
-  await act(async () => finish({ sessions: [] })); expect(container.textContent).toContain('진행 중인 학습이 없어요');
+  expect(container.textContent).not.toContain('진행 중인 학습이 없습니다');
+  await act(async () => finish({ sessions: [] })); expect(container.textContent).toContain('진행 중인 학습이 없습니다');
 });
 it('offers a retry after a list failure and then restores the resume links', async () => {
   mocks.list.mockRejectedValueOnce(new Error('unavailable')); await render('page');

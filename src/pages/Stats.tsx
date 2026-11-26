@@ -152,7 +152,7 @@ export default function Stats() {
           <div>
             <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900, color: "var(--color-text-strong)", letterSpacing: 0 }}>학습 통계</h2>
             <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-              {loading ? "불러오는 중..." : attempts.length === 0 ? "퀴즈를 풀면 이곳에 학습 흐름이 쌓입니다." : `${attempts.length}회 풀이 · ${totalQuestions}문제 · 평균 ${average}%`}
+              {loading ? "불러오는 중..." : attempts.length === 0 ? "퀴즈를 풀면 통계가 표시됩니다." : `${attempts.length}회 풀이 · ${totalQuestions}문제 · 평균 ${average}%`}
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

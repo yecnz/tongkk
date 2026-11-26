@@ -35,7 +35,7 @@ it('replays an ambiguous submission with the exact same attempt id and answer',a
  expect(localStorage.getItem('tongkk:review:user:card')).toContain('보존할 답변');
 });
 it('blocks stale-source practice and preserves ungraded answers for editing',async()=>{
- response.source_changed=true;await render();expect(container.querySelector('textarea')).toBeNull();expect(container.textContent).toContain('원문이 바뀌었어요');
+ response.source_changed=true;await render();expect(container.querySelector('textarea')).toBeNull();expect(container.textContent).toContain('원문이 변경되었습니다');
  await act(async()=>root.unmount());root=createRoot(container);response=initial();response.latest={id:'failed',answer:'원래 답변',status:'ungraded',assisted:false,feedback:null,check_result:null,eligible_for_schedule:true};
  await render();expect(container.querySelector('textarea')?.value).toBe('원래 답변');await type('');expect(container.querySelector('textarea')?.value).toBe('');
 });

@@ -48,7 +48,7 @@ export default function Auth() {
       endRecovery(); // recovery 종료 → 아래 리다이렉트 가드가 대시보드로 이동시킨다.
       navigate('/', { replace: true });
     } catch (err) {
-      setRecoveryError(authErrorMessage(err, '비밀번호 변경에 실패했습니다. 로그인 상태를 확인하거나 새 재설정 메일을 요청해주세요.'));
+      setRecoveryError(authErrorMessage(err, '비밀번호 변경에 실패했습니다. 로그인 상태를 확인하거나 새 재설정 메일을 요청하세요.'));
     } finally {
       setSubmitting(false);
       pending.current = false;

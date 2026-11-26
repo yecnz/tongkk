@@ -32,7 +32,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "Tongkk가 뭐예요?",
-        body: "강의 자료(PDF·PPT·이미지·텍스트)를 올리면 AI가 강의 노트·치트시트·마인드맵으로 요약하고, 퀴즈까지 만들어줘요.",
+        body: "강의자료로 AI 요약과 퀴즈를 만드세요.",
       },
       {
         title: "이렇게 써요",
@@ -48,7 +48,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "여기서 강의를 만들고 자료를 올려요",
-        body: "과목을 추가하고 강의자료를 올리면 AI가 요약·퀴즈를 만들 준비를 해요. '추가하고 자료 올리기'를 누르면 바로 업로드로 이어져요.",
+        body: "과목을 추가하고 강의자료를 업로드하세요.",
       },
     ],
   },
@@ -61,15 +61,15 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "자료를 올려 시작하기",
-        body: "PDF·PPT·DOCX·TXT·이미지를 끌어다 놓거나 '파일 선택'으로 올리면 AI가 내용을 읽어요. 파일이 없으면 '텍스트 붙여넣기' 탭에 필기를 붙여넣어도 돼요.",
+        body: "파일을 업로드하거나 텍스트를 붙여넣으세요.",
       },
       {
         title: "요약에 반영할 자료 고르기",
-        body: "기본은 가장 최근 자료 1개예요. 행을 눌러 여러 개를 함께 고를 수 있는데, 많이 묶을수록 AI가 내용을 줄여 요약해요. 한 강의에 집중하려면 1개만 두세요.",
+        body: "최근 자료가 기본 선택됩니다. 여러 자료를 선택하면 내용을 압축해 요약합니다.",
       },
       {
         title: "종류를 고르고 생성하기",
-        body: "일반 요약·강의 노트·마인드맵·치트시트 중에 골라 '요약 생성하기'를 누르세요. 만드는 동안 다른 화면으로 가도 완료되면 알려드려요.",
+        body: "요약 형식을 선택하고 생성하세요. 다른 화면에서도 완료 알림을 받을 수 있습니다.",
       },
     ],
   },
@@ -83,11 +83,11 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "만든 요약으로 학습해요",
-        body: "위쪽 '원본·요약·퀴즈' 탭으로 같은 자료를 여러 방식으로 살펴봐요. 요약을 읽다가 모르는 부분은 본문을 드래그하면 'AI 튜터에게 묻기'로 바로 질문할 수 있어요.",
+        body: "탭에서 원본·요약·퀴즈를 확인하세요. 본문을 드래그하면 튜터에게 질문할 수 있습니다.",
       },
       {
         title: "퀴즈로 바로 점검해요",
-        body: "'퀴즈' 탭에서 이 자료로 문제를 만들어 풀면 방금 이해한 내용을 곧장 확인할 수 있어요.",
+        body: "퀴즈 탭에서 문제를 생성하고 이해도를 확인하세요.",
       },
     ],
   },
@@ -101,7 +101,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "자료를 올려 퀴즈를 만들어요",
-        body: "PDF·PPT·이미지·문서를 올리면 그 자료 내용으로 문제를 만들어요. 반영할 자료를 골라야 생성할 수 있어요.",
+        body: "자료를 업로드하고 퀴즈에 반영할 자료를 선택하세요.",
       },
       {
         title: "시험 모드는 실전처럼",
@@ -109,7 +109,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
       },
       {
         title: "AI가 자료를 분석해 문제를 만들어요",
-        body: "'퀴즈 생성하기'를 누르면 AI가 자료를 읽고 문제를 만들어요. 이전에 푼 문제는 자동으로 빼 줘요.",
+        body: "퀴즈를 생성하세요. 이전에 푼 문제는 제외됩니다.",
       },
     ],
   },
@@ -121,7 +121,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "풀이 화면 사용법",
-        body: "객관식·OX는 보기를 누르면 바로 채점되고 다시 못 바꿔요. 단답형은 Enter나 '제출', 주관식은 제출하면 AI가 채점해요. 시험 모드는 결과에서 한꺼번에 확인돼요.",
+        body: "객관식·OX는 선택 즉시 채점되며 수정할 수 없습니다. 단답형·주관식은 제출 후 채점됩니다. 시험 모드는 종료 후 결과를 확인하세요.",
       },
     ],
   },

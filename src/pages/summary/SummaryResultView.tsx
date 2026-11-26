@@ -480,7 +480,7 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
               {loadingStep || "처리 중..."}
             </p>
             <p style={{ margin: 0, fontSize: 12.5, color: "var(--color-muted)", opacity: 0.8 }}>
-              기다리지 않고 다른 화면으로 이동해도 돼요. 완성되면 알려드릴게요.
+              다른 화면으로 이동해도 됩니다. 완료되면 알려드립니다.
             </p>
           </div>
         ) : error ? (
@@ -553,7 +553,7 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
                 suggestedQuestions={questions}
                 initialQuestion={!isLoading ? initialTutorQuestion : undefined}
                 pendingQuestion={tutorSelectionQuestion ?? undefined}
-                disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                disabledReason="요약을 생성한 뒤 질문하세요"
                 resetHistory={resetTutorHistory}
               />
             )}

@@ -90,7 +90,7 @@ it('does not show the no-course message while courses are still loading', async 
   mocks.courses.mockReturnValue(new Promise(r => { resolve = r; }));
   await render(); await click('.mini-material-trigger');
   expect(container.textContent).toContain('과목 불러오는 중…');
-  expect(container.textContent).not.toContain('아직 등록된 과목이 없어요.');
+  expect(container.textContent).not.toContain('등록된 과목이 없습니다.');
   await act(async () => resolve([{ id: 'course', name: '자료구조' }]));
   expect(container.textContent).not.toContain('과목 불러오는 중…');
   await click('.mini-select-toggle');
@@ -100,7 +100,7 @@ it('does not show the no-course message while courses are still loading', async 
 it('shows the empty-course state only after a successful empty response', async () => {
   mocks.courses.mockResolvedValue([]);
   await render(); await click('.mini-material-trigger');
-  expect(container.textContent).toContain('아직 등록된 과목이 없어요.');
+  expect(container.textContent).toContain('등록된 과목이 없습니다.');
   expect(element<HTMLAnchorElement>('.mini-panel-empty a').getAttribute('href')).toBe('/');
 });
 
@@ -108,7 +108,7 @@ it('retries a failed course load without presenting it as an empty account', asy
   mocks.courses.mockRejectedValueOnce(new Error('offline'));
   await render(); await click('.mini-material-trigger');
   expect(container.textContent).toContain('과목을 불러오지 못했어요.');
-  expect(container.textContent).not.toContain('아직 등록된 과목이 없어요.');
+  expect(container.textContent).not.toContain('등록된 과목이 없습니다.');
   await act(async () => retry().click());
   await click('.mini-select-toggle');
   expect(container.textContent).toContain('자료구조');

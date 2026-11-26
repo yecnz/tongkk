@@ -238,7 +238,7 @@ describe('login, signup and reset email UI', () => {
       return document.getElementById(description)?.textContent;
     })).toEqual([
       '올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해주세요.',
-      '비밀번호를 8자 이상 입력해주세요.',
+      '비밀번호를 8자 이상 입력하세요.',
       '비밀번호가 일치하지 않아요.',
     ]);
     expect(auth.signUp).not.toHaveBeenCalled();

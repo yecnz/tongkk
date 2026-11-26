@@ -6,8 +6,8 @@ import type { PaceStatus } from "./pace";
 export type BriefingItem = { title: string; reason: string; urgent: boolean; target?: LearningTarget };
 
 export type BriefingInput = {
-  ddays: { subj: string; type?: DdayType; daysLeft: number }[];
-  paces: { course: string; status: PaceStatus; progress: number; todayTarget: number; unitLabel: string }[];
+  ddays: { id?: string; date?: string; subj: string; type?: DdayType; daysLeft: number }[];
+  paces: { id?: string; date?: string; course: string; status: PaceStatus; progress: number; todayTarget: number; unitLabel: string }[];
   // 과목별 퀴즈 점수(최근 응시가 앞).
   scores: Record<string, number[]>;
   todayPlansLeft: number;
@@ -37,7 +37,7 @@ export const buildBriefing = ({ ddays, paces, scores, todayPlansLeft }: Briefing
       items.push({
         title: `${dday.subj} ${label} ${formatDdayLabel(dday.daysLeft)}`,
         reason: score === null ? `${label} ${when}` : `${label} ${when} · 최근 정답률 ${score}%`,
-        urgent: dday.daysLeft <= 3, target: { kind: "calendar" },
+        urgent: dday.daysLeft <= 3, target: { kind: "calendar", date: dday.date, ddayId: dday.id },
       });
     });
 
@@ -49,7 +49,7 @@ export const buildBriefing = ({ ddays, paces, scores, todayPlansLeft }: Briefing
       items.push({
         title: `${pace.course} 진도 따라잡기`,
         reason: `진도 ${pace.progress}% · 오늘 ${pace.todayTarget}${pace.unitLabel}`,
-        urgent: pace.status === "behind", target: { kind: "calendar" },
+        urgent: pace.status === "behind", target: { kind: "calendar", date: pace.date, paceId: pace.id },
       });
     });
 
@@ -60,7 +60,7 @@ export const buildBriefing = ({ ddays, paces, scores, todayPlansLeft }: Briefing
     .sort((a, b) => a.score - b.score)
     .slice(0, 1)
     .forEach(({ course, score }) => {
-      items.push({ title: `${course} 오답 복습`, reason: `최근 퀴즈 정답률 ${score}%`, urgent: false, target: { kind: "wrong" } });
+      items.push({ title: `${course} 오답 복습`, reason: `최근 퀴즈 정답률 ${score}%`, urgent: false, target: { kind: "wrong", course } });
     });
 
   if (todayPlansLeft > 0) {

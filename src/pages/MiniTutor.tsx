@@ -89,7 +89,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
       })
       .catch(err => {
         console.warn("강의자료 불러오기 실패", err);
-        if (!ignore) setMaterialsError("강의자료를 불러오지 못했어요. 과목을 다시 선택해 주세요.");
+        if (!ignore) setMaterialsError("강의자료를 불러오지 못했어요. 과목을 다시 선택하세요.");
       })
       .finally(() => { if (!ignore) setMaterialsLoading(false); });
     return () => { ignore = true; };
@@ -110,7 +110,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
     try {
       const selectedMaterial = materials.find(material => material.id === materialId);
       const source = selectedMaterial?.markdown.trim();
-      if (selectedMaterial && !source) throw new Error("선택한 자료의 본문이 없어 질문에 반영할 수 없어요.");
+      if (selectedMaterial && !source) throw new Error("선택한 자료의 본문이 없어 질문에 반영할 수 없습니다.");
       const sendFull = () => sendAgentMessage("", nextMessages, source ? `# ${selectedMaterial!.name}\n\n${source}` : undefined, undefined, undefined, undefined, request.signal);
       const response = currentThread
         ? await sendAgentMessage(currentThread, [userMessage], undefined, undefined, undefined, undefined, request.signal).catch(err => {
@@ -135,7 +135,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
     firstQuestionSent.current = true;
     if (initialMaterialId && (materialsError || !materials.some(material => material.id === initialMaterialId))) {
       setInput(question);
-      setError("선택한 자료를 불러오지 못했어요. 자료를 다시 선택해 주세요.");
+      setError("선택한 자료를 불러오지 못했어요. 자료를 다시 선택하세요.");
       return;
     }
     void ask(question, [], "");
@@ -177,7 +177,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
   } else if (!user) {
     body = (
       <p className="text-[13px] text-text">
-        <button type="button" onClick={() => setShowLogin(true)} className="cursor-pointer border-0 bg-transparent p-0 font-bold text-text-strong underline">로그인</button>하면 튜터에게 물어볼 수 있어요.
+        <button type="button" onClick={() => setShowLogin(true)} className="cursor-pointer border-0 bg-transparent p-0 font-bold text-text-strong underline">로그인</button>하면 튜터에게 물어볼 수 있습니다.
       </p>
     );
   } else {
@@ -186,12 +186,12 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
         {messages.length === 0 && !sending && ready && (
           courses.length === 0 ? (
             <div className="flex flex-col gap-1 text-[13px]">
-              <p className="font-bold text-text-strong">아직 등록된 강의가 없어요</p>
+              <p className="font-bold text-text-strong">등록된 강의가 없습니다</p>
               <a href="/" target="_blank" className="font-bold text-pink no-underline">Tongkk에서 강의자료 추가하기 →</a>
             </div>
           ) : (
             <p className="text-[13px] text-muted">
-              {materialId ? `선택한 자료를 바탕으로 답해요. 궁금한 걸 물어보세요.` : "자료를 선택하거나 일반 질문을 해보세요."}
+              {materialId ? `현재 자료에 대해 질문하세요.` : "자료를 선택하거나 일반 질문을 하세요."}
             </p>
           )
         )}
@@ -213,7 +213,7 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   {(visibleContent || !suggestions.length) && (
                     <div className="mini-tutor-reply rounded-[14px] rounded-tl-[4px] border px-3 py-[10px] text-[13px] leading-normal">
-                      {visibleContent ? <FormattedTutorText content={visibleContent} compact /> : "답변을 받지 못했어요. 다시 질문해 주세요."}
+                      {visibleContent ? <FormattedTutorText content={visibleContent} compact /> : "답변을 받지 못했어요. 다시 질문하세요."}
                     </div>
                   )}
                   {showSuggestions && (
@@ -288,9 +288,9 @@ function MiniTutorScreen({ user, loading }: { user: User | null; loading: boolea
                     onToggle={() => setExpandedList(expandedList === "material" ? null : "material")}
                     onChange={next => { changeMaterial(next); setExpandedList(null); }}
                   />
-                  {course && !materialsLoading && !materialsError && materials.length === 0 && <p className="text-[11px] text-muted">이 과목에 업로드된 자료가 없어요.</p>}
+                  {course && !materialsLoading && !materialsError && materials.length === 0 && <p className="text-[11px] text-muted">이 과목에 업로드된 자료가 없습니다.</p>}
                   {materialsError && <p role="alert" className="text-[11px] text-danger">{materialsError}</p>}
-                  {messages.length > 0 && <p className="text-[11px] text-muted">과목이나 자료를 바꾸면 새 대화가 시작돼요.</p>}
+                  {messages.length > 0 && <p className="text-[11px] text-muted">과목·자료 변경 시 새 대화가 시작됩니다.</p>}
                 </div>
               </details>
             )}

@@ -552,7 +552,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey, 
         <button type="button"
           onClick={toggleStudyMode}
           aria-pressed={studyMode}
-          title="켜면 노드를 클릭해 AI 튜터에게 질문할 수 있어요"
+          title="노드를 클릭해 튜터에게 질문"
           style={{
             ...toolBtn,
             background: studyMode ? "var(--color-tint-cyan)" : "var(--color-card)",
@@ -580,7 +580,7 @@ export function MindmapView({ data, onNodeFocus, printMode = false, persistKey, 
           background: "var(--color-surface)",
           border: "1px solid var(--color-border-soft)",
         }}>
-          💡 노드를 클릭하면 그 주제에 집중하고, AI 튜터에게 바로 질문할 수 있어요.
+          💡 노드를 클릭하면 그 주제에 집중하고, AI 튜터에게 바로 질문할 수 있습니다.
         </div>
       )}
 

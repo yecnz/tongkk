@@ -1,7 +1,7 @@
 import BrandLogo from "../components/BrandLogo";
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import LegalLinks from "../components/LegalLinks";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, FEEDBACK_EMAIL, pageRoutes, SidebarIcon, PaperPlaneIcon, Sidebar, Card, NoticeBanner, useSidebarOpen } from "../common";
 import { useCourses } from "../CourseContext";
@@ -47,7 +47,8 @@ import {
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 import LearningBriefing from "../features/review/LearningBriefing";
-import { learningTargetUrl } from "../services/learningTargets";
+import LearningRecommendations from "../features/review/LearningRecommendations";
+import './Dashboard.css';
 
 type CourseModalProps = { onClose: () => void; onAdd: (name: string) => void; onAddAndUpload: (name: string) => void };
 type RenameCourseModalProps = { course: string; courses: string[]; onClose: () => void; onRename: (oldName: string, newName: string) => void };
@@ -115,7 +116,7 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
         }}/>
         {/* 버튼이 비활성인 이유를 알 수 있게 안내한다(빈 값 제출이 조용히 막히면 고장으로 느껴짐). */}
         {!courseName && (
-          <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-muted)" }}>과목명을 입력하면 추가할 수 있어요.</p>
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-muted)" }}>과목명을 입력하면 추가할 수 있습니다.</p>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
@@ -126,7 +127,7 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
           }}>추가만 하기</button>
           <button type="button" onClick={handleAddAndUpload} disabled={!courseName} style={{
             padding: "8px 18px", borderRadius: 10, border: "none",
-            background: courseName ? PINK : "var(--color-border-soft)", color: "var(--color-on-brand)",
+            background: courseName ? "var(--color-action-pink)" : "var(--color-border-soft)", color: "var(--color-on-brand)",
             cursor: courseName ? "pointer" : "default", fontSize: 14, fontWeight: 600
           }}>추가하고 자료 올리기</button>
         </div>
@@ -169,7 +170,7 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleSave} disabled={!canSave} style={{
             padding: "8px 18px", borderRadius: 10, border: "none",
-            background: canSave ? PINK : "var(--color-border-soft)", color: "var(--color-on-brand)",
+            background: canSave ? "var(--color-action-pink)" : "var(--color-border-soft)", color: "var(--color-on-brand)",
             cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600
           }}>저장</button>
         </div>
@@ -189,7 +190,7 @@ const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps
         <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
         <button type="button" onClick={() => { onDelete(course); onClose(); }} style={{
           padding: "8px 18px", borderRadius: 10, border: "none",
-          background: "var(--color-danger)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 700
+          background: "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 700
         }}>삭제</button>
       </div>
     </Card>
@@ -268,7 +269,7 @@ const CourseDetailModal = ({
       // 자료와 함께 지워진 요약을 빼 "요약 N" 배지를 맞춘다.
       setSummaries(prev => prev.filter(summary => !summary.materialIds?.includes(material.id)));
       setPendingDelete(null);
-      showToast("자료를 삭제했어요.", "info");
+      showToast("자료를 삭제했습니다.", "info");
       onMaterialDeleted?.();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "강의자료 삭제에 실패했습니다.");
@@ -297,7 +298,7 @@ const CourseDetailModal = ({
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>강의자료 목록입니다. 자료를 눌러 상세를 보거나, 아래 버튼으로 새 요약·퀴즈를 만드세요.</p>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>자료를 선택하거나 요약·퀴즈를 만드세요.</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {/* 자료 목록에서 바로 강의 자료를 추가(요약 생성 화면으로 이동)할 수 있게 닫기 버튼 왼쪽에 둔다(이슈 #65). */}
@@ -390,8 +391,8 @@ const CourseDetailModal = ({
                         </span>
                       </span>
                       <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 800 }}>
-                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "summary"); }} style={{ color: summaryCount > 0 ? PINK : "var(--color-muted)", cursor: "pointer" }}>요약 {summaryCount}</span>
-                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "quiz"); }} style={{ color: quizCount > 0 ? CYAN : "var(--color-muted)", cursor: "pointer" }}>퀴즈 {quizCount}</span>
+                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "summary"); }} style={{ color: summaryCount > 0 ? "var(--color-pink-deep)" : "var(--color-muted)", cursor: "pointer" }}>요약 {summaryCount}</span>
+                        <span className="tongkk-count-link" onClick={e => { e.stopPropagation(); onOpenMaterial(material, "quiz"); }} style={{ color: quizCount > 0 ? "var(--color-cyan-deep)" : "var(--color-muted)", cursor: "pointer" }}>퀴즈 {quizCount}</span>
                       </span>
                     </button>
                     <button
@@ -428,7 +429,7 @@ const CourseDetailModal = ({
             borderRadius: 10,
             border: "none",
             background: "var(--color-tint-pink)",
-            color: PINK,
+            color: "var(--color-pink-deep)",
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
@@ -438,7 +439,7 @@ const CourseDetailModal = ({
             borderRadius: 10,
             border: "none",
             background: "var(--color-tint-cyan)",
-            color: CYAN,
+            color: "var(--color-cyan-deep)",
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
@@ -465,8 +466,8 @@ const NOTICES: { date: string; tag: string; title: string; body: string; link?: 
   {
     date: "2026.06.11",
     tag: "설문",
-    title: "사용자 설문에 참여해 주세요",
-    body: "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했어요. 잠깐이면 끝나니 아래 버튼으로 참여해 주시면 큰 도움이 됩니다.",
+    title: "사용자 설문에 참여하세요",
+    body: "설문에 참여해 서비스 개선 의견을 남겨주세요.",
     link: "https://forms.gle/cDguG46mLHqSUmu7A",
     linkLabel: "설문 참여하기",
   },
@@ -479,7 +480,7 @@ const NOTICES: { date: string; tag: string; title: string; body: string; link?: 
   {
     date: "2026.06.11",
     tag: "개발 중",
-    title: "아직 준비 중인 기능이 있어요",
+    title: "아직 준비 중인 기능이 있습니다",
     body: "다음 기능은 아직 완성되지 않았어요: 다크모드(완벽 적용 전), AI 학습 계획 자동 생성, 학습 통계 탭, 로그인 기능. 순차적으로 업데이트할 예정이니 양해 부탁드려요.",
   },
   {
@@ -507,7 +508,7 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
         {NOTICES.map((notice, i) => (
           <div key={i} style={{ padding: 16, borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-surface)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
-              <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: PINK, fontSize: 11, fontWeight: 800 }}>{notice.tag}</span>
+              <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)", color: "var(--color-pink-deep)", fontSize: 11, fontWeight: 800 }}>{notice.tag}</span>
               <span style={{ fontSize: 12, color: "var(--color-muted)", fontWeight: 700 }}>{notice.date}</span>
             </div>
             <p style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>{notice.title}</p>
@@ -520,7 +521,7 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12,
                   padding: "9px 16px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "var(--color-on-brand)",
+                  background: "var(--color-action-cyan)", color: "var(--color-on-brand)",
                   fontSize: 13, fontWeight: 800, textDecoration: "none", cursor: "pointer",
                 }}
               >
@@ -556,7 +557,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           }}>×</button>
         </div>
         <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
-          버그 제보, 기능 제안 등 어떤 의견이든 환영해요. 아래 주소로 메일을 보내주시면 큰 힘이 됩니다.
+          오류나 개선 의견을 아래 이메일로 보내주세요.
         </p>
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -573,7 +574,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
             }}
             style={{
               flexShrink: 0, padding: "6px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
-              background: "var(--color-card)", color: copied ? CYAN : "var(--color-text-secondary)",
+              background: "var(--color-card)", color: copied ? "var(--color-cyan-deep)" : "var(--color-text-secondary)",
               fontSize: 12.5, fontWeight: 700, cursor: "pointer",
             }}
           >{copied ? "복사됨!" : "복사"}</button>
@@ -583,7 +584,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             padding: "12px 16px", borderRadius: 10, border: "none",
-            background: PINK, color: "var(--color-on-brand)",
+            background: "var(--color-action-pink)", color: "var(--color-on-brand)",
             fontSize: 14, fontWeight: 800, textDecoration: "none", cursor: "pointer",
             boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
           }}
@@ -859,7 +860,7 @@ export default function Dashboard() {
       eventCount ? `가까운 일정 ${eventCount}개` : "",
       reviewCount ? `복습 추천 ${reviewCount}개` : "",
     ].filter(Boolean);
-    if (parts.length === 0) return "자동으로 고른 항목이 없어요. 반영할 항목을 선택해 주세요.";
+    if (parts.length === 0) return "자동으로 고른 항목이 없습니다. 반영할 항목을 선택하세요.";
     if (mode === "lighter") return `${parts.join("와 ")}만 가볍게 반영할게요.`;
     if (mode === "harder") return `${parts.join("와 ")}를 조금 빡세게 반영할게요.`;
     if (mode === "assignment") return `과제 중심으로 ${parts.join("와 ")}를 골라뒀어요.`;
@@ -1044,7 +1045,7 @@ export default function Dashboard() {
     setPlans(prev => prev.filter((item, index) =>
       removed.id ? item.id !== removed.id : index !== removeIndex
     ));
-    showToast("학습 계획을 삭제했어요.", "info", {
+    showToast("학습 계획을 삭제했습니다.", "info", {
       duration: 6000,
       action: {
         label: "되돌리기",
@@ -1135,31 +1136,41 @@ export default function Dashboard() {
     )[0] ?? null;
   const recommendedCourse = stepView?.plan.course ?? null;
   const startHint = !stepView
-    ? "추천할 과목이 아직 없어요."
+    ? "추천할 과목이 없습니다."
     : stepView.status !== "on"
       ? `조금 밀렸어요. ${stepView.plan.course}부터 시작해요.`
       : stepView.dday
         ? `오늘 추천: ${stepView.plan.course} · ${formatDdayLabel(stepView.daysLeft)}`
         : `오늘 추천: ${stepView.plan.course}`;
-  const briefing = buildBriefing({
-    ddays: sortedDdays.map(dday => ({ subj: dday.subj, type: dday.type, daysLeft: getDaysLeft(dday.date) })),
+  const recommendations = buildBriefing({
+    ddays: sortedDdays.map(dday => ({ id: dday.id, date: dday.date, subj: dday.subj, type: dday.type, daysLeft: getDaysLeft(dday.date) })),
     paces: [...activePaceViews]
       .sort((a, b) => statusRank[a.status] - statusRank[b.status] || a.daysLeft - b.daysLeft)
-      .map(view => ({ course: view.plan.course, status: view.status, progress: view.progress, todayTarget: view.todayTarget, unitLabel: view.unitLabel })),
+      .map(view => ({ id: view.plan.id, date: todayStr, course: view.plan.course, status: view.status, progress: view.progress, todayTarget: view.todayTarget, unitLabel: view.unitLabel })),
     scores: Object.fromEntries(Object.entries(courseQuizAttempts).map(([course, attempts]) => [course, attempts.map(attempt => attempt.scorePercent)])),
-    todayPlansLeft: todayPlanEntries.filter(({ plan }) => !plan.done).length,
+    // 남은 계획 수는 같은 카드의 '오늘 할 일'에서 표시한다.
+    todayPlansLeft: 0,
   });
-  // "자료 복습하기" 대상 과목: 추천 과목 → 요약 있는 과목 → 자료 있는 과목 순.
-  // (페이스 플랜이 없어도 복습 동선이 끊기지 않게 한다.)
+  // 자료 개수를 아직 불러오지 않았거나 첫 자료를 올리기 전에도 과목 자료로 진입한다.
   const reviewCourse = recommendedCourse
     ?? courses.find(course => (courseStats[course]?.summaries ?? 0) > 0)
     ?? courses.find(course => (courseStats[course]?.materials ?? 0) > 0)
+    ?? courses[0]
     ?? null;
 
   // "자료 복습하기"는 라벨대로 '보러' 간다: 가장 최근 요약이 달린 자료 상세(요약 탭)로
-  // 바로 이동하고, 과목에 요약이 아직 없으면 요약 설정 화면으로 폴백한다.
+  // 바로 이동하고, 과목에 요약이 아직 없으면 자료 업로드 화면으로 폴백한다.
   const handleReviewMaterials = async () => {
-    if (!reviewCourse || reviewNavigating) return;
+    if (reviewNavigating) return;
+    if (!requireAuth("자료를 복습하려면 로그인이 필요해요")) return;
+    if (!hasLoadedCourses) {
+      showToast("강의 목록을 불러오는 중이에요. 잠시 후 다시 눌러주세요.", "info");
+      return;
+    }
+    if (!reviewCourse) {
+      setShowAddCourse(true);
+      return;
+    }
     setReviewNavigating(true);
     const fallbackState = { selectedCourse: reviewCourse, fromDashboard: true };
     try {
@@ -1236,10 +1247,10 @@ export default function Dashboard() {
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>
         <NoticeBanner messages={[
-          { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: PINK },
+          { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: "var(--color-pink-deep)" },
           "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",
-          "Tongkk는 무료! 사용료 대신 여러분의 피드백을 먹고 자랍니다 ^.^ ",
-          "더 나은 Tongkk을 만들기 위해 짧은 설문을 준비했으니 오른쪽 공지사항을 참고해주세요."
+          "Tongkk는 무료로 이용할 수 있습니다. ",
+          "설문 참여는 공지사항을 확인하세요."
 ,
         ]} />
         <button type="button"
@@ -1277,69 +1288,10 @@ export default function Dashboard() {
       </div>
 
       <div className="app-container">
-        <LearningBriefing key={user?.id || 'guest'} />
-        <Card className="mb-5 border border-cyan/30 bg-cyan/5 p-5">
-          <h2 className="m-0 text-xl font-extrabold leading-7 text-text-strong">
-            오늘의 학습 브리핑
-          </h2>
-          <p className="m-0 mt-2 text-sm font-bold leading-5 text-muted">
-            {!stepView && briefing.length > 0 ? "오늘 챙길 것을 모아봤어요." : startHint}
-          </p>
-          {briefing.length > 0 && (
-            <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0" aria-label="오늘의 브리핑">
-              {briefing.map(item => (
-                <li key={item.title} className="flex items-start gap-2.5 rounded-xl bg-white px-4 py-3 dark:bg-slate-900">
-                  <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.urgent ? "bg-pink" : "bg-cyan"}`} />
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <button type="button" onClick={() => item.target && navigate(learningTargetUrl(item.target))} className="text-left text-sm font-extrabold text-text-strong cursor-pointer">{item.title} →</button>
-                    <span className="text-xs font-semibold text-muted">{item.reason}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {resumePoint && courses.includes(resumePoint.course) && (
-            <button
-              type="button"
-              onClick={() => navigate(resumePoint.route, { state: resumePoint.state })}
-              className="mt-4 flex w-full items-center justify-between gap-3 rounded-[14px] border border-cyan bg-cyan px-5 py-4 text-left cursor-pointer hover:opacity-90"
-            >
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="text-xs font-bold text-white/80">이어서 하기 · {resumePoint.course}</span>
-                <span className="truncate text-base font-extrabold text-white">{resumePoint.title}</span>
-                <span className="text-xs font-semibold text-white/80">{resumePoint.activity}</span>
-              </span>
-              <span aria-hidden className="shrink-0 text-xl font-extrabold text-white">→</span>
-            </button>
-          )}
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => navigate(pageRoutes["오답 노트"])}
-              className="flex flex-col items-start gap-1 rounded-[14px] border border-pink bg-white px-5 py-4 text-left cursor-pointer hover:bg-pink/5 dark:bg-slate-900"
-            >
-              <span className="text-base font-extrabold text-pink">오답 다시 풀기</span>
-              <span className="text-xs font-semibold text-pink/80">틀린 문제부터 확인</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleReviewMaterials()}
-              disabled={!reviewCourse}
-              className={reviewCourse
-                ? "flex flex-col items-start gap-1 rounded-[14px] border border-cyan bg-white px-5 py-4 text-left cursor-pointer hover:bg-cyan/5 dark:bg-slate-900"
-                : "flex flex-col items-start gap-1 rounded-[14px] border border-cyan/40 bg-white px-5 py-4 text-left cursor-default opacity-60 dark:bg-slate-900"}
-            >
-              <span className="text-base font-extrabold text-cyan">자료 복습하기</span>
-              <span className="text-xs font-semibold text-cyan/80">
-                {!reviewCourse
-                  ? "과목과 자료를 먼저 추가해보세요"
-                  : (courseStats[reviewCourse]?.summaries ?? 0) > 0
-                    ? `${reviewCourse} 최근 요약 보기`
-                    : `${reviewCourse} 요약 만들러 가기`}
-              </span>
-            </button>
-          </div>
-        </Card>
+        <LearningBriefing
+          key={user?.id || 'guest'}
+          resumePoint={resumePoint && courses.includes(resumePoint.course) ? resumePoint : null}
+        />
         <div className="dash-main-grid">
           {/* 강의 목록 카드 그리드 */}
           <div>
@@ -1361,18 +1313,11 @@ export default function Dashboard() {
               }}>
                 <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 850, color: "var(--color-text-strong)" }}>아직 등록된 강의가 없습니다.</h2>
                 <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.7, color: "var(--color-muted)" }}>
-                  강의를 만들고 강의자료를 올려보세요.<br />AI가 요약·퀴즈·학습 계획까지 한 번에 도와드려요.
+                  강의를 만들고 강의자료를 올려보세요.<br />AI로 요약·퀴즈·학습 계획을 만드세요.
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-                  <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
-                    padding: "11px 18px", borderRadius: 10, border: "none", background: PINK,
-                    color: "var(--color-on-brand)", fontSize: 14, fontWeight: 850, cursor: "pointer",
-                    boxShadow: "0 10px 24px rgba(240,112,174,0.22)",
-                  }}>+ 강의 추가하기</button>
-                  <button type="button" onClick={openSampleDemo} style={{
-                    padding: "11px 18px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, background: "transparent",
-                    color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                  }}>예시로 둘러보기</button>
+                  <button type="button" className="dashboard-action dashboard-action--brand" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }}>+ 강의 추가하기</button>
+                  <button type="button" className="dashboard-action dashboard-action--text" onClick={openSampleDemo}>예시로 둘러보기</button>
                 </div>
               </div>
             ) : (
@@ -1386,26 +1331,31 @@ export default function Dashboard() {
                     <Card
                       key={course}
                       className="tongkk-hover-lift"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openCourseDetail(course)}
-                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCourseDetail(course); } }}
                       style={{
-                        minHeight: 120, padding: 20, cursor: "pointer", position: "relative",
+                        minHeight: 120, position: "relative",
                         // hover 시 transform이 쌓임 맥락을 만들어 메뉴 zIndex가 카드 안에 갇힌다 → 메뉴가 열린 카드 자체를 위로 올려 아래 카드에 가리지 않게.
                         zIndex: openCourseMenu === course ? 30 : undefined,
                         display: "flex", flexDirection: "column", justifyContent: "space-between",
                         transition: "transform 0.15s ease, box-shadow 0.15s ease",
                       }}
                     >
-                      <div>
-                        <h2 style={{ margin: "0 44px 10px 0", fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
+                      <button
+                        type="button"
+                        onClick={() => openCourseDetail(course)}
+                        aria-label={`${course} 강의 자료 보기`}
+                        style={{
+                          display: "flex", flex: 1, flexDirection: "column", gap: 10,
+                          width: "100%", padding: 20, border: "none", borderRadius: 18,
+                          background: "transparent", textAlign: "left", cursor: "pointer",
+                        }}
+                      >
+                        <span style={{ marginRight: 44, fontSize: 17, fontWeight: 850, color: "var(--color-text-strong)", lineHeight: 1.35, wordBreak: "break-word" }}>
                           {course}
-                        </h2>
-                        <p style={{ margin: 0, fontSize: 13, color: stats.error ? "var(--color-danger)" : "var(--color-text-secondary)", fontWeight: 700 }}>
+                        </span>
+                        <span style={{ fontSize: 13, color: stats.error ? "var(--color-danger)" : "var(--color-text-secondary)", fontWeight: 700 }}>
                           {stats.error ? "정보를 불러오지 못했습니다" : statsLabel}
-                        </p>
-                      </div>
+                        </span>
+                      </button>
                       <button
                         type="button"
                         className="tongkk-hover-dim"
@@ -1433,10 +1383,7 @@ export default function Dashboard() {
                     </Card>
                   );
                 })}
-                <button type="button" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }} style={{
-                  minHeight: 120, borderRadius: 18, border: "1px dashed var(--color-border)",
-                  background: "var(--color-card)", color: PINK, fontSize: 15, fontWeight: 850, cursor: "pointer",
-                }}>+ 강의 추가하기</button>
+                <button type="button" className="dashboard-action dashboard-action--brand dashboard-course-add" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }}>+ 강의 추가하기</button>
               </div>
             )}
           </div>
@@ -1446,9 +1393,9 @@ export default function Dashboard() {
             {/* D-day */}
             <Card style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: PINK }}>D-day</h3>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-pink-deep)" }}>D-day</h3>
                 <button type="button" onClick={() => { if (!requireAuth("D-day를 추가하려면 로그인이 필요해요")) return; setShowAddDday(true); }} aria-label="D-day 추가" title="D-day 추가" style={{
-                  background: "none", border: "none", fontSize: 20, color: PINK, cursor: "pointer", lineHeight: 1
+                  background: "none", border: "none", fontSize: 20, color: "var(--color-pink-deep)", cursor: "pointer", lineHeight: 1
                 }}>+</button>
               </div>
               {sortedDdays.length === 0 ? (
@@ -1473,7 +1420,7 @@ export default function Dashboard() {
                           <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{d.subj}</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: left <= 7 ? "var(--color-pink-deep)" : "var(--color-cyan-deep)" }}>
                             {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                           </span>
                           <button type="button"
@@ -1494,7 +1441,7 @@ export default function Dashboard() {
                   {sortedDdays.length > 3 && (
                     <button type="button" onClick={() => setShowAllDdays(!showAllDdays)} style={{
                       marginTop: 10, padding: "6px 0", width: "100%", background: "none",
-                      border: "none", color: PINK, fontSize: 13, cursor: "pointer", fontWeight: 500
+                      border: "none", color: "var(--color-pink-deep)", fontSize: 13, cursor: "pointer", fontWeight: 500
                     }}>{showAllDdays ? "접기" : `더보기 (${sortedDdays.length - 3}개)`}</button>
                   )}
                 </>
@@ -1525,6 +1472,31 @@ export default function Dashboard() {
                   </svg>
                 </button>
               </div>
+              <section aria-labelledby="today-recommendations-heading" className="mb-5 border-b border-border-soft pb-4">
+                <h4 id="today-recommendations-heading" className="m-0 text-[13px] font-bold text-text-strong">오늘의 추천</h4>
+                {stepView && <p className="m-0 mt-1.5 text-xs leading-5 text-muted">{startHint}</p>}
+                <LearningRecommendations key={user?.id || 'guest'} items={recommendations} />
+                <div className="today-review-actions">
+                  <Link
+                    to={`${pageRoutes["오답 노트"]}?tab=wrong`}
+                    className="dashboard-action"
+                  >오답 다시 풀기</Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleReviewMaterials()}
+                    disabled={reviewNavigating}
+                    aria-busy={reviewNavigating}
+                    title={reviewCourse ? `${reviewCourse} 자료 복습하기` : "강의를 추가하고 자료 복습 시작하기"}
+                    className="dashboard-action"
+                  >{reviewNavigating ? "불러오는 중…" : "자료 복습하기"}</button>
+                </div>
+              </section>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h4 className="m-0 text-[13px] font-bold text-text-strong">오늘 할 일</h4>
+                {todayPlanEntries.length > 0 && (
+                  <span className="text-xs text-muted">{todayPlanEntries.filter(({ plan }) => plan.done).length}/{todayPlanEntries.length} 완료</span>
+                )}
+              </div>
               {studyPlanMessage ? (
                 <p style={{ margin: "0 0 12px", color: "var(--color-text)", fontSize: 13, lineHeight: 1.6 }}>
                   {studyPlanMessage}
@@ -1544,7 +1516,7 @@ export default function Dashboard() {
                 </p>
               ) : (
                 <p style={{ margin: "0 0 12px", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
-                  D-day와 미완료 항목을 보고 오늘 할 일을 자동으로 쪼개드릴게요.
+                  D-day와 미완료 계획으로 오늘 할 일을 생성합니다.
                 </p>
               )}
               <div style={{ display: "flex", gap: 8, marginBottom: showStudyPlanOptions ? 8 : 14 }}>
@@ -1557,7 +1529,7 @@ export default function Dashboard() {
                       flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 8,
                       border: `1px solid ${!canGenerateStudyPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN}`,
                       background: "var(--color-card)",
-                      color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : CYAN,
+                      color: !canGenerateStudyPlan || studyPlanLoading ? "var(--color-muted)" : "var(--color-cyan-deep)",
                       cursor: !canGenerateStudyPlan || studyPlanLoading ? "default" : "pointer",
                       fontSize: 13, fontWeight: 800,
                     }}
@@ -1572,7 +1544,7 @@ export default function Dashboard() {
                     style={{
                       width: 30, flexShrink: 0, borderRadius: 8,
                       border: "1px solid color-mix(in srgb, var(--color-cyan) 20%, transparent)", background: "var(--color-card)",
-                      color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
+                      color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 13, fontWeight: 800, padding: 0,
                     }}
                   >
                     {showStudyPlanOptions ? "⌃" : "⌄"}
@@ -1584,7 +1556,7 @@ export default function Dashboard() {
                   style={{
                     flex: 1, padding: "8px 10px", borderRadius: 8,
                     border: `1px solid ${CYAN}`, background: "var(--color-card)",
-                    color: CYAN, cursor: "pointer", fontSize: 13, fontWeight: 800,
+                    color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 13, fontWeight: 800,
                   }}
                 >
                   직접 추가하기
@@ -1625,7 +1597,7 @@ export default function Dashboard() {
                     {planSourceMessage}
                   </p>
                   <p style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
-                    직접 작성한 계획은 그대로 유지돼요. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
+                    직접 작성한 계획은 그대로 유지됩니다. 함께 반영한 남은 계획과 이전 AI 계획만 새로 짜드려요.
                   </p>
                   {([
                     { title: "D-day", sources: ddayPlanSources },
@@ -1725,7 +1697,7 @@ export default function Dashboard() {
                                 padding: "6px 9px", borderRadius: 999,
                                 border: `1px solid ${selected ? CYAN : "var(--color-border-soft)"}`,
                                 background: selected ? "var(--color-tint-cyan)" : "var(--color-card)",
-                                color: selected ? CYAN : "var(--color-text-secondary)",
+                                color: selected ? "var(--color-cyan-deep)" : "var(--color-text-secondary)",
                                 cursor: "pointer", fontSize: 12, fontWeight: selected ? 800 : 650,
                               }}
                             >
@@ -1743,14 +1715,14 @@ export default function Dashboard() {
                       background: "var(--color-card)", border: "1px solid var(--color-border-soft)",
                     }}>
                       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--color-text-secondary)" }}>
-                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인해보세요.
+                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인하세요.
                       </p>
                       <button
                         type="button"
                         onClick={() => navigate(pageRoutes["퀴즈 생성"], { state: { course: diagnosticCourse, diagnostic: true, fromDashboard: true } })}
                         style={{
                           flexShrink: 0, padding: "6px 9px", borderRadius: 8, border: `1px solid ${CYAN}`,
-                          background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 12, fontWeight: 800,
+                          background: "var(--color-card)", color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 12, fontWeight: 800,
                         }}
                       >
                         진단 퀴즈 풀기
@@ -1772,7 +1744,7 @@ export default function Dashboard() {
                       disabled={!canSubmitPlan || studyPlanLoading}
                       style={{
                         padding: "7px 11px", borderRadius: 8, border: "none",
-                        background: !canSubmitPlan || studyPlanLoading ? "var(--color-border-soft)" : CYAN,
+                        background: !canSubmitPlan || studyPlanLoading ? "var(--color-border-soft)" : "var(--color-action-cyan)",
                         color: "var(--color-on-brand)",
                         cursor: !canSubmitPlan || studyPlanLoading ? "default" : "pointer",
                         fontSize: 12, fontWeight: 800,
@@ -1790,7 +1762,7 @@ export default function Dashboard() {
               )}
               {!canGenerateStudyPlan && (
                 <p style={{ color: "var(--color-muted)", fontSize: 13, textAlign: "center", padding: "6px 0 12px", margin: 0 }}>
-                  먼저 D-day에 과제나 일정을 추가해보세요
+                  먼저 D-day에 과제나 일정을 추가하세요
                 </p>
               )}
               {todayPlanEntries.length === 0 ? (
@@ -1803,20 +1775,29 @@ export default function Dashboard() {
                     const showTopBorder = idx > 0;
                     return (
                       <div key={p.id || `${p.text}-${i}`} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                        display: "flex", alignItems: "center", gap: 8, padding: "10px 0",
                         borderTop: showTopBorder ? "1px solid var(--color-border-soft)" : "none"
                       }}>
-                        <button type="button" onClick={() => {
-                          setPlans(prev => prev.map((item, index) => index === i ? { ...item, done: !item.done } : item));
-                        }} style={{
-                          width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "var(--color-border-soft)"}`,
-                          background: p.done ? CYAN : "var(--color-card)", cursor: "pointer", display: "flex",
-                          alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0
+                        <label style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 44, height: 44, flexShrink: 0, cursor: "pointer",
                         }}>
-                          {p.done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
-                        </button>
+                          <input
+                            type="checkbox"
+                            checked={p.done}
+                            aria-label={`${p.text} 완료`}
+                            onChange={e => {
+                              const done = e.target.checked;
+                              setPlans(prev => prev.map((item, index) => index === i ? { ...item, done } : item));
+                            }}
+                            style={{ width: 22, height: 22, margin: 0, accentColor: "var(--color-cyan-deep)", cursor: "pointer" }}
+                          />
+                        </label>
                         {isEditing ? (
                           <input
+                            name="study-plan"
+                            aria-label="학습 계획 수정"
+                            autoComplete="off"
                             value={editingPlanText}
                             onChange={e => setEditingPlanText(e.target.value)}
                             onBlur={() => finishEditPlan(p, i)}
@@ -1830,7 +1811,7 @@ export default function Dashboard() {
                             autoFocus
                             style={{
                               flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8,
-                              border: `1px solid ${CYAN}`, outline: "none", fontSize: 14,
+                              border: `1px solid ${CYAN}`, fontSize: 14,
                               color: "var(--color-text-strong)", boxSizing: "border-box",
                             }}
                           />
@@ -1851,7 +1832,7 @@ export default function Dashboard() {
                             {p.origin === "ai" && (
                               <span style={{
                                 display: "inline-block", marginRight: 6, padding: "1px 6px", borderRadius: 999,
-                                background: "var(--color-tint-cyan)", color: CYAN, fontSize: 10, fontWeight: 850,
+                                background: "var(--color-tint-cyan)", color: "var(--color-cyan-deep)", fontSize: 10, fontWeight: 850,
                                 verticalAlign: "1px", textDecoration: "none",
                               }}>AI</span>
                             )}
@@ -1868,7 +1849,7 @@ export default function Dashboard() {
                             title={planActionLabels[p.action]}
                             style={{
                               width: 24, height: 24, borderRadius: 8, border: `1px solid ${CYAN}`,
-                              background: "var(--color-card)", color: CYAN, cursor: "pointer", fontSize: 13,
+                              background: "var(--color-card)", color: "var(--color-cyan-deep)", cursor: "pointer", fontSize: 13,
                               lineHeight: "22px", padding: 0, flexShrink: 0, fontWeight: 800,
                             }}
                           >↗</button>

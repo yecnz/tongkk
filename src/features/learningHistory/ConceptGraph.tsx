@@ -15,9 +15,9 @@ export default function ConceptGraph() {
   useEffect(() => { if (!user) return; const c = new AbortController(); workflowRequest<Graph>('/learning-graph','GET',undefined,c.signal).then(setData).catch(e => { if (!c.signal.aborted) setError(e.message); }); return () => c.abort(); },[user,retry]);
   async function connect(a:string,b:string,kind:string) { setBusy(true); setError(''); try { setData(await workflowRequest<Graph>('/learning-graph/links','POST',{id:crypto.randomUUID(),source_id:a,target_id:b,relation:kind})); } catch(e) { setError(e instanceof Error ? e.message : '개념을 연결하지 못했어요.'); } finally { setBusy(false); } }
   async function remove(id:string) { setBusy(true); try { setData(await workflowRequest<Graph>(`/learning-graph/links/${id}`,'DELETE')); } catch(e) { setError(e instanceof Error ? e.message : '연결을 해제하지 못했어요.'); } finally { setBusy(false); } }
-  if (!user) return <p className="workflow-muted">로그인하면 여러 과목의 개념을 연결할 수 있어요.</p>;
+  if (!user) return <p className="workflow-muted">개념을 연결하려면 로그인하세요.</p>;
   const members = data?.groups.flatMap(g => g.members) || []; const names = Object.fromEntries(members.map(m => [m.id,`${m.title} · ${m.course_name}`]));
-  return <div className="workflow-surface workflow-stack"><h2 className="workflow-view-title">개념 지도</h2><p className="workflow-muted">같은 뜻의 개념은 확인 후 연결하고, 먼저 공부할 개념에서 다음 개념으로 선수 관계를 연결하세요. 원문별 답변과 근거는 각각 보존해요.</p>
+  return <div className="workflow-surface workflow-stack"><h2 className="workflow-view-title">개념 지도</h2><p className="workflow-muted">같은 개념을 연결하거나 학습 순서를 설정하세요. 원문별 기록은 유지됩니다.</p>
     {error && <p role="alert">{error} <button type="button" onClick={() => { setError('');setRetry(n=>n+1); }}>다시 확인</button></p>}
     {!data ? <p role="status">지도를 불러오는 중…</p> : <>
       {data.recommendations.map(r=><Card key={r.concept_id} className="workflow-panel workflow-stack"><h3>먼저 보완하기: {r.title}</h3><p className="workflow-muted">{r.reason}</p><Link to={`/stats?view=concepts&conceptId=${r.concept_id}`}>수행 근거 보기 →</Link></Card>)}
@@ -25,15 +25,15 @@ export default function ConceptGraph() {
         {data.prerequisites.map(e=>{const a=data.groups.findIndex(g=>g.id===e.source),b=data.groups.findIndex(g=>g.id===e.target);return <path key={`${e.source}:${e.target}`} d={`M 490 ${a*84+35} C 700 ${a*84+35},700 ${b*84+35},490 ${b*84+35}`} fill="none" stroke="var(--color-muted)" markerEnd="url(#concept-arrow)"/>;})}
         {data.groups.map((g,i)=><g key={g.id}><rect x="12" y={i*84+8} width="475" height="62" rx="10" fill="var(--color-card)" stroke="var(--color-border)"/><text x="28" y={i*84+33} fill="var(--color-text)" fontSize="15">{g.title.slice(0,35)}</text><text x="28" y={i*84+54} fill="var(--color-muted)" fontSize="12">{new Set(g.members.map(m=>m.course_name)).size}개 과목 · {g.members.length}개 원문 개념 · 근거 {g.evidence_count}개</text></g>)}
       </svg></div>}
-      {data.groups.length > 0 && <p className="workflow-map-hint workflow-meta">지도를 좌우로 움직여 개념과 선수 관계를 확인하세요.</p>}
-      {!members.length ? <p>설명 학습을 완료하면 지도에 개념이 나타나요.</p> : <>
+      {data.groups.length > 0 && <p className="workflow-map-hint workflow-meta">좌우로 움직여 개념과 학습 순서를 확인하세요.</p>}
+      {!members.length ? <p>학습을 완료하면 개념이 표시됩니다.</p> : <>
         <Card className="workflow-panel workflow-stack"><h3>개념 연결</h3><div className="workflow-form-grid"><label className="workflow-field">먼저 공부할 개념 / 같은 개념<select value={source} onChange={e=>setSource(e.target.value)}><option value="">선택</option>{members.filter(m=>!m.source_changed).map(m=><option key={m.id} value={m.id}>{names[m.id]} · {m.material_name}</option>)}</select></label>
           <label className="workflow-field">연결 유형<select value={relation} onChange={e=>setRelation(e.target.value)}><option value="prerequisite">선수 개념 → 다음 개념</option><option value="equivalent">같은 뜻의 개념</option></select></label>
           <label className="workflow-field workflow-span-full">연결할 개념<select value={target} onChange={e=>setTarget(e.target.value)}><option value="">선택</option>{members.filter(m=>!m.source_changed && m.id!==source).map(m=><option key={m.id} value={m.id}>{names[m.id]} · {m.material_name}</option>)}</select></label></div>
           <button type="button" className="workflow-primary" disabled={busy||!source||!target||source===target} onClick={()=>{void connect(source,target,relation);}}>연결 저장</button></Card>
-        {data.suggestions.length>0 && <Card className="workflow-panel workflow-stack"><h3>같은 개념인지 확인해주세요</h3>{data.suggestions.map(s=><div className="workflow-item" key={`${s.source_id}:${s.target_id}`}><p>{names[s.source_id]} ↔ {names[s.target_id]}</p><button type="button" disabled={busy} onClick={()=>{void connect(s.source_id,s.target_id,'equivalent');}}>같은 개념으로 연결</button></div>)}</Card>}
+        {data.suggestions.length>0 && <Card className="workflow-panel workflow-stack"><h3>같은 개념인지 확인하세요</h3>{data.suggestions.map(s=><div className="workflow-item" key={`${s.source_id}:${s.target_id}`}><p>{names[s.source_id]} ↔ {names[s.target_id]}</p><button type="button" disabled={busy} onClick={()=>{void connect(s.source_id,s.target_id,'equivalent');}}>같은 개념으로 연결</button></div>)}</Card>}
         {data.groups.map(g=><Card className="workflow-panel workflow-stack" key={g.id}><h3>{g.title}</h3>{g.members.map(m=><p key={m.id}><Link to={`/stats?view=concepts&conceptId=${m.id}`}>{m.course_name} · {m.material_name} · {labels[m.state] || m.state} →</Link></p>)}</Card>)}
-        <Card className="workflow-panel workflow-stack"><h3>저장한 관계</h3>{data.links.map(e=><div className="workflow-card-heading" key={e.id}><p>{names[e.source_id]} {e.relation==='equivalent'?'↔':'→'} {names[e.target_id]}</p><button type="button" disabled={busy} onClick={()=>{void remove(e.id);}}>연결 해제</button></div>)}{!data.links.length&&<p>아직 연결한 관계가 없어요.</p>}</Card>
+        <Card className="workflow-panel workflow-stack"><h3>저장한 관계</h3>{data.links.map(e=><div className="workflow-card-heading" key={e.id}><p>{names[e.source_id]} {e.relation==='equivalent'?'↔':'→'} {names[e.target_id]}</p><button type="button" disabled={busy} onClick={()=>{void remove(e.id);}}>연결 해제</button></div>)}{!data.links.length&&<p>연결한 관계가 없습니다.</p>}</Card>
       </>}
     </>}
   </div>;

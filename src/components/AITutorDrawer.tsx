@@ -200,7 +200,7 @@ export const AITutorDrawer = ({
   initialQuestion,
   onInitialQuestionConsumed,
   pendingQuestion,
-  disabledReason = "요약 생성 후 AI 튜터를 사용할 수 있습니다",
+  disabledReason = "요약을 생성한 뒤 질문하세요",
   resetHistory = false,
   layout = "drawer",
   fill = false,
@@ -847,7 +847,7 @@ export const AITutorDrawer = ({
               </div>
             ) : chatLoading ? (
               <div style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>
-                이전 AI 튜터 대화를 불러오는 중입니다.
+                이전 AI 튜터 대화를 불러오는 중…
               </div>
             ) : agentMessages.length === 0 ? (
               <div style={{ padding: 14, borderRadius: 12, background: "var(--color-surface)", color: "var(--color-muted)", fontSize: 13, lineHeight: 1.6 }}>

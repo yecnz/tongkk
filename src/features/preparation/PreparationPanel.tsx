@@ -21,7 +21,7 @@ export default function PreparationPanel({ course, materialId, onApplied }: { co
     let active = true;
     async function load() {
       const id = (await fetchCourses()).find(c => c.name === course)?.id;
-      if (!id) throw new Error('과목을 찾을 수 없어요.');
+      if (!id) throw new Error('과목을 찾을 수 없습니다.');
       const value = await workflowRequest<{ requests: Preparation[] }>(`/preparation-requests?${new URLSearchParams({ course_id: id, material_id: materialId })}`);
       if (active) { setItems(value.requests); setError(''); }
     }
@@ -47,7 +47,7 @@ export default function PreparationPanel({ course, materialId, onApplied }: { co
     finally { setBusy(false); }
   }
   return <Card className="workflow-surface workflow-panel workflow-stack workflow-preparation"><button type="button" className="workflow-preparation-toggle" aria-expanded={open} onClick={() => setOpen(v => !v)}>학습 자료 자동 준비 {open ? '접기' : '열기'}</button>
-    {open && <><p className="workflow-muted">요약·퀴즈·설명 학습을 준비하고 초안을 확인한 뒤 저장해요.</p>
+    {open && <><p className="workflow-muted">요약·퀴즈·설명 학습 초안을 검토하고 저장하세요.</p>
       <PreparationOptions value={kinds} disabled={busy} onChange={value => { entry.current = null; setKinds(value); }} />
       <label className="workflow-field">페이지 범위 <input value={pages} disabled={busy} placeholder="전체 또는 1-3, 5" onChange={e => { entry.current = null; setPages(e.target.value); }} /></label>
       <label className="workflow-check"><input type="checkbox" checked={regenerate} disabled={busy} onChange={e => { entry.current = null; setRegenerate(e.target.checked); }} />기존 결과 대신 새로 생성</label>

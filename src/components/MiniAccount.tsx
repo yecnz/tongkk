@@ -89,7 +89,7 @@ export default function MiniAccount({ user, onSwitchAccount }: { user: User; onS
       await signOut({ scope: "local" });
       navigate("/mini", { replace: true });
     } catch {
-      setError("로그아웃하지 못했어요. 다시 시도해 주세요.");
+      setError("로그아웃하지 못했어요. 다시 시도하세요.");
     } finally {
       signingOut.current = false;
       setPending(false);

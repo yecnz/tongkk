@@ -25,7 +25,7 @@ export const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelec
 
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>출력 템플릿 선택</h2>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>반영할 범위와 집중할 내용을 정한 뒤, 요약 형식을 선택하세요</p>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>요약 범위와 형식을 선택하세요</p>
       </div>
 
       <div style={{ display: "grid", gap: 14, marginBottom: 24, maxWidth: 720 }}>

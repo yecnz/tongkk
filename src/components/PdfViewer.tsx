@@ -116,7 +116,7 @@ export function PdfViewer({ url, title, cacheKey }: PdfViewerProps) {
         boxSizing: "border-box",
       }}
     >
-      {status === "loading" && <div style={messageStyle}>원본 PDF를 불러오는 중입니다.</div>}
+      {status === "loading" && <div style={messageStyle}>원본 PDF를 불러오는 중…</div>}
       {status === "error" && (
         <div style={messageStyle}>
           <div style={{ color: "var(--color-danger)", fontWeight: 700, marginBottom: 10 }}>

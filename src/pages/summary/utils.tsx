@@ -42,7 +42,7 @@ export const classifyUploadFailure = (message: string): { kind: UploadFailureKin
     return {
       kind: "unsupported",
       label: "지원하지 않는 파일",
-      guide: "PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일이나 텍스트 붙여넣기로 다시 추가해주세요.",
+      guide: "PDF, PPT/PPTX, DOCX, TXT/MD, 이미지 파일이나 텍스트 붙여넣기로 다시 추가하세요.",
     };
   }
   if (
@@ -54,14 +54,14 @@ export const classifyUploadFailure = (message: string): { kind: UploadFailureKin
     return {
       kind: "tooLarge",
       label: "파일이 너무 큼",
-      guide: "파일을 50MB 미만으로 줄이거나 나눠 올리면 원본도 저장됩니다. 지금도 텍스트는 저장돼 요약·퀴즈엔 사용할 수 있어요.",
+      guide: "원본은 50MB 미만으로 업로드하세요. 저장된 텍스트로 요약·퀴즈는 이용할 수 있습니다.",
     };
   }
   if (message.includes("로그인") || message.includes("인증") || message.includes("401") || lower.includes("jwt")) {
     return {
       kind: "auth",
       label: "로그인 만료",
-      guide: "다시 로그인한 뒤 같은 파일을 재시도해주세요.",
+      guide: "다시 로그인한 뒤 같은 파일을 재시도하세요.",
     };
   }
   if (message.includes("LibreOffice") || message.includes("서버에") || message.includes("설정되지") || lower.includes("converter") || lower.includes("not found")) {
@@ -75,7 +75,7 @@ export const classifyUploadFailure = (message: string): { kind: UploadFailureKin
     return {
       kind: "network",
       label: "네트워크 오류",
-      guide: "잠시 후 다시 시도해주세요. 큰 파일이면 페이지 수를 줄이면 성공률이 높아집니다.",
+      guide: "잠시 후 다시 시도하세요. 큰 파일이면 페이지 수를 줄이면 성공률이 높아집니다.",
     };
   }
   return {

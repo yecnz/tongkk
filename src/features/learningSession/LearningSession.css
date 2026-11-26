@@ -122,6 +122,10 @@
 .learning-activity .learning-actions .primary { min-height: 44px; }
 .learning-submitted { margin: 20px 0; }
 .learning-page summary { cursor: pointer; font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+.learning-note { margin: 12px 0; font-size: 12px; line-height: 1.7; color: var(--color-text-secondary); }
+.learning-note > summary { cursor: pointer; font-size: 13px; line-height: 1.6; }
+.learning-note > p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.learning-note > summary:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 3px; border-radius: 4px; }
 .learning-page .learning-context h2 { font-size: 15px; margin-bottom: 14px; }
 .learning-context > p { font-size: 13px; }
 .learning-context-details, .learning-result-details { margin: 20px 0; display: grid; gap: 12px; font-size: 12px; }

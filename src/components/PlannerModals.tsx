@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useId, useRef, type CSSProperties } from "react";
 import { PINK, CYAN, Card } from "../common";
+import ModalDialog from "./ModalDialog";
 import { loadCourseMaterialsFromServer } from "../services/materials";
 import { loadQuizSetsFromServer } from "../services/quizSets";
 import type { PacePlan } from "../services/pace";
@@ -180,7 +181,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
             <button type="button" key={day} onClick={() => { onChange(dateStr); onSelectDate?.(dateStr); }} aria-label={dayLabel} aria-pressed={isSelected} style={{
               width: "100%", aspectRatio: "1", borderRadius: "50%",
               border: isSelected ? "none" : isToday ? "1px solid color-mix(in srgb, var(--color-cyan) 55%, transparent)" : "none",
-              background: isSelected ? PINK : "transparent",
+              background: isSelected ? "var(--color-action-pink)" : "transparent",
               color: isSelected ? "var(--color-on-brand)" : isToday ? "var(--color-cyan-deep)" : "var(--color-text-strong)",
               fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
               cursor: "pointer", transition: "background 0.15s",
@@ -216,6 +217,7 @@ type AddDdayModalProps = {
 };
 
 export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "assignment", initialSubj = "", heading = "D-day 추가", submitLabel = "추가" }: AddDdayModalProps) => {
+  const titleId = useId();
   const [type, setType] = useState<DdayType>(initialType);
   const [subj, setSubj] = useState(initialSubj);
   const [date, setDate] = useState(initialDate);
@@ -224,14 +226,14 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const placeholder = `${ddayTypeLabels[type]}명`;
   const handleSubmit = () => {
     if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해주세요.`); return; }
-    if (!date) { setError("달력에서 날짜를 선택해주세요."); return; }
+    if (!date) { setError("달력에서 날짜를 선택하세요."); return; }
     onAdd(type, subj.trim(), date);
     onClose();
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ width: "min(380px, 100%)", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
+    <ModalDialog labelledBy={titleId} onClose={onClose}>
+      <div style={{ width: "100%", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
+        <h3 id={titleId} style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
           {(["assignment", "event", "exam"] as const).map(item => {
             const selected = type === item;
@@ -263,8 +265,8 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
           background: "var(--glass-bg)"
         }}/>
         {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
-        <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? PINK : "var(--color-muted)" }}>
-          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택해주세요 (필수)"}
+        <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? "var(--color-pink-deep)" : "var(--color-muted)" }}>
+          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택하세요 (필수)"}
         </div>
         <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
         {error && (
@@ -273,37 +275,39 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleSubmit} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: PINK, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: "var(--color-action-pink)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>{submitLabel}</button>
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };
 
 type AddPlanModalProps = { onClose: () => void; onAdd: (text: string) => void };
 
 export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
+  const titleId = useId();
   const [txt, setTxt] = useState("");
   const [error, setError] = useState("");
   const handleAdd = () => {
     const planText = txt.trim();
-    if (!planText) { setError("학습 계획을 입력해주세요."); return; }
+    if (!planText) { setError("학습 계획을 입력하세요."); return; }
     onAdd(planText);
     onClose();
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <Card style={{ padding: 28, width: "min(340px, 100%)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
+    <ModalDialog labelledBy={titleId} onClose={onClose} width={340}>
+      <Card style={{ padding: 28, width: "100%" }}>
+        <h3 id={titleId} style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>학습 계획 추가</h3>
         <input
           value={txt}
           onChange={e => { setTxt(e.target.value); if (error) setError(""); }}
           onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
           placeholder="학습 계획을 입력하세요"
           aria-label="학습 계획"
-          autoFocus
+          name="study-plan"
+          autoComplete="off"
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
             fontSize: 14, boxSizing: "border-box", marginBottom: error ? 8 : 16
@@ -315,11 +319,11 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
           <button type="button" onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: CYAN, color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
+            padding: "8px 18px", borderRadius: 10, border: "none", background: "var(--color-action-cyan)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
           }}>추가</button>
         </div>
       </Card>
-    </div>
+    </ModalDialog>
   );
 };
 
@@ -406,7 +410,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
   const previewDaysLeft = rawDaysLeft !== null ? Math.max(rawDaysLeft, 1) : PACE_NO_DDAY_HORIZON_DAYS;
   const perDay = total > 0 ? Math.max(1, Math.ceil(total / Math.max(previewDaysLeft, 1))) : 0;
   const previewText = total <= 0
-    ? "기준을 선택하면 하루 권장량을 알려드려요."
+    ? "기준을 선택해 하루 학습량을 확인하세요."
     : rawDaysLeft === null
       ? `${PACE_NO_DDAY_HORIZON_DAYS}일 기준 → 하루 약 ${perDay}${unitLabel}`
       : rawDaysLeft > 0
@@ -426,12 +430,12 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
         <div className="border-b border-border bg-white px-6 py-5 dark:bg-slate-900">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan">
+              <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan-deep">
                 PACE PLAN
               </span>
               <h3 className="m-0 text-[19px] font-extrabold text-text-strong">페이스 플랜 만들기</h3>
               <p className="m-0 mt-1 text-sm leading-6 text-muted">
-                마감일과 분량을 연결해서 오늘 할 양을 계산해요.
+                마감일과 분량으로 하루 학습량을 계산합니다.
               </p>
             </div>
             <button
@@ -446,7 +450,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
           {courses.length === 0 ? (
             <div className="mb-5 rounded-[12px] border border-border bg-slate-50 px-4 py-4 dark:bg-slate-800/60">
               <p className="m-0 text-sm leading-6 text-muted">
-                먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있어요.
+                먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있습니다.
               </p>
             </div>
           ) : (
@@ -470,7 +474,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                   </select>
                 ) : (
                   <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
-                    D-day 없이 14일 기준 페이스로 시작합니다.
+                    마감일 미설정 시 14일 기준으로 계산합니다.
                   </div>
                 )}
               </div>
@@ -500,10 +504,10 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                                 : "border-border bg-white cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
                           }`}
                         >
-                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-text"}`}>
+                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan-deep" : "text-text"}`}>
                             {option.title}
                           </span>
-                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan" : "text-text-secondary"}`}>
+                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan-deep" : "text-text-secondary"}`}>
                             {option.hint}
                           </span>
                         </button>
@@ -519,12 +523,12 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                           : "border-border bg-white hover:bg-slate-50 dark:bg-slate-800"
                       }`}
                     >
-                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan" : "text-text"}`}>직접 입력</span>
+                      <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan-deep" : "text-text"}`}>직접 입력</span>
                       <span className="shrink-0 text-xs font-semibold text-muted">숫자로 직접 지정</span>
                     </button>
                   </div>
                 )}
-                {metricsError && <p className="m-0 mt-2 text-xs text-pink">{metricsError}</p>}
+                {metricsError && <p className="m-0 mt-2 text-xs text-pink-deep">{metricsError}</p>}
               </div>
               {basis === "manual" && (
                 <div className="mb-4">
@@ -541,7 +545,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
               )}
               <div className="mb-5 flex items-center justify-between gap-3 rounded-[12px] bg-pink/10 px-4 py-3">
                 <span className="shrink-0 text-xs font-bold text-text-secondary">하루 권장 학습량</span>
-                <span className="text-right text-sm font-extrabold text-pink">{previewText}</span>
+                <span className="text-right text-sm font-extrabold text-pink-deep">{previewText}</span>
               </div>
             </>
           )}
@@ -550,7 +554,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
             <button type="button"
               onClick={handleAdd}
               disabled={!canAdd}
-              className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
+              className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-action-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
             >
               만들기
             </button>
@@ -629,8 +633,8 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
         </div>
 
         {isQuiz ? (
-          <p style={{ margin: "0 0 14px", fontSize: 12, color: CYAN, fontWeight: 700 }}>
-            퀴즈 기준 플랜은 진행도가 퀴즈 응시에서 자동 집계돼요.
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--color-cyan-deep)", fontWeight: 700 }}>
+            퀴즈 진행도는 풀이 기록으로 자동 계산됩니다.
           </p>
         ) : (
           <div style={{ marginBottom: 14 }}>
@@ -654,7 +658,7 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
             disabled={!canSave}
             style={{
               padding: "8px 18px", borderRadius: 10, border: "none",
-              background: canSave ? PINK : "var(--color-muted)", color: "var(--color-on-brand)",
+              background: canSave ? "var(--color-action-pink)" : "var(--color-muted)", color: "var(--color-on-brand)",
               cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600,
             }}
           >저장</button>

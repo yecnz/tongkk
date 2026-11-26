@@ -17,7 +17,7 @@ function Row({ card, refresh }: { card: ReviewCard; refresh: () => void }) {
     finally { setBusy(false); }
   }
   return <Card className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{card.title}</h3><span className="workflow-badge" data-state={card.paused ? 'closed' : 'connected'}>{card.paused ? '일시 정지' : '복습 예정'}</span></div><p className="workflow-meta">{new Date(card.due_at).toLocaleString('ko-KR')}</p>
-    {card.source_changed && <p className="workflow-muted">원문이 바뀌었어요. 새 학습이 필요해요.</p>}
+    {card.source_changed && <p className="workflow-muted">원문이 변경되었습니다. 다시 학습하세요.</p>}
     <div className="workflow-actions">{!card.source_changed && !card.paused && <Link className="workflow-button workflow-primary" to={`/learn/review/${card.id}`}>설명하며 복습하기 →</Link>}{[[card.paused ? 'resume' : 'pause', card.paused ? '재개' : '일시 정지'], ['postpone', '1일 미루기']].map(([name, label]) =>
       <button type="button" key={name} disabled={busy || Boolean(pending.current && pending.current.action !== name)} onClick={() => { void action(name); }}>{pending.current?.action === name ? '이전 변경 확인' : label}</button>)}</div>
     {error && <p role="alert">{error} <button type="button" onClick={refresh}>새로 불러오기</button></p>}
@@ -38,6 +38,6 @@ export default function ReviewQueue({ day }: { day?: string }) {
   return <section className="workflow-surface workflow-stack" aria-label={day ? '선택한 날의 복습' : '복습 목록'}><h2>{day ? '이 날의 복습' : '오늘 복습'}</h2>
     {!day && <label className="workflow-check"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} />예정·일시 정지 복습도 보기</label>}
     {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
-      : loading ? <p role="status">복습을 불러오는 중…</p> : cards.length ? cards.map(c => <Row key={`${c.id}:${c.revision}`} card={c} refresh={() => setRetry(n => n + 1)} />) : <p>표시할 복습이 없어요.</p>}
+      : loading ? <p role="status">복습을 불러오는 중…</p> : cards.length ? cards.map(c => <Row key={`${c.id}:${c.revision}`} card={c} refresh={() => setRetry(n => n + 1)} />) : <p>표시할 복습이 없습니다.</p>}
   </section>;
 }

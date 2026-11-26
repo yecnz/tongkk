@@ -195,7 +195,7 @@ function SettingsWindow({ userId, email, loading, signOut }: {
     void runAction(async () => {
       const available = await hasNewWebBuild();
       setRefreshAvailable(available);
-      setUpdateMessage(available ? "새 버전이 있어요." : "최신 웹 버전을 사용 중이에요.");
+      setUpdateMessage(available ? "새 버전이 있습니다." : "최신 웹 버전을 사용 중이에요.");
     }, "버전을 확인하지 못했어요.");
   }
 
@@ -250,7 +250,7 @@ function SettingsWindow({ userId, email, loading, signOut }: {
               </div>
               <CheckRow label="시험·과제 하루 전 알림" checked={reminders.dayBefore} dark={dark}
                 disabled={remindersDisabled} onChange={dayBefore => saveReminder({ ...reminders, dayBefore })} />
-              <p className="menubar-settings-note">알림 설정은 Tongkk 웹과 함께 저장돼요.</p>
+              <p className="menubar-settings-note">알림 설정은 웹과 동기화됩니다.</p>
             </SettingsGroup>
           </>}
           {tab === "menubar" && <SettingsGroup title="메뉴바">
@@ -261,7 +261,7 @@ function SettingsWindow({ userId, email, loading, signOut }: {
             </div>
             <hr />
             <PopoverShortcutControl shortcut={shortcut} disabled={pending} onChange={changeShortcut} />
-            <p className="menubar-settings-note">할 일을 체크하면 Tongkk 웹에도 바로 반영돼요.</p>
+            <p className="menubar-settings-note">완료한 할 일은 웹에도 반영됩니다.</p>
           </SettingsGroup>}
           {tab === "account" && <>
             <SettingsGroup title="계정">

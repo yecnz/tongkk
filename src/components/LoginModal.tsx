@@ -114,7 +114,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     }
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail) || (webReset && emailTypeMismatch)) {
-      setError("이메일 주소를 다시 확인해주세요."); return;
+      setError("이메일 주소를 다시 확인하세요."); return;
     }
     if (view === 'reset' && emailWaitSeconds(kind, email) > 0) return;
     pending.current = true;
@@ -122,7 +122,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     try {
       if (view === 'reset') {
         await resetPassword(trimmedEmail);
-        setMessage('재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인해주세요.');
+        setMessage('재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인하세요.');
       } else if (view === 'confirmation') {
         await verifySignupCode(trimmedEmail, code);
         onAuthenticated();
@@ -141,10 +141,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
         changeView('confirmation');
         return;
       }
-      const fallback = view === 'reset' ? '재설정 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.'
-        : view === 'confirmation' ? '인증하지 못했어요. 인증번호를 확인하고 다시 시도해주세요.'
-        : mode === 'signUp' ? '회원가입을 완료하지 못했어요. 입력한 정보를 확인하고 다시 시도해주세요.'
-        : '로그인하지 못했어요. 입력한 정보를 확인하고 다시 시도해주세요.';
+      const fallback = view === 'reset' ? '재설정 메일을 보내지 못했어요. 잠시 후 다시 시도하세요.'
+        : view === 'confirmation' ? '인증하지 못했어요. 인증번호를 확인하고 다시 시도하세요.'
+        : mode === 'signUp' ? '회원가입을 완료하지 못했어요. 입력한 정보를 확인하고 다시 시도하세요.'
+        : '로그인하지 못했어요. 입력한 정보를 확인하고 다시 시도하세요.';
       // Supabase는 틀린 번호와 만료된 번호 모두 otp_expired로 응답한다.
       if (confirming && err && typeof err === 'object' && 'code' in err && err.code === 'otp_expired') {
         setWrongCode(true);
@@ -160,7 +160,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     if (pending.current || emailWaitSeconds(kind, email) > 0) return;
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail)) {
-      setError("이메일 주소를 다시 확인해주세요."); return;
+      setError("이메일 주소를 다시 확인하세요."); return;
     }
     pending.current = true;
     setError(''); setMessage(''); setWrongCode(false); setSubmitting(true);
@@ -169,7 +169,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
       setCode(''); setSentAt(Date.now());
       setMessage('새 인증번호를 보냈어요.');
     } catch (err) {
-      setError(authErrorMessage(err, '인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.'));
+      setError(authErrorMessage(err, '인증 메일을 보내지 못했어요. 잠시 후 다시 시도하세요.'));
     } finally {
       pending.current = false; setSubmitting(false); setNow(Date.now());
     }
@@ -201,7 +201,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             <h2 id={`${id}-title`}>{title}</h2>
             {confirming ? <p className="auth-confirmation-description">
               {email.trim()} 으로 {sentAt === null ? '받은 인증번호를 입력해 주세요.' : '인증번호를 보냈어요.'}<br />
-              메일이 안 보이면 스팸함을 확인해주세요.
+              메일이 안 보이면 스팸함을 확인하세요.
             </p> : webReset ? (
               <p className="auth-recovery-description" role={message ? 'status' : undefined}>
                 {message ? <>가입한 이메일이라면 재설정 링크를 보냈어요.<br />메일이 안 보이면 스팸함을 확인해 주세요.</>
@@ -225,7 +225,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
           </div>
           <SignupPasswordField id={`${id}-password`} label="비밀번호" value={password} onChange={setPassword}
             hint="8자 이상" valid={passwordValid} compact={compact} disabled={submitting}
-            error={signupAttempted && !passwordValid ? '비밀번호를 8자 이상 입력해주세요.' : ''} />
+            error={signupAttempted && !passwordValid ? '비밀번호를 8자 이상 입력하세요.' : ''} />
           <SignupPasswordField id={`${id}-password-confirmation`} label="비밀번호 확인" value={passwordConfirmation}
             onChange={setPasswordConfirmation} hint="비밀번호 일치" valid={passwordsMatch && passwordValid}
             compact={compact} disabled={submitting}

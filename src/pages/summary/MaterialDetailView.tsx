@@ -576,8 +576,8 @@ export const MaterialDetailView = ({
       return (
         <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
           {previewLoading
-            ? (isDocx ? "DOCX 미리보기를 PDF로 변환하는 중입니다." : "PPT/PPTX 미리보기를 PDF로 변환하는 중입니다.")
-            : (isImage ? "원본 이미지를 불러오는 중입니다." : "원본 파일을 불러오는 중입니다.")}
+            ? (isDocx ? "DOCX 미리보기를 PDF로 변환 중…" : "PPT/PPTX 미리보기를 PDF로 변환 중…")
+            : (isImage ? "원본 이미지를 불러오는 중…" : "원본 파일을 불러오는 중…")}
         </div>
       );
     }
@@ -588,7 +588,7 @@ export const MaterialDetailView = ({
       if (!imageUrl) {
         return (
           <div style={{ height: "100%", minHeight: 0, display: "grid", placeItems: "center", background: "var(--color-surface)", color: "var(--color-text-secondary)", fontSize: 14 }}>
-            원본 이미지를 불러오는 중입니다.
+            원본 이미지를 불러오는 중…
           </div>
         );
       }
@@ -625,7 +625,7 @@ export const MaterialDetailView = ({
     const noOriginalMessage =
       !material.filePath && originalSize != null && originalSize > MAX_ORIGINAL_FILE_BYTES
         ? `이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.`
-        : "이 자료는 원본 저장 기능 추가 전에 업로드되어 원본 파일이 없습니다. 같은 파일을 다시 업로드하면 다음부터 원본 보기로 열립니다.";
+        : "원본 파일이 없습니다. 같은 파일을 다시 업로드해 연결하세요.";
 
     return (
       <div style={{
@@ -927,7 +927,7 @@ export const MaterialDetailView = ({
                     suggestedQuestions={tutorSuggestions}
                     initialQuestion={tutorPrompt}
                     onInitialQuestionConsumed={() => setTutorPrompt("")}
-                    disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                    disabledReason="요약을 생성한 뒤 질문하세요"
                   />
                 </div>
               </>
@@ -939,12 +939,12 @@ export const MaterialDetailView = ({
         {activeTab === "summary" && (
           <div style={{ padding: 24, background: "var(--color-surface)", minHeight: 520 }}>
             {hubLoading ? (
-              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "var(--color-muted)", fontSize: 14 }}>연결된 요약을 불러오는 중입니다.</div>
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "var(--color-muted)", fontSize: 14 }}>연결된 요약을 불러오는 중…</div>
             ) : summaries.length === 0 ? (
               <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
                 <div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 요약이 없습니다</h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료를 기준으로 바로 학습용 요약을 만들 수 있습니다.</p>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료로 요약을 생성하세요.</p>
                   <button type="button" onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-pink) 25%, transparent)", background: "var(--color-tint-pink)", color: PINK, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     요약 생성하기
                   </button>
@@ -1058,7 +1058,7 @@ export const MaterialDetailView = ({
                           initialQuestion={tutorPrompt}
                           onInitialQuestionConsumed={() => setTutorPrompt("")}
                           pendingQuestion={tutorSelectionQuestion ?? undefined}
-                          disabledReason="요약 생성 후 AI 튜터를 사용할 수 있습니다"
+                          disabledReason="요약을 생성한 뒤 질문하세요"
                         />
                       </div>
                     </>
@@ -1072,12 +1072,12 @@ export const MaterialDetailView = ({
         {activeTab === "quiz" && (
           <div style={{ padding: 24, background: "var(--color-surface)", minHeight: 520 }}>
             {hubLoading ? (
-              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "var(--color-muted)", fontSize: 14 }}>연결된 퀴즈를 불러오는 중입니다.</div>
+              <div style={{ minHeight: 300, display: "grid", placeItems: "center", color: "var(--color-muted)", fontSize: 14 }}>연결된 퀴즈를 불러오는 중…</div>
             ) : quizSets.length === 0 ? (
               <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
                 <div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 퀴즈가 없습니다</h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료와 연결된 문제 세트를 새로 만들 수 있습니다.</p>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료로 퀴즈를 생성하세요.</p>
                   <button type="button" onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-cyan) 25%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     퀴즈 생성하기
                   </button>
@@ -1242,7 +1242,7 @@ export const MaterialDetailView = ({
                 type="button"
                 onClick={confirmDelete}
                 disabled={deleteBusy}
-                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "light-dark(#4b5563, #5b6473)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
+                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
               >
                 {deleteBusy ? "삭제 중" : "삭제"}
               </button>

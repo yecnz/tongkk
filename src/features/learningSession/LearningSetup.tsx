@@ -45,7 +45,7 @@ export default function LearningSetup() {
     if (!course) { setMaterialsLoading(false); return; }
     setMaterialsLoading(true);
     loadCourseMaterialsFromServer(course).then(rows => { if (active) setMaterials(rows); })
-      .catch(() => { if (active) setError('자료를 불러오지 못했어요. 과목을 다시 선택해주세요.'); })
+      .catch(() => { if (active) setError('자료를 불러오지 못했어요. 과목을 다시 선택하세요.'); })
       .finally(() => { if (active) setMaterialsLoading(false); });
     return () => { active = false; };
   }, [course]);
@@ -71,7 +71,7 @@ export default function LearningSetup() {
   const settingsDisabled = busy || Boolean(pending.current);
   useEffect(() => {
     beforeLeaveRef.current = async () => {
-      if (busy || pending.current) throw new Error('학습 시작 요청의 결과를 확인한 뒤 이동해주세요.');
+      if (busy || pending.current) throw new Error('학습 시작 결과를 확인한 뒤 이동하세요.');
     };
     return () => { beforeLeaveRef.current = null; };
   }, [beforeLeaveRef, busy]);
@@ -112,10 +112,10 @@ export default function LearningSetup() {
             disabled={settingsDisabled || materialsLoading || !course || !materials.length} onChange={setMaterial} />
         </div>
         {loading && <p className="learning-caption" role="status">{coursesLoading ? '과목을 불러오는 중…' : materialsLoading ? '자료를 불러오는 중…' : '학습 범위를 불러오는 중…'}</p>}
-        {!loading && !error && !courses.length && <div className="learning-empty"><strong>학습할 과목을 먼저 추가해주세요.</strong>
-          <p>과목을 만들고 자료를 올리면 학습을 시작할 수 있어요.</p><LearningLink to="/" className="learning-button">과목 추가하러 가기 →</LearningLink></div>}
-        {!loading && !error && course && !materials.length && <div className="learning-empty"><strong>아직 등록된 자료가 없어요.</strong>
-          <p>강의자료를 올린 뒤 학습할 구간을 선택해주세요.</p>
+        {!loading && !error && !courses.length && <div className="learning-empty"><strong>등록된 과목이 없습니다.</strong>
+          <p>과목과 자료를 추가해 학습을 시작하세요.</p><LearningLink to="/" className="learning-button">과목 추가하러 가기 →</LearningLink></div>}
+        {!loading && !error && course && !materials.length && <div className="learning-empty"><strong>등록된 자료가 없습니다.</strong>
+          <p>자료를 올리고 학습 범위를 선택하세요.</p>
           <LearningLink to={`/summary?${new URLSearchParams({ course, view: 'upload' })}`} className="learning-button">자료 올리기 →</LearningLink></div>}
         {scopes && <>
           <div className="learning-scope-heading"><span>선택한 원문 {chars.toLocaleString()} / {scopes.max_chars.toLocaleString()}자</span>
@@ -127,18 +127,18 @@ export default function LearningSetup() {
               <span>{unit.label}<small className="learning-muted">{unit.chars.toLocaleString()}자</small></span></label>)}
           </fieldset>
           {chars > scopes.max_chars && <div className="learning-notice learning-error" role="alert">한 번에 학습할 범위를 줄여주세요.</div>}
-          {!selected.length && <p className="learning-caption">학습할 구간을 하나 이상 선택해주세요.</p>}
+          {!selected.length && <p className="learning-caption">학습할 구간을 하나 이상 선택하세요.</p>}
         </>}
         {!scopes && !loading && courses.length > 0 && (!course || materials.length > 0) && <div className="learning-empty"><span className="learning-empty-symbol" aria-hidden="true">↗</span>
-          <p>자료를 선택하면 학습 범위가 표시돼요.</p></div>}
+          <p>자료를 선택해 학습 범위를 확인하세요.</p></div>}
       </Card>
       <Card className="learning-card learning-settings" role="region" aria-labelledby="learning-settings-title">
         <h2 id="learning-settings-title">이번 학습 설정</h2>
         <fieldset className="learning-setting-group" disabled={settingsDisabled}>
           <legend>시작 방식</legend>
           <div className="learning-mode-options">
-            {[{ value: 'attended', label: '수업 후 회상', description: '기억에서 먼저 꺼내 설명해요' },
-              { value: 'new', label: '처음 배우기', description: '짧은 설명을 읽은 뒤 설명해요' }].map(mode =>
+            {[{ value: 'attended', label: '수업 후 회상', description: '자료 없이 먼저 설명' },
+              { value: 'new', label: '처음 배우기', description: '설명을 읽고 직접 설명' }].map(mode =>
               <label key={mode.value} className="learning-choice learning-mode-choice">
                 <input type="radio" name="learning-mode" value={mode.value} aria-label={mode.label}
                   checked={familiarity === mode.value} onChange={() => setFamiliarity(mode.value)} />
@@ -156,7 +156,9 @@ export default function LearningSetup() {
           <div className="learning-choice-options">{[1, 2, 3].map(n => <label key={n} className="learning-choice">
             <input type="radio" name="learning-count" value={n} checked={count === n} onChange={() => setCount(n)} />{n}개</label>)}</div>
         </fieldset>
-        <p className="learning-caption">분량은 개념 수로 정해요. 목표 시간이 지나도 계속할 수 있어요.</p>
+        <details className="learning-note"><summary>학습 분량·시간 안내</summary>
+          <p>학습 분량은 선택한 개념 수로 정합니다. 목표 시간이 지나도 학습을 계속할 수 있습니다.</p>
+        </details>
         <div className="learning-flow" aria-label="학습 순서">{familiarity === 'new' ? '짧은 설명 → 직접 설명 → 보완 → 기초 확인' : '기억에서 설명 → 보완 → 기초 확인'}</div>
         <div className="learning-setup-summary"><span>{selected.length}개 구간 선택</span><strong>목표 {minutes}분 · 최대 {count}개 개념</strong></div>
         {error && <div className="learning-notice learning-error" role="alert">{error}</div>}

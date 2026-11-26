@@ -71,6 +71,6 @@ export default function PopoverShortcutControl({ shortcut, disabled, onChange }:
     </div>
     {recording
       ? <p className="menubar-settings-note" id={hintId} role="status">⌃, ⌥, ⌘ 중 하나와 다른 키를 누르세요. Esc로 취소.</p>
-      : shortcut?.registered === false && <p className="menubar-settings-note" role="status">현재 단축키를 사용할 수 없어요. 다른 조합을 선택하세요.</p>}
+      : shortcut?.registered === false && <p className="menubar-settings-note" role="status">현재 단축키를 사용할 수 없습니다. 다른 조합을 선택하세요.</p>}
   </>;
 }

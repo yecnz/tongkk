@@ -51,10 +51,10 @@ function Practice({ id, userId }: { id: string; userId: string }) {
   }, [polling, refresh]);
   useEffect(() => {
     try { localStorage.setItem(key, JSON.stringify({ text, assisted, pending, newRound, prompt })); }
-    catch { setError('기기에 저장할 수 없어요. 화면을 닫기 전에 답변을 제출해주세요.'); }
+    catch { setError('기기에 저장할 수 없습니다. 화면을 닫기 전에 답변을 제출하세요.'); }
   }, [key, text, assisted, pending, newRound, prompt]);
   useEffect(() => {
-    beforeLeaveRef.current = async () => { if (busy || pending) throw new Error('제출 결과를 확인한 뒤 이동해주세요.'); };
+    beforeLeaveRef.current = async () => { if (busy || pending) throw new Error('제출 결과를 확인한 뒤 이동하세요.'); };
     return () => { beforeLeaveRef.current = null; };
   }, [beforeLeaveRef, busy, pending]);
   async function send(request: Pending) {
@@ -80,13 +80,13 @@ function Practice({ id, userId }: { id: string; userId: string }) {
     {pending && <button type="button" disabled={busy} onClick={() => { void send(pending); }}>이전 제출 결과 확인</button>}
     {!view && !busy && error && <button type="button" onClick={() => { void refresh(); }}>다시 불러오기</button>}
     {view && <Card className="workflow-panel workflow-stack">
-      {view.paused ? <p>일시 정지한 복습이에요. 복습 관리에서 재개해주세요.</p> : view.source_changed ? <div className="learning-notice">원문이 바뀌었어요. 새 자료로 학습한 뒤 복습을 추가해주세요.</div>
+      {view.paused ? <p>복습이 일시 정지되었습니다. 복습 관리에서 재개하세요.</p> : view.source_changed ? <div className="learning-notice">원문이 변경되었습니다. 새 자료를 학습한 뒤 복습을 추가하세요.</div>
         : answering ? <>
           {attempt?.status === 'ungraded' && <p role="status">평가하지 못했어요. 답변은 보존됐고 일정은 그대로예요.</p>}
           <Markdown text={prompt?.text || (text.trim() ? view.question : view.next_question || view.question)} />
-          <p className="learning-caption">{view.question_id ? '새 사례로 확인하는 복습 문제예요.' : '기존 학습 문제로 연습하고 있어요.'}</p>
+          <p className="learning-caption">{view.question_id ? '새 사례로 복습합니다.' : '기존 문제로 연습합니다.'}</p>
           {view.question_status==='queued' ? <p role="status">새 복습 문제를 준비하는 중…</p> : view.question_status==='ready' ? null : <button type="button" disabled={preparing||busy||Boolean(pending)||Boolean(text.trim())} onClick={()=>{void prepare(view.question_status==='failed');}}>{view.question_status==='failed'?'새 문제 생성 다시 시도':'새 복습 문제 준비'}</button>}
-          <label htmlFor="review-answer"><p>자료를 보지 않고 핵심을 설명해주세요.</p></label>
+          <label htmlFor="review-answer"><p>자료를 보지 않고 핵심을 설명하세요.</p></label>
           <textarea id="review-answer" maxLength={4000} value={text} disabled={blocked}
             onChange={event => { if (!prompt) setPrompt({id:view.question_id||null,text:view.next_question||view.question}); if(!event.target.value) setPrompt(null); setText(event.target.value); }} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
           <label className="learning-option"><input type="checkbox" checked={assisted} disabled={blocked} onChange={event => setAssisted(event.target.checked)} />자료를 보고 답했어요</label>
@@ -105,7 +105,7 @@ function Practice({ id, userId }: { id: string; userId: string }) {
           </>}
           {attempt.check_result && <div className="learning-notice"><strong>{attempt.check_result.correct ? '정답이에요.' : '다시 확인해요.'}</strong>
             <LearningExplanation text={attempt.check_result.explanation} /><p>다음 복습: {new Date(view.due_at).toLocaleDateString('ko-KR')}</p>
-            {!attempt.eligible_for_schedule && <p className="learning-caption">예정일 전 연습이라 복습 일정은 유지돼요.</p>}
+            {!attempt.eligible_for_schedule && <p className="learning-caption">예정일 전 연습은 복습 일정에 반영되지 않습니다.</p>}
             <button type="button" disabled={blocked} onClick={() => { setText(''); setPrompt(null); setAssisted(false); setNewRound(true); setSelected(null); }}>다시 연습하기</button></div>}
           {view.baseline && <details><summary>처음 학습과 비교</summary>{view.baseline.answer && <Markdown text={view.baseline.answer} />}
             {view.baseline.feedback && <LearningFeedback feedback={view.baseline.feedback} />}</details>}

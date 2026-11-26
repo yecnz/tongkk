@@ -25,10 +25,10 @@ export default function LearningHistory({ sessionId }: { sessionId?: string }) {
     {data?.sessions && <ul className="learning-resume-list">{data.sessions.map(record => <li key={record.id}>
       <LearningLink to={`/learn/${record.id}`}><span className="learning-resume-material"><strong>{record.material_name}</strong>
         <small>{record.status === 'completed' ? '완료' : '취소'} · {new Date(record.updated_at).toLocaleDateString('ko-KR')}</small></span><span className="learning-resume-action">기록 보기 →</span></LearningLink>
-    </li>)}{!data.sessions.length && <li>완료한 학습이 없어요.</li>}</ul>}
+    </li>)}{!data.sessions.length && <li>완료한 학습이 없습니다.</li>}</ul>}
     {data?.items?.map(item => <details className="learning-result-row" key={item.id}><summary>{item.title}{item.skipped ? ' · 건너뜀' : ''}</summary>
       {item.question && <Markdown text={item.question} />}
-      {item.answer ? <><h3>내 설명</h3><Markdown text={item.answer} /></> : <p>제출한 설명이 없어요.</p>}
+      {item.answer ? <><h3>내 설명</h3><Markdown text={item.answer} /></> : <p>제출한 설명이 없습니다.</p>}
       {item.feedback && <LearningFeedback feedback={item.feedback} />}
       {sessionId && item.answer && <StartRevision sessionId={sessionId} itemId={item.id} />}
       {item.check && <><h3>확인 문제</h3><Markdown text={item.check.question} />
