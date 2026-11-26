@@ -1383,7 +1383,7 @@ export default function Dashboard() {
                     </Card>
                   );
                 })}
-                <button type="button" className="dashboard-action dashboard-action--brand dashboard-course-add" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }}>+ 강의 추가하기</button>
+                <button type="button" className="dashboard-action dashboard-course-add" onClick={() => { if (!requireAuth("강의를 추가하려면 로그인이 필요해요")) return; setShowAddCourse(true); }}>+ 강의 추가하기</button>
               </div>
             )}
           </div>
