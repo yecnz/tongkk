@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card } from '../../common';
@@ -18,8 +19,8 @@ function ConceptDetail({ id }: { id: string }) {
   }, [id, retry]);
   useLearningScope(data ? { courseId: data.concept.course_id, materialId: data.concept.material_id, title: data.concept.title } : null);
   return <Card className="workflow-panel workflow-stack">
-    {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 불러오기</button></p>}
-    {!data ? <p role="status">기록을 불러오는 중…</p> : <>
+    {error && <InlineAlert tone="error">{error} <Button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 불러오기</Button></InlineAlert>}
+    {!data ? !error && <p role="status">기록을 불러오는 중…</p> : <>
       <div className="workflow-card-heading"><h2>{data.concept.title}</h2><span className="workflow-badge" data-state={data.concept.state}>{labels[data.concept.state]}</span></div>
       <dl className="workflow-metrics"><div><dt>수행 근거</dt><dd>{data.concept.evidence_count}개</dd></div><div><dt>도움 사용</dt><dd>{data.concept.assisted_count}회</dd></div><div><dt>독립 설명의 서로 다른 질문</dt><dd>{data.concept.independent_questions}개</dd></div><div><dt>예정일 이후 복습 성공</dt><dd>{data.concept.delayed_practice}회</dd></div></dl>
       <details className="workflow-details"><summary>학습 기록·평가 기준</summary>
@@ -44,15 +45,15 @@ export default function ConceptHistory() {
     return () => controller.abort();
   }, [user, selected, page, retry]);
   if (!user) return <p className="workflow-muted">개념별 학습 기록을 보려면 로그인해 주세요.</p>;
-  if (selected) return <div className="workflow-surface workflow-stack"><button type="button" className="workflow-button" onClick={() => setParams({ view: 'concepts' })}>← 개념 목록</button><ConceptDetail key={selected} id={selected} /></div>;
+  if (selected) return <div className="workflow-surface workflow-stack"><Button type="button"  onClick={() => setParams({ view: 'concepts' })}>← 개념 목록</Button><ConceptDetail key={selected} id={selected} /></div>;
   return <div className="workflow-surface workflow-stack"><h2 className="workflow-view-title">개념별 학습 기록</h2>
-    {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>
+    {error ? <InlineAlert tone="error">{error} <Button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</Button></InlineAlert>
       : !data ? <p role="status">기록을 불러오는 중…</p> : <>
         <p className="workflow-muted">학습한 개념 {data.total}개 · 자료 버전별로 기록해요.</p>
         {data.concepts.map(c => <Card key={c.id} className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{c.title}</h3><span className="workflow-badge" data-state={c.state}>{labels[c.state]}</span></div><p className="workflow-meta">수행 근거 {c.evidence_count}개</p>
-          <button type="button" className="workflow-button" onClick={() => setParams({ view: 'concepts', conceptId: c.id })}>변화와 근거 보기 →</button></Card>)}
+          <Button type="button"  onClick={() => setParams({ view: 'concepts', conceptId: c.id })}>변화와 근거 보기 →</Button></Card>)}
         {!data.total && <p>학습한 개념이 없습니다. 설명 학습을 시작해 주세요.</p>}
-        <div className="workflow-actions"><button type="button" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</button><button type="button" disabled={(page + 1) * 30 >= data.total} onClick={() => setPage(p => p + 1)}>다음</button></div>
+        <div className="workflow-actions"><Button type="button" disabled={!page} onClick={() => setPage(p => p - 1)}>이전</Button><Button type="button" disabled={(page + 1) * 30 >= data.total} onClick={() => setPage(p => p + 1)}>다음</Button></div>
       </>}
   </div>;
 }

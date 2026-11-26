@@ -109,7 +109,7 @@ describe('password recovery routing and forms', () => {
     await render(path, { keepUrl: true });
     expect(container.querySelector('input[type=password]')).toBeNull();
     await click('재설정 메일 다시 받기');
-    expect(container.querySelector('[role=dialog]')?.textContent).toContain('비밀번호 찾기');
+    expect(container.querySelector('dialog')?.textContent).toContain('비밀번호 찾기');
   });
   it('requires a valid session and blocks password submission while signed out', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
@@ -170,11 +170,11 @@ describe('login, signup and reset email UI', () => {
       ))))));
 
     await click('팝업 열기');
-    const link = container.querySelector<HTMLAnchorElement>(`[role=dialog] a[href="/${kind}"]`);
+    const link = container.querySelector<HTMLAnchorElement>(`dialog a[href="/${kind}"]`);
     expect(link).not.toBeNull();
     await act(async () => link!.click());
     expect(container.querySelector('h1')?.textContent).toBe(title);
-    expect(container.querySelector('[role=dialog]')).toBeNull();
+    expect(container.querySelector('dialog')).toBeNull();
   });
 
   it('establishes the returned Supabase session and closes on a successful login', async () => {

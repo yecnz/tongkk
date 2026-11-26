@@ -1,0 +1,9 @@
+.summary-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.summary-toolbar > * { max-width: 100%; }
+.summary-result-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
+.summary-result-heading .summary-toolbar { flex: 1 1 280px; justify-content: flex-end; }
+.summary-result-card { padding: clamp(16px, 3vw, 28px); }
+.summary-toolbar .ui-button { white-space: normal; }
+@media (max-width: 480px) {
+  .summary-result-heading .summary-toolbar { justify-content: flex-start; }
+}

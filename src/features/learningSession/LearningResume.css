@@ -2,7 +2,7 @@
 .learning-resume-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .learning-resume h2 { margin: 0; font-size: 18px; font-weight: 700; color: var(--color-text-strong); }
 .learning-resume-heading p, .learning-resume-message { margin: 8px 0 0; font-size: 13px; line-height: 1.7; color: var(--color-text-secondary); }
-.learning-resume-start { flex-shrink: 0; text-decoration: none; padding: 9px 14px; border-radius: 10px; background: var(--color-tint-pink); color: var(--color-pink-deep); font-size: 13px; font-weight: 600; }
+.learning-resume-heading > .ui-button { flex-shrink: 0; }
 .learning-resume-list { list-style: none; padding: 0; margin: 16px 0 0; }
 .learning-resume-list li + li { border-top: 1px solid var(--color-border-soft); }
 .learning-resume-list a { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; color: var(--color-text); text-decoration: none; }
@@ -10,9 +10,8 @@
 .learning-resume-material strong { font-size: 14px; font-weight: 600; }
 .learning-resume-material small { color: var(--color-text-secondary); font-size: 12px; }
 .learning-resume-action { flex-shrink: 0; color: var(--color-cyan-deep); font-size: 12px; font-weight: 600; }
-.learning-resume-error { margin-top: 16px; color: var(--color-pink-deep); font-size: 13px; }
-.learning-resume-error button { margin-left: 10px; border: 1px solid var(--color-border); border-radius: 10px; padding: 8px 12px; background: var(--color-card); color: var(--color-text); cursor: pointer; font: inherit; }
-.learning-resume a:focus-visible, .learning-resume button:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 3px; }
+.learning-resume > .ui-alert { margin-top: 16px; }
+.learning-resume a:not(.ui-button):focus-visible { outline: 2px solid var(--color-cyan-deep); outline-offset: 3px; }
 @media (max-width: 480px) {
   .learning-resume { padding: 18px; }
   .learning-resume-list a { flex-wrap: wrap; gap: 8px; }

@@ -1,3 +1,4 @@
+import { Button, InlineAlert, PageHeading } from '../../components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -61,32 +62,32 @@ function PathEditor({ id }: { id: string }) {
   }
   const progress = path ? pathProgress(path) : null;
   return <div className="workflow-surface workflow-stack study-paths-surface">
-    <div className="workflow-actions"><button type="button" className="workflow-button" disabled={busy || dirty} onClick={() => navigate('/study-paths')}>← 코스 목록</button>
-      <button type="button" className="workflow-button" disabled={locked || dirty} onClick={() => setRetry(n => n + 1)}>학습 진도 새로고침</button></div>
-    {error && <p role="alert">{error} {!path && <button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</button>}</p>}
+    <div className="workflow-actions"><Button type="button"  disabled={busy || dirty} onClick={() => navigate('/study-paths')}>← 코스 목록</Button>
+      <Button type="button"  disabled={locked || dirty} onClick={() => setRetry(n => n + 1)}>학습 진도 새로고침</Button></div>
+    {error && <InlineAlert tone="error">{error} {!path && <Button type="button" onClick={() => setRetry(n => n + 1)}>다시 불러오기</Button>}</InlineAlert>}
     {!path ? !error && <p role="status">코스를 불러오는 중…</p> : <>
       <Card className="workflow-panel workflow-stack">
-        <label className="workflow-field">코스 이름<input maxLength={100} value={path.title} disabled={locked} onChange={e => setPath({ ...path, title: e.target.value })} /></label>
+        <label className="workflow-field">코스 이름<input className="ui-input" maxLength={100} value={path.title} disabled={locked} onChange={e => setPath({ ...path, title: e.target.value })} /></label>
         <p className="workflow-meta">활동 완료 {progress!.completed} / {progress!.total}챕터</p>
         <progress className="study-path-progress" aria-label="학습 코스 진도" value={progress!.completed} max={Math.max(1, progress!.total)} />
         <p className="workflow-muted">각 챕터에서 핵심 개념 2개를 설명하고 확인 문제를 풉니다. 모든 확인 활동을 마친 세션만 진도에 반영하며, 장기 이해를 뜻하지는 않습니다.</p>
-        <div className="workflow-actions"><button type="button" className="workflow-primary" disabled={locked || !dirty || !path.title.trim() || !path.chapters.some(c => c.included) || path.chapters.some(c => !c.title.trim())} onClick={() => { void save(); }}>{busy ? '처리 중…' : '변경 저장'}</button>
-          <button type="button" className="workflow-button" disabled={locked || !dirty} onClick={() => { setPath(JSON.parse(saved)); setError(''); }}>편집 되돌리기</button>
-          {progress!.next && <button type="button" className="workflow-primary" disabled={locked || dirty} onClick={() => { void start(progress!.next!.id); }}>다음 챕터 학습 →</button>}</div>
+        <div className="workflow-actions"><Button type="button" variant={dirty ? 'primary' : 'secondary'} disabled={locked || !dirty || !path.title.trim() || !path.chapters.some(c => c.included) || path.chapters.some(c => !c.title.trim())} onClick={() => { void save(); }}>{busy ? '처리 중…' : '변경 저장'}</Button>
+          <Button type="button"  disabled={locked || !dirty} onClick={() => { setPath(JSON.parse(saved)); setError(''); }}>편집 되돌리기</Button>
+          {progress!.next && <Button type="button" variant="primary" disabled={locked || dirty} onClick={() => { void start(progress!.next!.id); }}>다음 챕터 학습 →</Button>}</div>
         {loading && <p role="status">최신 학습 진도를 확인하는 중…</p>}
         {dirty && <p className="workflow-muted">저장하지 않은 변경이 있어요. 학습 전에 저장해주세요.</p>}
         {notice && <p role="status">{notice}</p>}
       </Card>
       <ol className="workflow-stack" aria-label="챕터 순서" style={{ paddingLeft: 24 }}>{path.chapters.map((chapter, index) => <li key={chapter.id}>
         <Card className="workflow-panel workflow-stack">
-          <label className="workflow-field">챕터 {index + 1}<input maxLength={100} value={chapter.title} disabled={locked} onChange={e => setPath({ ...path, chapters: path.chapters.map(c => c.id === chapter.id ? { ...c, title: e.target.value } : c) })} /></label>
+          <label className="workflow-field">챕터 {index + 1}<input className="ui-input" maxLength={100} value={chapter.title} disabled={locked} onChange={e => setPath({ ...path, chapters: path.chapters.map(c => c.id === chapter.id ? { ...c, title: e.target.value } : c) })} /></label>
           <p>{chapter.objective}</p><p className="workflow-meta">{chapter.material_name} · {chapter.source_labels.join(', ')}</p>
           <label className="workflow-check"><input type="checkbox" checked={chapter.included} disabled={locked} onChange={e => setPath({ ...path, chapters: path.chapters.map(c => c.id === chapter.id ? { ...c, included: e.target.checked } : c) })} /><span>코스에 포함</span></label>
           <div className="workflow-actions">
-            <button type="button" className="workflow-button" aria-label={`${chapter.title} 위로 이동`} disabled={locked || index === 0} onClick={() => setPath({ ...path, chapters: moveChapter(path.chapters, index, -1) })}>↑ 위로</button>
-            <button type="button" className="workflow-button" aria-label={`${chapter.title} 아래로 이동`} disabled={locked || index === path.chapters.length - 1} onClick={() => setPath({ ...path, chapters: moveChapter(path.chapters, index, 1) })}>↓ 아래로</button>
-            <button type="button" className="workflow-primary" disabled={locked || dirty || !chapter.included || chapter.source_changed} onClick={() => { void start(chapter.id); }}>
-              {chapter.completed ? '완료한 학습 보기' : ['completed', 'abandoned'].includes(chapter.session_status ?? '') ? '부분 학습 다시 시작' : chapter.session_id ? '학습 이어가기' : '학습 시작'}</button>
+            <Button type="button"  aria-label={`${chapter.title} 위로 이동`} disabled={locked || index === 0} onClick={() => setPath({ ...path, chapters: moveChapter(path.chapters, index, -1) })}>↑ 위로</Button>
+            <Button type="button"  aria-label={`${chapter.title} 아래로 이동`} disabled={locked || index === path.chapters.length - 1} onClick={() => setPath({ ...path, chapters: moveChapter(path.chapters, index, 1) })}>↓ 아래로</Button>
+            <Button type="button" disabled={locked || dirty || !chapter.included || chapter.source_changed} onClick={() => { void start(chapter.id); }}>
+              {chapter.completed ? '완료한 학습 보기' : ['completed', 'abandoned'].includes(chapter.session_status ?? '') ? '부분 학습 다시 시작' : chapter.session_id ? '학습 이어가기' : '학습 시작'}</Button>
           </div>
           {chapter.completed && <p className="workflow-badge study-path-completion">설명·확인 활동 완료</p>}
           {chapter.source_changed && <p role="status">원문이 변경되거나 삭제되어 새 코스가 필요해요. {chapter.session_id && <LearningLink to={`/learn/${chapter.session_id}?studyPath=${path.id}`}>이전 학습 기록 보기</LearningLink>}</p>}
@@ -149,20 +150,20 @@ function PathList() {
   }
   const chars = materials.filter(m => selected.includes(m.id)).reduce((sum, m) => sum + m.markdown.length, 0);
   return <div className="workflow-surface workflow-stack study-paths-surface">
-    {error && <p role="alert">{error} <button type="button" disabled={busy} onClick={() => setRetry(n => n + 1)}>다시 불러오기</button></p>}
+    {error && <InlineAlert tone="error">{error} <Button type="button" disabled={busy} onClick={() => setRetry(n => n + 1)}>다시 불러오기</Button></InlineAlert>}
     {loading ? <p role="status">코스를 불러오는 중…</p> : <>
       <Card className="workflow-panel workflow-stack"><h2>강의자료로 코스 만들기</h2>
         <p className="workflow-muted">최대 6개 자료를 챕터로 나눕니다. AI 초안을 만든 뒤 제목·순서·포함 여부를 편집할 수 있어요.</p>
         {!courses.length && <p>먼저 <Link to="/summary">과목과 강의자료를 추가</Link>해주세요.</p>}
         <label className="workflow-field">과목<CustomSelect value={courseId} disabled={busy} onChange={setCourseId} options={[{ value: '', label: '과목 선택' }, ...courses.map(c => ({ value: c.id, label: c.name }))]} aria-label="과목" /></label>
-        <label className="workflow-field">코스 이름<input value={title} maxLength={100} placeholder={courseName ? `${courseName} 학습 코스` : '예: 중간고사 1~4주차'} disabled={busy} onChange={e => setTitle(e.target.value)} /></label>
+        <label className="workflow-field">코스 이름<input className="ui-input" value={title} maxLength={100} placeholder={courseName ? `${courseName} 학습 코스` : '예: 중간고사 1~4주차'} disabled={busy} onChange={e => setTitle(e.target.value)} /></label>
         {materialLoading ? <p role="status">자료를 불러오는 중…</p> : courseId && !materials.length ? <p>이 과목에 자료가 없습니다. <Link to="/summary">자료 추가하기</Link></p> : <fieldset disabled={busy} className="workflow-stack"><legend>코스에 넣을 자료</legend>{materials.map(m => <label key={m.id} className="workflow-check"><input type="checkbox" checked={selected.includes(m.id)} disabled={!m.markdown.trim() || (!selected.includes(m.id) && selected.length >= 6)} onChange={e => setSelected(e.target.checked ? [...selected, m.id] : selected.filter(id => id !== m.id))} /><span>{m.name}{!m.markdown.trim() && ' · 추출된 본문 없음'}</span></label>)}</fieldset>}
         <p className="workflow-meta">선택 {selected.length}/6개 · 원문 {chars.toLocaleString()} / 60,000자</p>
-        <button type="button" className="workflow-primary" disabled={busy || materialLoading || !selected.length || chars > 60000} onClick={() => { void create(); }}>{busy ? '원문으로 코스 구성 중…' : 'AI 코스 초안 만들기'}</button>
+        <Button type="button" variant="primary" disabled={busy || materialLoading || !selected.length || chars > 60000} onClick={() => { void create(); }}>{busy ? '원문으로 코스 구성 중…' : 'AI 코스 초안 만들기'}</Button>
         {busy && <p role="status">자료를 읽고 챕터를 구성하고 있어요. 이 화면을 열어두세요.</p>}
       </Card>
       <h2>내 학습 코스</h2>{!paths.length && <p className="workflow-muted">아직 저장한 코스가 없습니다. 위에서 강의자료를 선택해 시작하세요.</p>}
-      {paths.map(path => { const progress = pathProgress(path); return <Card key={path.id} className="workflow-panel workflow-stack"><h3>{path.title}</h3><p className="workflow-meta">{courses.find(c => c.id === path.course_id)?.name} · 활동 완료 {progress.completed}/{progress.total}챕터</p><Link to={`/study-paths?path=${path.id}`} className="workflow-button">코스 열기 →</Link></Card>; })}
+      {paths.map(path => { const progress = pathProgress(path); return <Card key={path.id} className="workflow-panel workflow-stack"><h3>{path.title}</h3><p className="workflow-meta">{courses.find(c => c.id === path.course_id)?.name} · 활동 완료 {progress.completed}/{progress.total}챕터</p><Link to={`/study-paths?path=${path.id}`} className="ui-button ui-button--secondary">코스 열기 →</Link></Card>; })}
     </>}
   </div>;
 }
@@ -171,7 +172,7 @@ export default function StudyPaths() {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const id = params.get('path');
-  return <LearningLayout active="학습 코스"><div className="workflow-page-heading"><h1>학습 코스</h1><p className="workflow-muted">여러 강의자료를 순서대로 학습하고 이어가세요.</p></div>
+  return <LearningLayout active="학습 코스"><PageHeading title="학습 코스" description="여러 강의자료를 순서대로 학습하고 이어가세요." />
     {!user ? <p><Link to="/auth">로그인</Link>하면 내 자료로 학습 코스를 만들 수 있어요.</p> : id ? <PathEditor key={`${user.id}:${id}`} id={id} /> : <PathList key={user.id} />}
   </LearningLayout>;
 }

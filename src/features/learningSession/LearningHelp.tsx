@@ -1,3 +1,4 @@
+import { Button } from '../../components/ui';
 import { Card } from '../../common';
 import type { LearningSession } from '../../services/learningSessions';
 import Markdown from './LearningMarkdown';
@@ -21,14 +22,14 @@ export default function LearningHelp({ item, blocked, selfCheck, onHelp, onSelfC
       {revealed.length > 0 && <ol className="learning-help-steps">{revealed.map(step => <li key={step.type}>
         <span className="learning-help-number" aria-hidden="true">{step.number}</span><section><h3>{step.title}</h3><Markdown text={item.help[step.type]!} /></section>
       </li>)}</ol>}
-      {next && <button type="button" className="workflow-primary learning-full-button" disabled={blocked} onClick={() => onHelp(next.type)}>{next.label}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
-      {selfCheck && !item.help.reference && next?.type !== 'reference' && <button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('reference')}>모범 설명</button>}
+      {next && <Button type="button" variant="primary" className="learning-full-button" disabled={blocked} onClick={() => onHelp(next.type)}>{next.label}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></Button>}
+      {selfCheck && !item.help.reference && next?.type !== 'reference' && <Button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('reference')}>모범 설명</Button>}
       <section className="learning-source" aria-label="원문 근거"><h3>원문 근거</h3>
-        {item.help.source ? <Markdown text={item.help.source} /> : <button type="button" className="learning-button learning-source-button" disabled={blocked} onClick={() => onHelp('source')}>관련 원문 보기</button>}
+        {item.help.source ? <Markdown text={item.help.source} /> : <Button type="button" className="learning-source-button" disabled={blocked} onClick={() => onHelp('source')}>관련 원문 보기</Button>}
       </section>
       {selfCheck && item.help.reference && <fieldset className="learning-self-check" disabled={blocked}><legend>직접 점검하기</legend>
         {[['understood', '설명을 이해했어요'], ['needs_review', '추가 확인이 필요해요'], ['unknown', '아직 모르겠어요']].map(([value, label]) =>
-          <button type="button" key={value} onClick={() => onSelfCheck(value)}>{label}</button>)}
+          <Button type="button" key={value} onClick={() => onSelfCheck(value)}>{label}</Button>)}
       </fieldset>}
     </div>
     <p className="learning-caption learning-help-policy">도움 사용 여부가 학습 기록에 남아요.</p>

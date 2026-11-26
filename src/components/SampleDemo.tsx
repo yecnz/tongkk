@@ -1,3 +1,5 @@
+import ModalDialog from "./ModalDialog";
+import { Button } from "./ui";
 import { useState, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -35,7 +37,7 @@ function nodeText(node: ReactNode): string {
 // 코드블록 구조도, 표를 토큰 색으로 렌더한다(왼쪽 색 띠 없이 사방 중립 테두리).
 const md: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 14px", paddingBottom: 9, borderBottom: "2px solid var(--color-border-soft)", fontSize: 19, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
-  h2: ({ children }) => <h2 style={{ margin: "22px 0 10px", padding: "8px 11px", borderRadius: 8, background: "var(--color-surface)", fontSize: 15.5, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
+  h2: ({ children }) => <h2 id="sample-demo-title" style={{ margin: "22px 0 10px", padding: "8px 11px", borderRadius: 8, background: "var(--color-surface)", fontSize: 15.5, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
   h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "16px 0 7px", padding: "3px 8px", borderRadius: 6, background: "var(--color-surface)", fontSize: 13.5, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
   p: ({ children }) => <p style={{ margin: "0 0 10px", lineHeight: 1.7, color: "var(--color-text)" }}>{children}</p>,
   strong: ({ children }) => <strong style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</strong>,
@@ -149,13 +151,7 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
   const summary = sampleSummaries.find(s => s.kind === summaryKind) ?? sampleSummaries[0];
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 360, display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(15, 23, 42, 0.28)", backdropFilter: "blur(6px)", padding: 24, boxSizing: "border-box",
-      }}
-    >
+    <ModalDialog labelledBy="sample-demo-title" onClose={onClose} width={920}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
@@ -175,26 +171,17 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
               샘플 자료 <strong style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>{SAMPLE_SOURCE_NAME}</strong>로 만든 예시예요. 실제로는 내 강의 자료를 올려 만들어요.
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="예시 닫기" style={{ background: "none", border: "none", fontSize: 18, color: "var(--color-muted)", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}>✕</button>
+          <Button type="button" onClick={onClose} aria-label="예시 닫기" variant="ghost">✕</Button>
         </div>
 
         {/* 탭 */}
-        <div style={{ display: "flex", gap: 6, padding: "12px 22px 0" }}>
+        <div className="ui-tabs" style={{ padding: "12px 22px 0", marginBottom: 0 }}>
           {TABS.map(t => {
             const activeTab = tab === t.id;
             return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                style={{
-                  padding: "7px 16px", borderRadius: 999, border: `1px solid ${activeTab ? "transparent" : BORDER_COLOR}`,
-                  background: activeTab ? PINK : "transparent", color: activeTab ? "var(--color-on-brand)" : "var(--color-text-secondary)",
-                  fontSize: 13, fontWeight: 700, cursor: "pointer",
-                }}
-              >
+              <Button key={t.id} type="button" onClick={() => setTab(t.id)} variant="secondary" aria-pressed={activeTab}>
                 {t.label}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -205,22 +192,13 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
 
           {tab === "summary" && (
             <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+              <div className="ui-tabs">
                 {sampleSummaries.map(s => {
                   const activeKind = s.kind === summaryKind;
                   return (
-                    <button
-                      key={s.kind}
-                      type="button"
-                      onClick={() => setSummaryKind(s.kind)}
-                      style={{
-                        padding: "6px 14px", borderRadius: 999, border: `1px solid ${activeKind ? "transparent" : BORDER_COLOR}`,
-                        background: activeKind ? "var(--color-tint-pink)" : "transparent", color: activeKind ? PINK : "var(--color-text-secondary)",
-                        fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-                      }}
-                    >
+                    <Button key={s.kind} type="button" onClick={() => setSummaryKind(s.kind)} variant="secondary" aria-pressed={activeKind}>
                       {s.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -244,11 +222,11 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
         <div className="sample-demo-footer">
           <span style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>내 강의자료로 요약과 퀴즈를 만드세요.</span>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <button type="button" onClick={onClose} style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${BORDER_COLOR}`, background: CARD_BACKGROUND, color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>닫기</button>
-            <button type="button" onClick={onStart} style={{ padding: "10px 18px", borderRadius: 12, border: "none", background: PINK, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>내 자료로 시작하기</button>
+            <Button type="button" onClick={onClose} variant="secondary">닫기</Button>
+            <Button type="button" onClick={onStart} variant="primary">내 자료로 시작하기</Button>
           </div>
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 }

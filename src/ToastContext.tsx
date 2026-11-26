@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { Button } from './components/ui';
 
 type ToastType = "success" | "error" | "info";
 // action이 있으면 토스트 안에 버튼을 함께 보여준다(예: 삭제 직후 "되돌리기").
@@ -48,16 +49,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map(toast => (
           <div
             key={toast.id}
-            role="status"
+            role={toast.type === 'error' ? 'alert' : 'status'}
+            className={`ui-alert ui-alert--${toast.type}`}
             style={{
               pointerEvents: "auto",
               maxWidth: "100%",
               padding: "12px 18px",
               borderRadius: 12,
-              background: "var(--color-card)",
-              border: "1px solid var(--color-border-soft)",
               boxShadow: "var(--shadow-card)",
-              color: "var(--color-text-strong)",
               fontSize: 14,
               fontWeight: 600,
               lineHeight: 1.5,
@@ -67,9 +66,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               gap: 12,
             }}
           >
+            <strong className="ui-alert-label">{toast.type === 'error' ? '오류' : toast.type === 'success' ? '완료' : '안내'}</strong>
             <span style={{ minWidth: 0 }}>{toast.message}</span>
             {toast.action && (
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 className="tongkk-hover-dim"
                 onClick={() => {
@@ -78,18 +78,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 }}
                 style={{
                   flexShrink: 0,
-                  padding: "5px 11px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border-soft)",
-                  background: "transparent",
-                  color: "var(--color-cyan)",
-                  fontSize: 13,
-                  fontWeight: 800,
-                  cursor: "pointer",
                 }}
               >
                 {toast.action.label}
-              </button>
+              </Button>
             )}
           </div>
         ))}

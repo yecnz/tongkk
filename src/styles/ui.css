@@ -1,0 +1,55 @@
+/* Shared controls follow My Page, Summary and Quiz: bright accents and quiet cards. */
+:root {
+  --ui-control-radius: 10px;
+  --ui-control-height: 38px;
+  --ui-control-font-size: 13px;
+  --ui-panel-padding: 24px;
+}
+
+.ui-button {
+  --ui-accent: var(--color-pink);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--ui-control-height); max-width: 100%; padding: 8px 16px;
+  border: 1px solid var(--color-border); border-radius: var(--ui-control-radius);
+  background: var(--color-card); color: var(--color-text-strong);
+  font: inherit; font-size: var(--ui-control-font-size); font-weight: 600; line-height: 1.5;
+  text-decoration: none; text-align: center; cursor: pointer;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.ui-button--cyan { --ui-accent: var(--color-cyan); }
+.ui-button--primary { border-color: transparent; background: var(--ui-accent); color: var(--color-on-accent); font-weight: 700; }
+.ui-button--ghost { border-color: transparent; background: transparent; color: var(--color-text-secondary); }
+.ui-button--danger { border-color: var(--color-error); background: var(--color-tint-error); color: var(--color-error-text); }
+.ui-button--sm { min-height: 32px; padding: 5px 12px; font-size: 12px; }
+.ui-button:disabled { background: var(--color-muted-surface); border-color: var(--color-border); color: var(--color-muted); cursor: default; opacity: 1; }
+@media (hover: hover) {
+  .ui-button:not(:disabled):hover { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--color-text-strong) 6%, transparent); }
+}
+.ui-button:focus-visible, .ui-input:focus-visible, .ui-tabs button:focus-visible { outline: 2px solid var(--color-cyan-deep); outline-offset: 3px; }
+.ui-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin-bottom: 16px; }
+.ui-field > label { font-size: 13px; font-weight: 600; color: var(--color-text-strong); }
+.ui-input { width: 100%; min-width: 0; min-height: 40px; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-text-strong); font: inherit; font-size: 14px; line-height: 1.5; box-sizing: border-box; }
+textarea.ui-input { min-height: 140px; resize: vertical; }
+.ui-input[aria-invalid="true"] { border-color: var(--color-error); }
+.ui-field-hint, .ui-field-error { margin: 0; font-size: 12px; line-height: 1.6; }
+.ui-field-hint { color: var(--color-muted); }
+.ui-field-error { color: var(--color-error-text); }
+.ui-alert { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-text); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.ui-alert--error { border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-border)); background: var(--color-tint-error); color: var(--color-error-text); }
+.ui-alert--success { background: var(--color-tint-cyan); color: var(--color-cyan-deep); }
+.ui-alert-label { flex: 0 0 auto; font-size: 12px; }
+.ui-alert-content { min-width: 0; flex: 1; }
+.ui-alert-content > :first-child { margin-top: 0; }
+.ui-alert-content > :last-child { margin-bottom: 0; }
+.ui-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.ui-page-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.ui-page-heading h1 { margin: 0; color: var(--color-text-strong); font-size: 24px; font-weight: 800; line-height: 1.4; }
+.ui-page-heading p { margin: 8px 0 0; color: var(--color-text-secondary); font-size: 14px; line-height: 1.65; }
+.ui-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.ui-tabs button { min-height: 38px; padding: 8px 14px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-card); color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.ui-tabs button[aria-selected="true"], .ui-tabs button[aria-pressed="true"] { border-color: var(--color-pink); background: var(--color-tint-pink); color: var(--color-pink-deep); font-weight: 700; }
+.ui-modal-body { padding: var(--ui-panel-padding); }
+.ui-modal-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.ui-modal-heading h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.ui-modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+@media (max-width: 600px) { :root { --ui-panel-padding: 20px; } .ui-page-heading { gap: 12px; } .ui-modal-actions > .ui-button { flex: 1; } }

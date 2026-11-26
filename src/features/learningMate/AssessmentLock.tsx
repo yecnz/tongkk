@@ -1,3 +1,4 @@
+import { InlineAlert } from '../../components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { workflowRequest } from '../../services/workflow';
@@ -12,5 +13,5 @@ export default function AssessmentLock() {
     lock(); const timer = setInterval(lock, 30000);
     return () => { active = false; clearInterval(timer); void send(false).catch(() => {}); };
   }, [user]);
-  return error ? <p role="alert">{error}</p> : null;
+  return error ? <InlineAlert tone="error">{error}</InlineAlert> : null;
 }

@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -62,7 +63,7 @@ export default function LearningRecommendations({ items }: { items: BriefingItem
     </ul>}
     {loading && <p role="status" className="m-0 mt-2 text-xs leading-5 text-muted">추천을 확인하는 중…</p>}
     {!loading && !visible.length && !errors.length && <p className="m-0 mt-2 text-xs leading-5 text-muted">지금 챙길 추천 항목이 없습니다.</p>}
-    {errors.length > 0 && <p role="alert" className="m-0 mt-2 text-xs leading-5 text-text-secondary">{errors.join('·')} 추천을 불러오지 못했어요. <button type="button" className="cursor-pointer border-0 bg-transparent p-0 font-bold text-cyan-deep underline" onClick={() => setRetry(n => n + 1)}>추천 다시 불러오기</button></p>}
+    {errors.length > 0 && <InlineAlert tone="error" className="mt-2">{errors.join('·')} 추천을 불러오지 못했어요. <Button type="button" variant="ghost" size="sm" onClick={() => setRetry(n => n + 1)}>추천 다시 불러오기</Button></InlineAlert>}
     {user && <Link to="/review?tab=today" className="mt-3 inline-block text-xs font-bold text-cyan-deep no-underline hover:underline">복습·학습 이슈 전체 보기 →</Link>}
   </>;
 }

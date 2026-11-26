@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import ModalDialog from "./ModalDialog";
 import { createPortal } from "react-dom";
 import { CARD_BACKGROUND, BORDER_COLOR, MENUBAR_DMG_URL, PINK } from "../common";
 
@@ -11,18 +11,11 @@ const UNBLOCK = [
 
 // 사이드바 "메뉴바 앱 받기"를 누르면 다운로드와 함께 뜨는 설치 안내. ✕·바깥 클릭·Esc로 닫는다.
 export const MenubarDownloadModal = ({ onClose }: { onClose: () => void }) => {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+
 
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+    <ModalDialog labelledBy="menubar-download-title" onClose={onClose} width={440}>
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="menubar-download-title"
         onClick={event => event.stopPropagation()}
         style={{ width: "min(440px, 100%)", padding: "32px 32px 28px", borderRadius: 20, background: CARD_BACKGROUND, boxShadow: "0 20px 50px rgba(15, 23, 42, 0.18)" }}
       >
@@ -61,7 +54,7 @@ export const MenubarDownloadModal = ({ onClose }: { onClose: () => void }) => {
           <a href={MENUBAR_DMG_URL} download style={{ marginLeft: 4, fontWeight: 700, color: "var(--color-text-strong)", textDecoration: "none" }}>다시 받기</a>
         </p>
       </div>
-    </div>,
+    </ModalDialog>,
     document.body,
   );
 };

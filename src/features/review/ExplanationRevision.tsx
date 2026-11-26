@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -8,6 +9,7 @@ import type { Feedback } from '../../services/learningSessions';
 import LearningLayout from '../learningSession/LearningLayout';
 import { useLearningNavigation } from '../learningSession/navigation';
 import LearningFeedback from '../learningSession/LearningFeedback';
+import Markdown from '../learningSession/LearningMarkdown';
 
 export type RevisionView = { title: string; question: string; baseline: string; baseline_feedback: Feedback | null; source_changed: boolean;
   revision: { id: string; session_id: string; item_id: string; answer: string; revision: number; status: 'draft' | 'pending' | 'graded' | 'ungraded' };
@@ -32,7 +34,7 @@ export function StartRevision({ sessionId, itemId, parentId }: { sessionId: stri
     } catch (e) { setError(e instanceof Error ? e.message : '설명 개선을 시작하지 못했어요.'); }
     finally { setBusy(false); }
   }
-  return <div><button type="button" className="workflow-button" disabled={busy} onClick={() => { void start(); }}>{parentId ? '새 수정본 만들기' : '설명 다듬기'}</button>{error && <p role="alert">{error}</p>}</div>;
+  return <div><Button type="button"  disabled={busy} onClick={() => { void start(); }}>{parentId ? '새 수정본 만들기' : '설명 다듬기'}</Button>{error && <InlineAlert tone="error">{error}</InlineAlert>}</div>;
 }
 function Editor({ id, userId }: { id: string; userId: string }) {
   const { beforeLeaveRef } = useLearningNavigation();
@@ -111,21 +113,21 @@ function Editor({ id, userId }: { id: string; userId: string }) {
     finally { setBusy(false); }
   }
   return <div className="workflow-surface workflow-stack"><h1>설명 개선</h1>
-    {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>서버 기록 확인</button></p>}
-    {!data ? <p role="status">설명을 불러오는 중…</p> : <>
-      <h2>{data.title}</h2><p>{data.question}</p>
-      {conflictDraft !== null && <div role="alert"><p>서버와 다른 기기 초안이 남아 있습니다.</p><button type="button" className="workflow-button" onClick={() => { change(conflictDraft); setConflictDraft(null); }}>기기 초안을 편집창으로 가져오기</button></div>}
-      {data.source_changed && <p role="alert">원문이 변경되었습니다. 새 자료를 학습한 뒤 설명을 수정해 주세요.</p>}
-      <Card className="workflow-panel workflow-stack"><h3>처음 제출한 설명</h3><p style={{ whiteSpace: 'pre-wrap' }}>{data.baseline}</p>{data.baseline_feedback && <LearningFeedback feedback={data.baseline_feedback} />}</Card>
+    {error && <InlineAlert tone="error">{error} <Button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>서버 기록 확인</Button></InlineAlert>}
+    {!data ? !error && <p role="status">설명을 불러오는 중…</p> : <>
+      <h2>{data.title}</h2><Markdown text={data.question} />
+      {conflictDraft !== null && <InlineAlert tone="error"><p>서버와 다른 기기 초안이 남아 있습니다.</p><Button type="button"  onClick={() => { change(conflictDraft); setConflictDraft(null); }}>기기 초안을 편집창으로 가져오기</Button></InlineAlert>}
+      {data.source_changed && <InlineAlert tone="error">원문이 변경되었습니다. 새 자료를 학습한 뒤 설명을 수정해 주세요.</InlineAlert>}
+      <Card className="workflow-panel workflow-stack"><h3>처음 제출한 설명</h3><Markdown text={data.baseline} />{data.baseline_feedback && <LearningFeedback feedback={data.baseline_feedback} />}</Card>
       <Card className="workflow-panel workflow-stack"><h3>수정 설명</h3>
-        <textarea aria-label="수정 설명" maxLength={4000} value={text} disabled={busy || data.revision.status !== 'draft' || data.source_changed}
+        <textarea className="ui-input" aria-label="수정 설명" maxLength={4000} value={text} disabled={busy || data.revision.status !== 'draft' || data.source_changed}
           onChange={e => change(e.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
         <details className="workflow-details"><summary>변경 내용 비교</summary>{explanationChanges(data.baseline, text).map((change, index) => <p key={index} style={{ whiteSpace: 'pre-wrap' }}>{change.kind === 'removed' ? <del>− {change.text}</del> : change.kind === 'added' ? <ins>+ {change.text}</ins> : change.text}</p>)}</details>
         {saved && <p className="workflow-meta" role="status">저장됨</p>}
         <details className="workflow-details"><summary>설명 수정·복습의 차이</summary>
           <p>설명 수정은 피드백을 참고한 보완 기록입니다. 도움 없이 기억하는지는 복습에서 확인합니다.</p>
         </details>
-        {!polling && data.revision.status !== 'graded' && <button type="button" className="workflow-button workflow-primary" disabled={busy || composing || !text.trim() || data.source_changed} onClick={() => { void submit(); }}>{pending.current ? '이전 제출 결과 확인' : data.evaluation?.status === 'ungraded' ? '같은 설명 재평가' : '수정 설명 평가'}</button>}
+        {!polling && data.revision.status !== 'graded' && <Button type="button" variant="primary" disabled={busy || composing || !text.trim() || data.source_changed} onClick={() => { void submit(); }}>{pending.current ? '이전 제출 결과 확인' : data.evaluation?.status === 'ungraded' ? '같은 설명 재평가' : '수정 설명 평가'}</Button>}
         {polling && <p role="status">설명을 평가하는 중…</p>}
         {data.evaluation?.status === 'ungraded' && <p>평가하지 못했어요. 답변은 보존됐어요.</p>}
         {data.evaluation?.feedback && <LearningFeedback feedback={data.evaluation.feedback} />}

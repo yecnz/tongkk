@@ -51,7 +51,7 @@ function Material() {
 function Stats() {
   const [params, setParams] = useSearchParams();
   const graph = params.get('view') === 'graph';
-  return <HostLayout active="학습 통계"><nav className="workflow-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!graph} onClick={() => setParams({view:'concepts'})}>개념별 학습 기록</button><button type="button" aria-pressed={graph} onClick={() => setParams({view:'graph'})}>개념 지도</button></nav>{graph ? <ConceptGraph /> : <ConceptHistory />}</HostLayout>;
+  return <HostLayout active="학습 통계"><nav className="ui-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!graph} onClick={() => setParams({view:'concepts'})}>개념별 학습 기록</button><button type="button" aria-pressed={graph} onClick={() => setParams({view:'graph'})}>개념 지도</button></nav>{graph ? <ConceptGraph /> : <ConceptHistory />}</HostLayout>;
 }
 function Settings() {
   const [params] = useSearchParams();

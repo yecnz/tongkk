@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../common';
@@ -25,11 +26,11 @@ export default function LearningResume({ variant = 'dashboard' }: { variant?: 'd
   return <Card className="learning-resume" role="region" aria-label="진행 중인 학습">
     <div className="learning-resume-heading"><div><h2>{variant === 'page' ? '이어서 학습하기' : '기억에서 꺼내는 학습'}</h2>
       <p>설명하고, 문제로 확인해요.</p></div>
-      {variant === 'dashboard' && <Link to="/learn" className="learning-resume-start">학습 시작 →</Link>}
+      {variant === 'dashboard' && <Link to="/learn" className="ui-button ui-button--primary">학습 시작 →</Link>}
     </div>
-    {loading ? <p className="learning-resume-message" role="status">진행 중인 학습을 불러오는 중…</p> : error ? <div className="learning-resume-error" role="alert">{error}
-      <button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button></div> : sessions.length === 0
-      ? <p className="learning-resume-message">진행 중인 학습이 없습니다.{variant === 'page' ? ' 위에서 새 학습을 시작해 주세요.' : ' 새 학습을 시작해 주세요.'}</p>
+    {loading ? <p className="learning-resume-message" role="status">진행 중인 학습을 불러오는 중…</p> : error ? <InlineAlert  tone="error">{error}
+      <Button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</Button></InlineAlert> : sessions.length === 0
+      ? <p className="learning-resume-message">진행 중인 학습이 없습니다.{variant === 'page' ? ' 아래에서 새 학습을 시작해 주세요.' : ' 새 학습을 시작해 주세요.'}</p>
       : <ul className="learning-resume-list">{sessions.slice(0, 5).map(session => <li key={session.id}>
         <Link to={`/learn/${session.id}`}><span className="learning-resume-material"><strong>{session.material_name}</strong><small>{statusLabels[session.status] || '진행 상태 확인'}</small></span>
           <span className="learning-resume-action">이어서 하기 →</span></Link></li>)}</ul>}

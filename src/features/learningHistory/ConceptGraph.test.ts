@@ -22,3 +22,10 @@ it('offers automatic study without asking the learner to configure relationships
  expect(container.textContent).not.toContain('연결 저장');
  expect(mocks.request.mock.calls.every(call=>call[1]==='GET')).toBe(true);
 });
+
+it('replaces loading with a retryable error when the concept map cannot be read',async()=>{
+ mocks.request.mockRejectedValue(new Error('지도를 불러오지 못했어요'));
+ await act(async()=>root.render(h(MemoryRouter,null,h(ConceptGraph))));
+ expect(container.querySelector('[role="alert"]')?.textContent).toContain('지도를 불러오지 못했어요');
+ expect(container.textContent).not.toContain('지도를 불러오는 중');
+});

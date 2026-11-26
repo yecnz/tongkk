@@ -5,6 +5,7 @@ import { emailWaitSeconds } from "../services/authEmails";
 import closeIcon from "../assets/mini/login-close.svg";
 import LegalLinks from "./LegalLinks";
 import PasswordControl, { type PasswordControlProps } from "./PasswordControl";
+import ModalDialog from './ModalDialog';
 import "./LoginModal.css";
 
 export type AuthMode = "signIn" | "signUp";
@@ -183,11 +184,8 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const submitDisabled = submitting || (view === 'reset' && wait > 0)
     || (confirming && (expired ? wait > 0 : code.length < CODE_LENGTH));
 
-  return (
-    <div className={compact ? 'mini-stage' : 'auth-overlay'}
-      style={compact ? undefined : { position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxSizing: 'border-box', background: 'rgba(15,23,42,0.2)', backdropFilter: 'blur(6px)' }}>
-      <form onSubmit={handleSubmit} noValidate={signingUp || webSignIn || webReset} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}
+  const form = (
+      <form onSubmit={handleSubmit} noValidate={signingUp || webSignIn || webReset} role={compact ? 'dialog' : undefined} aria-modal={compact ? true : undefined} aria-labelledby={`${id}-title`}
         aria-describedby={webSignIn && subtitle ? `${id}-description` : undefined}
         className={[compact ? 'mini-login-card' : 'auth-dialog', confirming ? 'auth-confirmation' : '', signingUp ? 'auth-signup' : '', webReset ? 'auth-recovery' : ''].filter(Boolean).join(' ')}
         onKeyDown={compact ? (event) => {
@@ -308,8 +306,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             <button type="button" className={webReset ? 'auth-recovery-link' : undefined} disabled={submitting} onClick={() => { setMode('signIn'); changeView('credentials'); }}>로그인으로 돌아가기</button>
           )}
         </div>}
-        {!compact && signingUp && <LegalLinks signup onNavigate={onClose} />}
+        {!compact && signingUp && <LegalLinks signup disabled={submitting} onNavigate={onClose} />}
       </form>
-    </div>
   );
+  return compact ? <div className="mini-stage">{form}</div>
+    : <ModalDialog labelledBy={`${id}-title`} describedBy={webSignIn && subtitle ? `${id}-description` : undefined}
+      onClose={() => { if (!pending.current) onClose(); }} closeOnBackdrop={!submitting} className="auth-modal">{form}</ModalDialog>;
 }

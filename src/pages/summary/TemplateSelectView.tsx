@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { PINK, Card } from "../../common";
 import type { SummaryTemplate } from "../../services/gpt";
 import { summaryTypeIcon } from "./utils";
+import { Button, PageHeading, TextField, TextAreaField } from '../../components/ui';
 
 type TemplateSelectViewProps = { onSelect: (template: SummaryTemplate, opts?: { pageRange?: string; focusPrompt?: string }) => void; onBack: () => void; pageHint?: string };
 
@@ -19,39 +20,23 @@ export const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelec
 
   return (
     <div>
-      <button type="button" onClick={onBack} style={{
-        background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
-      }}>← 돌아가기</button>
+      <Button variant="ghost" onClick={onBack} style={{ marginBottom: 20 }}>← 돌아가기</Button>
 
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>출력 템플릿 선택</h2>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>요약 범위와 형식을 선택해 주세요</p>
-      </div>
+      <PageHeading title="요약 형식 선택" description="요약 범위를 입력한 뒤 형식을 선택하면 생성이 시작됩니다." />
 
       <div style={{ display: "grid", gap: 14, marginBottom: 24, maxWidth: 720 }}>
-        <div>
-          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>
-            반영할 페이지 <span style={{ fontWeight: 600, color: "var(--color-muted)" }}>(선택 · 비우면 전체)</span>
-          </label>
-          <input
+          <TextField label="반영할 페이지" hint="선택 사항이며, 비우면 전체 자료를 요약합니다."
             value={pageRange}
             onChange={e => setPageRange(e.target.value)}
             placeholder={pageHint ? `예: 1-5, 8  (${pageHint})` : "예: 1-5, 8"}
-            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)" }}
           />
-        </div>
-        <div>
-          <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>
-            집중할 내용 <span style={{ fontWeight: 600, color: "var(--color-muted)" }}>(선택)</span>
-          </label>
-          <textarea
+          <TextAreaField label="집중할 내용 (선택)"
             value={focusPrompt}
             onChange={e => setFocusPrompt(e.target.value)}
             placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
             rows={3}
-            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--color-border-soft)", fontSize: 14, color: "var(--color-text-strong)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+            style={{ resize: 'vertical', lineHeight: 1.6 }}
           />
-        </div>
       </div>
 
       <div className="summary-template-grid">

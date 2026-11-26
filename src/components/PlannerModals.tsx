@@ -1,6 +1,7 @@
 import { useState, useEffect, useId, useRef, type CSSProperties } from "react";
 import { PINK, CYAN, Card } from "../common";
 import ModalDialog from "./ModalDialog";
+import { Button, InlineAlert } from "./ui";
 import CustomSelect from "./CustomSelect";
 import { loadCourseMaterialsFromServer } from "../services/materials";
 import { loadQuizSetsFromServer } from "../services/quizSets";
@@ -93,7 +94,7 @@ export const CustomCalendar = ({ value, onChange, markers, eventsByDate, onSelec
   };
 
   return (
-    <div style={{ background: "var(--glass-bg)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid var(--glass-border)" }}>
+    <div style={{ background: "var(--color-card)", backdropFilter: "blur(16px)", borderRadius: 18, padding: "16px 12px", border: "1px solid var(--glass-border)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <button type="button" onClick={prevMonth} aria-label="이전 달" className="tongkk-cal-nav" style={{ border: "none", cursor: "pointer", fontSize: 20, padding: "4px 10px", borderRadius: 8 }}>‹</button>
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -233,7 +234,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   };
   return (
     <ModalDialog labelledBy={titleId} onClose={onClose}>
-      <div style={{ width: "100%", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
+      <div style={{ width: "100%", boxSizing: "border-box", background: "var(--color-card)", backdropFilter: "blur(24px)", borderRadius: "var(--radius-card)", padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
         <h3 id={titleId} style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 700 }}>{heading}</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
           {(["assignment", "event", "exam"] as const).map(item => {
@@ -263,7 +264,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         <input value={subj} onChange={e => { setSubj(e.target.value); if (error) setError(""); }} onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }} placeholder={placeholder} aria-label={placeholder} style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
           fontSize: 14, boxSizing: "border-box", marginBottom: 14,
-          background: "var(--glass-bg)"
+          background: "var(--color-card)"
         }}/>
         {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
         <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? "var(--color-pink-deep)" : "var(--color-muted)" }}>
@@ -271,13 +272,11 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         </div>
         <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
         {error && (
-          <p role="alert" style={{ margin: "12px 0 0", fontSize: 12.5, fontWeight: 700, color: "var(--color-danger)" }}>{error}</p>
+          <InlineAlert tone="error" style={{ marginBlock: 16 }}>{error}</InlineAlert>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button type="button" onClick={handleSubmit} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: "var(--color-action-pink)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>{submitLabel}</button>
+          <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+          <Button variant="primary" type="button" onClick={handleSubmit}>{submitLabel}</Button>
         </div>
       </div>
     </ModalDialog>
@@ -315,13 +314,11 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           }}
         />
         {error && (
-          <p role="alert" style={{ margin: "0 0 16px", fontSize: 12.5, fontWeight: 700, color: "var(--color-danger)" }}>{error}</p>
+          <InlineAlert tone="error" style={{ marginBlock: 16 }}>{error}</InlineAlert>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button type="button" onClick={handleAdd} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none", background: "var(--color-action-cyan)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 600
-          }}>추가</button>
+          <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+          <Button variant="primary" type="button" onClick={handleAdd}>추가</Button>
         </div>
       </Card>
     </ModalDialog>
@@ -427,15 +424,15 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
   const selectStyle: CSSProperties = { padding: "12px 14px", fontSize: 14, color: "var(--color-text-strong)" };
   const labelClass = "block mb-2 text-xs font-extrabold text-text-secondary";
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4 py-6">
+    <ModalDialog labelledBy="add-pace-title" onClose={onClose} width={430}>
       <Card className="w-[min(430px,100%)] overflow-hidden">
-        <div className="border-b border-border bg-white px-6 py-5 dark:bg-slate-900">
+        <div className="border-b border-border bg-card px-6 py-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <span className="mb-2 inline-flex rounded-full bg-cyan/10 px-2.5 py-1 text-[11px] font-extrabold text-cyan-deep">
                 PACE PLAN
               </span>
-              <h3 className="m-0 text-[19px] font-extrabold text-text-strong">페이스 플랜 만들기</h3>
+              <h3 id="add-pace-title" className="m-0 text-[19px] font-extrabold text-text-strong">페이스 플랜 만들기</h3>
               <p className="m-0 mt-1 text-sm leading-6 text-muted">
                 마감일과 분량으로 하루 학습량을 계산합니다.
               </p>
@@ -444,13 +441,13 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
               type="button"
               onClick={onClose}
               aria-label="페이스 플랜 닫기"
-              className="h-9 w-9 shrink-0 rounded-[10px] border border-border bg-white text-lg leading-none text-muted cursor-pointer hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+              className="h-9 w-9 shrink-0 rounded-[10px] border border-border bg-card text-lg leading-none text-muted cursor-pointer hover:bg-surface"
             >×</button>
           </div>
         </div>
         <div className="px-6 py-5">
           {courses.length === 0 ? (
-            <div className="mb-5 rounded-[12px] border border-border bg-slate-50 px-4 py-4 dark:bg-slate-800/60">
+            <div className="mb-5 rounded-[12px] border border-border bg-surface px-4 py-4">
               <p className="m-0 text-sm leading-6 text-muted">
                 먼저 강의를 추가하면 분량을 페이스선으로 묶을 수 있습니다.
               </p>
@@ -487,7 +484,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                     style={selectStyle}
                   />
                 ) : (
-                  <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
+                  <div className="rounded-[10px] border border-dashed border-border bg-surface px-3.5 py-3 text-sm text-muted">
                     마감일 미설정 시 14일 기준으로 계산합니다.
                   </div>
                 )}
@@ -495,7 +492,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
               <div className="mb-4">
                 <label className={labelClass}>무엇을 기준으로 끝낼까요?</label>
                 {metricsLoading ? (
-                  <div className="rounded-[10px] border border-border bg-slate-50 px-3.5 py-4 text-sm text-muted dark:bg-slate-800/60">
+                  <div className="rounded-[10px] border border-border bg-surface px-3.5 py-4 text-sm text-muted">
                     강의 콘텐츠 분량을 불러오는 중…
                   </div>
                 ) : (
@@ -512,16 +509,16 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                           onClick={() => setBasis(option.key)}
                           className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 text-left transition ${
                             disabled
-                              ? "border-border bg-slate-50 cursor-default dark:bg-slate-800/40"
+                              ? "border-border bg-surface cursor-default"
                               : selected
                                 ? "border-cyan bg-cyan/10 cursor-pointer"
-                                : "border-border bg-white cursor-pointer hover:bg-slate-50 dark:bg-slate-800"
+                                : "border-border bg-card cursor-pointer hover:bg-surface"
                           }`}
                         >
-                          <span className={`text-sm font-bold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan-deep" : "text-text"}`}>
+                          <span className={`text-sm font-bold ${disabled ? "text-muted" : selected ? "text-cyan-deep" : "text-text"}`}>
                             {option.title}
                           </span>
-                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-slate-300 dark:text-slate-600" : selected ? "text-cyan-deep" : "text-text-secondary"}`}>
+                          <span className={`shrink-0 text-sm font-extrabold ${disabled ? "text-muted" : selected ? "text-cyan-deep" : "text-text-secondary"}`}>
                             {option.hint}
                           </span>
                         </button>
@@ -534,7 +531,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
                       className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 text-left transition cursor-pointer ${
                         basis === "manual"
                           ? "border-cyan bg-cyan/10"
-                          : "border-border bg-white hover:bg-slate-50 dark:bg-slate-800"
+                          : "border-border bg-card hover:bg-surface"
                       }`}
                     >
                       <span className={`text-sm font-bold ${basis === "manual" ? "text-cyan-deep" : "text-text"}`}>직접 입력</span>
@@ -564,18 +561,14 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
             </>
           )}
           <div className="flex gap-2.5 justify-end">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-[10px] border border-border bg-card text-sm font-bold text-text cursor-pointer hover:bg-muted-surface">취소</button>
-            <button type="button"
-              onClick={handleAdd}
-              disabled={!canAdd}
-              className={`px-5 py-2.5 rounded-[10px] border-none text-sm font-extrabold text-white ${canAdd ? "bg-action-pink cursor-pointer hover:brightness-95" : "bg-slate-300 cursor-default"}`}
-            >
+            <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+            <Button variant="primary" type="button" onClick={handleAdd} disabled={!canAdd}>
               만들기
-            </button>
+            </Button>
           </div>
         </div>
       </Card>
-    </div>
+    </ModalDialog>
   );
 };
 
@@ -612,14 +605,14 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-    fontSize: 14, boxSizing: "border-box", background: "var(--glass-bg)",
+    fontSize: 14, boxSizing: "border-box", background: "var(--color-card)",
   };
   const labelStyle: CSSProperties = { display: "block", marginBottom: 6, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ width: "min(380px, 100%)", boxSizing: "border-box", background: "var(--glass-bg)", backdropFilter: "blur(24px)", borderRadius: 22, padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>페이스 플랜 수정</h3>
+    <ModalDialog labelledBy="edit-pace-title" onClose={onClose} width={380}>
+      <div style={{ width: "min(380px, 100%)", boxSizing: "border-box", background: "var(--color-card)", backdropFilter: "blur(24px)", borderRadius: "var(--radius-card)", padding: 28, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", border: "1px solid var(--glass-border)" }}>
+        <h3 id="edit-pace-title" style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>페이스 플랜 수정</h3>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-muted)" }}>{plan.course}</p>
 
         <div style={{ marginBottom: 14 }}>
@@ -672,18 +665,10 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
         )}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--glass-bg)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            style={{
-              padding: "8px 18px", borderRadius: 10, border: "none",
-              background: canSave ? "var(--color-action-pink)" : "var(--color-muted)", color: "var(--color-on-brand)",
-              cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600,
-            }}
-          >저장</button>
+          <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+          <Button variant="primary" type="button" onClick={handleSave} disabled={!canSave}>저장</Button>
         </div>
       </div>
-    </div>
+    </ModalDialog>
   );
 };

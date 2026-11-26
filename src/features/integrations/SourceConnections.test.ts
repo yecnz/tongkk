@@ -22,3 +22,10 @@ it('keeps imported content as a draft until the user approves a new version',asy
  expect(mocks.request).toHaveBeenCalledWith('/source-integrations/drafts/draft/actions','POST',{action:'apply'});
  expect(mocks.invalidate).toHaveBeenCalledWith('운영체제');
 });
+
+it('shows a failed connection check without a simultaneous loading announcement',async()=>{
+ mocks.request.mockRejectedValue(new Error('연결 확인 실패'));
+ await act(async()=>root.render(h(MemoryRouter,null,h(SourceProvider,{provider:'notion'}))));
+ expect(container.querySelector('[role="alert"]')?.textContent).toContain('연결 확인 실패');
+ expect(container.textContent).not.toContain('연결을 확인하는 중');
+});

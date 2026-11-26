@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import BrandLogo from '../../components/BrandLogo';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -27,13 +28,13 @@ export default function LearningLayout({ children, active = '학습 세션' }: {
     <div className="learning-page">
       {sidebar && <Sidebar active={active} onNav={item => { void go(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
       <header className="learning-header">
-        <button type="button" className="learning-menu-button" aria-label={sidebar ? '메뉴 닫기' : '메뉴 열기'} onClick={() => setSidebar(!sidebar)}><SidebarIcon /></button>
+        <Button type="button" className="learning-menu-button" aria-label={sidebar ? '메뉴 닫기' : '메뉴 열기'} onClick={() => setSidebar(!sidebar)}><SidebarIcon /></Button>
         <LearningLink to="/" className="brand-home"><BrandLogo /></LearningLink>
         <span className="learning-header-label">/ {active === '오답 노트' ? '복습 관리' : active}</span>
         <LearningLink to="/" className="learning-header-back">대시보드로</LearningLink>
       </header>
       <main className="app-container learning-main">
-        {error && <div className="learning-notice learning-error" role="alert">{error}</div>}
+        {error && <InlineAlert  tone="error">{error}</InlineAlert>}
         {children}
       </main>
     </div>

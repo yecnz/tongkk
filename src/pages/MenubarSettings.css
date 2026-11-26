@@ -1,4 +1,3 @@
-@import "@fontsource-variable/noto-sans-kr";
 
 html:has(.menubar-settings-stage) #root { zoom: 1; }
 html.menubar-settings-app, html.menubar-settings-app body { overflow: hidden; }
@@ -28,7 +27,7 @@ html.menubar-settings-app, html.menubar-settings-app body { overflow: hidden; }
   background: var(--color-mini-card);
   box-shadow: var(--settings-shadow);
   color: var(--settings-text);
-  font: 400 13px / 16px "Noto Sans KR Variable", "Pretendard Variable", sans-serif;
+  font: 400 13px / 16px var(--font-ui);
 }
 
 [data-theme="dark"] .menubar-settings-window { --settings-shadow: 0 12px 32px rgb(0 0 0 / 18%); }

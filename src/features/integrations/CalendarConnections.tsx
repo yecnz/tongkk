@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
@@ -12,7 +13,7 @@ export default function CalendarConnections() {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    const load = () => { void workflowRequest<CalendarIntegration>('/integrations').then(v => { if (active) setData(v); }).catch(e => { if (active) setError(e.message); }); };
+    const load = () => { void workflowRequest<CalendarIntegration>('/integrations').then(v => { if (active) { setData(v); setError(''); } }).catch(e => { if (active) setError(e.message); }); };
     load(); const timer = polling ? setInterval(load, 3000) : undefined;
     return () => { active = false; clearInterval(timer); };
   }, [user, retry, polling]);
@@ -41,18 +42,18 @@ export default function CalendarConnections() {
   return <Card className="workflow-surface workflow-panel workflow-stack"><h2 className="workflow-panel-title">연결된 서비스</h2>
     <div className="workflow-card-heading"><h3>Google Calendar</h3>{data && <span className="workflow-badge" data-state={connected ? 'connected' : 'disconnected'}>{connected ? '연결됨' : data.connection?.status === 'reconnect' ? '다시 연결 필요' : '연결되지 않음'}</span>}</div>
     <p className="workflow-muted">지난 30일~향후 180일의 기본 캘린더 일정을 가져옵니다. 원본은 유지됩니다.</p>
-    {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 확인</button></p>}
+    {error && <InlineAlert tone="error">{error} <Button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 확인</Button></InlineAlert>}
     {notice && <p role="status">{notice}</p>}
-    {!data ? <p role="status">연결을 확인하는 중…</p> : !data.configured ? <p>캘린더 연결 설정이 필요합니다. 관리자에게 문의해 주세요.</p> : <>
+    {!data ? !error && <p role="status">연결을 확인하는 중…</p> : !data.configured ? <p>캘린더 연결 설정이 필요합니다. 관리자에게 문의해 주세요.</p> : <>
       {connected && <div className="workflow-subsection"><label className="workflow-toggle"><span>일정을 자동으로 동기화</span><input type="checkbox" checked={data.connection?.sync_enabled||false} disabled={busy||!data.worker_enabled} onChange={e=>{void scheduling(e.target.checked,data.connection?.sync_interval_minutes||30);}}/></label><label className="workflow-setting-row">가져오기 간격<CustomSelect disabled={busy} value={data.connection?.sync_interval_minutes||30} onChange={value=>{void scheduling(Boolean(data.connection?.sync_enabled),Number(value));}} options={[15,30,60,360,1440].map(n=>({value:n,label:n<60?`${n}분`:`${n/60}시간`}))} aria-label="가져오기 간격" /></label>{data.connection?.next_sync_at&&<p className="workflow-meta">다음 확인: {new Date(data.connection.next_sync_at).toLocaleString('ko-KR')}</p>}<p className="workflow-muted">실패 시 재시도 간격이 늘어납니다. 연결 해제 시 동기화가 중지됩니다.</p></div>}
       {data.connection?.last_synced_at && <p className="workflow-meta">최근 가져오기: {new Date(data.connection.last_synced_at).toLocaleString('ko-KR')}</p>}
-      {(data.job?.status === 'failed' || data.connection?.last_error) && <p role="alert">일정을 가져오지 못했어요. 연결 상태를 확인하고 다시 시도해 주세요.</p>}
+      {(data.job?.status === 'failed' || data.connection?.last_error) && <InlineAlert tone="error">일정을 가져오지 못했어요. 연결 상태를 확인하고 다시 시도해 주세요.</InlineAlert>}
       {polling && <p role="status">일정을 가져오는 중…</p>}
-      <div className="workflow-actions"><button type="button" disabled={busy} onClick={() => { void action('connect'); }}>{connected ? '다른 계정으로 다시 연결' : 'Google Calendar 연결'}</button>
-        {connected && <button type="button" className="workflow-primary" disabled={busy || polling || !data.worker_enabled} onClick={() => { void action('sync'); }}>일정 가져오기</button>}</div>
+      <div className="workflow-actions"><Button type="button" disabled={busy} onClick={() => { void action('connect'); }}>{connected ? '다른 계정으로 다시 연결' : 'Google Calendar 연결'}</Button>
+        {connected && <Button type="button" variant="primary" disabled={busy || polling || !data.worker_enabled} onClick={() => { void action('sync'); }}>일정 가져오기</Button>}</div>
       {!data.worker_enabled && <p>일정 가져오기를 사용할 수 없습니다. 관리자에게 문의해 주세요.</p>}
       {data.connection && data.connection.status !== 'disconnected' && <div className="workflow-subsection"><label className="workflow-check"><input type="checkbox" checked={deleteEvents} onChange={e => setDeleteEvents(e.target.checked)} />연결 해제 시 가져온 일정도 삭제</label>
-        <button type="button" className="workflow-button workflow-danger" disabled={busy} onClick={() => { void action('disconnect'); }}>연결 해제</button></div>}
+        <Button type="button" variant="danger" disabled={busy} onClick={() => { void action('disconnect'); }}>연결 해제</Button></div>}
     </>}
   </Card>;
 }

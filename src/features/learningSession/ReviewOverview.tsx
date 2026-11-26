@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../common';
@@ -27,8 +28,8 @@ export default function ReviewOverview({ variant = 'dashboard' }: { variant?: 'd
   return <Card className="learning-resume" role="region" aria-label="복습 현황">
     <div className="learning-resume-heading"><div><h2>{variant === 'stats' ? '학습과 기억 유지' : variant === 'all' ? '내 복습 목록' : '오늘 복습'}</h2>
       <p>{variant === 'stats' ? '학습 직후와 복습 결과를 비교해 주세요.' : '개념을 설명하고 확인 문제를 풀어 주세요.'}</p></div>
-      {variant !== 'all' && <Link to="/review?tab=today" className="learning-resume-start">복습 관리 →</Link>}</div>
-    {error ? <div className="learning-resume-error" role="alert">{error}<button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button></div>
+      {variant !== 'all' && <Link to="/review?tab=today" className="ui-button ui-button--secondary">복습 관리 →</Link>}</div>
+    {error ? <InlineAlert  tone="error">{error}<Button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</Button></InlineAlert>
       : !data ? <p role="status">불러오는 중…</p> : <>
         <p className="learning-resume-message">완료한 학습 {data.stats.completed_sessions}회 · 복습 예정 {data.stats.due_cards}개</p>
         {variant === 'stats' ? <><p>학습 직후 확인: {ratio(data.stats.initial_correct, data.stats.initial_checks)}</p>

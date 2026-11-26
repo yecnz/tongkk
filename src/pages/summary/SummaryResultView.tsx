@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useId } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { PINK, CYAN, BORDER_COLOR, Card } from "../../common";
+import { PINK, Card } from "../../common";
 import type { SummaryTemplate } from "../../services/gpt";
 import { useToast } from "../../ToastContext";
 import { MindmapView } from "../../components/MindmapView";
@@ -12,33 +12,29 @@ import { FormattedAiText } from "./SummaryContent";
 import { collapseForLectureNote, hoistSourceToHeadings, normalizeMarkdownContent, simplifySoleFileSources } from "./markdown";
 import type { DragAnchor } from "./types";
 import { buildMindmapQuestion, restoreScrollToAnchor, suggestedTutorQuestions, templateLabels } from "./utils";
+import ModalDialog from '../../components/ModalDialog';
+import { Button, InlineAlert } from '../../components/ui';
+import './SummaryViews.css';
 
-type SummarySample = { title: string; content: string };
+function PrintGuide({ onClose, onContinue }: { onClose: () => void; onContinue: () => void }) {
+  const titleId = useId();
+  return <ModalDialog labelledBy={titleId} onClose={onClose} width={440} closeOnBackdrop>
+    <div className="ui-modal-body">
+    <h3 id={titleId} style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700 }}>PDF로 저장하기</h3>
+    <p style={{ margin: '0 0 16px', fontSize: 14, lineHeight: 1.8 }}>계속을 누르면 인쇄 창이 열립니다. 프린터 대신 <strong>PDF로 저장</strong>을 선택해 주세요.</p>
+    <InlineAlert tone="info">저장된 PDF에서 텍스트를 선택하고 복사할 수 있어요.</InlineAlert>
+    <div className="summary-toolbar" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
+      <Button onClick={onClose}>취소</Button>
+      <Button variant="primary" tone="cyan" onClick={onContinue}>계속</Button>
+    </div>
+    </div>
+  </ModalDialog>;
+}
 
 type SummaryResultViewProps = { template: SummaryTemplate; onBack: () => void; backLabel: string; contextTitle: string; realContent: string; sourceMarkdown?: string; sourcePages?: string; isLoading: boolean; error: string; loadingStep: string; elapsedTime: string | null; threadId: string; summaryId: string | null; resetTutorHistory?: boolean; initialTutorQuestion?: string; onGoToQuiz?: () => void; onRetry?: () => void };
 
-const summaryData: Record<SummaryTemplate, SummarySample> = {
-  GENERAL: {
-    title: "일반 요약",
-    content: "핵심 결론\n이 자료는 **동적 프로그래밍**의 개념, 적용 조건, 구현 방식을 설명합니다.\n\n주요 내용\n- **동적 프로그래밍**은 반복되는 하위 문제의 결과를 저장해 재사용합니다.\n- 적용 조건은 **최적 부분 구조**와 **중복 부분 문제**입니다.\n- 구현 방식은 **메모이제이션**과 **타뷸레이션**으로 나뉩니다.\n\n한 줄 요약\n동적 프로그래밍은 중복 계산을 줄여 복잡한 문제를 효율적으로 푸는 방법입니다.",
-  },
-  LECTURE_NOTE: {
-    title: "강의 노트",
-    content: "핵심 개념\n**동적 프로그래밍**은 큰 문제를 작은 하위 문제로 나누고, 이미 계산한 결과를 저장해 재사용하는 알고리즘 설계 기법입니다.\n\n주요 내용\n- **최적 부분 구조**: 전체 문제의 최적해가 부분 문제의 최적해로 구성됩니다.\n- **중복 부분 문제**: 같은 하위 문제가 반복해서 등장합니다.\n\n시험 포인트\n1. **메모이제이션**과 **타뷸레이션**의 차이를 구분합니다.\n2. DP가 적용되기 위한 조건을 설명할 수 있어야 합니다.",
-  },
-  MINDMAP: {
-    title: "마인드맵",
-    content: "중심 주제\n**동적 프로그래밍**\n\n주요 가지\n- **적용 조건**\n  - 최적 부분 구조\n  - 중복 부분 문제\n- **구현 방식**\n  - 메모이제이션\n  - 타뷸레이션\n- **대표 문제**\n  - 피보나치\n  - 배낭 문제\n  - LCS\n\n핵심 연결\n- 반복 계산을 줄이면 시간 복잡도를 개선할 수 있습니다.",
-  },
-  CHEAT_SHEET: {
-    title: "치트시트",
-    content: "빠른 암기표\n- **DP 적용 조건**: 최적 부분 구조, 중복 부분 문제\n- **Top-down**: 재귀 + 메모이제이션\n- **Bottom-up**: 반복문 + 테이블\n\n자주 나오는 비교\n- **메모이제이션**: 필요한 값만 계산, 재귀 호출 사용\n- **타뷸레이션**: 작은 문제부터 순서대로 계산, 반복문 사용\n\n시험 직전 체크\n- DP 조건 2가지를 말할 수 있는가?\n- 대표 문제와 구현 방식을 연결할 수 있는가?",
-  },
-};
-
 export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, realContent, sourceMarkdown, sourcePages, isLoading, error, loadingStep, elapsedTime, threadId, summaryId, resetTutorHistory = false, initialTutorQuestion, onGoToQuiz, onRetry }: SummaryResultViewProps) => {
-  const data = summaryData[template];
-  const displayContent = realContent || data.content;
+  const displayContent = realContent.trim();
   const mindmapData = template === "MINDMAP" && displayContent ? parseMindmapJson(displayContent) : null;
   const [actionMessage, setActionMessage] = useState("");
   const [mindmapPaneHeight, setMindmapPaneHeight] = useState<number | undefined>(undefined);
@@ -256,75 +252,17 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
           @page { size: A4; margin: 14mm; }
         }
       `}</style>
-      {showPrintGuide && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="PDF 저장 안내"
-          onClick={() => setShowPrintGuide(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: "rgba(0,0,0,0.32)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{
-            width: "min(440px, 100%)", background: "var(--color-card)", borderRadius: 20, padding: "32px 30px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-              <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-cyan)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
-              }}>📄</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>PDF로 저장하기</h3>
-            </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "var(--color-text)", wordBreak: "keep-all" }}>
-              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "var(--color-text-strong)" }}>인쇄 창</b>이 열립니다.<br />
-              프린터 대신 <b style={{ color: "var(--color-text-strong)" }}>PDF로 저장</b>을 선택하면 돼요.
-            </p>
-            <div style={{
-              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "var(--color-page)",
-              fontSize: 13, lineHeight: 1.8, color: "var(--color-text-secondary)", wordBreak: "keep-all",
-              display: "flex", gap: 8, alignItems: "flex-start",
-            }}>
-              <span style={{ flexShrink: 0 }}>💡</span>
-              <span>
-                저장된 PDF는 이미지가 아니라 문서 형태라서,<br />
-                <b style={{ color: "var(--color-text-strong)" }}>텍스트 선택과 복사</b>가 가능해요.
-              </span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setShowPrintGuide(false)}
-                style={{
-                  padding: "9px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                }}
-              >취소</button>
-              <button
-                type="button"
-                onClick={runPrint}
-                style={{
-                  padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
-                }}
-              >계속</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPrintGuide && <PrintGuide onClose={() => setShowPrintGuide(false)} onContinue={runPrint} />}
       <button type="button" onClick={onBack} style={{
         background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
       }}>{backLabel}</button>
-      <Card style={{ padding: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
+      <Card className="summary-result-card">
+        <div className="summary-result-heading">
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <span style={{
               padding: "9px 18px", borderRadius: 10, border: "2px solid var(--color-border-soft)",
               background: "var(--color-card)", fontSize: 17, fontWeight: 600, flex: "0 0 auto",
-              color: template === "GENERAL" ? "var(--color-text)" : template === "LECTURE_NOTE" ? PINK : template === "MINDMAP" ? CYAN : "var(--color-violet)"
+              color: 'var(--color-pink-deep)'
             }}>{templateLabels[template]}</span>
             {isLoading && (
               <span style={{ fontSize: 13, color: "var(--color-muted)", fontWeight: 700 }}>
@@ -332,7 +270,7 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
               </span>
             )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
+          <div className="summary-toolbar">
             {isLoading && (
               <span style={{
                 padding: "6px 10px", borderRadius: 999, background: "var(--color-tint-pink)",
@@ -345,29 +283,11 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
                 color: "var(--color-muted)", fontSize: 12, fontWeight: 700
               }}>{elapsedTime}초</span>
             )}
-            {!isLoading && (
+            {!isLoading && !error && displayContent && (
               <>
-                <button type="button" className="tongkk-hover-tint" onClick={handleCopyAll} style={{
-                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 600, cursor: "pointer"
-                }}>전체 복사</button>
-                <button type="button" className="tongkk-hover-tint" onClick={handleDownload} disabled={pdfSaving} style={{
-                  height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 600,
-                  cursor: pdfSaving ? "default" : "pointer",
-                  opacity: pdfSaving ? 0.6 : 1,
-                }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
-                <button type="button" className="tongkk-hover-tint" onClick={() => handleTutorOpenChange(!isTutorOpen)} style={{
-                  height: 34,
-                  padding: "0 14px",
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border-soft)",
-                  background: isTutorOpen ? "var(--color-muted-surface)" : "var(--color-card)",
-                  color: isTutorOpen ? "var(--color-text-strong)" : "var(--color-text)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}>{isTutorOpen ? "튜터 닫기" : "AI 튜터"}</button>
+                <Button size="sm" onClick={handleCopyAll}>전체 복사</Button>
+                <Button size="sm" onClick={handleDownload} busy={pdfSaving}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</Button>
+                <Button size="sm" aria-expanded={isTutorOpen} onClick={() => handleTutorOpenChange(!isTutorOpen)}>{isTutorOpen ? "튜터 닫기" : "AI 튜터"}</Button>
               </>
             )}
           </div>
@@ -377,34 +297,16 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
             {actionMessage}
           </div>
         )}
-        {!isLoading && !error && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18, borderBottom: "1px solid var(--color-border-soft)" }}>
-            <button type="button" style={{
-              padding: "10px 4px 12px",
-              border: "none",
-              borderBottom: `2px solid ${PINK}`,
-              background: "transparent",
-              color: "var(--color-text-strong)",
-              fontSize: 14,
-              fontWeight: 800,
-              cursor: "default",
-            }}>요약 결과</button>
+        {!isLoading && !error && displayContent && (
+          <div className="ui-tabs" role="group" aria-label="학습 결과" style={{ marginBottom: 18 }}>
+            <Button aria-pressed>요약 결과</Button>
             {onGoToQuiz && (
-              <button type="button" onClick={onGoToQuiz} style={{
-                padding: "10px 4px 12px",
-                border: "none",
-                borderBottom: "2px solid transparent",
-                background: "transparent",
-                color: "var(--color-muted)",
-                fontSize: 14,
-                fontWeight: 800,
-                cursor: "pointer",
-              }}>퀴즈 풀기</button>
+              <Button onClick={onGoToQuiz} aria-pressed={false}>퀴즈 풀기</Button>
             )}
           </div>
         )}
 
-        {!isLoading && !error && (
+        {!isLoading && !error && displayContent && (
           <div
             ref={pdfExportRef}
             className="pdf-print-area"
@@ -483,25 +385,17 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
               다른 화면으로 이동해도 됩니다. 완료되면 알려드립니다.
             </p>
           </div>
-        ) : error ? (
-          <div style={{
-            background: "var(--color-tint-pink)", borderRadius: 12, padding: 24,
-            fontSize: 14, color: "var(--color-danger)", lineHeight: 1.6
-          }}>
-            <strong>요약 실패:</strong> {error}
+        ) : error || !displayContent ? (
+          <InlineAlert tone="error">
+            {error || "생성된 요약 내용이 없습니다. 같은 설정으로 다시 시도해 주세요."}
             {onRetry && (
               <div style={{ marginTop: 14 }}>
-                <button
-                  type="button"
+                <Button variant="primary"
                   onClick={onRetry}
-                  style={{
-                    padding: "9px 18px", borderRadius: 10, border: "none",
-                    background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer",
-                  }}
-                >같은 설정으로 다시 시도</button>
+                >같은 설정으로 다시 시도</Button>
               </div>
             )}
-          </div>
+          </InlineAlert>
         ) : (
           <div className="summary-result-grid" style={{
             display: "grid",
@@ -704,75 +598,9 @@ export const SummaryActions = ({ template, content }: { template: SummaryTemplat
           @page { size: A4; margin: 14mm; }
         }
       `}</style>
-      {showPrintGuide && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="PDF 저장 안내"
-          onClick={() => setShowPrintGuide(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: "rgba(0,0,0,0.32)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{
-            width: "min(440px, 100%)", background: "var(--color-card)", borderRadius: 20, padding: "32px 30px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-              <span style={{
-                width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-cyan)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
-              }}>📄</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>PDF로 저장하기</h3>
-            </div>
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.8, color: "var(--color-text)", wordBreak: "keep-all" }}>
-              <b style={{ color: CYAN }}>계속</b>을 누르면 <b style={{ color: "var(--color-text-strong)" }}>인쇄 창</b>이 열립니다.<br />
-              프린터 대신 <b style={{ color: "var(--color-text-strong)" }}>PDF로 저장</b>을 선택하면 돼요.
-            </p>
-            <div style={{
-              margin: "0 0 24px", padding: "16px 16px", borderRadius: 12, background: "var(--color-page)",
-              fontSize: 13, lineHeight: 1.8, color: "var(--color-text-secondary)", wordBreak: "keep-all",
-              display: "flex", gap: 8, alignItems: "flex-start",
-            }}>
-              <span style={{ flexShrink: 0 }}>💡</span>
-              <span>
-                저장된 PDF는 이미지가 아니라 문서 형태라서,<br />
-                <b style={{ color: "var(--color-text-strong)" }}>텍스트 선택과 복사</b>가 가능해요.
-              </span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setShowPrintGuide(false)}
-                style={{
-                  padding: "9px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 14, fontWeight: 700, cursor: "pointer",
-                }}
-              >취소</button>
-              <button
-                type="button"
-                onClick={runPrint}
-                style={{
-                  padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
-                }}
-              >계속</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <button type="button" className="tongkk-hover-tint" onClick={handleCopyAll} style={{
-        padding: "9px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
-        background: "var(--color-card)", color: "var(--color-text)", fontSize: 12, fontWeight: 800, cursor: "pointer",
-      }}>전체 복사</button>
-      <button type="button" className="tongkk-hover-tint" onClick={handleDownload} disabled={pdfSaving} style={{
-        padding: "9px 12px", borderRadius: 8, border: `1px solid ${BORDER_COLOR}`,
-        background: "var(--color-card)", color: "var(--color-text)", fontSize: 12, fontWeight: 800,
-        cursor: pdfSaving ? "default" : "pointer",
-        opacity: pdfSaving ? 0.6 : 1,
-      }}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</button>
+      {showPrintGuide && <PrintGuide onClose={() => setShowPrintGuide(false)} onContinue={runPrint} />}
+      <Button size="sm" onClick={handleCopyAll}>전체 복사</Button>
+      <Button size="sm" onClick={handleDownload} busy={pdfSaving}>{pdfSaving ? "PDF 생성 중" : "PDF 다운로드"}</Button>
       <div
         ref={pdfExportRef}
         className="pdf-print-area"

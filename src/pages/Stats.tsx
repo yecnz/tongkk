@@ -5,7 +5,8 @@ import ReviewOverview from "../features/learningSession/ReviewOverview";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PINK, CYAN, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel, useSidebarOpen } from "../common";
-import { useToast } from "../ToastContext";
+import { Button, InlineAlert, PageHeading } from '../components/ui';
+import { scoreColor } from '../services/scorePresentation';
 import { useAuth } from "../AuthContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
 import {
@@ -32,12 +33,6 @@ const formatDate = (timestamp: number) => {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 };
 
-const scoreColor = (score: number) => {
-  if (score >= 80) return CYAN;
-  if (score >= 60) return "var(--color-indigo)";
-  return PINK;
-};
-
 const progressColor = (progress: number) => {
   if (progress >= 70) return CYAN;
   if (progress >= 40) return "var(--color-indigo)";
@@ -60,6 +55,7 @@ const SummaryCard = ({ label, value, accent, note }: { label: string; value: Rea
 const CHART_WIDTH = 600;
 const CHART_HEIGHT = 160;
 const BAR_GAP = 10;
+const CHART_SIDE_PAD = 10;
 // 점수 100%일 때 막대 위 점수 라벨(y-8)·꼭짓점이 viewBox(y=0) 위로 넘어가 잘리므로 위쪽 여백을 둔다.
 const CHART_TOP_PAD = 22;
 
@@ -69,16 +65,18 @@ export default function Stats() {
   const showConcepts = params.get('view') === 'concepts';
   const showGraph = params.get('view') === 'graph';
   const { user } = useAuth();
-  const { showToast } = useToast();
   const page: PageRouteLabel = "학습 통계";
   const [sidebar, setSidebar] = useSidebarOpen();
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [loadRetry, setLoadRetry] = useState(0);
   const [showAllCourses, setShowAllCourses] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
 
   useEffect(() => {
     let ignore = false;
+    setLoadError('');
     // 게스트는 조회 없이 빈 상태로 — 로그인하면(user 갱신) 자동 재로딩.
     if (!user) {
       setAttempts([]);
@@ -86,12 +84,13 @@ export default function Stats() {
       return () => { ignore = true; };
     }
     setLoading(true);
+    setAttempts([]);
     loadAllQuizAttemptsFromServer()
       .then(rows => { if (!ignore) setAttempts(rows); })
-      .catch(err => { if (!ignore) showToast(err instanceof Error ? err.message : "학습 통계를 불러오지 못했습니다.", "error"); })
+      .catch(err => { if (!ignore) setLoadError(err instanceof Error ? err.message : "학습 통계를 불러오지 못했습니다."); })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
-  }, [user, showToast]);
+  }, [user, loadRetry]);
 
   const trend = useMemo(() => scoreTrend(attempts), [attempts]);
   const courses = useMemo(() => coursePerformance(attempts), [attempts]);
@@ -119,14 +118,13 @@ export default function Stats() {
   const totalQuestions = totalQuestionCount(attempts);
   const bestCourse = courses.length > 0 ? [...courses].sort((a, b) => b.progressPercent - a.progressPercent)[0] : null;
   const latestScore = latest[0]?.scorePercent ?? 0;
-  const previousScore = latest[1]?.scorePercent ?? null;
-  const scoreDelta = previousScore === null ? null : latestScore - previousScore;
 
   const barCount = trend.length;
-  const barWidth = barCount > 0 ? (CHART_WIDTH - BAR_GAP * (barCount - 1)) / barCount : 0;
+  const barWidth = barCount > 0 ? (CHART_WIDTH - CHART_SIDE_PAD * 2 - BAR_GAP * (barCount - 1)) / barCount : 0;
+  const chartX = (index: number) => CHART_SIDE_PAD + index * (barWidth + BAR_GAP) + barWidth / 2;
   const trendPath = trend
     .map((point, index) => {
-      const x = barCount <= 1 ? CHART_WIDTH / 2 : index * (CHART_WIDTH / (barCount - 1));
+      const x = chartX(index);
       const y = CHART_HEIGHT - (point.scorePercent / 100) * CHART_HEIGHT;
       return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
@@ -145,15 +143,10 @@ export default function Stats() {
       </div>
 
       <div className="stats-shell">
-        <nav className="workflow-tabs" aria-label="통계 보기"><button type="button" aria-pressed={!showConcepts && !showGraph} onClick={() => setParams({})}>학습 통계</button><button type="button" aria-pressed={showConcepts} onClick={() => setParams({ view: 'concepts' })}>개념별 학습 기록</button><button type="button" aria-pressed={showGraph} onClick={() => setParams({ view: 'graph' })}>개념 지도</button></nav>
+        <nav className="ui-tabs" aria-label="통계 보기"><Button aria-pressed={!showConcepts && !showGraph} onClick={() => setParams({})}>학습 통계</Button><Button aria-pressed={showConcepts} onClick={() => setParams({ view: 'concepts' })}>개념별 학습 기록</Button><Button aria-pressed={showGraph} onClick={() => setParams({ view: 'graph' })}>개념 지도</Button></nav>
         {showGraph ? <ConceptGraph key={user?.id || 'guest'} /> : showConcepts ? <ConceptHistory key={user?.id || 'guest'} /> : <>
-        <div className="stats-hero">
-          <div>
-            <h2 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 900, color: "var(--color-text-strong)", letterSpacing: 0 }}>학습 통계</h2>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-              {loading ? "불러오는 중..." : attempts.length === 0 ? "퀴즈를 풀면 통계가 표시됩니다." : `${attempts.length}회 풀이 · ${totalQuestions}문제 · 평균 ${average}%`}
-            </p>
-          </div>
+        <PageHeading title="학습 통계" description={loading ? '학습 기록을 불러오고 있어요.' : loadError ? '학습 기록을 다시 불러와 주세요.' : attempts.length === 0 ? '퀴즈를 풀면 통계가 표시됩니다.' : `${attempts.length}회 풀이 · ${totalQuestions}문제 · 평균 ${average}%`} />
+        {!loading && !loadError && attempts.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ padding: "8px 12px", borderRadius: 999, background: "var(--color-card)", border: `1px solid ${BORDER_COLOR}`, color: "var(--color-text-secondary)", fontSize: 12.5, fontWeight: 850 }}>
               최근 학습 날짜 {latest[0] ? formatDate(latest[0].createdAt) : "-"}
@@ -162,14 +155,31 @@ export default function Stats() {
               {latest[0] ? `최근 풀이 점수 ${latestScore}%` : "기록 없음"}
             </span>
           </div>
-        </div>
+        )}
 
         <ReviewOverview variant="stats" />
+        {loading ? (
+          <Card style={{ padding: 24 }} role="status" aria-label="학습 통계 불러오는 중">
+            <p style={{ margin: '0 0 16px' }}>학습 통계를 불러오는 중…</p>
+            <div className="tongkk-skeleton-block" style={{ height: 120 }} />
+          </Card>
+        ) : loadError ? (
+          <Card style={{ padding: 24 }}>
+            <InlineAlert tone="error">{loadError}</InlineAlert>
+            <Button onClick={() => setLoadRetry(value => value + 1)}>다시 불러오기</Button>
+          </Card>
+        ) : attempts.length === 0 ? (
+          <Card style={{ padding: 32, textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>아직 풀이 기록이 없어요</h3>
+            <p style={{ margin: '0 0 20px', color: 'var(--color-text-secondary)' }}>강의 자료로 퀴즈를 풀면 학습 시간과 점수 변화를 확인할 수 있어요.</p>
+            <Button variant="primary" onClick={() => navigate('/')}>강의 자료 보기</Button>
+          </Card>
+        ) : <>
         <div className="stats-summary-grid">
           <SummaryCard label="연속 학습일" value={`${streak}일`} accent={PINK} note={streak > 0 ? "연속 학습 중이에요" : "오늘 기록 없음"} />
           <SummaryCard label="총 학습시간" value={formatStudyTime(minutes)} accent={CYAN} note={`${attempts.length}회 풀이 기준`} />
-          <SummaryCard label="평균 점수" value={`${average}%`} accent={scoreColor(average)} note={scoreDelta === null ? "이전 기록 없음" : `${scoreDelta >= 0 ? "+" : ""}${scoreDelta}%p 변화`} />
-          <SummaryCard label="최근 집중 과목" value={bestCourse ? bestCourse.courseName : "-"} accent="var(--color-indigo)" note={bestCourse ? `진척도 ${bestCourse.progressPercent}% · ${bestCourse.attempts}회` : "과목 기록 없음"} />
+          <SummaryCard label="평균 점수" value={`${average}%`} accent={scoreColor(average)} note={`전체 ${attempts.length}회 풀이 평균`} />
+          <SummaryCard label="가장 높은 진척 과목" value={bestCourse ? bestCourse.courseName : "-"} accent="var(--color-indigo)" note={bestCourse ? `진척도 ${bestCourse.progressPercent}% · ${bestCourse.attempts}회` : "과목 기록 없음"} />
         </div>
 
         <div style={{ marginBottom: 18 }}>
@@ -188,14 +198,17 @@ export default function Stats() {
                 viewBox={`0 ${-CHART_TOP_PAD} ${CHART_WIDTH} ${CHART_HEIGHT + 42 + CHART_TOP_PAD}`}
                 width="100%"
                 preserveAspectRatio="xMidYMid meet"
+                role="img"
+                aria-label={`최근 ${trend.length}회 점수 추이`}
                 style={{ display: "block", width: "100%", maxWidth: CHART_WIDTH, margin: "0 auto" }}
               >
+                <title>{trend.map(point => `${point.date}: ${point.scorePercent}%`).join(', ')}</title>
                 <line x1="0" y1={CHART_HEIGHT * 0.3} x2={CHART_WIDTH} y2={CHART_HEIGHT * 0.3} stroke="var(--color-border)" strokeWidth="1" />
                 <line x1="0" y1={CHART_HEIGHT * 0.6} x2={CHART_WIDTH} y2={CHART_HEIGHT * 0.6} stroke="var(--color-border)" strokeWidth="1" />
                 <line x1="0" y1={CHART_HEIGHT} x2={CHART_WIDTH} y2={CHART_HEIGHT} stroke={BORDER_COLOR} strokeWidth="1" />
                 {trend.map((point, index) => {
                   const height = Math.max(3, (point.scorePercent / 100) * CHART_HEIGHT);
-                  const x = index * (barWidth + BAR_GAP);
+                  const x = chartX(index) - barWidth / 2;
                   const y = CHART_HEIGHT - height;
                   const color = scoreColor(point.scorePercent);
                   const [, month, day] = point.date.split("-");
@@ -209,7 +222,7 @@ export default function Stats() {
                 })}
                 {trend.length > 1 && <path d={trendPath} fill="none" stroke={CYAN} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
                 {trend.map((point, index) => {
-                  const x = barCount <= 1 ? CHART_WIDTH / 2 : index * (CHART_WIDTH / (barCount - 1));
+                  const x = chartX(index);
                   const y = CHART_HEIGHT - (point.scorePercent / 100) * CHART_HEIGHT;
                   return <circle key={`dot-${index}`} cx={x} cy={y} r="4.5" fill="var(--color-card)" stroke={scoreColor(point.scorePercent)} strokeWidth="3" />;
                 })}
@@ -304,6 +317,7 @@ export default function Stats() {
             )}
           </Card>
         </div>
+        </>}
         </>}
       </div>
     </div>

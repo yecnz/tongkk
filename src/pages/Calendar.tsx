@@ -8,7 +8,8 @@ import type { PageRouteLabel } from "../common";
 import { useCourses } from "../CourseContext";
 import { useAuth } from "../AuthContext";
 import { useAuthGate } from "../AuthGateContext";
-import { loadDashboardState, saveDashboardState } from "../services/dashboardState";
+import { Button, InlineAlert, PageHeading } from '../components/ui';
+import { useCalendarState } from './useCalendarState';
 import { buildPaceCalendarEntries, paceDateKey, type PacePlan } from "../services/pace";
 import { loadQuizAttemptsFromServer } from "../services/quizAttempts";
 import { workflowRequest } from "../services/workflow";
@@ -69,12 +70,10 @@ export default function Calendar() {
   const page: PageRouteLabel = "학습 캘린더";
   const [sidebar, setSidebar] = useSidebarOpen();
 
-  const [ddays, setDdays] = useState<Dday[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [pacePlans, setPacePlans] = useState<PacePlan[]>([]);
+  const { ddays, setDdays, plans, setPlans, pacePlans, setPacePlans, loaded, loading, saving,
+    loadError, saveError, canEdit, retryLoad, retrySave } = useCalendarState(user?.id);
   // 퀴즈 기준 페이스의 진행도를 파생 계산하기 위한 과목별 응시 기록 {count, createdAt}.
   const [courseQuizAttempts, setCourseQuizAttempts] = useState<Record<string, { count: number; createdAt: number }[]>>({});
-  const [loaded, setLoaded] = useState(false);
 
   const todayStr = paceDateKey(new Date());
   const [params, setParams] = useSearchParams();
@@ -103,57 +102,32 @@ export default function Calendar() {
   const [editingDday, setEditingDday] = useState<Dday | null>(null);
   const [editingPace, setEditingPace] = useState<PacePlan | null>(null);
 
-  // 대시보드와 동일한 dashboardState 키를 공유. mount 시 load, 변경 시 save.
-  // (load는 .then 콜백에서 setState → effect 내 동기 setState 아님)
-  useEffect(() => {
-    let ignore = false;
-    // 게스트(또는 세션 만료)면 서버 호출 없이 빈 상태로 — user가 deps에 있어 로그인 시 자동 재로딩.
-    if (!user) {
-      setDdays([]);
-      setPlans([]);
-      setPacePlans([]);
-      setLoaded(false);
-      return () => { ignore = true; };
-    }
-    Promise.all([
-      loadDashboardState<Dday[]>("ddays", []),
-      loadDashboardState<Plan[]>("plans", []),
-      loadDashboardState<PacePlan[]>("pacePlans", []),
-    ])
-      .then(([nextDdays, nextPlans, nextPace]) => {
-        if (ignore) return;
-        setDdays(nextDdays.map(item => ({ ...item, type: item.type || "assignment" })));
-        setPlans(nextPlans);
-        setPacePlans(nextPace);
-        setLoaded(true);
-      })
-      .catch(error => console.warn("학습 캘린더 상태 불러오기 실패", error));
-    return () => { ignore = true; };
-  }, [user]);
-
   // Google 캘린더에서 가져온 일정 — 달력 칸에 칩으로 보여준다(상세·과목 연결은 오른쪽 카드).
   const [externalEvents, setExternalEvents] = useState<{ days: string[]; title: string }[]>([]);
+  const [externalError, setExternalError] = useState('');
+  const [externalAttempt, setExternalAttempt] = useState(0);
   useEffect(() => {
     let ignore = false;
+    setExternalError('');
+    setExternalEvents([]);
     if (!user) { setExternalEvents([]); return () => { ignore = true; }; }
     workflowRequest<{ timezone: string; events: ExternalEventRow[] }>("/integrations/events")
       .then(({ timezone, events }) => {
         if (!ignore) setExternalEvents(events.map(e => ({ title: e.title, days: externalEventDays(e, timezone) })));
       })
-      .catch(error => console.warn("가져온 캘린더 일정 불러오기 실패", error));
+      .catch(() => { if (!ignore) setExternalError('연결한 캘린더 일정을 불러오지 못했어요.'); });
     return () => { ignore = true; };
-  }, [user]);
-
-  useEffect(() => { if (loaded) saveDashboardState("ddays", ddays).catch(console.warn); }, [loaded, ddays]);
-  useEffect(() => { if (loaded) saveDashboardState("plans", plans).catch(console.warn); }, [loaded, plans]);
-  useEffect(() => { if (loaded) saveDashboardState("pacePlans", pacePlans).catch(console.warn); }, [loaded, pacePlans]);
+  }, [user, externalAttempt]);
 
   // 퀴즈 기준 페이스가 있는 과목만 응시 기록을 조회(과목 집합이 바뀔 때만 재조회).
   const paceQuizCoursesKey = JSON.stringify(
     Array.from(new Set(pacePlans.filter(plan => plan.basis === "quiz").map(plan => plan.course))).sort()
   );
+  const [progressError, setProgressError] = useState('');
+  const [progressAttempt, setProgressAttempt] = useState(0);
   useEffect(() => {
     const paceCourses: string[] = JSON.parse(paceQuizCoursesKey);
+    setProgressError('');
     if (paceCourses.length === 0) { setCourseQuizAttempts({}); return; }
     let ignore = false;
     Promise.all(paceCourses.map(async course => {
@@ -161,9 +135,9 @@ export default function Calendar() {
       return [course, attempts.map(a => ({ count: a.count, createdAt: a.createdAt }))] as const;
     }))
       .then(entries => { if (!ignore) setCourseQuizAttempts(Object.fromEntries(entries)); })
-      .catch(error => console.warn("페이스 퀴즈 진행 불러오기 실패", error));
+      .catch(() => { if (!ignore) setProgressError('퀴즈 학습 진행도를 불러오지 못해 완료량이 정확하지 않을 수 있어요.'); });
     return () => { ignore = true; };
-  }, [paceQuizCoursesKey]);
+  }, [paceQuizCoursesKey, progressAttempt]);
 
   // ── 마커(점): 페이스 + 할 일을 모두 같은 "할 일" 점(회색)으로. 마감·일정(D-day)만 칩. ──
   // (페이스 점은 paceEntriesByDate 계산 이후에 채운다.)
@@ -254,10 +228,6 @@ export default function Calendar() {
       ? { ...p, doneUnits: Math.min(p.totalUnits, p.doneUnits + amount), ...(isToday ? { lastActivityAt: Date.now() } : {}) }
       : p)));
 
-  const addBtnStyle: CSSProperties = {
-    border: `1px solid ${CYAN}`, background: "var(--color-card)", color: CYAN,
-    borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 800, cursor: "pointer",
-  };
   const deleteBtnStyle: CSSProperties = {
     width: 24, height: 24, borderRadius: 8, border: "1px solid var(--color-border-soft)",
     background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 15,
@@ -272,10 +242,10 @@ export default function Calendar() {
   return (
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebar && <Sidebar active={page} onNav={(item) => { navigate(pageRoutes[item]); }} onClose={() => setSidebar(false)} />}
-      {showAddDday && <AddDdayModal initialDate={selectedDate} onClose={() => setShowAddDday(false)} onAdd={addDday} />}
-      {showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={addPlanForSelected} />}
-      {showAddPace && <AddPaceModal courses={courses} ddays={ddays} onClose={() => setShowAddPace(false)} onAdd={addPacePlan} />}
-      {editingDday && (
+      {canEdit && showAddDday && <AddDdayModal initialDate={selectedDate} onClose={() => setShowAddDday(false)} onAdd={addDday} />}
+      {canEdit && showAddPlan && <AddPlanModal onClose={() => setShowAddPlan(false)} onAdd={addPlanForSelected} />}
+      {canEdit && showAddPace && <AddPaceModal courses={courses} ddays={ddays} onClose={() => setShowAddPace(false)} onAdd={addPacePlan} />}
+      {canEdit && editingDday && (
         <AddDdayModal
           initialDate={editingDday.date}
           initialType={editingDday.type || "assignment"}
@@ -286,7 +256,7 @@ export default function Calendar() {
           onAdd={(type, subj, date) => updateDday(editingDday, type, subj, date)}
         />
       )}
-      {editingPace && (
+      {canEdit && editingPace && (
         <EditPaceModal
           plan={editingPace}
           ddays={ddays}
@@ -303,10 +273,13 @@ export default function Calendar() {
       </div>
 
       <div className="app-container">
-        <div style={{ marginBottom: 18 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>학습 캘린더</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>학습량·D-day·할 일을 관리하세요.</p>
-        </div>
+        <PageHeading title="학습 캘린더" description="학습량·D-day·할 일을 관리하세요." />
+        {loading && <p role="status">일정을 불러오는 중이에요…</p>}
+        {loadError && <InlineAlert tone="error">{loadError} <Button size="sm" onClick={retryLoad}>다시 불러오기</Button></InlineAlert>}
+        {saving && <p role="status">변경 사항을 저장하는 중이에요…</p>}
+        {saveError && <InlineAlert tone="error">{saveError} <Button size="sm" onClick={retrySave}>다시 저장</Button></InlineAlert>}
+        {externalError && <InlineAlert tone="error">{externalError} <Button size="sm" onClick={() => setExternalAttempt(attempt => attempt + 1)}>연결 일정 다시 불러오기</Button></InlineAlert>}
+        {progressError && <InlineAlert tone="error">{progressError} <Button size="sm" onClick={() => setProgressAttempt(attempt => attempt + 1)}>진행도 다시 불러오기</Button></InlineAlert>}
 
         <div className="grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* 큰 월 달력 + 범례 */}
@@ -339,22 +312,22 @@ export default function Calendar() {
             <ExternalEvents key={`external-${user?.id}:${selectedDate}`} day={selectedDate} />
             <Card id="calendar-day-details" tabIndex={-1} aria-labelledby="calendar-day-heading" style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <h3 id="calendar-day-heading" style={{ margin: 0, fontSize: 16, fontWeight: 850, color: "var(--color-text-strong)" }}>{formatPanelDate(selectedDate)}</h3>
+                <h2 id="calendar-day-heading" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>{formatPanelDate(selectedDate)}</h2>
                 {selectedIsToday && (
-                  <span style={{ fontSize: 11, fontWeight: 800, color: CYAN, background: "var(--color-tint-cyan)", borderRadius: 999, padding: "2px 8px" }}>오늘</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-cyan-deep)', background: "var(--color-tint-cyan)", borderRadius: 999, padding: "2px 8px" }}>오늘</span>
                 )}
               </div>
 
               {/* 그 날의 할 일: 페이스 분량 + 일반 할 일 (모두 할 일로 통합) */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>할 일</span>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>할 일</h3>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button type="button" onClick={() => { if (!requireAuth("할 일을 추가하려면 로그인이 필요해요")) return; setShowAddPlan(true); }} style={addBtnStyle}>+ 할 일</button>
-                  <button type="button" onClick={() => { if (!requireAuth("페이스를 추가하려면 로그인이 필요해요")) return; setShowAddPace(true); }} style={addBtnStyle}>+ 페이스</button>
+                  <Button size="sm" tone="cyan" disabled={Boolean(user) && !canEdit} onClick={() => { if (!requireAuth("할 일을 추가하려면 로그인이 필요해요")) return; if (canEdit) setShowAddPlan(true); }}>+ 할 일</Button>
+                  <Button size="sm" tone="cyan" disabled={Boolean(user) && !canEdit} onClick={() => { if (!requireAuth("페이스를 추가하려면 로그인이 필요해요")) return; if (canEdit) setShowAddPace(true); }}>+ 페이스</Button>
                 </div>
               </div>
               {dayPaceEntries.length === 0 && dayPlanEntries.length === 0 ? (
-                <p style={{ margin: "0 0 6px", fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>이 날의 할 일이 없습니다</p>
+                <p style={{ margin: "0 0 6px", fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>{user && !loaded ? '일정을 불러온 뒤 할 일을 확인할 수 있어요.' : '이 날의 할 일이 없습니다'}</p>
               ) : (
                 <>
                   {dayPaceEntries.map((entry, idx) => {
@@ -362,7 +335,7 @@ export default function Calendar() {
                     const checkedToday = selectedIsToday && plan ? isPaceDoneToday(plan.lastActivityAt) : false;
                     const done = entry.status === "done" || checkedToday;
                     // 어제 공부하고 체크를 잊은 경우를 보정할 수 있게, 오늘뿐 아니라 지난 날짜도 체크를 허용한다(미래 제외).
-                    const canCheck = selectedDate <= todayStr && !entry.readOnly && !done && Boolean(plan);
+                    const canCheck = canEdit && selectedDate <= todayStr && !entry.readOnly && !done && Boolean(plan);
                     const meta = PACE_STATUS_META[done ? "done" : entry.status];
                     return (
                       <div key={`pace-${entry.planId}-${idx}`} id={`calendar-pace-${entry.planId}`} tabIndex={focusedPace === entry.planId ? -1 : undefined} style={{
@@ -389,7 +362,7 @@ export default function Calendar() {
                               alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
                             }}
                           >
-                            {done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                            {done && <span style={{ color: "var(--color-on-accent)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                           </button>
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -403,8 +376,8 @@ export default function Calendar() {
                         </div>
                         {plan && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                            <button type="button" className="tongkk-icon-btn" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
-                            <button type="button" className="tongkk-icon-btn danger" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                            <button type="button" disabled={!canEdit} className="tongkk-icon-btn" onClick={() => setEditingPace(plan)} aria-label={`${entry.course} 페이스 수정`} title="수정" style={editBtnStyle}>✎</button>
+                            <button type="button" disabled={!canEdit} className="tongkk-icon-btn danger" onClick={() => deletePacePlan(entry.planId)} aria-label={`${entry.course} 페이스 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                           </div>
                         )}
                       </div>
@@ -417,7 +390,9 @@ export default function Calendar() {
                     }}>
                       <button
                         type="button"
+                        disabled={!canEdit}
                         onClick={() => togglePlan(i)}
+                        aria-pressed={p.done}
                         aria-label={`${p.text} 완료 토글`}
                         style={{
                           width: 22, height: 22, borderRadius: "50%", border: `2px solid ${p.done ? CYAN : "var(--color-border-soft)"}`,
@@ -425,13 +400,13 @@ export default function Calendar() {
                           alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
                         }}
                       >
-                        {p.done && <span style={{ color: "var(--color-on-brand)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
+                        {p.done && <span style={{ color: "var(--color-on-accent)", fontSize: 13, lineHeight: 1, fontWeight: 700 }}>✔</span>}
                       </button>
                       <span style={{
                         flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.45, wordBreak: "break-word",
                         color: p.done ? "var(--color-muted)" : "var(--color-text)", textDecoration: p.done ? "line-through" : "none",
                       }}>{p.text}</span>
-                      <button type="button" className="tongkk-icon-btn danger" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                      <button type="button" disabled={!canEdit} className="tongkk-icon-btn danger" onClick={() => deletePlan(p, i)} aria-label={`${p.text} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                     </div>
                   ))}
                 </>
@@ -439,11 +414,11 @@ export default function Calendar() {
 
               {/* 그 날의 마감 / 일정 */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text)" }}>마감 · 일정</span>
-                <button type="button" onClick={() => { if (!requireAuth("D-day를 추가하려면 로그인이 필요해요")) return; setShowAddDday(true); }} style={addBtnStyle}>+ D-day</button>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>마감 · 일정</h3>
+                <Button size="sm" tone="cyan" disabled={Boolean(user) && !canEdit} onClick={() => { if (!requireAuth("D-day를 추가하려면 로그인이 필요해요")) return; if (canEdit) setShowAddDday(true); }}>+ D-day</Button>
               </div>
               {dayDdays.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>이 날의 D-day가 없습니다</p>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)", padding: "4px 0" }}>{user && !loaded ? '일정을 불러온 뒤 D-day를 확인할 수 있어요.' : '이 날의 D-day가 없습니다'}</p>
               ) : (
                 dayDdays.map((d, idx) => {
                   const type = d.type || "assignment";
@@ -466,8 +441,8 @@ export default function Calendar() {
                         <span style={{ fontSize: 13, fontWeight: 700, color: left <= 7 ? PINK : CYAN }}>
                           {left > 0 ? `D-${left}` : left === 0 ? "D-Day!" : `D+${Math.abs(left)}`}
                         </span>
-                        <button type="button" className="tongkk-icon-btn" onClick={() => setEditingDday(d)} aria-label={`${d.subj} 수정`} title="수정" style={editBtnStyle}>✎</button>
-                        <button type="button" className="tongkk-icon-btn danger" onClick={() => deleteDday(d)} aria-label={`${d.subj} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
+                        <button type="button" disabled={!canEdit} className="tongkk-icon-btn" onClick={() => setEditingDday(d)} aria-label={`${d.subj} 수정`} title="수정" style={editBtnStyle}>✎</button>
+                        <button type="button" disabled={!canEdit} className="tongkk-icon-btn danger" onClick={() => deleteDday(d)} aria-label={`${d.subj} 삭제`} title="삭제" style={deleteBtnStyle}>×</button>
                       </div>
                     </div>
                   );

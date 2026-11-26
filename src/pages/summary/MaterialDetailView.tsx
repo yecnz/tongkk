@@ -17,6 +17,10 @@ import { fetchMaterialFile } from "../../services/materialFileCache";
 import { SelectionAskButton } from "./SelectionAskButton";
 import { FormattedAiText, SummaryContentView } from "./SummaryContent";
 import { SummaryActions } from "./SummaryResultView";
+import QuizText from '../quiz/QuizText';
+import ModalDialog from '../../components/ModalDialog';
+import { Button, InlineAlert } from '../../components/ui';
+import './SummaryViews.css';
 import { markdownComponents } from "./markdown";
 import type { DragAnchor, MaterialDetailTab } from "./types";
 import { buildMindmapQuestion, classifyUploadFailure, formatHubDate, restoreScrollToAnchor, suggestedTutorQuestions, templateLabels } from "./utils";
@@ -824,12 +828,13 @@ export const MaterialDetailView = ({
           borderBottom: "1px solid var(--color-border-soft)",
         }}>
           {hasSummaries && activeTab !== "quiz" && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 10 }}>
+            <div className="summary-toolbar" style={{ justifyContent: 'flex-end', marginBottom: 10 }}>
               {activeTab === "summary" && (
                 <button
                   type="button"
                   onClick={() => setShowSummaryList(prev => !prev)}
                   aria-label={showSummaryList ? "요약 목록 닫기" : "요약 목록 열기"}
+                  aria-expanded={showSummaryList}
                   title={showSummaryList ? "요약 목록 닫기" : "요약 목록 열기"}
                   style={{
                     display: "flex",
@@ -886,10 +891,10 @@ export const MaterialDetailView = ({
               )}
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
-            <button type="button" onClick={() => setActiveTab("original")} style={tabButtonStyle("original")}>원본</button>
-            <button type="button" onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
-            <button type="button" onClick={() => setActiveTab("quiz")} style={tabButtonStyle("quiz")}>퀴즈 {quizSets.length > 0 ? quizSets.length : ""}</button>
+          <div className="ui-tabs" role="group" aria-label="자료 보기" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            <button type="button" aria-pressed={activeTab === 'original'} onClick={() => setActiveTab("original")} style={tabButtonStyle("original")}>원본</button>
+            <button type="button" aria-pressed={activeTab === 'summary'} onClick={() => setActiveTab("summary")} style={tabButtonStyle("summary")}>요약 {summaries.length > 0 ? summaries.length : ""}</button>
+            <button type="button" aria-pressed={activeTab === 'quiz'} onClick={() => setActiveTab("quiz")} style={tabButtonStyle("quiz")}>퀴즈 {quizSets.length > 0 ? quizSets.length : ""}</button>
           </div>
           {hubError && <p style={{ margin: "12px 0 0", fontSize: 12, color: "var(--color-danger)", fontWeight: 700 }}>{hubError}</p>}
         </div>
@@ -1092,11 +1097,8 @@ export const MaterialDetailView = ({
                   const isExpanded = expandedQuizSetId === quizSet.id;
                   return (
                     <div key={quizSet.id} style={{ padding: 18, borderRadius: 12, background: "var(--color-card)", border: `1px solid ${BORDER_COLOR}` }}>
-                      <div
-                        onClick={latestAttempt ? () => setExpandedQuizSetId(prev => (prev === quizSet.id ? null : quizSet.id)) : undefined}
-                        style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", cursor: latestAttempt ? "pointer" : "default" }}
-                      >
-                        <div style={{ minWidth: 0 }}>
+                      <div className="summary-toolbar" style={{ justifyContent: 'space-between', gap: 16 }}>
+                        <div style={{ minWidth: 0, flex: '1 1 180px' }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                             <h3 style={{ margin: 0, fontSize: 16, color: "var(--color-text-strong)", wordBreak: "break-word" }}>{quizSet.title}</h3>
                             {multiSourceBadge(quizSet.materialIds)}
@@ -1118,26 +1120,28 @@ export const MaterialDetailView = ({
                             <span>{quizSet.questionType}</span>
                             <span>{quizSet.count || quizSet.questions.length}문항</span>
                             <span>{formatHubDate(quizSet.createdAt)}</span>
-                            {latestAttempt && <span style={{ color: CYAN }}>{isExpanded ? "풀이 이력 접기 ▴" : "풀이 이력 보기 ▾"}</span>}
+                            {latestAttempt && <Button size="sm" variant="ghost" tone="cyan" aria-expanded={isExpanded}
+                              aria-controls={`quiz-history-${quizSet.id}`}
+                              onClick={() => setExpandedQuizSetId(prev => prev === quizSet.id ? null : quizSet.id)}>
+                              {isExpanded ? '풀이 이력 접기 ▴' : '풀이 이력 보기 ▾'}
+                            </Button>}
                           </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <button type="button" className="tongkk-hover-tint-cyan" onClick={e => { e.stopPropagation(); onOpenQuiz(quizSet); }} style={{ padding: "10px 14px", borderRadius: 9, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                        <div className="summary-toolbar">
+                          <Button tone="cyan" onClick={() => onOpenQuiz(quizSet)}>
                             {latestAttempt ? "분석 리포트" : "퀴즈 풀기"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button variant="danger" size="sm"
                             onClick={e => { e.stopPropagation(); requestDelete({ kind: "quiz", quizSet }); }}
                             aria-label={`${quizSet.title} 퀴즈 삭제`}
                             title="삭제"
-                            style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${BORDER_COLOR}`, background: "var(--color-card)", color: "var(--color-muted)", cursor: "pointer", fontSize: 16, lineHeight: "32px", padding: 0 }}
                           >
                             ×
-                          </button>
+                          </Button>
                         </div>
                       </div>
                       {isExpanded && latestAttempt && (
-                        <div style={{ marginTop: 14, borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: 14, display: "grid", gap: 12 }}>
+                        <div id={`quiz-history-${quizSet.id}`} style={{ marginTop: 14, borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: 14, display: "grid", gap: 12 }}>
                           {latestAttempt.answers.map((ans, i) => {
                             // 저장된 퀴즈 세트의 같은 인덱스 문항에서 선지/정답 인덱스를 가져온다(문항 순서는 보존됨).
                             const q = quizSet.questions[i];
@@ -1155,7 +1159,7 @@ export const MaterialDetailView = ({
                                     fontWeight: 850,
                                   }}>{ans.isCorrect ? "정답" : "오답"}</span>
                                   <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-text-strong)", lineHeight: 1.5, wordBreak: "break-word" }}>
-                                    Q{i + 1}. {ans.question}
+                                    Q{i + 1}. <QuizText>{ans.question}</QuizText>
                                   </span>
                                 </div>
                                 {options && options.length > 0 ? (
@@ -1163,20 +1167,20 @@ export const MaterialDetailView = ({
                                     {options.map((opt, oi) => {
                                       const isCorrectOpt = q?.answer === oi;
                                       const isMyChoice = opt === ans.studentAnswer;
-                                      // 내 선택은 연한 회색, 실제 정답은 오답일 때만 핑크로 강조. 나머지 선지는 중립.
+                                      // 정답은 청록, 내 오답은 분홍으로 모든 풀이 화면과 동일하게 표시한다.
                                       const showCorrect = isCorrectOpt && !ans.isCorrect;
                                       return (
                                         <div key={oi} style={{
                                           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
                                           padding: "9px 12px", borderRadius: 9,
-                                          background: showCorrect ? "var(--color-tint-pink)" : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
-                                          border: `1px solid ${showCorrect ? PINK : "var(--color-border-soft)"}`,
+                                          background: showCorrect ? "var(--color-tint-cyan)" : isMyChoice && !ans.isCorrect ? 'var(--color-tint-pink)' : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
+                                          border: `1px solid ${showCorrect ? CYAN : isMyChoice && !ans.isCorrect ? PINK : "var(--color-border-soft)"}`,
                                         }}>
-                                          <span style={{ minWidth: 0, fontSize: 13, color: showCorrect ? PINK : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 750 : 600, lineHeight: 1.45, wordBreak: "break-word" }}>
-                                            {String.fromCharCode(65 + oi)}. {opt}
+                                          <span style={{ minWidth: 0, fontSize: 13, color: showCorrect ? 'var(--color-cyan-deep)' : isMyChoice && !ans.isCorrect ? 'var(--color-pink-deep)' : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 750 : 600, lineHeight: 1.45, wordBreak: "break-word" }}>
+                                            {String.fromCharCode(65 + oi)}. <QuizText>{opt}</QuizText>
                                           </span>
                                           {(isMyChoice || showCorrect) && (
-                                            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? PINK : "var(--color-text-secondary)" }}>
+                                            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? 'var(--color-cyan-deep)' : "var(--color-text-secondary)" }}>
                                               {showCorrect ? "정답" : "내 답"}
                                             </span>
                                           )}
@@ -1185,7 +1189,7 @@ export const MaterialDetailView = ({
                                     })}
                                     {q?.explanation && (
                                       <div style={{ marginTop: 2, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                                        <strong style={{ color: "var(--color-text)" }}>해설</strong> {q.explanation}
+                                        <strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText sources>{q.explanation}</QuizText>
                                       </div>
                                     )}
                                   </div>
@@ -1193,10 +1197,10 @@ export const MaterialDetailView = ({
                                   <div style={{ display: "grid", gap: 6, fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6, paddingLeft: 2 }}>
                                     <span>내 답: <span style={{ padding: "2px 8px", borderRadius: 6, background: "var(--color-muted-surface)", color: "var(--color-text)", fontWeight: 700 }}>{ans.studentAnswer ?? "미응답"}</span></span>
                                     {!ans.isCorrect && (
-                                      <span>정답: <strong style={{ color: PINK }}>{ans.correctAnswer ?? "정답 정보 없음"}</strong></span>
+                                      <span>정답: <strong style={{ color: 'var(--color-cyan-deep)' }}><QuizText>{String(ans.correctAnswer ?? '정답 정보 없음')}</QuizText></strong></span>
                                     )}
                                     {(ans.feedback || q?.explanation) && (
-                                      <span><strong style={{ color: "var(--color-text)" }}>해설</strong> {ans.feedback || q?.explanation}</span>
+                                      <span><strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText sources>{ans.feedback || q?.explanation}</QuizText></span>
                                     )}
                                   </div>
                                 )}
@@ -1218,9 +1222,9 @@ export const MaterialDetailView = ({
         </div>
       </Card>
       {pendingDelete && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <Card style={{ padding: 28, width: "min(380px, 100%)" }}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>
+        <ModalDialog labelledBy="delete-study-item-heading" onClose={closeDelete} width={380}>
+          <div className="ui-modal-body">
+            <h3 id="delete-study-item-heading" style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>
               {pendingDelete.kind === "summary" ? "요약을 삭제할까요?" : "퀴즈를 삭제할까요?"}
             </h3>
             <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
@@ -1229,28 +1233,25 @@ export const MaterialDetailView = ({
                 : `'${pendingDelete.quizSet.title}' 퀴즈가 삭제됩니다. 풀이 기록은 통계에 남습니다. 삭제 후에는 되돌릴 수 없습니다.`}
             </p>
             {deleteError && (
-              <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--color-danger)", fontWeight: 700, lineHeight: 1.5 }}>{deleteError}</p>
+              <InlineAlert tone="error">{deleteError}</InlineAlert>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button
-                type="button"
+              <Button
                 onClick={closeDelete}
                 disabled={deleteBusy}
-                style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", color: "var(--color-text)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14 }}
               >
                 취소
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="danger"
                 onClick={confirmDelete}
                 disabled={deleteBusy}
-                style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: deleteBusy ? "var(--color-muted-surface)" : "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: deleteBusy ? "default" : "pointer", fontSize: 14, fontWeight: 700 }}
+                busy={deleteBusy}
               >
                 {deleteBusy ? "삭제 중" : "삭제"}
-              </button>
+              </Button>
             </div>
-          </Card>
-        </div>
+          </div>
+        </ModalDialog>
       )}
     </div>
     </SourceCitationContext.Provider>

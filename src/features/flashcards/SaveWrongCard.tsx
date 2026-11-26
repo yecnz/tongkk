@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchCourses } from '../../services/courses';
@@ -27,6 +28,6 @@ export default function SaveWrongCard(props: Props) {
     } catch (e) { setError(e instanceof Error ? e.message : '카드를 저장하지 못했어요.'); }
     finally { setBusy(false); }
   }
-  return <div>{saved ? <Link to="/flashcards">암기 카드에 저장됨 · 복습하기 →</Link> : <button type="button" disabled={busy} onClick={() => { void save(); }}>{busy ? '저장 중…' : '암기 카드로 저장'}</button>}
-    {error && <p role="alert">{error}</p>}</div>;
+  return <div>{saved ? <Link to="/flashcards">암기 카드에 저장됨 · 복습하기 →</Link> : <Button type="button" disabled={busy} onClick={() => { void save(); }}>{busy ? '저장 중…' : '암기 카드로 저장'}</Button>}
+    {error && <InlineAlert tone="error">{error}</InlineAlert>}</div>;
 }

@@ -1,6 +1,9 @@
 import QuizText from "./quiz/QuizText";
 import { SourceCitationContext } from '../features/sources/citationContext';
 import BrandLogo from "../components/BrandLogo";
+import { Button, InlineAlert, PageHeading } from '../components/ui';
+import { scoreColor, scoreSurface, scoreTone } from '../services/scorePresentation';
+import './Quiz.css';
 import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
@@ -1166,12 +1169,12 @@ export default function Quiz() {
             background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
           }}>← 돌아가기</button>
 
-          <h2 style={{ margin: "0 0 24px", fontSize: 20, fontWeight: 700, color: "var(--color-text-strong)" }}>{selectedCourse}</h2>
+          <PageHeading title={selectedCourse} description="자료와 출제 범위를 고르고 퀴즈를 만들어 보세요." />
 
           {error && (
-            <div style={{ marginBottom: 20, padding: "12px 16px", borderRadius: 10, background: "var(--color-tint-pink)", border: `1px solid ${PINK}`, fontSize: 13, color: PINK }}>
+            <InlineAlert tone="error" style={{ marginBottom: 20 }}>
               {error}
-            </div>
+            </InlineAlert>
           )}
 
           {resumableDraft && resumableDraft.course === selectedCourse && (
@@ -1292,6 +1295,7 @@ export default function Quiz() {
                       <label style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, cursor: "pointer" }}>
                         <input
                           type="checkbox"
+                          className="tongkk-checkbox"
                           checked={isSelected}
                           style={{ accentColor: PINK }}
                           onChange={e => {
@@ -1317,6 +1321,7 @@ export default function Quiz() {
                               key={option.value}
                               type="button"
                               disabled={!isSelected}
+                              aria-pressed={isActiveSource}
                               onClick={() => setMaterialSources(prev => ({ ...prev, [material.id]: option.value }))}
                               style={{
                                 border: isActiveSource ? "1px solid color-mix(in srgb, var(--color-pink) 24%, transparent)" : `1px solid ${BORDER_COLOR}`,
@@ -1386,9 +1391,9 @@ export default function Quiz() {
             <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "var(--color-text-strong)" }}>퀴즈 설정</h3>
 
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 수</label>
-            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <div role="group" aria-label="문제 수" style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[5, 10, 15, 20].map(n => (
-                <button type="button" key={n} onClick={() => setCount(n)} style={{
+                <button type="button" key={n} aria-pressed={count === n} onClick={() => setCount(n)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
                   border: count === n ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                   background: count === n ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -1398,9 +1403,9 @@ export default function Quiz() {
             </div>
 
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>난이도</label>
-            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <div role="group" aria-label="난이도" style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {(["쉬움", "보통", "어려움"] as QuizDifficulty[]).map(d => (
-                <button type="button" key={d} onClick={() => setDifficulty(d)} style={{
+                <button type="button" key={d} aria-pressed={difficulty === d} onClick={() => setDifficulty(d)} style={{
                   flex: 1, padding: "10px 0", borderRadius: 10,
                   border: difficulty === d ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                   background: difficulty === d ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -1410,9 +1415,9 @@ export default function Quiz() {
             </div>
 
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>문제 유형</label>
-            <div className="option-grid-4" style={{ marginBottom: 20 }}>
+            <div className="option-grid-4" role="group" aria-label="문제 유형" style={{ marginBottom: 20 }}>
               {(["객관식", "OX", "단답형", "주관식"] as QuizQuestionType[]).map(t => (
-                <button type="button" key={t} onClick={() => setQuestionType(t)} style={{
+                <button type="button" key={t} aria-pressed={questionType === t} onClick={() => setQuestionType(t)} style={{
                   padding: "10px 0", borderRadius: 10,
                   border: questionType === t ? "1px solid color-mix(in srgb, var(--color-pink) 45%, transparent)" : "1px solid var(--color-border-soft)",
                   background: questionType === t ? "var(--color-tint-pink)" : "var(--color-card)",
@@ -1425,6 +1430,7 @@ export default function Quiz() {
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 700, color: "var(--color-text-strong)", cursor: "pointer" }}>
                 <input
                   type="checkbox"
+                  className="tongkk-checkbox"
                   checked={examMode}
                   onChange={e => setExamMode(e.target.checked)}
                 />
@@ -1437,6 +1443,7 @@ export default function Quiz() {
                     key={minutes}
                     type="button"
                     disabled={!examMode}
+                    aria-pressed={examMinutes === minutes}
                     onClick={() => setExamMinutes(minutes)}
                     style={{
                       padding: "7px 10px",
@@ -1456,11 +1463,13 @@ export default function Quiz() {
               </div>
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", margin: "20px 0 8px", display: "block" }}>
+            <label htmlFor="quiz-page-range" className="ui-field" style={{ margin: '20px 0 8px' }}>
               반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
             </label>
             {selectedHasPageMarkers ? (
               <input
+                id="quiz-page-range"
+                className="ui-input"
                 value={quizPageRange}
                 onChange={e => setQuizPageRange(e.target.value)}
                 placeholder={quizPageHint ? `예: 1-5, 8  (${quizPageHint})` : "예: 1-5, 8"}
@@ -1476,10 +1485,12 @@ export default function Quiz() {
               </div>
             )}
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+            <label htmlFor="quiz-focus" className="ui-field" style={{ marginBottom: 8 }}>
               집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
             </label>
             <textarea
+              id="quiz-focus"
+              className="ui-input"
               value={quizFocusPrompt}
               onChange={e => setQuizFocusPrompt(e.target.value)}
               placeholder="예: 핵심 정의와 비교 위주로 문제 내줘"
@@ -1493,15 +1504,9 @@ export default function Quiz() {
               {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있습니다." : "반영할 자료를 1개 이상 선택해 주세요."}
             </p>
           )}
-          <button type="button" onClick={generate} disabled={!canGenerate} style={{
-            width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-            background: canGenerate ? PINK : "var(--color-border-soft)",
-            color: canGenerate ? "var(--color-on-brand)" : "var(--color-muted)",
-            fontSize: 16, fontWeight: 700,
-            cursor: canGenerate ? "pointer" : "not-allowed"
-          }}>
+          <Button variant="primary" onClick={generate} disabled={!canGenerate} busy={isExtracting} style={{ width: '100%' }}>
             {isExtracting ? "자료 분석 중..." : "퀴즈 생성하기"}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -1682,15 +1687,15 @@ export default function Quiz() {
               background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, padding: 0
             }}>← 돌아가기</button>
           </div>
-          <Card style={{ padding: 40 }}>
+          <Card className="quiz-result-card">
             <div style={{
               width: 100, height: 100, borderRadius: "50%", margin: "0 auto 20px",
-              background: scorePercent >= 80 ? "var(--color-tint-cyan)" : scorePercent >= 50 ? "var(--color-tint-yellow)" : "var(--color-tint-pink)",
+              background: scoreSurface(scorePercent),
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 32, fontWeight: 800, color: scorePercent >= 80 ? CYAN : scorePercent >= 50 ? "var(--color-amber-deep)" : PINK
+              fontSize: 32, fontWeight: 800, color: scoreColor(scorePercent)
             }}>{scorePercent}%</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700 }}>
-              {timedOut ? "시간이 종료되었습니다" : scorePercent >= 80 ? "훌륭해요!" : scorePercent >= 50 ? "좋은 시작이에요!" : "조금 더 노력해봐요!"}
+              {timedOut ? "시간이 종료되었습니다" : scoreTone(scorePercent) === 'strong' ? "훌륭해요!" : scoreTone(scorePercent) === 'developing' ? "좋은 시작이에요!" : "조금 더 노력해봐요!"}
             </h2>
             <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>{quizzes.length}문제 중 {correctCount}문제 정답</p>
             {attemptSaveNotice && (
@@ -1708,7 +1713,7 @@ export default function Quiz() {
                 textAlign: "left",
               }}>
                 <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 800, color: "var(--color-text-strong)" }}>분석 리포트</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div className="quiz-result-metrics">
                   <div style={{ padding: 12, borderRadius: 12, background: "var(--color-card)" }}>
                     <div style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 800, marginBottom: 4 }}>풀이 시간</div>
                     <div style={{ fontSize: 15, color: "var(--color-text-strong)", fontWeight: 850 }}>{reviewAttempt.durationSeconds === null ? "-" : formatSeconds(reviewAttempt.durationSeconds)}</div>
@@ -1827,14 +1832,14 @@ export default function Quiz() {
                       >
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
                           <span style={{ minWidth: 0, fontSize: 13, color: "var(--color-text-strong)", fontWeight: 800, lineHeight: 1.5 }}>
-                            Q{questionIndex + 1}. {quiz.question}
+                            Q{questionIndex + 1}. <QuizText>{quiz.question}</QuizText>
                           </span>
                           <span className="tongkk-row-hint" style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: CYAN }}>문제 보기 →</span>
                         </div>
                         <div style={{ display: "grid", gap: 5, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                           <span>내 답: <strong style={{ color: PINK }}>{userAnswer ?? "미응답"}</strong></span>
-                          <span>정답: <strong style={{ color: CYAN }}>{correctAnswer ?? "정답 정보 없음"}</strong></span>
-                          <span>틀린 이유: {attemptAnswer?.feedback || quiz.explanation}</span>
+                          <span>정답: <strong style={{ color: 'var(--color-cyan-deep)' }}><QuizText>{String(correctAnswer ?? '정답 정보 없음')}</QuizText></strong></span>
+                          <span>틀린 이유: <QuizText>{attemptAnswer?.feedback || quiz.explanation}</QuizText></span>
                         </div>
                       </button>
                     );
@@ -1847,27 +1852,12 @@ export default function Quiz() {
               <p style={{ margin: "0 0 12px", fontSize: 13, color: PINK }}>{analyzeError}</p>
             )}
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              <button type="button" onClick={() => navigate(pageRoutes["오답 노트"])} disabled={analyzing} style={{
-                padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
-                background: "var(--color-card)", fontSize: 14, fontWeight: 700,
-                cursor: analyzing ? "default" : "pointer", color: "var(--color-text)", opacity: analyzing ? 0.6 : 1
-              }}>오답 노트 보기</button>
-              <button type="button" onClick={retryQuiz} disabled={analyzing} style={{
-                padding: "12px 24px", borderRadius: 12, border: "1px solid var(--color-border-soft)",
-                background: "var(--color-card)", fontSize: 14, fontWeight: 700,
-                cursor: analyzing ? "default" : "pointer", color: "var(--color-text)", opacity: analyzing ? 0.6 : 1
-              }}>다시 풀기</button>
+              <Button onClick={() => navigate(pageRoutes["오답 노트"])} disabled={analyzing}>오답 노트 보기</Button>
+              <Button onClick={retryQuiz} disabled={analyzing}>다시 풀기</Button>
               {reviewActiveRef.current ? (
-                <button type="button" onClick={handleAnalyzeWrong} disabled={analyzing} style={{
-                  padding: "12px 24px", borderRadius: 12, border: "none",
-                  background: PINK, fontSize: 14, fontWeight: 600,
-                  cursor: analyzing ? "default" : "pointer", color: "var(--color-on-brand)", opacity: analyzing ? 0.7 : 1
-                }}>{analyzing ? "분석 중..." : "과목 오답 분석"}</button>
+                <Button variant="primary" onClick={handleAnalyzeWrong} busy={analyzing}>{analyzing ? "분석 중..." : "과목 오답 분석"}</Button>
               ) : (
-                <button type="button" onClick={() => setView("courseDetail")} style={{
-                  padding: "12px 24px", borderRadius: 12, border: "none",
-                  background: PINK, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "var(--color-on-brand)"
-                }}>새로 풀기</button>
+                <Button variant="primary" onClick={() => setView("courseDetail")}>새로 풀기</Button>
               )}
             </div>
           </Card>
@@ -1966,7 +1956,7 @@ export default function Quiz() {
           <span style={{ fontSize: 26, lineHeight: 1 }}>‹</span>
           <span style={{ fontSize: 11, fontWeight: 800 }}>이전</span>
         </button>
-        <Card style={{ flex: 1, minWidth: 0, padding: 28 }}>
+        <Card className="quiz-question-card" style={{ flex: 1, minWidth: 0 }}>
           {reviewMode && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               <span style={{
@@ -1988,14 +1978,14 @@ export default function Quiz() {
               }}>{currentCorrect ? "정답" : "오답"}</span>
             )}
           </div>
-          <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}><QuizText>{q.question}</QuizText></h3>
+          <h3 id="quiz-question-heading" style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 600, color: "var(--color-text-strong)", lineHeight: 1.5 }}><QuizText>{q.question}</QuizText></h3>
           {reviewMode ? (
             <div style={{ display: "grid", gap: 10 }}>
               {isShortAnswer || isSubjective ? (
                 <div style={{ display: "grid", gap: 8, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                   <span>내 답: <span style={{ padding: "3px 10px", borderRadius: 8, background: "var(--color-muted-surface)", color: "var(--color-text)", fontWeight: 700 }}>{typeof selected === "string" && selected.trim() ? selected : "미응답"}</span></span>
                   {!currentCorrect && (
-                    <span>정답: <strong style={{ color: PINK }}><QuizText>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</QuizText></strong></span>
+                    <span>정답: <strong style={{ color: 'var(--color-cyan-deep)' }}><QuizText>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</QuizText></strong></span>
                   )}
                   {isSubjective && subjectiveGrade && (
                     <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · <QuizText sources>{subjectiveGrade.feedback}</QuizText></span>
@@ -2009,15 +1999,15 @@ export default function Quiz() {
                     <div key={i} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
                       padding: "12px 16px", borderRadius: 12,
-                      background: showCorrect ? "var(--color-tint-pink)" : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
-                      border: `1.5px solid ${showCorrect ? PINK : "var(--color-border-soft)"}`,
+                      background: showCorrect ? "var(--color-tint-cyan)" : isMyChoice && !currentCorrect ? 'var(--color-tint-pink)' : isMyChoice ? "var(--color-muted-surface)" : "var(--color-card)",
+                      border: `1.5px solid ${showCorrect ? CYAN : isMyChoice && !currentCorrect ? PINK : "var(--color-border-soft)"}`,
                     }}>
-                      <span style={{ minWidth: 0, fontSize: 14, color: showCorrect ? PINK : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word" }}>
+                      <span style={{ minWidth: 0, fontSize: 14, color: showCorrect ? 'var(--color-cyan-deep)' : isMyChoice && !currentCorrect ? 'var(--color-pink-deep)' : "var(--color-text)", fontWeight: showCorrect || isMyChoice ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word" }}>
                         <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
                         <QuizText>{opt}</QuizText>
                       </span>
                       {(isMyChoice || showCorrect) && (
-                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? PINK : "var(--color-text-secondary)" }}>
+                        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 850, color: showCorrect ? 'var(--color-cyan-deep)' : "var(--color-text-secondary)" }}>
                           {showCorrect ? "정답" : "내 답"}
                         </span>
                       )}
@@ -2028,9 +2018,12 @@ export default function Quiz() {
             </div>
           ) : isShortAnswer || isSubjective ? (
             <div>
-              <div style={{ display: "flex", gap: 10, alignItems: isSubjective ? "flex-end" : "stretch" }}>
+              <div className="quiz-answer-entry">
                 {isSubjective ? (
                   <textarea
+                    className="ui-input"
+                    aria-label="서술형 답안"
+                    aria-describedby="quiz-question-heading"
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     disabled={reviewMode || selected !== undefined || grading}
@@ -2044,7 +2037,6 @@ export default function Quiz() {
                       background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)",
                       fontSize: 14,
                       color: "var(--color-text)",
-                      outline: "none",
                       resize: "vertical",
                       lineHeight: 1.6,
                       fontFamily: "inherit",
@@ -2052,27 +2044,25 @@ export default function Quiz() {
                   />
                 ) : (
                   <input
+                    className="ui-input"
+                    aria-label="단답형 답안"
+                    aria-describedby="quiz-question-heading"
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     disabled={reviewMode || selected !== undefined}
                     placeholder="정답을 입력해 주세요"
                     style={{
                       flex: 1, padding: "14px 16px", borderRadius: 12, border: "1.5px solid var(--color-border-soft)",
-                      background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)", fontSize: 14, color: "var(--color-text)", outline: "none"
+                      background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)", fontSize: 14, color: "var(--color-text)"
                     }}
                   />
                 )}
                 {!reviewMode && (
-                  <button type="button"
+                  <Button variant="primary"
                     onClick={isSubjective ? submitSubjectiveAnswer : submitShortAnswer}
                     disabled={!shortAnswerInput.trim() || selected !== undefined || grading}
-                    style={{
-                      padding: isSubjective ? "14px 20px" : "0 20px", borderRadius: 12, border: "none",
-                      background: shortAnswerInput.trim() && selected === undefined && !grading ? PINK : "var(--color-border-soft)",
-                      color: "var(--color-on-brand)", fontSize: 14, fontWeight: 700,
-                      cursor: shortAnswerInput.trim() && selected === undefined && !grading ? "pointer" : "default"
-                    }}
-                  >{grading ? "채점 중..." : "제출"}</button>
+                    busy={grading}
+                  >{grading ? "채점 중..." : "제출"}</Button>
                 )}
               </div>
               {isShortAnswer && (reviewMode || (selected !== undefined && !examMode)) && (
@@ -2110,13 +2100,13 @@ export default function Quiz() {
                 const answered = selected !== undefined;
                 const revealAnswer = answered && !examMode;
                 let bg = "var(--color-surface)", border = "var(--color-border-soft)", color = "var(--color-text)";
-                if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = CYAN; }
-                else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = PINK; }
+                if (revealAnswer && isCorrect) { bg = "var(--color-tint-cyan)"; border = CYAN; color = 'var(--color-cyan-deep)'; }
+                else if (revealAnswer && isSelected && !isCorrect) { bg = "var(--color-tint-pink)"; border = PINK; color = 'var(--color-pink-deep)'; }
                 else if (isSelected) { bg = "var(--color-muted-surface)"; border = "var(--color-muted)"; color = "var(--color-text-strong)"; }
                 return (
-                  <button type="button" key={i} className={answered ? undefined : "tongkk-quiz-option"} onClick={() => selectAnswer(i)} style={{
+                  <button type="button" key={i} aria-pressed={isSelected} className={answered && !examMode ? undefined : "tongkk-quiz-option"} onClick={() => selectAnswer(i)} style={{
                     padding: "14px 18px", borderRadius: 12, border: `1.5px solid ${border}`,
-                    background: bg, textAlign: "left", fontSize: 14, color, cursor: answered ? "default" : "pointer",
+                    background: bg, textAlign: "left", fontSize: 14, color, cursor: answered && !examMode ? "default" : "pointer",
                     fontWeight: isSelected || (revealAnswer && isCorrect) ? 600 : 400, transition: "all 0.2s"
                   }}>
                     <span style={{ marginRight: 10, fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
@@ -2140,20 +2130,11 @@ export default function Quiz() {
             )
           )}
           {reviewMode ? (
-            <button type="button" onClick={exitReviewToResult} style={{
-              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
-            }}>결과로 돌아가기</button>
+            <Button variant="primary" onClick={exitReviewToResult} style={{ marginTop: 20, width: '100%' }}>결과로 돌아가기</Button>
           ) : current < quizzes.length - 1 ? (
-            <button type="button" onClick={goNextActive} style={{
-              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
-            }}>다음</button>
+            <Button variant="primary" onClick={goNextActive} style={{ marginTop: 20, width: '100%' }}>다음</Button>
           ) : (
-            <button type="button" onClick={submitQuiz} style={{
-              marginTop: 20, width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-              background: PINK, color: "var(--color-on-brand)", fontSize: 15, fontWeight: 700, cursor: "pointer"
-            }}>결과 보기</button>
+            <Button variant="primary" onClick={submitQuiz} style={{ marginTop: 20, width: '100%' }}>결과 보기</Button>
           )}
         </Card>
         <button

@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
@@ -21,7 +22,8 @@ export default function LearningPreferences() {
   }
   if (!user) return null;
   return <Card className="workflow-surface workflow-panel workflow-stack"><h2 className="workflow-panel-title">복습 설정</h2>
-    {error && <p role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 불러오기</button></p>}
+    {error && <InlineAlert tone="error">{error} <Button type="button" onClick={() => { setError(''); setRetry(n => n + 1); }}>다시 불러오기</Button></InlineAlert>}
+    {!data && !error && <p role="status">복습 설정을 불러오는 중…</p>}
     {data && <><div className="workflow-subsection"><label className="workflow-toggle"><span>앞으로 완료한 설명 학습을 자동으로 복습에 추가</span><input type="checkbox" checked={data.auto_review} disabled={busy} onChange={e => { void save({ ...data, auto_review: e.target.checked }); }} /></label>
       <label className="workflow-setting-row">학습 시간대 <CustomSelect value={data.timezone} disabled={busy} aria-label="학습 시간대"
         onChange={timezone => { void save({ ...data, timezone }); }}

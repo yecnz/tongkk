@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { CARD_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, PINK } from "../common";
+import { useId, useState } from "react";
+import { CARD_BACKGROUND, BORDER_COLOR, PINK } from "../common";
+import ModalDialog from "./ModalDialog";
+import { Button } from "./ui";
 import type { TutorialConfig } from "../tutorialContent";
 
 // 튜토리얼 표현 컴포넌트. STEP n/N 페이저로 한 장씩 보여준다.
@@ -18,6 +20,7 @@ export function TutorialSheet({
   secondaryAction?: SheetAction;
   onClose: () => void;
 }) {
+  const titleId = useId();
   const [step, setStep] = useState(0);
   const total = config.steps.length;
   const isLast = step === total - 1;
@@ -36,8 +39,7 @@ export function TutorialSheet({
 
   const card = (
     <div
-      role={isModal ? "dialog" : "region"}
-      aria-modal={isModal ? true : undefined}
+      role={isModal ? undefined : "region"}
       aria-label={`${config.title} 사용법`}
       onClick={e => e.stopPropagation()}
       style={{
@@ -65,7 +67,7 @@ export function TutorialSheet({
         </button>
       </div>
 
-      <h2 style={{ margin: "0 0 8px", fontSize: isModal ? 19 : 16, fontWeight: 700, color: "var(--color-text-strong)" }}>
+      <h2 id={titleId} style={{ margin: "0 0 8px", fontSize: isModal ? 19 : 16, fontWeight: 700, color: "var(--color-text-strong)" }}>
         {current.title}
       </h2>
       <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.65, color: "var(--color-text-secondary)" }}>
@@ -91,41 +93,13 @@ export function TutorialSheet({
 
       <div style={{ display: "flex", gap: 10 }}>
         {step > 0 && (
-          <button
-            type="button"
-            onClick={() => setStep(s => s - 1)}
-            style={{
-              flex: 1,
-              padding: "11px 0",
-              borderRadius: 12,
-              border: `1px solid ${BORDER_COLOR}`,
-              background: MUTED_SURFACE,
-              color: "var(--color-text-secondary)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
+          <Button variant="secondary" type="button" style={{ flex: 1 }} onClick={() => setStep(s => s - 1)}>
             이전
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          onClick={advance}
-          style={{
-            flex: 2,
-            padding: "11px 0",
-            borderRadius: 12,
-            border: "none",
-            background: PINK,
-            color: "var(--color-on-brand)",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
+        <Button variant="primary" type="button" style={{ flex: 2 }} onClick={advance}>
           {isLast ? (primaryAction ? primaryAction.label : "완료") : "다음"}
-        </button>
+        </Button>
       </div>
 
       {secondaryAction && (
@@ -154,23 +128,9 @@ export function TutorialSheet({
 
   if (isModal) {
     return (
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 350,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "rgba(15, 23, 42, 0.2)",
-          backdropFilter: "blur(6px)",
-          padding: 24,
-          boxSizing: "border-box",
-        }}
-      >
+      <ModalDialog labelledBy={titleId} onClose={onClose} width={380}>
         {card}
-      </div>
+      </ModalDialog>
     );
   }
 

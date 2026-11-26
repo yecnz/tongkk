@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -57,11 +58,11 @@ function Study({ userId, conceptId }: { userId: string; conceptId: string }) {
 
   const current = path?.steps[path.position];
   return <>
-    {error && <p role="alert" className="learning-notice learning-error">{error} <button type="button" disabled={busy} onClick={() => setRetry(n => n + 1)}>다시 확인</button></p>}
-    {!path ? (error ? <LearningLink className="learning-text-button" to="/stats?view=graph">개념 지도로 돌아가기</LearningLink> : <p role="status">연결된 개념의 학습을 준비하는 중…</p>) : path.status === 'completed' ? <Card className="learning-card workflow-surface workflow-stack">
-      <h1>연결된 개념 학습을 마쳤어요</h1><p>개념별 답변과 확인 결과를 학습 기록에 저장했어요.</p><LearningLink to="/stats?view=graph" className="workflow-button">개념 지도 보기 →</LearningLink>
+    {error && <InlineAlert tone="error" >{error} <Button type="button" disabled={busy} onClick={() => setRetry(n => n + 1)}>다시 확인</Button></InlineAlert>}
+    {!path ? (error ? <LearningLink className="ui-button ui-button--ghost" to="/stats?view=graph">개념 지도로 돌아가기</LearningLink> : <p role="status">연결된 개념의 학습을 준비하는 중…</p>) : path.status === 'completed' ? <Card className="learning-card workflow-surface workflow-stack">
+      <h1>연결된 개념 학습을 마쳤어요</h1><p>개념별 답변과 확인 결과를 학습 기록에 저장했어요.</p><LearningLink to="/stats?view=graph" className="ui-button ui-button--secondary">개념 지도 보기 →</LearningLink>
     </Card> : path.status === 'invalidated' || current?.source_changed ? <Card className="learning-card workflow-surface workflow-stack">
-      <h1>새 학습 순서를 준비해주세요</h1><p>현재 자료와 학습 기록을 기준으로 다시 시작할 수 있어요.</p><LearningLink to="/stats?view=graph" className="workflow-button">개념 지도로 돌아가기</LearningLink>
+      <h1>새 학습 순서를 준비해주세요</h1><p>현재 자료와 학습 기록을 기준으로 다시 시작할 수 있어요.</p><LearningLink to="/stats?view=graph" className="ui-button ui-button--secondary">개념 지도로 돌아가기</LearningLink>
     </Card> : <>
       <div ref={introContextRef} className="concept-study-context"><Card className="learning-card workflow-surface workflow-stack" aria-label="연결된 개념 학습 순서">
         <div className="workflow-card-heading"><strong>연결된 개념 학습</strong><span className="workflow-meta">{path.position + 1} / {path.steps.length}</span></div>
@@ -70,10 +71,10 @@ function Study({ userId, conceptId }: { userId: string; conceptId: string }) {
         </li>)}</ol><p className="workflow-muted">{current?.reason}</p>
       </Card></div>
       {current?.session_id && <LearningRunner key={current.session_id} id={current.session_id} userId={userId} onCompletedChange={setCompleted} introContextRef={introContextRef}
-        completionActions={completed ? <div className="learning-actions"><button type="button" className="primary" disabled={busy} onClick={() => { void next(); }}>
+        completionActions={completed ? <div className="learning-actions"><Button type="button" variant="primary" disabled={busy} onClick={() => { void next(); }}>
           {busy ? '다음 학습 준비 중…' : path.position + 1 < path.steps.length ? `다음 개념: ${path.steps[path.position + 1].title} →` : '학습 마치기'}
-        </button></div> : undefined} />}
-      <div className="learning-actions"><LearningLink className="learning-text-button" to="/stats?view=graph">개념 지도 보기</LearningLink></div>
+        </Button></div> : undefined} />}
+      <div className="learning-actions"><LearningLink className="ui-button ui-button--ghost" to="/stats?view=graph">개념 지도 보기</LearningLink></div>
     </>}
   </>;
 }

@@ -1,5 +1,7 @@
 import { SourceCitationContext } from "../features/sources/citationContext";
 import BrandLogo from "../components/BrandLogo";
+import ModalDialog from '../components/ModalDialog';
+import { Button, PageHeading } from '../components/ui';
 import { PreparationOptions } from "../features/preparation/PreparationPanel";
 import { prepareUploadedMaterials, type PreparationKind } from "../services/preparation";
 import { useState, useRef, useEffect, type CSSProperties } from "react";
@@ -22,7 +24,6 @@ import { MaterialDeleteConfirmModal } from "../components/MaterialDeleteConfirmM
 import { hasPageMarkers } from "../utils/pageMarkers";
 import { saveResumePoint } from "../services/dashboardState";
 import { MaterialDetailView } from "./summary/MaterialDetailView";
-import { QuizCreateView } from "./summary/QuizCreateView";
 import { SummaryResultView } from "./summary/SummaryResultView";
 import { TemplateSelectView } from "./summary/TemplateSelectView";
 import type { MaterialDetailTab, UploadFailureKind } from "./summary/types";
@@ -30,7 +31,7 @@ import { classifyUploadFailure, formatHubDate, summaryTypeIcon, templateLabels }
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 
-type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "quizCreate" | "materialDetail";
+type SummaryView = "upload" | "materialList" | "templates" | "summaryResult" | "materialDetail";
 
 type UploadedFile = { name: string; size: number; type: FileKind; pages: number | null; slides: number | null; rawFile: File };
 
@@ -130,7 +131,6 @@ const VIEW_TO_URL_TOKEN: Record<SummaryView, string> = {
   materialList: "list",
   templates: "templates",
   summaryResult: "summary",
-  quizCreate: "quiz",
   materialDetail: "material",
 };
 
@@ -139,7 +139,7 @@ const URL_TOKEN_TO_VIEW: Record<string, SummaryView> = {
   list: "upload",
   templates: "templates",
   summary: "summaryResult",
-  quiz: "quizCreate",
+  quiz: "upload", // Legacy URLs return to the real material workflow.
   material: "materialDetail",
 };
 
@@ -1250,27 +1250,14 @@ export default function Summary() {
       )}
       {sidebar && <Sidebar active="자료 요약" onNav={(item) => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
       {sizeLimitNotice && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="원본 저장 한도 안내"
-          onClick={() => setSizeLimitNotice(null)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: "rgba(0,0,0,0.32)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{
-            width: "min(380px, 100%)", background: "var(--color-card)", borderRadius: 18, padding: 24,
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
-          }}>
+        <ModalDialog labelledBy="original-limit-heading" onClose={() => setSizeLimitNotice(null)} width={380} closeOnBackdrop>
+          <div className="ui-modal-body">
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <span style={{
                 width: 36, height: 36, borderRadius: "50%", background: "var(--color-tint-yellow)", color: "var(--color-amber-deep)",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0,
               }}>!</span>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>원본은 저장하지 않았어요</h3>
+              <h3 id="original-limit-heading" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>원본은 저장하지 않았어요</h3>
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text)" }}>
               아래 파일은 <b style={{ color: "var(--color-text-strong)" }}>50MB 저장 한도</b>를 넘어 원본을 저장하지 않았어요.{" "}
@@ -1286,35 +1273,17 @@ export default function Summary() {
               원본을 저장하려면 50MB 미만으로 나눠 업로드해 주세요.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                type="button"
+              <Button variant="primary" tone="cyan"
                 onClick={() => setSizeLimitNotice(null)}
-                style={{
-                  padding: "9px 22px", borderRadius: 10, border: "none",
-                  background: CYAN, color: "var(--color-on-brand)", fontSize: 14, fontWeight: 800, cursor: "pointer",
-                }}
-              >확인</button>
+              >확인</Button>
             </div>
           </div>
-        </div>
+        </ModalDialog>
       )}
       {duplicateSummaryPrompt && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="기존 요약 확인"
-          onClick={() => setDuplicateSummaryPrompt(null)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: "rgba(0,0,0,0.32)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{
-            width: "min(420px, 100%)", background: "var(--color-card)", borderRadius: 18, padding: "28px 26px",
-            boxShadow: "0 18px 50px rgba(0,0,0,0.22)", border: "1px solid var(--color-border-soft)",
-          }}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 800, color: "var(--color-text-strong)" }}>
+        <ModalDialog labelledBy="existing-summary-heading" onClose={() => setDuplicateSummaryPrompt(null)} width={420} closeOnBackdrop>
+          <div className="ui-modal-body">
+            <h3 id="existing-summary-heading" style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 700, color: "var(--color-text-strong)" }}>
               이미 만든 요약이 있습니다
             </h3>
             <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "var(--color-text)", wordBreak: "keep-all" }}>
@@ -1322,37 +1291,27 @@ export default function Summary() {
               {formatHubDate(duplicateSummaryPrompt.createdAt)}에 만들었어요.
               새로 생성하면 <b style={{ color: "var(--color-text-strong)" }}>이전 요약도 그대로 보관돼요</b>.
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                type="button"
+            <div style={{ display: "flex", flexWrap: 'wrap', justifyContent: "flex-end", gap: 8 }}>
+              <Button
                 onClick={() => {
                   setDuplicateSummaryPrompt(null);
                   startSummaryFromSettings(true);
                 }}
-                style={{
-                  padding: "9px 16px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-                  background: "var(--color-card)", color: "var(--color-text)", fontSize: 13, fontWeight: 800, cursor: "pointer",
-                }}
-              >새로 생성</button>
-              <button
-                type="button"
+              >새로 생성</Button>
+              <Button variant="primary"
                 onClick={() => {
                   const existing = duplicateSummaryPrompt;
                   setDuplicateSummaryPrompt(null);
                   if (existing) openExistingSummary(existing);
                 }}
-                style={{
-                  padding: "9px 16px", borderRadius: 10, border: "none",
-                  background: PINK, color: "var(--color-on-brand)", fontSize: 13, fontWeight: 800, cursor: "pointer",
-                }}
-              >기존 요약 보기</button>
+              >기존 요약 보기</Button>
             </div>
           </div>
-        </div>
+        </ModalDialog>
       )}
       {duplicateNotice && (
         <div
-          role="dialog"
+          role="status"
           aria-live="polite"
           aria-label="이미 등록된 파일 안내"
           style={{
@@ -1497,12 +1456,9 @@ export default function Summary() {
           />
         )}
 
-        {view === "quizCreate" && (
-          <QuizCreateView fileName={selectedMaterials.map(material => material.name).join(", ")} onBack={() => setView("upload")} onCreate={handleGoToQuiz} />
-        )}
-
         {view === "upload" && selectedCourse && (
           <div>
+            <PageHeading title={selectedCourse} description="자료를 올리고, 필요한 내용을 요약하거나 퀴즈로 학습하세요." />
             <Card className="learning-card"><p>업로드 후 함께 준비할 학습 자료</p><PreparationOptions value={autoPreparationKinds} onChange={setAutoPreparationKinds} />{preparationNotice && <p role="status">{preparationNotice}</p>}</Card>
             <button type="button" onClick={() => navigate(pageRoutes["대시보드"])} style={{
               background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
@@ -1513,6 +1469,7 @@ export default function Summary() {
                     <button
                       key={mode}
                       type="button"
+                      aria-pressed={inputMode === mode}
                       onClick={() => setInputMode(mode)}
                       style={{
                         padding: "10px 0",
@@ -1559,36 +1516,30 @@ export default function Summary() {
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                    <label className="ui-field" htmlFor="text-material-title">자료 이름</label>
                     <input
+                      id="text-material-title"
+                      className="ui-input"
                       value={textMaterialTitle}
                       onChange={e => setTextMaterialTitle(e.target.value)}
                       placeholder="자료 이름 (예: 3주차 강의 노트)"
-                      style={{ padding: "12px 13px", borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, outline: "none" }}
                     />
+                    <label className="ui-field" htmlFor="text-material-content">자료 내용</label>
                     <textarea
+                      id="text-material-content"
+                      className="ui-input"
                       value={textMaterialContent}
                       onChange={e => setTextMaterialContent(e.target.value)}
                       placeholder="강의 스크립트나 노트를 붙여넣어 주세요..."
                       rows={8}
-                      style={{ padding: 13, borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, lineHeight: 1.6, resize: "vertical", outline: "none", fontFamily: "inherit" }}
+                      style={{ lineHeight: 1.6, resize: "vertical" }}
                     />
-                    <button
-                      type="button"
+                    <Button variant="primary"
                       onClick={handleAddTextMaterial}
                       disabled={!textMaterialTitle.trim() || !textMaterialContent.trim()}
-                      style={{
-                        padding: "11px 0",
-                        borderRadius: 10,
-                        border: "none",
-                        background: textMaterialTitle.trim() && textMaterialContent.trim() ? PINK : "var(--color-border-soft)",
-                        color: "var(--color-on-brand)",
-                        fontSize: 13,
-                        fontWeight: 800,
-                        cursor: textMaterialTitle.trim() && textMaterialContent.trim() ? "pointer" : "default",
-                      }}
                     >
                       자료로 추가
-                    </button>
+                    </Button>
                   </div>
                 )}
 
@@ -1748,29 +1699,20 @@ export default function Summary() {
                       <div
                         key={material.id}
                         className={isSelected ? undefined : "tongkk-hover-row"}
-                        onClick={() => setSelectedMaterialIds(prev =>
-                          prev.includes(material.id)
-                            ? prev.filter(id => id !== material.id)
-                            : [...prev, material.id]
-                        )}
                         style={{
-                          display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                          display: "flex", alignItems: "center", flexWrap: 'wrap', gap: 12, padding: "10px 12px",
                           background: isSelected ? "var(--color-muted-surface)" : "var(--color-card)",
                           border: "1px solid var(--color-border-soft)",
-                          borderRadius: 10, marginBottom: 8, cursor: "pointer",
+                          borderRadius: 10, marginBottom: 8,
                           transition: "background 0.15s, border-color 0.15s",
                         }}>
-                        <div style={{
-                          width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
-                          background: isSelected ? PINK : "transparent",
-                          border: isSelected ? `2px solid ${PINK}` : "2px solid var(--color-muted)",
-                          transition: "all 0.15s",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                          {isSelected && <span style={{ color: "var(--color-on-brand)", fontSize: 10, lineHeight: 1, fontWeight: 800 }}>✓</span>}
-                        </div>
-                        <FileIcon type={material.type} />
-                        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontSize: 14, fontWeight: 600, color: "var(--color-text-strong)" }}>{material.name}</span>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 200px', minWidth: 0, minHeight: 40, cursor: 'pointer' }}>
+                          <input type="checkbox" className="tongkk-checkbox" checked={isSelected}
+                            onChange={event => setSelectedMaterialIds(previous => event.target.checked
+                              ? [...previous, material.id] : previous.filter(id => id !== material.id))} />
+                          <FileIcon type={material.type} />
+                          <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontSize: 14, fontWeight: 600, color: "var(--color-text-strong)" }}>{material.name}</span>
+                        </label>
                         {materialSummaryCount > 0 && (
                           <button
                             type="button"
@@ -1879,6 +1821,7 @@ export default function Summary() {
                       const active = templatePicked && summaryTemplate === t.key;
                       return (
                         <button key={t.key} type="button"
+                          aria-pressed={active}
                           onClick={() => { if (active) { setTemplatePicked(false); } else { setSummaryTemplate(t.key); setTemplatePicked(true); } }}
                           onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--color-muted-surface)"; }}
                           onMouseLeave={e => { if (!active) e.currentTarget.style.background = "var(--color-card)"; }}
@@ -1897,11 +1840,13 @@ export default function Summary() {
                     })}
                   </div>
 
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                  <label htmlFor="summary-page-range" className="ui-field" style={{ marginBottom: 8 }}>
                     반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
                   </label>
                   {selectedHasPageMarkers ? (
                     <input
+                      id="summary-page-range"
+                      className="ui-input"
                       value={summaryPageRange}
                       onChange={e => setSummaryPageRange(e.target.value)}
                       placeholder={summaryPageHint ? `예: 1-5, 8  (${summaryPageHint})` : "예: 1-5, 8"}
@@ -1915,10 +1860,12 @@ export default function Summary() {
                     </div>
                   )}
 
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-muted)", marginBottom: 8, display: "block" }}>
+                  <label htmlFor="summary-focus" className="ui-field" style={{ marginBottom: 8 }}>
                     집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
                   </label>
                   <textarea
+                    id="summary-focus"
+                    className="ui-input"
                     value={summaryFocusPrompt}
                     onChange={e => setSummaryFocusPrompt(e.target.value)}
                     placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
@@ -1929,19 +1876,14 @@ export default function Summary() {
               )}
 
               {searched && (
-                <button type="button"
+                <Button variant="primary"
                   onClick={handleGenerateFromSettings}
                   disabled={!selectedMarkdown || isExtracting || isSummarizing || !templatePicked}
-                  style={{
-                    width: "100%", padding: "14px 0", borderRadius: 12, border: "none", marginTop: 16,
-                    background: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? PINK : "var(--color-border-soft)",
-                    color: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? "var(--color-on-brand)" : "var(--color-muted)",
-                    fontSize: 16, fontWeight: 700,
-                    cursor: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? "pointer" : "not-allowed",
-                  }}
+                  busy={isExtracting || isSummarizing}
+                  style={{ width: '100%', marginTop: 16 }}
                 >
                   {isExtracting ? "자료 분석 중..." : isSummarizing ? "요약 생성 중..." : !templatePicked ? "요약 종류를 선택해 주세요" : "요약 생성하기"}
-                </button>
+                </Button>
               )}
           </div>
         )}

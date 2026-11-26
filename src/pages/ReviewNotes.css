@@ -14,7 +14,7 @@
 .review-notes .review-course-title h3 { margin: 0; color: var(--color-text-strong); font-size: 16px; line-height: 1.5; font-weight: 750; }
 .review-course-title > span { flex-shrink: 0; color: var(--color-muted); font-size: 12px; }
 .review-course-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.review-course-actions .workflow-button { min-height: 42px; }
+.review-course-actions :is(.workflow-button, .ui-button) { min-height: 42px; }
 .review-analysis { padding: 16px 18px; margin-bottom: 16px; border: 1px solid var(--color-border-soft); border-radius: 12px; background: var(--color-surface); }
 .review-analysis > summary { color: var(--color-text-strong); font-size: 13px; font-weight: 700; cursor: pointer; }
 .review-notes .review-analysis > p { margin: 12px 0; font-size: 13px; line-height: 1.75; }
@@ -35,6 +35,8 @@
 .review-answer-comparison dd { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.7; white-space: pre-wrap; }
 .review-question-explanation h5 { margin: 0 0 6px; color: var(--color-text-strong); font-size: 13px; font-weight: 600; }
 .review-notes .review-question-explanation p { margin: 0; font-size: 13px; line-height: 1.8; white-space: pre-wrap; }
+.review-explanation-text { font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.review-notes .katex-display { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
 .review-question-footer { padding-top: 14px; margin-top: 16px; border-top: 1px solid var(--color-border-soft); }
 .review-question-footer .workflow-button { font-size: 12px; }
 .review-question-footer label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
@@ -51,7 +53,7 @@
   .review-course-heading { align-items: stretch; flex-direction: column; }
   .review-course-title { flex-basis: auto; }
   .review-course-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
-  .review-course-actions .workflow-button { width: 100%; }
+  .review-course-actions :is(.workflow-button, .ui-button) { width: 100%; }
   .review-question { padding: 16px; }
   .review-analysis-points > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }

@@ -1,4 +1,6 @@
 import BrandLogo from "../components/BrandLogo";
+import ModalDialog from "../components/ModalDialog";
+import { Button, TextField, InlineAlert } from "../components/ui";
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -108,32 +110,24 @@ const AddCourseModal = ({ onClose, onAdd, onAddAndUpload }: CourseModalProps) =>
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <ModalDialog labelledBy="add-course-title" onClose={onClose} width={400}>
       <Card style={{ padding: 28, width: "min(400px, 100%)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
-        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAddAndUpload(); }} placeholder="과목명 입력" aria-label="과목명" autoFocus style={{
+        <h3 id="add-course-title" style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 추가</h3>
+        <TextField label="과목명" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAddAndUpload(); }} placeholder="과목명 입력" aria-label="과목명" autoFocus style={{
           width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-          fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 8
+          fontSize: 14, boxSizing: "border-box", marginBottom: 8
         }}/>
         {/* 버튼이 비활성인 이유를 알 수 있게 안내한다(빈 값 제출이 조용히 막히면 고장으로 느껴짐). */}
         {!courseName && (
           <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-muted)" }}>과목명을 입력하면 추가할 수 있습니다.</p>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button type="button" onClick={handleAdd} disabled={!courseName} style={{
-            padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)",
-            background: "var(--color-card)", color: courseName ? "var(--color-text)" : "var(--color-muted)",
-            cursor: courseName ? "pointer" : "default", fontSize: 14, fontWeight: 600
-          }}>추가만 하기</button>
-          <button type="button" onClick={handleAddAndUpload} disabled={!courseName} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none",
-            background: courseName ? "var(--color-action-pink)" : "var(--color-border-soft)", color: "var(--color-on-brand)",
-            cursor: courseName ? "pointer" : "default", fontSize: 14, fontWeight: 600
-          }}>추가하고 자료 올리기</button>
+          <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+          <Button variant="secondary" type="button" onClick={handleAdd} disabled={!courseName}>추가만 하기</Button>
+          <Button variant="primary" type="button" onClick={handleAddAndUpload} disabled={!courseName}>추가하고 자료 올리기</Button>
         </div>
       </Card>
-    </div>
+    </ModalDialog>
   );
 };
 
@@ -150,10 +144,10 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <Card style={{ padding: 28, width: "min(340px, 100%)" }}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 이름 변경</h3>
-        <input
+    <ModalDialog labelledBy="rename-course-title" onClose={onClose} width={380}>
+      <Card style={{ padding: 28, width: "100%" }}>
+        <h3 id="rename-course-title" style={{ margin: "0 0 16px", fontSize: 17, fontWeight: 600 }}>강의 이름 변경</h3>
+        <TextField label="과목명"
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") handleSave(); }}
@@ -161,41 +155,34 @@ const RenameCourseModal = ({ course, courses, onClose, onRename }: RenameCourseM
           style={{
             width: "100%", padding: "10px 14px", borderRadius: 10,
             border: isDuplicate ? "1px solid var(--color-danger)" : "1px solid var(--color-border-soft)",
-            fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: isDuplicate ? 8 : 16
+            fontSize: 14, boxSizing: "border-box", marginBottom: isDuplicate ? 8 : 16
           }}
         />
         {isDuplicate && (
           <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--color-danger)" }}>이미 등록된 강의 이름입니다.</p>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-          <button type="button" onClick={handleSave} disabled={!canSave} style={{
-            padding: "8px 18px", borderRadius: 10, border: "none",
-            background: canSave ? "var(--color-action-pink)" : "var(--color-border-soft)", color: "var(--color-on-brand)",
-            cursor: canSave ? "pointer" : "default", fontSize: 14, fontWeight: 600
-          }}>저장</button>
+          <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+          <Button variant="primary" type="button" onClick={handleSave} disabled={!canSave}>저장</Button>
         </div>
       </Card>
-    </div>
+    </ModalDialog>
   );
 };
 
 const DeleteCourseModal = ({ course, onClose, onDelete }: DeleteCourseModalProps) => (
-  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-    <Card style={{ padding: 28, width: "min(360px, 100%)" }}>
-      <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>강의를 삭제할까요?</h3>
+  <ModalDialog labelledBy="delete-course-title" onClose={onClose} width={380}>
+    <Card style={{ padding: 28, width: "100%" }}>
+      <h3 id="delete-course-title" style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "var(--color-text-strong)" }}>강의를 삭제할까요?</h3>
       <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
         {course}의 저장된 강의자료, 요약, 퀴즈도 함께 삭제됩니다.
       </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button type="button" onClick={onClose} style={{ padding: "8px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)", cursor: "pointer", fontSize: 14 }}>취소</button>
-        <button type="button" onClick={() => { onDelete(course); onClose(); }} style={{
-          padding: "8px 18px", borderRadius: 10, border: "none",
-          background: "var(--color-action-neutral)", color: "var(--color-on-brand)", cursor: "pointer", fontSize: 14, fontWeight: 700
-        }}>삭제</button>
+        <Button variant="secondary" type="button" onClick={onClose}>취소</Button>
+        <Button variant="danger" type="button" onClick={() => { onDelete(course); onClose(); }}>삭제</Button>
       </div>
     </Card>
-  </div>
+  </ModalDialog>
 );
 
 const CourseDetailModal = ({
@@ -280,16 +267,7 @@ const CourseDetailModal = ({
   };
 
   return (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 220,
-      background: "rgba(0,0,0,0.32)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 24,
-    }}>
+    <ModalDialog labelledBy="course-detail-title" onClose={onClose} width={900}>
       <Card style={{
         width: "min(900px, 100%)",
         maxHeight: "calc(100vh - 56px)",
@@ -298,24 +276,12 @@ const CourseDetailModal = ({
       }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
-            <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
+            <h2 id="course-detail-title" style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 850, color: "var(--color-text-strong)" }}>{course}</h2>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>자료를 선택하거나 요약·퀴즈를 만드세요.</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {/* 자료 목록에서 바로 강의 자료를 추가(요약 생성 화면으로 이동)할 수 있게 닫기 버튼 왼쪽에 둔다(이슈 #65). */}
-            <button type="button" className="tongkk-hover-dim" onClick={onGoSummary} aria-label="강의 자료 추가" style={{
-              height: 32,
-              padding: "0 14px",
-              borderRadius: 9,
-              border: "1px solid var(--color-border-soft)",
-              background: "var(--color-card)",
-              color: "var(--color-text)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: 600,
-              lineHeight: "32px",
-              whiteSpace: "nowrap",
-            }}>+ 자료 추가</button>
+            <Button variant="secondary" type="button" onClick={onGoSummary} aria-label="강의 자료 추가">+ 자료 추가</Button>
             <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="강의 상세 닫기" style={{
               width: 32,
               height: 32,
@@ -333,9 +299,9 @@ const CourseDetailModal = ({
         </div>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "var(--color-tint-pink)", color: "var(--color-danger)", fontSize: 13 }}>
+          <InlineAlert tone="error" style={{ marginBottom: 16 }}>
             {error}
-          </div>
+          </InlineAlert>
         )}
 
         <div style={{ border: "1px solid var(--color-border-soft)", borderRadius: 14, background: "var(--color-card)", minHeight: 320, padding: 18 }}>
@@ -343,10 +309,7 @@ const CourseDetailModal = ({
             <div style={{ minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
               <p style={{ margin: 0, fontSize: 13, color: "var(--color-muted)" }}>{emptyText}</p>
               {!loading && (
-                <button type="button" onClick={onGoSummary} style={{
-                  padding: "11px 18px", borderRadius: 10, border: "1px solid var(--color-border-soft)", background: "var(--color-card)",
-                  color: "var(--color-text)", fontSize: 14, fontWeight: 600, cursor: "pointer",
-                }}>+ 자료 추가하기</button>
+                <Button variant="secondary" type="button" onClick={onGoSummary}>+ 자료 추가하기</Button>
               )}
             </div>
           ) : (
@@ -425,26 +388,8 @@ const CourseDetailModal = ({
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button type="button" onClick={onGoSummary} style={{
-            padding: "10px 18px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--color-tint-pink)",
-            color: "var(--color-pink-deep)",
-            fontSize: 14,
-            fontWeight: 800,
-            cursor: "pointer",
-          }}>요약 새로 생성</button>
-          <button type="button" onClick={onGoQuiz} style={{
-            padding: "10px 18px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--color-tint-cyan)",
-            color: "var(--color-cyan-deep)",
-            fontSize: 14,
-            fontWeight: 800,
-            cursor: "pointer",
-          }}>퀴즈 새로 생성</button>
+          <Button variant="primary" type="button" onClick={onGoSummary}>요약 새로 생성</Button>
+          <Button variant="primary" tone="cyan" type="button" onClick={onGoQuiz}>퀴즈 새로 생성</Button>
         </div>
       </Card>
       {pendingDelete && (
@@ -457,7 +402,7 @@ const CourseDetailModal = ({
           onConfirm={confirmDelete}
         />
       )}
-    </div>
+    </ModalDialog>
   );
 };
 
@@ -493,13 +438,10 @@ const NOTICES: { date: string; tag: string; title: string; body: string; link?: 
 ];
 
 const NoticeModal = ({ onClose }: { onClose: () => void }) => (
-  <div onClick={onClose} style={{
-    position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.24)",
-    display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-  }}>
+  <ModalDialog labelledBy="notice-title" onClose={onClose} width={460}>
     <Card onClick={e => e.stopPropagation()} style={{ width: "min(460px, 100%)", maxHeight: "calc(100vh - 56px)", overflowY: "auto", padding: 26 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>공지사항</h3>
+        <h3 id="notice-title" style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>공지사항</h3>
         <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="공지사항 닫기" style={{
           width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
           color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
@@ -537,7 +479,7 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
         ))}
       </div>
     </Card>
-  </div>
+  </ModalDialog>
 );
 
 // 피드백 보내기 — 메일 주소를 보여주고, mailto로 바로 메일을 보낼 수 있게 한다.
@@ -545,13 +487,10 @@ const NoticeModal = ({ onClose }: { onClose: () => void }) => (
 const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
   const [copied, setCopied] = useState(false);
   return (
-    <div onClick={onClose} style={{
-      position: "fixed", inset: 0, zIndex: 210, background: "rgba(0,0,0,0.24)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-    }}>
+    <ModalDialog labelledBy="feedback-title" onClose={onClose} width={400}>
       <Card onClick={e => e.stopPropagation()} style={{ width: "min(400px, 100%)", padding: 26 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>피드백 보내기</h3>
+          <h3 id="feedback-title" style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--color-text-strong)" }}>피드백 보내기</h3>
           <button type="button" className="tongkk-hover-dim" onClick={onClose} aria-label="피드백 창 닫기" style={{
             width: 30, height: 30, borderRadius: 8, border: "none", background: "var(--color-surface)",
             color: "var(--color-muted)", cursor: "pointer", fontSize: 18, lineHeight: "30px",
@@ -594,7 +533,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           메일 보내기
         </a>
       </Card>
-    </div>
+    </ModalDialog>
   );
 };
 
@@ -1379,7 +1318,7 @@ export default function Dashboard() {
                         }}>
                           <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); goUploadForCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>자료 추가</button>
                           <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); setRenamingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-text-strong)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 600 }}>이름 변경</button>
-                          <button type="button" className="tongkk-hover-row" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "none", background: "var(--color-card)", color: "var(--color-danger)", cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: 700 }}>삭제</button>
+                          <Button variant="danger" type="button" onClick={() => { setOpenCourseMenu(null); setDeletingCourse(course); }}>삭제</Button>
                         </div>
                       )}
                     </Card>
@@ -1732,14 +1671,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowPlanSourcePicker(false)}
-                      style={{
-                        padding: "7px 11px", borderRadius: 8, border: "1px solid var(--color-border-soft)",
-                        background: "var(--color-card)", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, fontWeight: 750,
-                      }}
-                    >취소</button>
+                    <Button variant="secondary" type="button" onClick={() => setShowPlanSourcePicker(false)}>취소</Button>
                     <button
                       type="button"
                       onClick={requestStudyPlan}

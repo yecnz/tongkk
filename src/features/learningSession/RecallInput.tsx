@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { learningRequest, readLocalDraft, removeLocalDraft, writeLocalDraft, type LearningSession } from '../../services/learningSessions';
 
@@ -88,20 +89,20 @@ export default function RecallInput({ session, userId, busy, disabled, onSave, o
   }
 
   return <>
-    {conflict && <div className="learning-notice" role="alert">
+    {conflict && <InlineAlert  tone="error">
       <strong>이 기기의 초안과 서버 답변이 다릅니다.</strong>
       <p>서버 답변: {item.draft || '(비어 있음)'}</p>
       <div className="learning-row">
-        <button type="button" onClick={() => { edit(item.draft); setConflict(false); }}>서버 답변 사용</button>
-        <button type="button" onClick={() => { setConflict(false); edit(latest.current); }}>현재 초안 사용</button>
+        <Button type="button" onClick={() => { edit(item.draft); setConflict(false); }}>서버 답변 사용</Button>
+        <Button type="button" onClick={() => { setConflict(false); edit(latest.current); }}>현재 초안 사용</Button>
       </div>
-    </div>}
+    </InlineAlert>}
     <label htmlFor="recall-answer"><p>자료를 보지 않고 핵심을 설명해 주세요.</p></label>
-    <textarea id="recall-answer" value={text} maxLength={4000} disabled={busy || disabled}
+    <textarea className="ui-input" id="recall-answer" value={text} maxLength={4000} disabled={busy || disabled}
       onChange={event => edit(event.target.value)} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
     <p className="learning-muted" aria-live="polite" style={{ fontSize: 13 }}>
       {text.length.toLocaleString()} / 4,000자 · {saveError || (saving ? '저장 중…' : text === item.draft ? '저장됨' : '임시 저장됨')}
     </p>
-    <button type="button" className="primary" disabled={busy || disabled || composing || conflict || !text.trim()} onClick={() => { void submit(); }}>설명 제출</button>
+    <Button type="button" variant="primary" disabled={busy || disabled || composing || conflict || !text.trim()} onClick={() => { void submit(); }}>설명 제출</Button>
   </>;
 }

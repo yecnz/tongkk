@@ -12,6 +12,8 @@ import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type Wro
 import QuizIssueLink from '../features/review/QuizIssueLink';
 import SaveWrongCard from '../features/flashcards/SaveWrongCard';
 import './ReviewNotes.css';
+import QuizText from './quiz/QuizText';
+import { Button, PageHeading } from '../components/ui';
 
 const ALL = "전체";
 
@@ -216,13 +218,8 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       </div>}
 
       <section className={embedded ? "review-notes-content" : "app-container narrow review-notes-content"} aria-labelledby="wrong-notes-heading">
-        <header className="review-notes-heading">
-          <div>
-            <h2 id="wrong-notes-heading">오답 노트</h2>
-            <p>틀린 문제를 확인하고, 과목별로 다시 풀어보세요.</p>
-          </div>
-          {!loading && !loadError && wrongEntries.length > 0 && <span className="review-notes-total">{courseNames.length}과목 · 오답 {wrongEntries.length}문항</span>}
-        </header>
+        <PageHeading title="오답 노트" description="틀린 문제를 확인하고, 과목별로 다시 풀어보세요." id="wrong-notes-heading"
+          actions={!loading && !loadError && wrongEntries.length > 0 ? <span className="review-notes-total">{courseNames.length}과목 · 오답 {wrongEntries.length}문항</span> : undefined} />
 
         {courseNames.length > 0 && (
           <div className="review-course-filters" role="group" aria-label="오답 과목 필터">
@@ -244,7 +241,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
         ) : loadError ? (
           <Card className="review-empty">
             <p role="alert">{loadError}</p>
-            <button type="button" className="workflow-button" onClick={() => setLoadRetry(value => value + 1)}>다시 불러오기</button>
+            <Button onClick={() => setLoadRetry(value => value + 1)}>다시 불러오기</Button>
           </Card>
         ) : wrongEntries.length === 0 ? (
           <Card className="review-empty">
@@ -254,7 +251,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
         ) : visibleCourses.length === 0 ? (
           <Card className="review-empty">
             <p>선택한 과목에 기록된 오답이 없습니다.</p>
-            <button type="button" className="workflow-button" onClick={() => setFilter(ALL)}>전체 오답 보기</button>
+            <Button onClick={() => setFilter(ALL)}>전체 오답 보기</Button>
           </Card>
         ) : (
           visibleCourses.map(courseName => {
@@ -268,26 +265,23 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
                     <span>{entries.length}문항</span>
                   </div>
                   <div className="review-course-actions">
-                    <button
-                      type="button"
-                      className="workflow-button workflow-primary"
+                    <Button
+                      variant="primary"
                       onClick={() => handleRetry(courseName)}
                       disabled={retryingCourse !== null}
-                      aria-busy={retryingCourse === courseName}
+                      busy={retryingCourse === courseName}
                       aria-label={`${courseName} 오답 다시 풀기`}
                     >
                       {retryingCourse === courseName ? "준비 중…" : <>오답 다시 풀기 <span aria-hidden="true">→</span></>}
-                    </button>
-                    <button
-                      type="button"
-                      className="workflow-button"
+                    </Button>
+                    <Button
                       onClick={() => handleAnalyze(courseName)}
                       disabled={analyzingCourse !== null}
-                      aria-busy={analyzingCourse === courseName}
+                      busy={analyzingCourse === courseName}
                       aria-label={`${courseName} ${analysis ? "오답 다시 분석" : "오답 분석"}`}
                     >
                       {analyzingCourse === courseName ? "분석 중…" : analysis ? "다시 분석" : "오답 분석"}
-                    </button>
+                    </Button>
                   </div>
                 </header>
 
@@ -330,14 +324,14 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
                         <span className="review-question-number">문항 {index + 1}</span>
                         <span>{entry.type}</span>
                       </div>
-                      <h4>{entry.question}</h4>
+                      <h4><QuizText>{entry.question}</QuizText></h4>
                       <dl className="review-answer-comparison">
                         <div className="review-answer-student"><dt>내 답</dt><dd>{entry.studentAnswer ?? "미응답"}</dd></div>
-                        <div className="review-answer-correct"><dt>정답</dt><dd>{entry.correctAnswer ?? "정답 정보 없음"}</dd></div>
+                        <div className="review-answer-correct"><dt>정답</dt><dd><QuizText>{String(entry.correctAnswer ?? '정답 정보 없음')}</QuizText></dd></div>
                       </dl>
                       <div className="review-question-explanation">
                         <h5>해설</h5>
-                        <p>{entry.feedback || entry.explanation || "등록된 해설이 없습니다."}</p>
+                        <div className="review-explanation-text"><QuizText>{entry.feedback || entry.explanation || '등록된 해설이 없습니다.'}</QuizText></div>
                       </div>
                       <div className="review-question-footer">
                         <SaveWrongCard {...entry} />

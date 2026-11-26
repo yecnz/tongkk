@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import CustomSelect from '../../components/CustomSelect';
@@ -20,6 +21,6 @@ export default function QuizIssueLink({ attemptId, questionIndex }: { attemptId:
   return <div>{concepts && (concepts.length ? <label>관련 개념 <CustomSelect value={selected} onChange={setSelected} aria-label="관련 개념"
     options={[{ value: '', label: '선택해 주세요' }, ...concepts.map(c => ({ value: c.id, label: c.title }))]} /></label>
     : <p>설명 학습을 완료한 뒤 개념을 연결해 주세요.</p>)}
-    <button type="button" className="workflow-button" aria-busy={busy} disabled={busy || (concepts !== null && !selected)} onClick={() => { void run(); }}>{busy ? concepts === null ? '개념 불러오는 중…' : '연결 중…' : concepts === null ? '학습 이슈에 연결' : '선택한 개념에 연결'}</button>
-    {concepts && <p className="workflow-muted">직접 연결한 오답은 확인 필요로 기록됩니다.</p>}{error && <p role="alert">{error}</p>}</div>;
+    <Button type="button"  aria-busy={busy} disabled={busy || (concepts !== null && !selected)} onClick={() => { void run(); }}>{busy ? concepts === null ? '개념 불러오는 중…' : '연결 중…' : concepts === null ? '학습 이슈에 연결' : '선택한 개념에 연결'}</Button>
+    {concepts && <p className="workflow-muted">직접 연결한 오답은 확인 필요로 기록됩니다.</p>}{error && <InlineAlert tone="error">{error}</InlineAlert>}</div>;
 }

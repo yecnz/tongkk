@@ -46,3 +46,25 @@ it('preserves the question identity of a saved answer when a new question become
  await render();expect(container.textContent).toContain('이전 사례를 설명해 주세요');expect(container.textContent).not.toContain('새 사례를 설명해 주세요');
  await click('설명 제출');expect(request).toHaveBeenCalledWith('/card/answers','POST',expect.objectContaining({question_id:'old-question',answer:'이전 문제에 쓴 설명'}));
 });
+
+it('keeps review navigation and provides a recovery action for changed source material',async()=>{
+ response.source_changed=true;await render();
+ expect(container.querySelector('.learning-header-label')?.textContent).toContain('복습 관리');
+ expect(container.querySelector('a[href="/review?tab=today"]')?.textContent).toContain('복습 목록으로');
+ expect(container.querySelector('a[href="/learn"]')?.textContent).toContain('새 자료로 학습하기');
+});
+
+it('distinguishes the selected wrong answer from the correct answer after review',async()=>{
+ response.due_at='2099-01-01T00:00:00Z';response.check={question:'방법 선택',options:['시간 간격','몰아서']};
+ response.latest={id:'attempt',answer:'내 답변',status:'graded',assisted:false,feedback:null,eligible_for_schedule:true,check_result:{selected:1,answer_index:0,correct:false,explanation:'간격을 두어야 해요'}};
+ await render();
+ expect(container.querySelector('.learning-option.is-incorrect')?.textContent).toContain('몰아서내 선택');
+ expect(container.querySelector('.learning-option.is-correct')?.textContent).toContain('시간 간격정답');
+ expect((container.querySelector('input[name="review-check"][value="1"]') as HTMLInputElement).checked).toBe(true);
+});
+
+it('does not describe a failed initial request as still loading',async()=>{
+ request.mockRejectedValue(new Error('연결 실패'));await render();
+ expect(container.querySelector('[role="alert"]')?.textContent).toContain('연결 실패');
+ expect(container.textContent).not.toContain('복습 불러오는 중');
+});

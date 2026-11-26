@@ -1,3 +1,4 @@
+import { Button, InlineAlert } from '../../components/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -8,6 +9,7 @@ import LearningLink from './LearningLink';
 import LearningFeedback from './LearningFeedback';
 import Markdown from './LearningMarkdown';
 import LearningExplanation from './LearningExplanation';
+import AnswerOptions from './AnswerOptions';
 import { useLearningNavigation } from './navigation';
 
 type Pending = { path: string; body: Record<string, unknown> };
@@ -36,7 +38,7 @@ function Practice({ id, userId }: { id: string; userId: string }) {
   const [composing, setComposing] = useState(false);
   const activeCommand = useRef(false);
   const refresh = useCallback(async () => {
-    try { setView(await reviewRequest<ReviewView>(`/${id}`)); }
+    try { setView(await reviewRequest<ReviewView>(`/${id}`)); setError(''); }
     catch (e) { setError(e instanceof Error ? e.message : '복습을 불러오지 못했어요.'); }
   }, [id]);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -75,49 +77,45 @@ function Practice({ id, userId }: { id: string; userId: string }) {
   const answering = !attempt || attempt.status === 'ungraded' || (Boolean(attempt.check_result) && (newRound || (!showResult && Boolean(view && new Date(view.due_at).getTime() <= Date.now()))));
   const blocked = preparing || busy || Boolean(pending) || polling || view?.source_changed || view?.paused;
   return <div className="workflow-surface">
-    <div className="learning-page-title"><p className="learning-eyebrow">복습</p><h1>{view?.title || '복습 불러오는 중'}</h1></div>
-    {error && <div className="learning-notice learning-error" role="alert">{error}</div>}
-    {pending && <button type="button" disabled={busy} onClick={() => { void send(pending); }}>이전 제출 결과 확인</button>}
-    {!view && !busy && error && <button type="button" onClick={() => { void refresh(); }}>다시 불러오기</button>}
+    <div className="learning-page-title"><p className="learning-eyebrow">복습</p><h1>{view?.title || (error ? '복습' : '복습 불러오는 중')}</h1></div>
+    {error && <InlineAlert  tone="error">{error}</InlineAlert>}
+    {pending && <Button type="button" disabled={busy} onClick={() => { void send(pending); }}>이전 제출 결과 확인</Button>}
+    {!view && !busy && error && <Button type="button" onClick={() => { void refresh(); }}>다시 불러오기</Button>}
     {view && <Card className="workflow-panel workflow-stack">
-      {view.paused ? <p>복습이 일시 정지되었습니다. 복습 관리에서 재개해 주세요.</p> : view.source_changed ? <div className="learning-notice">원문이 변경되었습니다. 새 자료를 학습한 뒤 복습을 추가해 주세요.</div>
+      {view.paused ? <div className="workflow-stack"><p>복습이 일시 정지되었습니다. 복습 관리에서 재개해 주세요.</p><LearningLink className="ui-button ui-button--primary" to="/review?tab=today">복습 관리에서 재개하기</LearningLink></div> : view.source_changed ? <div className="workflow-stack"><p>원문이 변경되었습니다. 새 자료를 학습한 뒤 복습을 추가해 주세요.</p><LearningLink className="ui-button ui-button--primary" to="/learn">새 자료로 학습하기 →</LearningLink></div>
         : answering ? <>
           {attempt?.status === 'ungraded' && <p role="status">평가하지 못했어요. 답변은 보존됐고 일정은 그대로예요.</p>}
           <Markdown text={prompt?.text || (text.trim() ? view.question : view.next_question || view.question)} />
           <p className="learning-caption">{view.question_id ? '새 사례로 복습합니다.' : '기존 문제로 연습합니다.'}</p>
-          {view.question_status==='queued' ? <p role="status">새 복습 문제를 준비하는 중…</p> : view.question_status==='ready' ? null : <button type="button" disabled={preparing||busy||Boolean(pending)||Boolean(text.trim())} onClick={()=>{void prepare(view.question_status==='failed');}}>{view.question_status==='failed'?'새 문제 생성 다시 시도':'새 복습 문제 준비'}</button>}
+          {view.question_status==='queued' ? <p role="status">새 복습 문제를 준비하는 중…</p> : view.question_status==='ready' ? null : <Button type="button" disabled={preparing||busy||Boolean(pending)||Boolean(text.trim())} onClick={()=>{void prepare(view.question_status==='failed');}}>{view.question_status==='failed'?'새 문제 생성 다시 시도':'새 복습 문제 준비'}</Button>}
           <label htmlFor="review-answer"><p>자료를 보지 않고 핵심을 설명해 주세요.</p></label>
-          <textarea id="review-answer" maxLength={4000} value={text} disabled={blocked}
+          <textarea className="ui-input" id="review-answer" maxLength={4000} value={text} disabled={blocked}
             onChange={event => { if (!prompt) setPrompt({id:view.question_id||null,text:view.next_question||view.question}); if(!event.target.value) setPrompt(null); setText(event.target.value); }} onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} />
           <label className="learning-option"><input type="checkbox" checked={assisted} disabled={blocked} onChange={event => setAssisted(event.target.checked)} />자료를 보고 답했어요</label>
-          <button type="button" className="primary" disabled={blocked || composing || !text.trim()}
-            onClick={() => { void send({ path: `/${id}/answers`, body: { attempt_id: crypto.randomUUID(), answer: text, assisted, question_id: prompt?.id || null } }); }}>설명 제출</button>
+          <Button type="button" variant="primary" disabled={blocked || composing || !text.trim()}
+            onClick={() => { void send({ path: `/${id}/answers`, body: { attempt_id: crypto.randomUUID(), answer: text, assisted, question_id: prompt?.id || null } }); }}>설명 제출</Button>
         </> : attempt.status === 'pending' ? <p role="status">설명 평가 중…</p> : <>
           {attempt.feedback && <LearningFeedback feedback={attempt.feedback} />}
           <details><summary>내 설명</summary><Markdown text={attempt.answer} /></details>
           {view.check && <><h2>기초 확인</h2><Markdown text={view.check.question} />
-            <fieldset className="learning-check" disabled={blocked || Boolean(attempt.check_result)}><legend>답안 선택</legend>
-              {view.check.options.map((option, index) => <label className={`learning-option${attempt.check_result?.answer_index === index ? ' is-correct' : ''}`} key={index}>
-                <input type="radio" name="review-check" value={index} checked={(attempt.check_result?.selected ?? selected) === index} onChange={() => setSelected(index)} />{option}
-                {attempt.check_result?.answer_index === index && <span className="learning-badge">정답</span>}</label>)}
-            </fieldset>
-            {!attempt.check_result && <button type="button" className="primary" disabled={blocked || selected === null} onClick={() => { void send({ path: `/${id}/check`, body: { attempt_id: attempt.id, selected } }); }}>답안 제출</button>}
+            <AnswerOptions name="review-check" options={view.check.options} selected={selected} onChange={setSelected} result={attempt.check_result} disabled={blocked} />
+            {!attempt.check_result && <Button type="button" variant="primary" disabled={blocked || selected === null} onClick={() => { void send({ path: `/${id}/check`, body: { attempt_id: attempt.id, selected } }); }}>답안 제출</Button>}
           </>}
           {attempt.check_result && <div className="learning-notice"><strong>{attempt.check_result.correct ? '정답이에요.' : '다시 확인해요.'}</strong>
             <LearningExplanation text={attempt.check_result.explanation} /><p>다음 복습: {new Date(view.due_at).toLocaleDateString('ko-KR')}</p>
             {!attempt.eligible_for_schedule && <p className="learning-caption">예정일 전 연습은 복습 일정에 반영되지 않습니다.</p>}
-            <button type="button" disabled={blocked} onClick={() => { setText(''); setPrompt(null); setAssisted(false); setNewRound(true); setSelected(null); }}>다시 연습하기</button></div>}
+            <Button type="button" disabled={blocked} onClick={() => { setText(''); setPrompt(null); setAssisted(false); setNewRound(true); setSelected(null); }}>다시 연습하기</Button></div>}
           {view.baseline && <details><summary>처음 학습과 비교</summary>{view.baseline.answer && <Markdown text={view.baseline.answer} />}
             {view.baseline.feedback && <LearningFeedback feedback={view.baseline.feedback} />}</details>}
           {view.previous && <details><summary>지난 복습과 비교</summary><Markdown text={view.previous.answer} />{view.previous.feedback && <LearningFeedback feedback={view.previous.feedback} />}</details>}
         </>}
-      <div className="learning-actions"><LearningLink to="/learn" className="learning-button">학습 목록으로</LearningLink></div>
+      <div className="learning-actions"><LearningLink to="/review?tab=today" className="ui-button ui-button--secondary">복습 목록으로</LearningLink></div>
     </Card>}
   </div>;
 }
 export default function ReviewPractice() {
   const { user } = useAuth(); const { cardId } = useParams();
   if (!user) return <Navigate to="/auth" replace />;
-  if (!cardId) return <Navigate to="/learn" replace />;
-  return <LearningLayout><Practice key={`${user.id}:${cardId}`} id={cardId} userId={user.id} /></LearningLayout>;
+  if (!cardId) return <Navigate to="/review?tab=today" replace />;
+  return <LearningLayout active="오답 노트"><Practice key={`${user.id}:${cardId}`} id={cardId} userId={user.id} /></LearningLayout>;
 }
