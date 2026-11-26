@@ -19,7 +19,7 @@ grant usage on schema public,auth to service_role,authenticated,anon;
 // PGlite already provides the built-in UUID/SHA256 functions used here; its optional
 // pgcrypto extension is unavailable. Supabase supplies pgcrypto in deployment.
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8').replace('create extension if not exists pgcrypto;', '');
-for(const file of readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(name=>/^20261123001[5-8]_/.test(name))) check(schema.includes(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8')),`Fresh schema mirrors ${file}`);
+for(const file of readdirSync(new URL('../supabase/migrations/',import.meta.url)).filter(name=>/^(20261123001[5-8]|20261126000[1-3])_/.test(name))) check(schema.includes(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8')),`Fresh schema mirrors ${file}`);
 await db.exec(schema);
 check(true, 'Full fresh schema applies with Auth/Storage infrastructure stubs');
 const user = randomUUID(), other = randomUUID(), course = randomUUID();
@@ -53,17 +53,24 @@ check((await db.query('select status,content from learning_session_packs where i
 await db.query("update learning_session_packs set status='preparing' where id=$1", [pack.applied_id]);
 await assert.rejects(prepare('pack', 'pack-busy', { content: { concepts: [{ title: '충돌' }, { title: '스레드' }] } }), /LS_BUSY/);
 check((await db.query('select content from learning_session_packs where id=$1', [pack.applied_id])).rows[0].content.concepts[0].title === '복구한 개념', 'Approval cannot overwrite a pack generation in progress');
-const privateTables = ['background_jobs','learning_evidence','learning_issues','explanation_revisions','preparation_requests','external_connections','integration_oauth_states','external_calendar_events','concept_learning_state'];
+const privateTables = ['background_jobs','learning_evidence','learning_issues','explanation_revisions','preparation_requests','external_connections','integration_oauth_states','external_calendar_events','concept_learning_state','study_paths','study_path_sessions'];
 for (const name of privateTables) {
   check(!(await db.query("select has_table_privilege('authenticated',$1,'SELECT,INSERT,UPDATE,DELETE') as allowed", [name])).rows[0].allowed, `Browser roles cannot inspect ${name}`);
 }
 const unsafe = await db.query(`select proname from pg_proc where pronamespace='public'::regnamespace
- and proname ~ '^(workflow_|integration_|preparation_|explanation_|learning_issue_|learning_concept_|learning_assessment_|learning_workflow_|learning_graph_|source_|review_question_)'
+ and proname ~ '^(workflow_|integration_|preparation_|explanation_|learning_issue_|learning_concept_|learning_assessment_|learning_workflow_|learning_graph_|source_|review_question_|study_path_)'
  and has_function_privilege('authenticated',oid,'EXECUTE')`);
 check(unsafe.rows.length === 0, 'Server RPCs are not executable by browser roles');
 await db.query('select learning_preferences_set($1,true,$2)', [other, 'UTC']);
 await db.exec('begin');
+const resetCard = randomUUID(), resetPath = randomUUID();
+await db.query('insert into study_flashcards(id,user_id,course_id,front,back,origin_key) values($1,$2,$3,$4,$5,$6)', [resetCard,user,course,'질문','답','reset-test']);
+await db.query('insert into study_flashcard_reviews(user_id,request_id,card_id,rating,result) values($1,$2,$3,$4,$5)', [user,randomUUID(),resetCard,'good','{}']);
+await db.query('insert into study_paths(id,user_id,course_id,title,chapters) values($1,$2,$3,$4,$5::jsonb)', [resetPath,user,course,'초기화할 코스',JSON.stringify([{id:randomUUID()}])]);
 await db.query('select learning_workflow_clear($1)', [user]);
+for (const table of ['study_flashcards','study_flashcard_reviews','study_paths','study_path_sessions']) {
+  check(Number((await db.query(`select count(*) from ${table} where user_id=$1`, [user])).rows[0].count) === 0, `App reset clears ${table}`);
+}
 check(Number((await db.query('select count(*) from preparation_requests where user_id=$1', [user])).rows[0].count) === 0, 'App reset clears private preparation data');
 check((await db.query('select learning_preferences_get($1) as data', [other])).rows[0].data.auto_review, 'App reset preserves another user');
 await db.exec('rollback');

@@ -1,3 +1,4 @@
+import { SourceCitationContext } from "../features/sources/citationContext";
 import BrandLogo from "../components/BrandLogo";
 import { PreparationOptions } from "../features/preparation/PreparationPanel";
 import { prepareUploadedMaterials, type PreparationKind } from "../services/preparation";
@@ -1439,6 +1440,7 @@ export default function Summary() {
         )}
 
         {view === "summaryResult" && selectedTemplate && (
+          <SourceCitationContext.Provider value={{ courseName: selectedCourse, materials, materialIds: summaries.find(summary => summary.id === activeSummaryId)?.materialIds || selectedMaterialIds }}>
           <SummaryResultView
             template={selectedTemplate}
             onBack={() => setView(resultBackView)}
@@ -1466,6 +1468,7 @@ export default function Summary() {
               if (args) void handleTemplateSelect(args.template, args.opts, args.backView, true);
             } : undefined}
           />
+          </SourceCitationContext.Provider>
         )}
 
         {view === "materialDetail" && activeMaterial && (

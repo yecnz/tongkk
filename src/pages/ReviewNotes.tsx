@@ -10,11 +10,13 @@ import { loadAllWrongAnswerAnalysesFromServer, saveWrongAnswerAnalysisToServer }
 import { analyzeWrongAnswers, type QuizQuestion, type QuizQuestionType, type WrongAnswerAnalysis, type WrongAnalysisItem } from "../services/gpt";
 
 import QuizIssueLink from '../features/review/QuizIssueLink';
+import SaveWrongCard from '../features/flashcards/SaveWrongCard';
 import './ReviewNotes.css';
 
 const ALL = "전체";
 
 type WrongEntry = {
+  materialIds: string[];
   attemptId: string;
   questionIndex: number;
   courseName: string;
@@ -88,6 +90,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
         if (seen.has(key)) continue;
         seen.add(key);
         result.push({
+          materialIds: attempt.materialIds,
           attemptId: attempt.id, questionIndex,
           courseName: attempt.courseName,
           quizSetId: attempt.quizSetId,
@@ -337,6 +340,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
                         <p>{entry.feedback || entry.explanation || "등록된 해설이 없습니다."}</p>
                       </div>
                       <div className="review-question-footer">
+                        <SaveWrongCard {...entry} />
                         <QuizIssueLink attemptId={entry.attemptId} questionIndex={entry.questionIndex} />
                       </div>
                     </Card>

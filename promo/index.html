@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff4f8">
+  <meta name="description" content="강의자료를 요약하고, 질문하고, 퀴즈로 확인하세요. 자료 확인부터 복습까지 이어지는 통크크의 실제 학습 흐름을 만나보세요.">
+  <title>통크크 — 내 공부가, 내 지식이 되는 곳</title>
+  <link rel="icon" href="assets/mascot.png" type="image/png">
+  <link rel="stylesheet" href="styles.css?v=actual-ui-4">
+  <link rel="stylesheet" href="demo.css?v=actual-ui-4">
+  <script src="script.js?v=actual-ui-4" defer></script>
+  <script src="demo.js?v=actual-ui-4" defer></script>
+</head>
+<body class="landing-page" id="top">
+  <svg class="lp-icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7V5Z"/></symbol>
+    <symbol id="icon-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6ZM14 3v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Zm8-1 .6 1.4L22 4l-1.4.6L20 6l-.6-1.4L18 4l1.4-.6L20 2Z"/></symbol>
+    <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 18 0ZM7 10h8M7 14h5"/></symbol>
+    <symbol id="icon-quiz" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6m-6 4 2 2 4-4"/></symbol>
+    <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18m-13 5 2 2 5-4"/></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="icon-book" viewBox="0 0 24 24"><path d="M12 5v16M12 5C9 2 5 3 2 4v15c3-1 7-2 10 1 3-3 7-2 10-1V4c-3-1-7-2-10 1Z"/></symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  </svg>
+
+  <a class="lp-skip-link" href="#landing-main">본문으로 바로가기</a>
+  <header class="lp-header">
+    <div class="lp-nav-wrap">
+      <a class="lp-brand" href="#top" aria-label="통크크 소개 홈"><img class="brand-logo" src="assets/logo.png" alt="통크크" width="114" height="38"></a>
+      <nav class="lp-nav" id="landing-navigation" aria-label="소개 페이지 메뉴">
+        <a href="#preview" data-flow-start>학습 흐름</a><a href="#features">기능 소개</a><a href="#faq">자주 묻는 질문</a>
+      </nav>
+      <div class="lp-nav-actions">
+        <a class="lp-login" href="https://tongkk.com/auth">로그인</a>
+        <a class="lp-button lp-button-small" href="https://tongkk.com/">시작하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+        <button class="lp-menu-toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" aria-controls="landing-navigation"><svg class="lp-icon" aria-hidden="true"><use href="#icon-menu"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="landing-main">
+    <section class="lp-hero" aria-labelledby="landing-title">
+      <div class="lp-hero-copy">
+        <div class="lp-eyebrow"><span></span><span>나의 공부에, 든든한 한 편</span></div>
+        <h1 id="landing-title">쌓여 있는 강의자료,<br><span class="lp-hero-highlight">내 지식이 되는 순간<svg viewBox="0 0 620 20" preserveAspectRatio="none" aria-hidden="true"><path d="M5 14Q295-1 610 11"/></svg></span></h1>
+        <p class="lp-hero-description">요약하고, 질문하고, 직접 풀어보세요.<br>통크크가 흩어진 공부를 하나의 흐름으로 이어줍니다.</p>
+        <div class="lp-hero-actions">
+          <a class="lp-button" href="https://tongkk.com/">내 자료로 시작하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+          <a class="lp-button lp-button-secondary" href="#preview" data-flow-start><span class="lp-play-circle"><svg class="lp-icon" aria-hidden="true"><use href="#icon-play"/></svg></span>학습 흐름 보기</a>
+        </div>
+        <p class="lp-hero-hint">자료를 이해하는 순간부터, 스스로 기억하는 순간까지</p>
+      </div>
+      <div class="lp-floating-note" aria-hidden="true"><span class="lp-note-pin"></span><span class="lp-float-label">오늘의 공부</span><strong>어려운 개념도<br><em>하나씩, 차근차근</em></strong><span class="lp-float-check"><svg class="lp-icon"><use href="#icon-check"/></svg> 이해 완료!</span></div>
+      <div class="lp-floating-mascot" aria-hidden="true"><span>이번 학기도 같이 해요!</span><img src="assets/mascot.png" alt="" width="160" height="160"></div>
+      <div class="lp-hero-spark lp-hero-spark-one" aria-hidden="true"><svg class="lp-icon"><use href="#icon-sparkles"/></svg></div>
+      <div class="lp-hero-spark lp-hero-spark-two" aria-hidden="true"><svg class="lp-icon"><use href="#icon-sparkles"/></svg></div>
+
+      <div class="lp-product" id="preview">
+        <div class="lp-flow-intro"><span class="lp-section-kicker">FROM YOUR MATERIALS TO YOUR KNOWLEDGE</span><h2>직접 눌러보는 학습 흐름</h2><p>원본을 읽고, 내 방식으로 요약하고, 퀴즈로 확인해 보세요.</p></div>
+        <div class="lp-product-window" aria-label="통크크 예시 체험">
+          <div class="lp-app-header">
+            <div><div class="lp-app-title"><span class="lp-app-badge">예시</span><h2>시간 복잡도와 정렬 알고리즘</h2></div><p>샘플 자료 <strong>알고리즘 3주차 강의자료.pdf</strong>로 만든 예시예요. 실제로는 내 강의 자료를 올려 만들어요.</p></div>
+            <button class="lp-app-close" type="button" aria-label="예시 닫기" data-demo-close>✕</button>
+          </div>
+          <div class="lp-product-tabs" role="tablist" aria-label="통크크 학습 흐름" aria-orientation="horizontal">
+            <button id="flow-tab-original" type="button" role="tab" aria-selected="true" aria-controls="flow-original" tabindex="0">원본</button>
+            <button id="flow-tab-summary" type="button" role="tab" aria-selected="false" aria-controls="flow-summary" tabindex="-1">요약</button>
+            <button id="flow-tab-quiz" type="button" role="tab" aria-selected="false" aria-controls="flow-quiz" tabindex="-1">퀴즈</button>
+          </div>
+          <section class="lp-flow-panel" id="flow-original" role="tabpanel" aria-labelledby="flow-tab-original" tabindex="0"><div id="demo-original"></div></section>
+          <section class="lp-flow-panel" id="flow-summary" role="tabpanel" aria-labelledby="flow-tab-summary" tabindex="0" hidden><div id="demo-summary"></div></section>
+          <section class="lp-flow-panel" id="flow-quiz" role="tabpanel" aria-labelledby="flow-tab-quiz" tabindex="0" hidden><div id="demo-quiz"></div></section>
+          <div class="lp-app-footer"><span>내 강의자료로 요약과 퀴즈를 만드세요.</span><div><button type="button" class="lp-app-button" data-demo-close>닫기</button><a class="lp-app-button lp-app-button-primary" href="https://tongkk.com/">내 자료로 시작하기</a></div></div>
+        </div>
+        <div class="lp-demo-reopen" hidden><p>예시 자료를 다시 살펴볼까요?</p><button type="button" class="lp-button" data-demo-open>예시 다시 열기</button></div>
+        <p class="lp-product-caption">통크크의 공개 샘플 자료로 체험해 보세요 · 로그인 없이 시작할 수 있어요</p>
+        <noscript><p class="lp-product-caption">JavaScript를 켜면 예시 자료와 요약, 퀴즈를 직접 체험할 수 있어요. <a href="https://tongkk.com/">통크크로 이동하기</a></p><style>.lp-product-window{display:none}</style></noscript>
+      </div>
+    </section>
+
+    <section class="lp-formats lp-container" aria-label="지원하는 자료 형식"><p>공부하던 자료 그대로 가져오세요</p><div><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>PDF</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>PPT · PPTX</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>이미지</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>Word (.docx)</span><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg>텍스트 · Markdown</span></div></section>
+
+    <section class="lp-features lp-container lp-section-reveal" id="features" aria-labelledby="features-title">
+      <div class="lp-section-heading"><span class="lp-section-kicker">LESS OVERWHELM, MORE UNDERSTANDING</span><h2 id="features-title">읽는 공부에서,<br><span>이해하는 공부로</span></h2><p>자료를 정리하는 시간은 줄이고,<br>진짜 내 것이 되는 공부에 집중하세요.</p></div>
+      <div class="lp-feature-grid">
+        <article class="lp-feature-card lp-feature-pink"><div class="lp-feature-copy"><span class="lp-feature-icon"><svg class="lp-icon" aria-hidden="true"><use href="#icon-file"/></svg></span><h3>긴 자료 속 핵심이<br>한눈에 들어오도록</h3><p>빠르게 훑는 요약부터 촘촘한 강의 노트까지.<br>공부하는 방식에 맞춰 네 가지로 정리해요.</p></div><div class="lp-feature-sample"><h4>공부하는 방식에 맞춰 골라보세요</h4><ul><li>핵심부터 빠르게 읽는 일반 요약</li><li>강의 노트와 마인드맵으로 개념 연결</li><li>치트시트로 시험 전 빠르게 비교</li></ul><a class="lp-text-button" href="#preview" data-demo-step="1">4가지 요약 직접 보기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div></article>
+        <article class="lp-feature-card lp-feature-blue"><div class="lp-feature-copy"><span class="lp-feature-icon"><svg class="lp-icon" aria-hidden="true"><use href="#icon-quiz"/></svg></span><h3>풀어보고, 확인하면서<br>더 또렷하게 기억해요</h3><p>내 자료로 만든 퀴즈로 이해를 확인하고,<br>정답과 해설을 함께 읽으며 개념을 다져요.</p></div><div class="lp-feature-sample"><h4>알고 있는지, 직접 확인해 보세요</h4><p>읽을 때는 알 것 같았던 개념도,<br>직접 답을 고르면 더 분명해져요.</p><a class="lp-text-button" href="#preview" data-demo-step="2">예시 퀴즈 3문제 풀기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div></article>
+      </div>
+      <div class="lp-feature-strip">
+        <article><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chat"/></svg></span><div><h3>막히는 순간엔, AI 튜터</h3><p>내 자료를 바탕으로 질문하고 답하며<br>이해되지 않는 개념을 하나씩 풀어가요.</p></div></article>
+        <article><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-book"/></svg></span><div><h3>내 말로 설명하는 연습</h3><p>떠올리고 설명하고 피드백을 받으며<br>단순한 암기를 넘어 이해를 쌓아요.</p></div></article>
+        <article><span><svg class="lp-icon" aria-hidden="true"><use href="#icon-calendar"/></svg></span><div><h3>오늘 할 일이 보이는 공부</h3><p>D-day, 학습 계획, 캘린더로<br>다음에 무엇을 할지 가볍게 정해요.</p></div></article>
+      </div>
+    </section>
+
+    <section class="lp-how lp-section-reveal" id="how-it-works" aria-labelledby="how-title"><div class="lp-container">
+      <div class="lp-section-heading"><span class="lp-section-kicker">A LITTLE START, A BETTER STUDY</span><h2 id="how-title">시작은 가볍게<br><span>공부는 차근차근</span></h2><p>지금 가지고 있는 강의자료 한 개면 충분해요.</p></div>
+      <div class="lp-steps">
+        <article><div class="lp-step-visual lp-step-upload" aria-hidden="true"><svg class="lp-icon"><use href="#icon-upload"/></svg></div><div class="lp-step-heading"><span>01</span><h3>자료를 올리고</h3></div><p>과목을 만들고 강의자료를 추가하세요.<br>공부의 시작점을 한곳에 모아드려요.</p></article>
+        <article><div class="lp-step-visual lp-step-understand" aria-hidden="true"><svg class="lp-icon"><use href="#icon-book"/></svg></div><div class="lp-step-heading"><span>02</span><h3>내 방식으로 이해하고</h3></div><p>요약으로 흐름을 잡고, 튜터에게 질문하며<br>어려운 개념을 하나씩 풀어가세요.</p></article>
+        <article><div class="lp-step-visual lp-step-review" aria-hidden="true"><svg class="lp-icon"><use href="#icon-check"/></svg></div><div class="lp-step-heading"><span>03</span><h3>확인하고, 다시 기억하기</h3></div><p>퀴즈와 설명으로 이해를 확인하세요.<br>헷갈린 부분은 다음 복습으로 이어져요.</p></article>
+      </div>
+      <a class="lp-text-button" href="#preview" data-flow-start>실제 학습 흐름 다시 보기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a>
+    </div></section>
+
+    <section class="lp-faq lp-container lp-section-reveal" id="faq" aria-labelledby="faq-title">
+      <div class="lp-faq-heading"><span class="lp-section-kicker">GOOD QUESTIONS</span><h2 id="faq-title">궁금한 게<br>있으신가요?</h2><p>시작하기 전에 알아두면 좋은 이야기</p><img src="assets/mascot.png" alt="연필을 든 통크크 마스코트" width="136" height="136" loading="lazy"></div>
+      <div class="lp-faq-list">
+        <details name="tongkk-promo-faq"><summary>통크크는 어떤 서비스인가요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>내 강의자료를 바탕으로 요약, AI 질문, 퀴즈, 복습과 학습 계획을 이어가는 AI 학습 도우미예요. 읽고 끝내는 대신, 직접 떠올리고 설명하면서 이해를 확인할 수 있어요.</p></details>
+        <details name="tongkk-promo-faq"><summary>어떤 자료를 올릴 수 있나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>PDF, PPT·PPTX, 이미지, Word(.docx) 문서와 텍스트·Markdown 자료를 사용할 수 있어요. 글자가 흐리거나 복잡한 표·수식이 많은 자료는 변환 결과를 원본과 함께 확인해 주세요.</p></details>
+        <details name="tongkk-promo-faq"><summary>이 페이지에서 학습을 시작할 수 있나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>이 페이지에서 예시 원본을 읽고, 네 가지 요약을 바꿔 보고, 퀴즈를 직접 풀 수 있어요. ‘내 자료로 시작하기’를 누르면 통크크 서비스로 이동해요. 내 자료와 학습 기록을 저장하려면 로그인이 필요해요.</p></details>
+        <details name="tongkk-promo-faq"><summary>요약과 퀴즈는 어떻게 연결되나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>강의자료를 올려 요약을 만든 뒤 같은 자료로 퀴즈를 생성할 수 있어요. 틀린 문제는 오답 노트에 모아 다시 풀고, 학습 캘린더와 계획으로 다음 공부를 이어갈 수 있어요.</p></details>
+        <details name="tongkk-promo-faq"><summary>AI가 만든 내용을 그대로 믿어도 되나요?<span><svg class="lp-icon" aria-hidden="true"><use href="#icon-chevron"/></svg></span></summary><p>AI가 생성한 요약이나 답변에는 오류가 있을 수 있어요. 중요한 개념과 수치는 원본 강의자료와 비교하고, 이해가 잘 되지 않는 부분은 튜터에게 추가로 질문해 보세요.</p></details>
+      </div>
+    </section>
+
+    <section class="lp-final-cta lp-container lp-section-reveal"><div class="lp-cta-inner"><div><span class="lp-section-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h2>공부가 조금 더<br><span>가벼워지는 시작</span></h2><p>첫 강의자료부터, 통크크와 함께해요.</p><a class="lp-button" href="https://tongkk.com/">내 자료로 시작하기<svg class="lp-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></a></div><div class="lp-cta-art" aria-hidden="true"><span class="lp-cta-orbit lp-cta-orbit-one"></span><span class="lp-cta-orbit lp-cta-orbit-two"></span><img src="assets/mascot.png" alt="" width="238" height="238" loading="lazy"><span class="lp-cta-sticker"><svg class="lp-icon"><use href="#icon-check"/></svg>오늘도 한 걸음!</span></div></div></section>
+  </main>
+
+  <footer class="lp-footer lp-container">
+    <div class="lp-footer-top"><div><a href="#top" aria-label="통크크 소개 홈"><img class="brand-logo" src="assets/logo.png" alt="통크크" width="105" height="35" loading="lazy"></a><p>내 공부가, 내 지식이 되는 곳</p></div><nav aria-label="하단 메뉴"><a href="#features">기능 소개</a><a href="#how-it-works">이용 방법</a><a href="#preview" data-flow-start>학습 흐름</a></nav></div>
+    <div class="lp-footer-bottom"><small>© <span data-year>2026</span> Tongkk. All rights reserved.</small><div><a href="https://tongkk.com/terms">이용약관</a><a href="https://tongkk.com/privacy">개인정보처리방침</a></div></div>
+  </footer>
+
+</body>
+</html>

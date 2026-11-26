@@ -1,0 +1,14 @@
+.flashcards-workspace .workflow-panel { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 16px; }
+.flashcard-face { min-height: 130px; display: grid; align-content: center; font-size: 1.15rem; }
+.flashcard-answer { border-top: 1px solid var(--color-border); padding-top: 18px; }
+.flashcard-ratings { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.flashcard-ratings button, .flashcard-actions button { min-height: 44px; border: 1px solid var(--color-border); border-radius: 10px; padding: 10px 14px; background: var(--color-card); color: var(--color-text); cursor: pointer; }
+.flashcard-ratings button:hover:not(:disabled) { background: var(--color-surface); }
+.flashcard-ratings button:focus-visible, .flashcard-actions a:focus-visible { outline: 2px solid var(--color-text); outline-offset: 3px; }
+.flashcard-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.flashcard-delete { align-self: start; color: var(--color-muted); }
+.study-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+.study-tools a { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--color-border); border-radius: 14px; padding: 16px; color: var(--color-text); text-decoration: none; background: var(--color-card); }
+.study-tools a:hover { background: var(--color-surface); }
+.study-tools span { color: var(--color-muted); font-size: 13px; }
+@media (max-width: 600px) { .flashcard-ratings { grid-template-columns: repeat(2, minmax(0, 1fr)); } .study-tools { grid-template-columns: 1fr; } }
