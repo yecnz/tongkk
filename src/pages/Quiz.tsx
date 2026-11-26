@@ -1,12 +1,10 @@
+import QuizText from "./quiz/QuizText";
+import { SourceCitationContext } from '../features/sources/citationContext';
 import BrandLogo from "../components/BrandLogo";
 import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, normalizeBoldSpacing, normalizeMathDelimiters, escapeStrayMultiplication, type PageRouteLabel } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
 import { useTutorial } from "../TutorialContext";
 import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { hasPageMarkers } from "../utils/pageMarkers";
@@ -65,32 +63,6 @@ const sourceLabels: Record<string, string> = {
   LECTURE_NOTE: "강의 노트",
   MINDMAP: "마인드맵",
   CHEAT_SHEET: "치트시트",
-};
-
-// LLM이 만든 문제·보기·해설에는 수식($...$ / $$...$$)·굵게·곱셈 별표가 섞여 있어, 평문으로
-// 그대로 출력하면 KaTeX가 깨지거나 별표가 강조로 먹혀 사라진다(이슈 #62). 요약·AI 튜터와
-// 똑같은 정규화 체인 + remark-math/rehype-katex로 렌더한다. 제목·보기·해설 한 줄 안에
-// 인라인으로 들어가야 하므로 p를 블록이 아닌 흐름(fragment)으로 펼친다.
-// (사용자가 직접 입력한 답안에는 적용하지 않는다 — LLM이 생성한 텍스트에만 쓴다.)
-const quizMarkdownComponents: Components = {
-  p: ({ children }) => <>{children}</>,
-  code: ({ children, className }) => (
-    <code className={className} style={{ padding: className ? 0 : "1px 5px", borderRadius: 5, background: className ? "transparent" : "var(--color-surface)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "0.92em" }}>
-      {children}
-    </code>
-  ),
-};
-
-const QuizText = ({ children }: { children?: string | null }) => {
-  const text = (children ?? "").replace(/\r\n/g, "\n").trim();
-  if (!text) return null;
-  // 단일 '~'(예: 'p.8~p.9')를 취소선으로 오인하지 않도록 singleTilde:false.
-  const cleaned = normalizeBoldSpacing(escapeStrayMultiplication(normalizeMathDelimiters(text)));
-  return (
-    <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkMath]} rehypePlugins={[rehypeKatex]} components={quizMarkdownComponents}>
-      {cleaned}
-    </ReactMarkdown>
-  );
 };
 
 // 풀이 중 새로고침·이탈로 답안이 날아가지 않도록 진행 상태를 세션에 스냅샷한다.
@@ -1934,6 +1906,7 @@ export default function Quiz() {
   // 오답 확인(복습) 화면 표시에 쓰는, 현재 문항을 맞혔는지 여부.
   const currentCorrect = isQuestionCorrect(q, current, selected);
   return (
+    <SourceCitationContext.Provider value={{ courseName: selectedCourse, materials, materialIds: reviewAttempt?.materialIds || priorQuizSets.find(item => item.id === activeQuizSetId)?.materialIds || selectedMaterialIds }}>
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
       {examMode && <AssessmentLock />}
@@ -2028,7 +2001,7 @@ export default function Quiz() {
                     <span>정답: <strong style={{ color: PINK }}><QuizText>{isSubjective ? (subjectiveGrade?.referenceAnswer || q.answerText || q.explanation) : (q.answerText || "정답 정보 없음")}</QuizText></strong></span>
                   )}
                   {isSubjective && subjectiveGrade && (
-                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · <QuizText>{subjectiveGrade.feedback}</QuizText></span>
+                    <span><strong style={{ color: "var(--color-text)" }}>채점</strong> {subjectiveGrade.score}점 · <QuizText sources>{subjectiveGrade.feedback}</QuizText></span>
                   )}
                 </div>
               ) : (
@@ -2125,7 +2098,7 @@ export default function Quiz() {
                   fontSize: 13,
                   lineHeight: 1.6,
                 }}>
-                  <strong>{subjectiveGrade.score}점</strong> · <QuizText>{subjectiveGrade.feedback}</QuizText>
+                  <strong>{subjectiveGrade.score}점</strong> · <QuizText sources>{subjectiveGrade.feedback}</QuizText>
                   <div style={{ marginTop: 8, color: "var(--color-text)" }}>
                     모범답안: <QuizText>{subjectiveGrade.referenceAnswer}</QuizText>
                   </div>
@@ -2161,11 +2134,11 @@ export default function Quiz() {
           {showExplanation && (
             reviewMode ? (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: "var(--color-surface)", border: "1px solid var(--color-border-soft)", fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                <strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText>{q.explanation}</QuizText>
+                <strong style={{ color: "var(--color-text)" }}>해설</strong> <QuizText sources>{q.explanation}</QuizText>
               </div>
             ) : (
               <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "var(--color-surface)", fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>
-                <strong style={{ color: CYAN }}>해설:</strong> <QuizText>{q.explanation}</QuizText>
+                <strong style={{ color: CYAN }}>해설:</strong> <QuizText sources>{q.explanation}</QuizText>
               </div>
             )
           )}
@@ -2203,5 +2176,6 @@ export default function Quiz() {
         </button>
       </div>
     </div>
+    </SourceCitationContext.Provider>
   );
 }

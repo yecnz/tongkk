@@ -32,6 +32,9 @@ import { RESET_PASSWORD_PATH } from "./services/authFlow";
 import AuthCallbackBoundary from "./components/AuthCallbackBoundary";
 
 const MenubarSettings = lazy(() => import("./pages/MenubarSettings"));
+const Flashcards = lazy(() => import('./features/flashcards/Flashcards'));
+const StudyPaths = lazy(() => import('./features/studyPath/StudyPaths'));
+const SourcePage = lazy(() => import('./features/sources/SourcePage'));
 
 function AppShell() {
   const { user, loading } = useAuth();
@@ -76,6 +79,9 @@ function AppShell() {
         <Route path="/summary" element={<Summary />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/learn" element={<LearningSession />} />
+        <Route path="/flashcards" element={<Suspense fallback={<p role="status">불러오는 중…</p>}><Flashcards /></Suspense>} />
+        <Route path="/study-paths" element={<Suspense fallback={<p role="status">불러오는 중…</p>}><StudyPaths /></Suspense>} />
+        <Route path="/source" element={<Suspense fallback={<p role="status">불러오는 중…</p>}><SourcePage /></Suspense>} />
         <Route path="/learn/review/:cardId" element={<ReviewPractice />} />
         <Route path="/learn/:sessionId/revisions/:revisionId" element={<ExplanationRevision />} />
         <Route path="/learn/:sessionId" element={<LearningSession />} />

@@ -47,6 +47,7 @@ import {
 } from "../services/studyPlanner";
 import { AddDdayModal, AddPlanModal } from "../components/PlannerModals";
 import LearningBriefing from "../features/review/LearningBriefing";
+import StudyTools from "../features/flashcards/StudyTools";
 import LearningRecommendations from "../features/review/LearningRecommendations";
 import './Dashboard.css';
 
@@ -1293,6 +1294,7 @@ export default function Dashboard() {
           resumePoint={resumePoint && courses.includes(resumePoint.course) ? resumePoint : null}
         />
         <div className="dash-main-grid">
+          <div style={{ gridColumn: '1 / -1' }}><StudyTools key={user?.id || 'guest'} /></div>
           {/* 강의 목록 카드 그리드 */}
           <div>
             {!hasLoadedCourses ? (
