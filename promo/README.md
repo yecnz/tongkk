@@ -2,6 +2,14 @@
 
 서비스 앱과 독립된 정적 페이지입니다. 이 폴더 전체를 정적 호스팅에 올리거나 로컬 HTTP 서버로 열면 됩니다. 배포된 파일을 사용하는 데는 빌드, 환경변수, 로그인 설정이 필요하지 않습니다. 기능 예시의 iframe 높이 동기화를 위해 `file://` 대신 HTTP로 미리 봅니다.
 
+## 기존 Vercel 프로젝트 배포
+
+저장소 루트에서 `npm run build`를 실행하면 Vite 앱 빌드 후 `scripts/copy-promo.mjs`가 배포용 HTML·CSS·JS·라이선스·assets를 `dist/promo/`로 복사합니다. 소스·테스트·빌드 스크립트는 공개하지 않습니다. 체험 번들은 아래 갱신 절차로 먼저 재생성한 저장본을 사용합니다.
+
+`vercel.json`은 빌드 명령을 `npm run build`, 출력 폴더를 `dist`로 지정합니다. `/promo`는 `/promo/`로 영구 이동하고, `/promo/`는 `promo/index.html`, 하위 파일은 원래 상대경로대로 제공합니다. 이 규칙은 앱의 SPA 폴백보다 먼저 적용되며 `/api/*` 프록시는 유지합니다.
+
+기능 예시 iframe인 `/promo/features.html`에만 `X-Frame-Options: SAMEORIGIN`을 적용합니다. 나머지 경로는 기존 `DENY`를 유지합니다. 새 프로젝트나 도메인은 필요하지 않으며 GitHub `main` 배포 완료 후 https://tongkk.com/promo/ 에서 확인합니다.
+
 ## 실제 화면 UI
 
 - 창 헤더·원본/요약/퀴즈 탭·하단 버튼: `src/components/SampleDemo.tsx`의 크기, 색상, 간격을 적용했습니다.
