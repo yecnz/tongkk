@@ -1,18 +1,21 @@
 import { demoFeedback } from './learning-sessions';
 import { changeDemoReview, getDemoReviewCards } from './learning-reviews';
 export class WorkflowError extends Error { constructor(message: string, public status: number) { super(message); } }
-export const issueLabels = { needs_confirmation: '확인 필요', in_progress: '보완 중', awaiting_reassessment: '재평가 대기', resolved: '해결', closed: '수동 종료' };
+export const issueLabels = { needs_confirmation: '확인 필요', in_progress: '복습 중', awaiting_reassessment: '다시 확인 예정', resolved: '평가로 확인됨', closed: '직접 확인함' };
 type IssueStatus = keyof typeof issueLabels;
 const copy = <T,>(value: T): T => structuredClone(value);
 const issues = ['퀵 정렬의 최악 시간 복잡도', '정렬의 안정성'].map((title, i) => ({ id: `issue-demo-${i}`, concept_id: i ? 'stable-demo' : 'quick-demo', title, course_id: 'course-demo', material_id: 'material-demo', status: (i ? 'in_progress' : 'needs_confirmation') as IssueStatus, revision: 1, updated_at: new Date().toISOString() }));
 const events: Record<string, { id: string; action: string; created_at: string }[]> = {};
+function issueEvents(id: string) {
+  return events[id] ||= [{ id: `event-${id}`, action: 'evidence', created_at: new Date(Date.now() - 86400000).toISOString() }];
+}
 function detail(id: string) {
   const issue = issues.find(item => item.id === id) || issues[0];
   return { issue, source_changed: false, review_card_id: `review-demo-${issue.id.endsWith('1') ? 1 : 0}`,
     concept: { id: issue.concept_id, title: issue.title, material_id: issue.material_id, course_id: issue.course_id,
       source_refs: [{ unit_id: 'unit-demo-1', quote: issue.id.endsWith('1') ? '안정성은 같은 키를 가진 원소의 상대 순서를 보존하는 성질이다.' : '퀵 정렬은 평균 O(n log n)이지만, 한쪽으로 치우친 분할이 반복되면 최악 O(n²)이다.' }] },
     evidence: [{ id: `evidence-${id}`, source_kind: 'recall', outcome: 'uncertain', assisted: false, session_id: 'demo-session-completed', item_id: 'item-demo-0', created_at: new Date(Date.now() - 86400000).toISOString(), answer: issue.id.endsWith('1') ? '안정 정렬은 실행 시간이 항상 일정한 정렬입니다.' : '퀵 정렬은 항상 반으로 나누기 때문에 O(n log n)입니다.' }],
-    events: events[id] || [{ id: 'event-demo', action: 'evidence', created_at: new Date(Date.now() - 86400000).toISOString() }] };
+    events: issueEvents(id) };
 }
 const revisions: Record<string, { title: string; question: string; baseline: string; baseline_feedback: ReturnType<typeof demoFeedback>; source_changed: boolean;
   revision: { id: string; session_id: string; item_id: string; answer: string; revision: number; status: string };
@@ -29,7 +32,7 @@ export async function handleLearningRequest(path: string, method = 'GET', body?:
       const issue = issues.find(item => item.id === id);
       if (issue) { const map: Record<string, IssueStatus> = { start: 'in_progress', reassess: 'awaiting_reassessment', close: 'closed', reopen: 'needs_confirmation' };
         issue.status = map[String(request.action)] || issue.status; issue.revision += 1; issue.updated_at = new Date().toISOString();
-        (events[id] ||= []).push({ id: crypto.randomUUID(), action: String(request.action), created_at: issue.updated_at }); }
+        issueEvents(id).unshift({ id: crypto.randomUUID(), action: String(request.action), created_at: issue.updated_at }); }
     }
     return copy(detail(id));
   }

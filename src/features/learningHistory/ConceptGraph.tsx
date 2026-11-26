@@ -8,7 +8,7 @@ type Member = { id: string; title: string; course_name: string; material_name: s
 type Graph = { groups: { id: string; title: string; evidence_count: number; members: Member[] }[]; prerequisites: { source: string; target: string }[];
   links: { id: string; source_id: string; target_id: string; relation: string }[]; suggestions: { source_id: string; target_id: string; title: string }[];
   recommendations: { concept_id: string; title: string; reason: string }[] };
-const labels: Record<string,string> = { needs_review: '보완 필요', needs_confirmation: '확인 필요', recent_stable: '최근 안정', unassessed: '미평가', awaiting_reassessment: '재평가 대기', source_changed: '원문 변경' };
+const labels: Record<string,string> = { needs_review: '보완 필요', needs_confirmation: '확인 필요', recent_stable: '최근 안정', unassessed: '미평가', awaiting_reassessment: '다시 확인 예정', source_changed: '원문 변경' };
 export default function ConceptGraph() {
   const { user } = useAuth(); const [data,setData] = useState<Graph|null>(null); const [error,setError] = useState('');
   const [busy,setBusy] = useState(false); const [source,setSource] = useState(''); const [target,setTarget] = useState(''); const [relation,setRelation] = useState('prerequisite');

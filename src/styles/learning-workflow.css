@@ -85,6 +85,46 @@
 .workflow-surface :is(input[type="checkbox"], input[type="radio"]), .workflow-options input {
   width: 16px; height: 16px; margin: 3px 0 0; flex-shrink: 0; accent-color: var(--color-cyan);
 }
+/* Keep a white check on the brand background instead of the browser's dark glyph.
+   Persistent on/off settings retain their separate switch appearance. */
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input) {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border: 1.5px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-card);
+  cursor: pointer;
+}
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input)::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid var(--color-on-brand);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+  visibility: hidden;
+}
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):checked {
+  border-color: var(--checkbox-accent, var(--color-cyan));
+  background: var(--checkbox-accent, var(--color-cyan));
+}
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):checked::after { visibility: visible; }
+:is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):disabled { cursor: default; opacity: .5; }
+@media (forced-colors: active) {
+  :is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input),
+  :is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input):checked {
+    appearance: auto;
+    background: revert;
+    border: revert;
+  }
+  :is(.workflow-surface input[type="checkbox"], .workflow-options input[type="checkbox"], input.tongkk-checkbox):not(.workflow-toggle input)::after { display: none; }
+}
 .workflow-options { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; font-family: inherit; font-size: 14px; }
 .workflow-toggle { display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 14px; color: var(--color-text); cursor: pointer; }
 .workflow-surface .workflow-toggle input {

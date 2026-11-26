@@ -1786,13 +1786,14 @@ export default function Dashboard() {
                         }}>
                           <input
                             type="checkbox"
+                            className="tongkk-checkbox"
                             checked={p.done}
                             aria-label={`${p.text} 완료`}
                             onChange={e => {
                               const done = e.target.checked;
                               setPlans(prev => prev.map((item, index) => index === i ? { ...item, done } : item));
                             }}
-                            style={{ width: 22, height: 22, margin: 0, accentColor: "var(--color-cyan-deep)", cursor: "pointer" }}
+                            style={{ width: 22, height: 22, margin: 0, cursor: "pointer" }}
                           />
                         </label>
                         {isEditing ? (

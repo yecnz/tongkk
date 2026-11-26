@@ -6,7 +6,7 @@ import { workflowRequest } from '../../services/workflow';
 import { useLearningScope } from '../learningMate/context';
 type Concept = { id: string; title: string; state: string; source_changed: boolean; course_id: string; material_id: string;
   evidence_count: number; independent_questions: number; assisted_count: number; delayed_practice: number; last_evaluated_at: string | null; policy_version: string };
-const labels: Record<string, string> = { unassessed: '미평가', needs_confirmation: '확인 필요', needs_review: '보완 필요', awaiting_reassessment: '재평가 대기', recent_stable: '최근 안정', source_changed: '원문 변경' };
+const labels: Record<string, string> = { unassessed: '미평가', needs_confirmation: '확인 필요', needs_review: '보완 필요', awaiting_reassessment: '다시 확인 예정', recent_stable: '최근 안정', source_changed: '원문 변경' };
 type Detail = { concept: Concept; evidence: { id: string; source_kind: string; outcome: string; assisted: boolean; independent: boolean; session_id: string; created_at: string }[];
   revisions: { id: string; session_id: string; status: string; created_at: string }[]; issue_id: string | null };
 function ConceptDetail({ id }: { id: string }) {

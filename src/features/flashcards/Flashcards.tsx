@@ -33,6 +33,7 @@ function Workspace() {
   const [retry, setRetry] = useState(0);
   const [materialLoading, setMaterialLoading] = useState(false);
   const [removeId, setRemoveId] = useState<string | null>(null);
+  const answerRef = useRef<HTMLDivElement>(null);
   const pending = useRef<{ card: Flashcard; rating: FlashcardRating; key: string } | null>(null);
   const [pendingRating, setPendingRating] = useState<FlashcardRating | null>(null);
   const course = courses.find(item => item.id === courseId);
@@ -42,6 +43,10 @@ function Workspace() {
   const dirty = drafts.some(draft => !draft.saved && Boolean(draft.front.trim() || draft.back.trim()));
   const courseName = (id: string) => courses.find(item => item.id === id)?.name || '과목';
   const discardDrafts = () => !dirty || window.confirm('저장하지 않은 카드 초안이 있어요. 초안을 버리고 계속할까요?');
+
+  useEffect(() => {
+    if (revealed && mode === 'review') answerRef.current?.focus({ preventScroll: true });
+  }, [revealed, mode, current?.id]);
 
   useEffect(() => {
     beforeLeaveRef.current = async () => {
@@ -99,7 +104,7 @@ function Workspace() {
     });
   }
   function source(card: Flashcard) {
-    return card.material_id && card.source_page ? <SourceLink courseName={courseName(card.course_id)} materialId={card.material_id} page={card.source_page}>원문 p.{card.source_page} →</SourceLink> : null;
+    return card.material_id && card.source_page ? <footer className="flashcard-source" aria-label="카드 출처"><span>출처</span><SourceLink courseName={courseName(card.course_id)} materialId={card.material_id} page={card.source_page}>원문 p.{card.source_page} →</SourceLink></footer> : null;
   }
   return <div className="workflow-surface workflow-stack flashcards-workspace">
     <div className="workflow-page-heading"><h1>암기 카드</h1><p className="workflow-muted">짧게 떠올리고, 기억한 정도에 맞춰 다시 만나세요.</p></div>
@@ -111,13 +116,23 @@ function Workspace() {
     {loading ? <p role="status">카드를 불러오는 중…</p> : mode === 'review' ? <>
       {!current ? <div className="workflow-panel workflow-stack"><h2>{cards.length ? '지금 복습할 카드를 모두 확인했어요' : '첫 암기 카드를 만들어 보세요'}</h2><p>자료에서 카드를 만들거나 오답 문항에서 가져올 수 있어요.</p>
         <div className="flashcard-actions"><button type="button" className="workflow-primary" onClick={() => setMode('create')}>카드 만들기</button><LearningLink to="/review?tab=wrong">오답에서 가져오기</LearningLink></div></div>
-        : <section className="workflow-panel workflow-stack" aria-label="복습 카드"><p className="workflow-meta">{courseName(current.course_id)} · 남은 카드 {queue.length}개</p>
-          <div className="flashcard-face"><Markdown text={current.front} /></div>
-          {!revealed ? <button type="button" className="workflow-primary" onClick={() => setRevealed(true)}>답 확인하기</button> : <>
-            <div className="flashcard-answer"><Markdown text={current.back} />{source(current)}</div><p>답을 보기 전에 얼마나 떠올렸나요?</p>
-            <div className="flashcard-ratings">{ratings.map(([value, label]) => <button type="button" key={value} disabled={busy || (!!pendingRating && pendingRating !== value)} onClick={() => rate(value)}>{pendingRating === value ? `${label} · 다시 저장` : label}</button>)}</div>
-            {pendingRating && !busy && <button type="button" onClick={() => { if (discardDrafts()) { pending.current = null; setPendingRating(null); setRevealed(false); setRetry(value => value + 1); } }}>최신 복습 상태 확인</button>}
-          </>}<p className="workflow-meta">자기평가에 따른 복습 일정입니다. 개념 이해도 평가와는 별도로 기록해요.</p></section>}
+        : <section className="flashcard-review workflow-stack" aria-label="복습 카드">
+          <header className="flashcard-review-meta"><span>{courseName(current.course_id)}</span><span>남은 카드 {queue.length}개</span></header>
+          <article className="flashcard-study-card" data-side={revealed ? 'answer' : 'question'} aria-label={revealed ? '답 카드' : '질문 카드'}>
+            <div className="flashcard-face"><p className="flashcard-label">질문</p><Markdown text={current.front} /></div>
+            {revealed ? <div className="flashcard-answer" ref={answerRef} tabIndex={-1} role="region" aria-label="답"><p className="flashcard-label">답</p><Markdown text={current.back} /></div>
+              : <div className="flashcard-reveal"><p className="workflow-muted">답을 먼저 떠올려 보세요.</p><button type="button" className="workflow-primary" onClick={() => setRevealed(true)}>답 확인하기</button></div>}
+          </article>
+          <p className="flashcard-announcement" role="status">{revealed ? '답을 공개했어요.' : ''}</p>
+          {revealed && <>
+            <section className="flashcard-assessment" aria-labelledby="flashcard-rating-heading"><h2 id="flashcard-rating-heading">답을 보기 전에 얼마나 떠올렸나요?</h2>
+              <div className="flashcard-ratings">{ratings.map(([value, label]) => <button type="button" key={value} disabled={busy || (!!pendingRating && pendingRating !== value)} onClick={() => rate(value)}>{pendingRating === value ? `${label} · 다시 저장` : label}</button>)}</div>
+              {pendingRating && !busy && <button type="button" onClick={() => { if (discardDrafts()) { pending.current = null; setPendingRating(null); setRevealed(false); setRetry(value => value + 1); } }}>최신 복습 상태 확인</button>}
+              <p className="workflow-meta">자기평가에 따라 다음 복습을 정해요. 개념 이해도 평가와는 별도로 기록합니다.</p>
+            </section>
+            {source(current)}
+          </>}
+        </section>}
     </> : mode === 'create' ? <>
       {!courses.length ? <p><Link to="/">대시보드</Link>에서 과목을 먼저 추가해주세요.</p> : <>
         <div className="workflow-panel workflow-stack"><label className="workflow-field">과목<CustomSelect value={courseId} disabled={busy} onChange={value => { if (discardDrafts()) setCourseId(value); }} options={courses.map(item => ({ value: item.id, label: item.name }))} aria-label="과목" /></label>
@@ -127,18 +142,20 @@ function Workspace() {
             {material.markdown.length > 60000 && <p className="workflow-muted">긴 자료는 앞부분 60,000자에서 카드를 만듭니다.</p>}</>}
           <button type="button" disabled={busy} onClick={() => setDrafts(previous => [...previous, { key: crypto.randomUUID(), front: '', back: '', source_page: null, saved: false }])}>직접 카드 추가</button></div>
         {drafts.length > 0 && <p>질문과 답을 확인하고 내 말로 수정한 뒤 저장하세요.</p>}
-        {drafts.map((draft, index) => <section key={draft.key} className="workflow-panel workflow-stack" aria-label={`카드 초안 ${index + 1}`}>
-          <label className="workflow-field">질문<textarea maxLength={2000} rows={3} value={draft.front} disabled={busy || draft.saved || draft.submitted} onChange={e => setDrafts(previous => previous.map(item => item.key === draft.key ? { ...item, front: e.target.value } : item))} /></label>
-          <label className="workflow-field">답<textarea maxLength={8000} rows={4} value={draft.back} disabled={busy || draft.saved || draft.submitted} onChange={e => setDrafts(previous => previous.map(item => item.key === draft.key ? { ...item, back: e.target.value } : item))} /></label>
+        {drafts.map((draft, index) => <section key={draft.key} className="workflow-panel workflow-stack flashcard-draft" aria-label={`카드 초안 ${index + 1}`}>
+          <header className="flashcard-draft-heading"><h2>카드 {index + 1}</h2><span className="workflow-meta">{draft.saved ? '저장됨' : '초안'}</span></header>
+          <label className="workflow-field flashcard-draft-question"><span className="flashcard-label">질문</span><textarea maxLength={2000} rows={3} value={draft.front} disabled={busy || draft.saved || draft.submitted} onChange={e => setDrafts(previous => previous.map(item => item.key === draft.key ? { ...item, front: e.target.value } : item))} /></label>
+          <label className="workflow-field flashcard-draft-answer"><span className="flashcard-label">답</span><textarea maxLength={8000} rows={4} value={draft.back} disabled={busy || draft.saved || draft.submitted} onChange={e => setDrafts(previous => previous.map(item => item.key === draft.key ? { ...item, back: e.target.value } : item))} /></label>
           {draft.submitted && !draft.saved && !busy && <p className="workflow-muted">저장 여부를 확인하지 못했어요. 같은 내용으로 다시 확인하면 중복 없이 저장 결과를 확인할 수 있어요.</p>}
           <div className="flashcard-actions"><button type="button" className="workflow-primary" disabled={busy || draft.saved || !draft.front.trim() || !draft.back.trim()} onClick={() => save(draft)}>{draft.saved ? '저장됨' : draft.submitted ? '저장 다시 확인' : '카드 저장'}</button>
             {!draft.saved && <button type="button" disabled={busy} onClick={() => setDrafts(previous => previous.filter(item => item.key !== draft.key))}>초안 제외</button>}</div></section>)}
       </>}
     </> : <>{!cards.length && <p>아직 저장한 카드가 없어요.</p>}
-      {cards.map(card => <article key={card.id} className="workflow-panel workflow-stack"><p className="workflow-meta">{courseName(card.course_id)} · 다음 복습 {new Date(card.due_at).toLocaleDateString('ko-KR')} · {card.reviews}회 복습</p>
-        <Markdown text={card.front} /><details><summary>답 보기</summary><Markdown text={card.back} />{source(card)}</details>
+      {cards.map(card => <article key={card.id} className="workflow-panel workflow-stack flashcard-library-card"><p className="workflow-meta">{courseName(card.course_id)} · 다음 복습 {new Date(card.due_at).toLocaleDateString('ko-KR')} · {card.reviews}회 복습</p>
+        <div className="flashcard-library-question"><p className="flashcard-label">질문</p><Markdown text={card.front} /></div>
+        <div className="flashcard-library-answer"><p className="flashcard-label">답</p><Markdown text={card.back} /></div>
         {removeId === card.id ? <div className="flashcard-actions"><span>카드와 복습 기록을 삭제할까요?</span><button type="button" disabled={busy} onClick={() => { void action(async () => { await deleteFlashcard(card.id); setCards(previous => previous.filter(item => item.id !== card.id)); setRemoveId(null); }); }}>삭제 확인</button><button type="button" disabled={busy} onClick={() => setRemoveId(null)}>취소</button></div>
-          : <button type="button" disabled={busy} className="flashcard-delete" onClick={() => setRemoveId(card.id)}>카드 삭제</button>}</article>)}
+          : <button type="button" disabled={busy} className="flashcard-delete" onClick={() => setRemoveId(card.id)}>카드 삭제</button>}{source(card)}</article>)}
       {cards.length === 1000 && <p>복습이 빠른 순서로 최대 1,000개를 표시합니다.</p>}</>}
   </div>;
 }

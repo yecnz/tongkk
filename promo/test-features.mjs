@@ -75,6 +75,9 @@ try {
       const initialQuestion = doc.querySelector('.flashcard-face').textContent;
       await click(button('답 확인하기'));
       assert(doc.querySelector('.flashcard-answer').textContent.length > 25, 'card reveals its real Markdown answer');
+      const answerCard = doc.querySelector('.flashcard-study-card[data-side="answer"]');
+      assert(answerCard && answerCard.querySelector('.flashcard-face').textContent === initialQuestion, 'the question remains above the revealed answer');
+      assert(doc.querySelector('.flashcard-review').lastElementChild.matches('.flashcard-source'), 'the source stays below the card and rating controls');
       await click(button('알겠음'));
       await until(() => text().includes('다음 복습:') && button('답 확인하기'), 'card rating schedules review and advances the queue');
       assert.notEqual(doc.querySelector('.flashcard-face').textContent, initialQuestion);
@@ -88,13 +91,19 @@ try {
       await click(button('카드 저장', draft));
       await until(() => button('저장됨', draft), 'manual card is saved locally');
     } else if (feature === 'issues') {
-      await until(() => button('보완 시작'), 'the linked quick-sort issue renders');
-      await click(button('보완 시작'));
+      await until(() => button('복습 중으로 표시'), 'the linked quick-sort issue renders');
+      await click(button('복습 중으로 표시'));
       await until(() => doc.querySelector('.workflow-badge[data-state="in_progress"]'), 'issue enters remediation');
-      await click(button('수동 종료'));
-      await until(() => button('다시 열기'), 'issue can be closed');
-      await click(button('다시 열기'));
-      await until(() => button('보완 시작'), 'issue can be reopened');
+      await click(button('다시 확인할 항목으로'));
+      await until(() => doc.querySelector('.workflow-badge[data-state="awaiting_reassessment"]'), 'issue is marked for another check');
+      await click(button('확인 완료로 표시'));
+      await until(() => button('다시 확인하기'), 'issue can be marked personally checked');
+      await click(button('다시 확인하기'));
+      await until(() => button('복습 중으로 표시'), 'issue can be reopened');
+      const recentChanges = [...doc.querySelectorAll('.learning-issue-history > .learning-issue-events > li')];
+      assert.equal(recentChanges.length, 2, 'only two recent changes are expanded');
+      assert(recentChanges[0].textContent.includes('확인 필요로 변경'), 'the most recent change appears first');
+      assert(!doc.querySelector('.learning-issue-older-events').open, 'older changes start collapsed');
     } else if (feature === 'courses') {
       await until(() => text().includes('챕터') && text().includes('정렬'), 'course chapters and progress render');
       assert(doc.querySelector('input'), 'course title can be edited');

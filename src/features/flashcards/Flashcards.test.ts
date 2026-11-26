@@ -28,7 +28,18 @@ async function click(label: string) {
 it('requires recall before showing the answer and records the selected rating', async () => {
   mocks.rate.mockResolvedValue({ ...card, revision: 1, due_at: '2099-01-01T00:00:00Z' });
   await render(); expect(container.textContent).not.toContain('숨겨진 정답');
+  const studyCard = container.querySelector('article[aria-label="질문 카드"]');
+  expect(studyCard).not.toBeNull();
+  expect(container.querySelector('.flashcard-assessment')).toBeNull();
   await click('답 확인하기'); expect(container.textContent).toContain('숨겨진 정답');
+  expect(container.querySelector('article[aria-label="답 카드"]')).toBe(studyCard);
+  expect(studyCard?.getAttribute('data-side')).toBe('answer');
+  const question = studyCard?.querySelector('.flashcard-face'), answer = studyCard?.querySelector('[role="region"][aria-label="답"]');
+  expect(question?.textContent).toContain('인출 질문');
+  expect(question?.nextElementSibling).toBe(answer);
+  expect(document.activeElement).toBe(answer);
+  expect(studyCard?.contains(container.querySelector('.flashcard-ratings'))).toBe(false);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe('답을 공개했어요.');
   await click('알겠음');
   expect(mocks.rate).toHaveBeenCalledWith(card, 'good', expect.any(String));
   expect(container.textContent).toContain('지금 복습할 카드를 모두 확인했어요');
@@ -47,4 +58,6 @@ it('makes a new question hidden after rating the previous card', async () => {
   await render(); await click('답 확인하기'); await click('쉬움');
   expect(container.textContent).toContain('다음 질문');
   expect(container.textContent).not.toContain('두번째 답');
+  expect(container.querySelector('article[aria-label="질문 카드"]')?.getAttribute('data-side')).toBe('question');
+  expect(container.querySelector('[role="region"][aria-label="답"]')).toBeNull();
 });

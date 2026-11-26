@@ -1,0 +1,13 @@
+.learning-issue-status { display: flex; flex-direction: column; gap: 10px; }
+.workflow-surface .learning-issue-status h3 { font-size: 13px; color: var(--color-text-secondary); }
+.learning-issue-section { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 20px; border-top: 1px solid var(--color-border-soft); }
+.learning-issue-section-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.learning-issue-evidence { gap: 8px; }
+.learning-issue-answer { color: var(--color-text-strong); white-space: pre-wrap; }
+.learning-issue-history { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid var(--color-border-soft); }
+.workflow-surface .learning-issue-history h3 { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); }
+.learning-issue-events { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.learning-issue-events li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
+.learning-issue-events time { flex-shrink: 0; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.workflow-surface .learning-issue-older-events summary { width: fit-content; color: var(--color-text-secondary); font-size: 12px; font-weight: 400; }
+.workflow-surface .learning-issue-older-events[open] > summary { margin-bottom: 6px; }
