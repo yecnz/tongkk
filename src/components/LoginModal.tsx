@@ -35,7 +35,7 @@ function SignupPasswordField({ hint, valid, error, compact, ...control }: Omit<P
     <div className={compact ? 'mini-login-field' : undefined}>
       <PasswordControl {...control} autoComplete="new-password" invalid={!!error} describedBy={hintId} />
       <p id={hintId} className="auth-signup-hint" data-valid={valid} role={error ? 'alert' : undefined}>
-        {!error && <svg aria-hidden="true" width={12} height={12} viewBox="0 0 12 12" fill="none"><path d="M1.25 5.5L4.75 9L10.75 3" stroke="currentColor" strokeWidth={1.5} /></svg>}
+        {!error && valid && <svg aria-hidden="true" width={12} height={12} viewBox="0 0 12 12" fill="none"><path d="M1.25 5.5L4.75 9L10.75 3" stroke="currentColor" strokeWidth={1.5} /></svg>}
         {error || hint}
       </p>
     </div>
