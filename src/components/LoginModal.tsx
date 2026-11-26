@@ -3,8 +3,6 @@ import { useAuth } from "../AuthContext";
 import { AuthActionError, authErrorMessage, INVALID_LOGIN_CREDENTIALS_MESSAGE, isValidAuthEmail } from "../services/authFlow";
 import { emailWaitSeconds } from "../services/authEmails";
 import closeIcon from "../assets/mini/login-close.svg";
-import checkSuccessIcon from "../assets/auth/check-success.svg";
-import checkMutedIcon from "../assets/auth/check-muted.svg";
 import LegalLinks from "./LegalLinks";
 import PasswordControl, { type PasswordControlProps } from "./PasswordControl";
 import "./LoginModal.css";
@@ -37,7 +35,7 @@ function SignupPasswordField({ hint, valid, error, compact, ...control }: Omit<P
     <div className={compact ? 'mini-login-field' : undefined}>
       <PasswordControl {...control} autoComplete="new-password" invalid={!!error} describedBy={hintId} />
       <p id={hintId} className="auth-signup-hint" data-valid={valid} role={error ? 'alert' : undefined}>
-        {!error && <img src={valid ? checkSuccessIcon : checkMutedIcon} alt="" width={12} height={12} />}
+        {!error && <svg aria-hidden="true" width={12} height={12} viewBox="0 0 12 12" fill="none"><path d="M1.25 5.5L4.75 9L10.75 3" stroke="currentColor" strokeWidth={1.5} /></svg>}
         {error || hint}
       </p>
     </div>

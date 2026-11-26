@@ -126,12 +126,13 @@
   overflow-wrap: anywhere;
 }
 
-.auth-signup-hint img {
+.auth-signup-hint svg {
   flex: 0 0 auto;
 }
 
+/* 회색 체계에서 통과가 눈에 띄도록 기본 안내(muted)보다 확실히 진하게 한다. */
 .auth-signup-hint[data-valid="true"] {
-  color: var(--color-success);
+  color: var(--color-text-strong);
 }
 
 .auth-signup-hint[role="alert"] {
