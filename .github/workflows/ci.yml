@@ -20,6 +20,10 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: Lint (eslint + check-inline-hex)
         run: npm run lint
+      - name: Standalone promo demo
+        run: |
+          node promo/build-demo.mjs
+          node promo/test-demo.mjs
       - name: Unit tests
         run: npm test
       - name: Learning workflow PostgreSQL integration
