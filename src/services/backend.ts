@@ -68,7 +68,7 @@ export async function fetchWithTunnelRetry(
 
 export async function parseApiError(response: Response): Promise<string> {
   if (TUNNEL_TIMEOUT_STATUSES.includes(response.status)) {
-    return 'Cloudflare 터널에서 요청 시간이 초과되었습니다. 이미지가 많은 PDF라면 페이지 수를 줄이거나 잠시 후 다시 시도해주세요.';
+    return 'Cloudflare 터널에서 요청 시간이 초과되었습니다. 이미지가 많은 PDF라면 페이지 수를 줄이거나 잠시 후 다시 시도해 주세요.';
   }
 
   const text = await response.text().catch(() => '');

@@ -58,5 +58,5 @@ it('shows a brief setup notice while preserving the error code for callers', asy
     error_code: 'SETUP_REQUIRED', message: '학습 세션 DB 연결 설정이 필요합니다.',
   } }), { status: 503 })));
   await expect(learningRequest('/scopes')).rejects.toMatchObject({ status: 503, code: 'SETUP_REQUIRED',
-    message: '학습 세션을 아직 사용할 수 없어요. 관리자에게 문의해주세요.' });
+    message: '학습 세션을 아직 사용할 수 없어요. 관리자에게 문의해 주세요.' });
 });

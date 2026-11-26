@@ -204,7 +204,7 @@ export const AITutorDrawer = ({
   initialQuestion,
   onInitialQuestionConsumed,
   pendingQuestion,
-  disabledReason = "요약을 생성한 뒤 질문하세요",
+  disabledReason = "요약을 생성한 뒤 질문해 주세요",
   resetHistory = false,
   layout = "drawer",
   fill = false,

@@ -9,7 +9,7 @@ vi.mock('../../services/reviews',async original=>({...await original<typeof impo
 import ReviewPractice from './ReviewPractice';
 import { ReviewError,type ReviewView } from '../../services/reviews';
 let root:Root;let container:HTMLDivElement;let response:ReviewView;
-function initial():ReviewView{return {id:'card',title:'분산 학습',question:'핵심을 설명하세요',due_at:'2020-01-01T00:00:00Z',source_changed:false,latest:null,check:null,baseline:null,previous:null};}
+function initial():ReviewView{return {id:'card',title:'분산 학습',question:'핵심을 설명해 주세요',due_at:'2020-01-01T00:00:00Z',source_changed:false,latest:null,check:null,baseline:null,previous:null};}
 async function click(label:string){await act(async()=>{const button=[...container.querySelectorAll('button')].find(b=>b.textContent===label);expect(button).toBeTruthy();button!.click();});}
 async function render(){await act(async()=>root.render(h(MemoryRouter,{initialEntries:['/learn/review/card']},h(Routes,null,h(Route,{path:'/learn/review/:cardId',element:h(ReviewPractice)})))));}
 async function type(text:string){await act(async()=>{const input=container.querySelector('textarea')!;Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(input,text);input.dispatchEvent(new Event('input',{bubbles:true}));});}
@@ -41,8 +41,8 @@ it('blocks stale-source practice and preserves ungraded answers for editing',asy
 });
 
 it('preserves the question identity of a saved answer when a new question becomes available',async()=>{
- localStorage.setItem('tongkk:review:user:card',JSON.stringify({text:'이전 문제에 쓴 설명',assisted:false,newRound:false,pending:null,prompt:{id:'old-question',text:'이전 사례를 설명하세요'}}));
- response.next_question='새 사례를 설명하세요';response.question_id='new-question';response.question_status='ready';
- await render();expect(container.textContent).toContain('이전 사례를 설명하세요');expect(container.textContent).not.toContain('새 사례를 설명하세요');
+ localStorage.setItem('tongkk:review:user:card',JSON.stringify({text:'이전 문제에 쓴 설명',assisted:false,newRound:false,pending:null,prompt:{id:'old-question',text:'이전 사례를 설명해 주세요'}}));
+ response.next_question='새 사례를 설명해 주세요';response.question_id='new-question';response.question_status='ready';
+ await render();expect(container.textContent).toContain('이전 사례를 설명해 주세요');expect(container.textContent).not.toContain('새 사례를 설명해 주세요');
  await click('설명 제출');expect(request).toHaveBeenCalledWith('/card/answers','POST',expect.objectContaining({question_id:'old-question',answer:'이전 문제에 쓴 설명'}));
 });

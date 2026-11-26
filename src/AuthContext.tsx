@@ -95,20 +95,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         syncCachesWithUser(data.session);
         setSession(data.session);
         if (callback.error || callbackError) {
-          setAuthCallbackError(callback.error || authErrorMessage(callbackError, '인증 링크를 확인할 수 없습니다. 새 메일을 요청하세요.'));
+          setAuthCallbackError(callback.error || authErrorMessage(callbackError, '인증 링크를 확인할 수 없습니다. 새 메일을 요청해 주세요.'));
           setRecoveryMode(false);
         } else if (error) {
-          setAuthCallbackError(authErrorMessage(error, '로그인 상태를 확인하지 못했습니다. 다시 로그인하세요.'));
+          setAuthCallbackError(authErrorMessage(error, '로그인 상태를 확인하지 못했습니다. 다시 로그인해 주세요.'));
           setRecoveryMode(false);
         } else if (callback.isRecovery && !data.session) {
-          setAuthCallbackError('재설정 세션이 만료되었습니다. 새 메일을 요청하세요.');
+          setAuthCallbackError('재설정 세션이 만료되었습니다. 새 메일을 요청해 주세요.');
           setRecoveryMode(false);
         }
         if (callback.hasCallback) window.history.replaceState(window.history.state, '',
           cleanAuthCallbackUrl(window.location.href, Boolean(callback.error || callbackError || callback.isRecovery && !data.session)));
       } catch {
         if (mounted) {
-          setAuthCallbackError('로그인 상태를 확인하지 못했습니다. 다시 시도하세요.');
+          setAuthCallbackError('로그인 상태를 확인하지 못했습니다. 다시 시도해 주세요.');
           setRecoveryMode(false);
         }
       } finally {

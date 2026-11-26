@@ -1,7 +1,7 @@
 import BrandLogo from "../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import { pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel, useSidebarOpen } from "../common";
 import { useToast } from "../ToastContext";
 import { useAuth } from "../AuthContext";
 import { loadAllQuizAttemptsFromServer, type SavedQuizAttemptWithCourse } from "../services/quizAttempts";
@@ -35,7 +35,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
   const { user } = useAuth();
   const { showToast } = useToast();
   const page: PageRouteLabel = "오답 노트";
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useSidebarOpen();
   const [attempts, setAttempts] = useState<SavedQuizAttemptWithCourse[]>([]);
   const [analyses, setAnalyses] = useState<Map<string, WrongAnswerAnalysis>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -208,7 +208,7 @@ export default function ReviewNotes({ embedded = false }: { embedded?: boolean }
       {!embedded && sidebar && <Sidebar active={page} onNav={item => navigate(pageRoutes[item])} onClose={() => setSidebar(false)} />}
 
       {!embedded && <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-surface)", display: "flex", alignItems: "center", gap: 16 }}>
-        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(true)} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+        <button type="button" className="tongkk-hover-dim" onClick={() => setSidebar(!sidebar)} aria-label={sidebar ? "메뉴 닫기" : "메뉴 열기"} style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
           <SidebarIcon />
         </button>
         <button type="button" className="brand-home tongkk-hover-fade" onClick={() => navigate("/")}><BrandLogo /></button>

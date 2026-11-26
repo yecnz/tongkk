@@ -17,7 +17,7 @@ function Row({ card, refresh }: { card: ReviewCard; refresh: () => void }) {
     finally { setBusy(false); }
   }
   return <Card className="workflow-panel workflow-stack"><div className="workflow-card-heading"><h3>{card.title}</h3><span className="workflow-badge" data-state={card.paused ? 'closed' : 'connected'}>{card.paused ? '일시 정지' : '복습 예정'}</span></div><p className="workflow-meta">{new Date(card.due_at).toLocaleString('ko-KR')}</p>
-    {card.source_changed && <p className="workflow-muted">원문이 변경되었습니다. 다시 학습하세요.</p>}
+    {card.source_changed && <p className="workflow-muted">원문이 변경되었습니다. 다시 학습해 주세요.</p>}
     <div className="workflow-actions">{!card.source_changed && !card.paused && <Link className="workflow-button workflow-primary" to={`/learn/review/${card.id}`}>설명하며 복습하기 →</Link>}{[[card.paused ? 'resume' : 'pause', card.paused ? '재개' : '일시 정지'], ['postpone', '1일 미루기']].map(([name, label]) =>
       <button type="button" key={name} disabled={busy || Boolean(pending.current && pending.current.action !== name)} onClick={() => { void action(name); }}>{pending.current?.action === name ? '이전 변경 확인' : label}</button>)}</div>
     {error && <p role="alert">{error} <button type="button" onClick={refresh}>새로 불러오기</button></p>}

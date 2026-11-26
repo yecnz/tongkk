@@ -24,7 +24,7 @@ export default function LearningPreferences() {
     {data && <><div className="workflow-subsection"><label className="workflow-toggle"><span>앞으로 완료한 설명 학습을 자동으로 복습에 추가</span><input type="checkbox" checked={data.auto_review} disabled={busy} onChange={e => { void save({ ...data, auto_review: e.target.checked }); }} /></label>
       <label className="workflow-setting-row">학습 시간대 <select value={data.timezone} disabled={busy} onChange={e => { void save({ ...data, timezone: e.target.value }); }}>{Array.from(new Set([data.timezone, 'Asia/Seoul', 'UTC', 'America/Los_Angeles', 'Europe/London'])).map(zone => <option key={zone}>{zone}</option>)}</select></label></div>
       <details className="workflow-details"><summary>자동 복습 안내</summary>
-        <p>이후 완료하는 학습이 복습 목록에 추가되며, 예정일에 새 사례 문제가 준비됩니다. 복습 확인·일시 정지·미루기는 복습 관리에서 설정하세요.</p>
+        <p>이후 완료하는 학습이 복습 목록에 추가되며, 예정일에 새 사례 문제가 준비됩니다. 복습 확인·일시 정지·미루기는 복습 관리에서 설정해 주세요.</p>
       </details></>}
   </Card>;
 }

@@ -344,7 +344,7 @@ async function streamSummaryChunk(
   }
 
   if (!done) {
-    throw new Error('요약 스트림이 중간에 끊겼습니다. 다시 시도해주세요.');
+    throw new Error('요약 스트림이 중간에 끊겼습니다. 다시 시도해 주세요.');
   }
   return { text, finishReason };
 }
@@ -412,7 +412,7 @@ export async function summarizeWithTemplateStream(
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
           if (options.signal?.aborted) throw new Error('요약 생성이 취소되었습니다.');
-          throw new Error('요약 구간 생성 시간이 초과되었습니다. 다시 시도해주세요.');
+          throw new Error('요약 구간 생성 시간이 초과되었습니다. 다시 시도해 주세요.');
         }
         throw err;
       } finally {
@@ -432,7 +432,7 @@ export async function summarizeWithTemplateStream(
     }
 
     if (isTruncatedFinishReason(result.finishReason)) {
-      throw new Error('요약 출력이 모델 한도에서 잘렸습니다. 페이지 범위를 줄여 다시 시도해주세요.');
+      throw new Error('요약 출력이 모델 한도에서 잘렸습니다. 페이지 범위를 줄여 다시 시도해 주세요.');
     }
     const text = result.text.trim();
     if (text) {
@@ -442,7 +442,7 @@ export async function summarizeWithTemplateStream(
   }
 
   if (!completed.trim()) {
-    throw new Error('요약 결과를 받지 못했습니다. 다시 시도해주세요.');
+    throw new Error('요약 결과를 받지 못했습니다. 다시 시도해 주세요.');
   }
   return cleanSummary(completed);
 }

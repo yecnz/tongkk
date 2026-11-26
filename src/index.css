@@ -70,6 +70,8 @@
   --color-tint-yellow: light-dark(#f1f1f1, #313131);
   --color-tint-green: light-dark(#e8e8e8, #3b3b3b);
   --color-danger: light-dark(#444444, #b8b8b8);
+  /* 입력 오류만 예외로 빨강을 쓴다. 회색 오류는 안내 문구와 구분되지 않는다. */
+  --color-error: light-dark(#e53e3e, #e08585);
   --color-action-neutral: light-dark(#444444, #666666);
   --color-success: light-dark(#555555, #d0d0d0);
   --color-amber-deep: light-dark(#666666, #b8b8b8);
@@ -159,7 +161,7 @@ body {
 body.tongkk-sidebar-open #root {
   padding-left: 240px;
 }
-.tongkk-sidebar {
+.tongkk-sidebar-animate {
   animation: tongkk-sidebar-in 0.25s ease;
 }
 @keyframes tongkk-sidebar-in {

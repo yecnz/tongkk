@@ -16,17 +16,17 @@ describe('brief failure explanations', () => {
   it('explains account locking with remaining time and never exposes backend details', async () => {
     const error = await authResponseError(new Response(JSON.stringify({ error_code: 'account_locked', detail: 'internal database path' }),
       { status: 429, headers: { 'Retry-After': '899' } }));
-    expect(authErrorMessage(error)).toBe('로그인 실패가 반복돼 잠시 잠겼어요. 15분 후 다시 시도해주세요.');
+    expect(authErrorMessage(error)).toBe('로그인 실패가 반복돼 잠시 잠겼어요. 15분 후 다시 시도해 주세요.');
     expect(authErrorMessage(error)).not.toContain('database');
   });
   it('handles proxy HTML, null JSON and unknown backend errors without rendering raw responses', async () => {
     for (const body of ['<html>private proxy information</html>', 'null', JSON.stringify({ detail: 'SUPABASE_SECRET_KEY missing' })]) {
-      expect(authErrorMessage(await authResponseError(new Response(body, { status: 503 })))).toBe('인증 서비스에 문제가 생겼어요. 잠시 후 다시 시도해주세요.');
+      expect(authErrorMessage(await authResponseError(new Response(body, { status: 503 })))).toBe('인증 서비스에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
     }
   });
   it('keeps rate limits separate from credential errors and ignores invalid retry headers', async () => {
     const limited = await authResponseError(new Response('{}', { status: 429, headers: { 'Retry-After': 'invalid' } }));
-    expect(authErrorMessage(limited)).toBe('요청이 너무 많아요. 잠시 후 다시 시도해주세요.');
+    expect(authErrorMessage(limited)).toBe('요청이 너무 많아요. 잠시 후 다시 시도해 주세요.');
     const credentials = await authResponseError(new Response('{}', { status: 401 }));
     expect(authErrorMessage(credentials)).toContain('이메일 또는 비밀번호');
     expect(authErrorMessage({ code: 'user_banned' })).toContain('이용이 제한');

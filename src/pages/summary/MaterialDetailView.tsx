@@ -135,7 +135,7 @@ const TutorSplitDivider = ({ onPointerDown }: { onPointerDown: (event: ReactPoin
     <div
       role="separator"
       aria-orientation="vertical"
-      title="드래그해서 요약과 AI 튜터 비율을 조절하세요"
+      title="드래그해서 요약과 AI 튜터 비율을 조절해 주세요"
       onPointerDown={onPointerDown}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -626,7 +626,7 @@ export const MaterialDetailView = ({
     const noOriginalMessage =
       !material.filePath && originalSize != null && originalSize > MAX_ORIGINAL_FILE_BYTES
         ? `이 자료는 원본이 ${(originalSize / (1024 * 1024)).toFixed(1)}MB로 저장 한도(50MB)를 넘어 원본을 저장하지 않았어요. 텍스트는 저장돼 요약·퀴즈에 그대로 사용할 수 있어요.`
-        : "원본 파일이 없습니다. 같은 파일을 다시 업로드해 연결하세요.";
+        : "원본 파일이 없습니다. 같은 파일을 다시 업로드해 연결해 주세요.";
 
     return (
       <div style={{
@@ -929,7 +929,7 @@ export const MaterialDetailView = ({
                     suggestedQuestions={tutorSuggestions}
                     initialQuestion={tutorPrompt}
                     onInitialQuestionConsumed={() => setTutorPrompt("")}
-                    disabledReason="요약을 생성한 뒤 질문하세요"
+                    disabledReason="요약을 생성한 뒤 질문해 주세요"
                   />
                 </div>
               </>
@@ -946,7 +946,7 @@ export const MaterialDetailView = ({
               <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
                 <div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 요약이 없습니다</h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료로 요약을 생성하세요.</p>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료로 요약을 생성해 주세요.</p>
                   <button type="button" onClick={onGoSummary} style={{ padding: "12px 18px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-pink) 25%, transparent)", background: "var(--color-tint-pink)", color: PINK, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     요약 생성하기
                   </button>
@@ -1060,7 +1060,7 @@ export const MaterialDetailView = ({
                           initialQuestion={tutorPrompt}
                           onInitialQuestionConsumed={() => setTutorPrompt("")}
                           pendingQuestion={tutorSelectionQuestion ?? undefined}
-                          disabledReason="요약을 생성한 뒤 질문하세요"
+                          disabledReason="요약을 생성한 뒤 질문해 주세요"
                         />
                       </div>
                     </>
@@ -1079,7 +1079,7 @@ export const MaterialDetailView = ({
               <div style={{ minHeight: 300, display: "grid", placeItems: "center", textAlign: "center" }}>
                 <div>
                   <h3 style={{ margin: "0 0 8px", fontSize: 18, color: "var(--color-text-strong)" }}>아직 퀴즈가 없습니다</h3>
-                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료로 퀴즈를 생성하세요.</p>
+                  <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--color-muted)" }}>이 자료로 퀴즈를 생성해 주세요.</p>
                   <button type="button" onClick={onGoQuiz} style={{ padding: "12px 18px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--color-cyan) 25%, transparent)", background: "var(--color-tint-cyan)", color: CYAN, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                     퀴즈 생성하기
                   </button>

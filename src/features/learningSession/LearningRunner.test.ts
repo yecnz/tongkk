@@ -20,7 +20,7 @@ function state(phase = 'recall_answering'): Session {
   return { id: 'session', course_id: 'course', material_id: 'material', material_name: '강의 자료.pdf', status: 'active',
     revision: 1, target_minutes: 15, concept_count: 2, completed_count: 0, source_changed: false, result: [], operation: null,
     allowed_actions: [...standard, ...(phase.endsWith('answering') ? ['submit', 'help', 'skip', ...(phase === 'recall_answering' ? ['unknown'] : [])] : ['advance', 'help'])],
-    current: { id: 'item-1', title: '개념 하나', position: 0, phase, revision: 1, question: '핵심 원리를 설명하세요.', draft: '',
+    current: { id: 'item-1', title: '개념 하나', position: 0, phase, revision: 1, question: '핵심 원리를 설명해 주세요.', draft: '',
       introduction: null, help: {}, feedback: null, evaluation_error: false, self_check: null, reported: false, check: null, check_result: null } };
 }
 function next(value: Session) { value.revision = response.revision + 1; response = value; }
@@ -177,7 +177,7 @@ it('marks an incorrect choice separately and preserves old long explanations beh
 it('keeps feedback evidence collapsed and preserves exact student and source quotes', async () => {
   const feedback = state('recall_feedback');
   feedback.current!.feedback = { criteria: [{ criterion_id: 'c1', status: 'contradicted', student_quote: '내가 쓴 원래 문장',
-    reason: '시간 간격을 두는 방식으로 수정해주세요.', source_refs: [{ unit_id: 'u0', quote: '원문의 조건과 수식 t > 0' }] }] };
+    reason: '시간 간격을 두는 방식으로 수정해 주세요.', source_refs: [{ unit_id: 'u0', quote: '원문의 조건과 수식 t > 0' }] }] };
   await render(feedback);
   expect(container.textContent).toContain('수정 필요');
   const evidence = container.querySelector('.learning-feedback-evidence') as HTMLDetailsElement;

@@ -32,7 +32,7 @@ export async function extractMarkdownFromPDF(file: File): Promise<string> {
     return data.markdown;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('파일 변환 시간 초과. 이미지가 많은 PDF라면 잠시 후 다시 시도하거나 페이지 수를 줄여주세요.');
+      throw new Error('파일 변환 시간 초과. 이미지가 많은 PDF라면 잠시 후 다시 시도하거나 페이지 수를 줄여 주세요.');
     }
     throw err;
   } finally {

@@ -34,7 +34,7 @@ export default function LearningSetup() {
   useEffect(() => {
     let active = true;
     fetchCourses().then(rows => { if (active) setCourses(rows); })
-      .catch(() => { if (active) setError('과목을 불러오지 못했어요. 잠시 후 다시 열어주세요.'); })
+      .catch(() => { if (active) setError('과목을 불러오지 못했어요. 잠시 후 다시 열어 주세요.'); })
       .finally(() => { if (active) setCoursesLoading(false); });
     return () => { active = false; };
   }, []);
@@ -45,7 +45,7 @@ export default function LearningSetup() {
     if (!course) { setMaterialsLoading(false); return; }
     setMaterialsLoading(true);
     loadCourseMaterialsFromServer(course).then(rows => { if (active) setMaterials(rows); })
-      .catch(() => { if (active) setError('자료를 불러오지 못했어요. 과목을 다시 선택하세요.'); })
+      .catch(() => { if (active) setError('자료를 불러오지 못했어요. 과목을 다시 선택해 주세요.'); })
       .finally(() => { if (active) setMaterialsLoading(false); });
     return () => { active = false; };
   }, [course]);
@@ -71,7 +71,7 @@ export default function LearningSetup() {
   const settingsDisabled = busy || Boolean(pending.current);
   useEffect(() => {
     beforeLeaveRef.current = async () => {
-      if (busy || pending.current) throw new Error('학습 시작 결과를 확인한 뒤 이동하세요.');
+      if (busy || pending.current) throw new Error('학습 시작 결과를 확인한 뒤 이동해 주세요.');
     };
     return () => { beforeLeaveRef.current = null; };
   }, [beforeLeaveRef, busy]);
@@ -99,12 +99,12 @@ export default function LearningSetup() {
     <div className="learning-page-title">
       <p className="learning-eyebrow">기억 · 설명 · 확인</p>
       <h1>학습 세션</h1>
-      <p className="learning-intro">자료를 고르고 학습을 시작하세요.</p>
+      <p className="learning-intro">자료를 고르고 학습을 시작해 주세요.</p>
     </div>
     <div className="learning-grid learning-setup" aria-label="학습 설정">
       <Card className="learning-card" role="region" aria-labelledby="learning-material-title">
         <div className="learning-section-heading"><div><h2 id="learning-material-title">학습 자료</h2>
-          <p className="learning-caption">과목·자료와 범위를 선택하세요.</p></div><span className="learning-badge">자료 선택</span></div>
+          <p className="learning-caption">과목·자료와 범위를 선택해 주세요.</p></div><span className="learning-badge">자료 선택</span></div>
         <div className="learning-fields">
           <LearningSelect label="과목" value={course} placeholder="과목 선택" options={courses.map(c => ({ value: c.name, label: c.name }))}
             disabled={settingsDisabled || coursesLoading || !courses.length} onChange={value => { setCourse(value); setMaterial(''); setError(''); }} />
@@ -113,9 +113,9 @@ export default function LearningSetup() {
         </div>
         {loading && <p className="learning-caption" role="status">{coursesLoading ? '과목을 불러오는 중…' : materialsLoading ? '자료를 불러오는 중…' : '학습 범위를 불러오는 중…'}</p>}
         {!loading && !error && !courses.length && <div className="learning-empty"><strong>등록된 과목이 없습니다.</strong>
-          <p>과목과 자료를 추가해 학습을 시작하세요.</p><LearningLink to="/" className="learning-button">과목 추가하러 가기 →</LearningLink></div>}
+          <p>과목과 자료를 추가해 학습을 시작해 주세요.</p><LearningLink to="/" className="learning-button">과목 추가하러 가기 →</LearningLink></div>}
         {!loading && !error && course && !materials.length && <div className="learning-empty"><strong>등록된 자료가 없습니다.</strong>
-          <p>자료를 올리고 학습 범위를 선택하세요.</p>
+          <p>자료를 올리고 학습 범위를 선택해 주세요.</p>
           <LearningLink to={`/summary?${new URLSearchParams({ course, view: 'upload' })}`} className="learning-button">자료 올리기 →</LearningLink></div>}
         {scopes && <>
           <div className="learning-scope-heading"><span>선택한 원문 {chars.toLocaleString()} / {scopes.max_chars.toLocaleString()}자</span>
@@ -126,11 +126,11 @@ export default function LearningSetup() {
               setSelected(previous => e.target.checked ? [...previous, unit.id] : previous.filter(id => id !== unit.id))} />
               <span>{unit.label}<small className="learning-muted">{unit.chars.toLocaleString()}자</small></span></label>)}
           </fieldset>
-          {chars > scopes.max_chars && <div className="learning-notice learning-error" role="alert">한 번에 학습할 범위를 줄여주세요.</div>}
-          {!selected.length && <p className="learning-caption">학습할 구간을 하나 이상 선택하세요.</p>}
+          {chars > scopes.max_chars && <div className="learning-notice learning-error" role="alert">한 번에 학습할 범위를 줄여 주세요.</div>}
+          {!selected.length && <p className="learning-caption">학습할 구간을 하나 이상 선택해 주세요.</p>}
         </>}
         {!scopes && !loading && courses.length > 0 && (!course || materials.length > 0) && <div className="learning-empty"><span className="learning-empty-symbol" aria-hidden="true">↗</span>
-          <p>자료를 선택해 학습 범위를 확인하세요.</p></div>}
+          <p>자료를 선택해 학습 범위를 확인해 주세요.</p></div>}
       </Card>
       <Card className="learning-card learning-settings" role="region" aria-labelledby="learning-settings-title">
         <h2 id="learning-settings-title">이번 학습 설정</h2>

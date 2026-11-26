@@ -225,8 +225,8 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
   const [error, setError] = useState("");
   const placeholder = `${ddayTypeLabels[type]}명`;
   const handleSubmit = () => {
-    if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해주세요.`); return; }
-    if (!date) { setError("달력에서 날짜를 선택하세요."); return; }
+    if (!subj.trim()) { setError(`${ddayTypeLabels[type]}명을 입력해 주세요.`); return; }
+    if (!date) { setError("달력에서 날짜를 선택해 주세요."); return; }
     onAdd(type, subj.trim(), date);
     onClose();
   };
@@ -266,7 +266,7 @@ export const AddDdayModal = ({ onClose, onAdd, initialDate = "", initialType = "
         }}/>
         {/* 날짜가 필수임을 선택 전에도 알 수 있게 안내를 상시 노출한다. */}
         <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 600, textAlign: "center", color: date ? "var(--color-pink-deep)" : "var(--color-muted)" }}>
-          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택하세요 (필수)"}
+          {date ? `선택된 날짜: ${date}` : "달력에서 날짜를 선택해 주세요 (필수)"}
         </div>
         <CustomCalendar value={date} onChange={d => { setDate(d); if (error) setError(""); }} />
         {error && (
@@ -291,7 +291,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
   const [error, setError] = useState("");
   const handleAdd = () => {
     const planText = txt.trim();
-    if (!planText) { setError("학습 계획을 입력하세요."); return; }
+    if (!planText) { setError("학습 계획을 입력해 주세요."); return; }
     onAdd(planText);
     onClose();
   };
@@ -304,7 +304,7 @@ export const AddPlanModal = ({ onClose, onAdd }: AddPlanModalProps) => {
           value={txt}
           onChange={e => { setTxt(e.target.value); if (error) setError(""); }}
           onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
-          placeholder="학습 계획을 입력하세요"
+          placeholder="학습 계획을 입력해 주세요"
           aria-label="학습 계획"
           name="study-plan"
           autoComplete="off"
@@ -410,7 +410,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
   const previewDaysLeft = rawDaysLeft !== null ? Math.max(rawDaysLeft, 1) : PACE_NO_DDAY_HORIZON_DAYS;
   const perDay = total > 0 ? Math.max(1, Math.ceil(total / Math.max(previewDaysLeft, 1))) : 0;
   const previewText = total <= 0
-    ? "기준을 선택해 하루 학습량을 확인하세요."
+    ? "기준을 선택해 하루 학습량을 확인해 주세요."
     : rawDaysLeft === null
       ? `${PACE_NO_DDAY_HORIZON_DAYS}일 기준 → 하루 약 ${perDay}${unitLabel}`
       : rawDaysLeft > 0

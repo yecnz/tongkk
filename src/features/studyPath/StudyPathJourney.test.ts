@@ -15,6 +15,7 @@ vi.mock('../../services/backend', () => ({ BACKEND_URL: '/api', getJsonRequestHe
 vi.mock('../../common', () => ({
   Card: ({ children, ...props }: { children: ReactNode }) => h('section', props, children),
   Sidebar: () => null, SidebarIcon: () => null, pageRoutes: { '학습 코스': '/study-paths' },
+  useSidebarOpen: () => [false, () => {}],
 }));
 
 import StudyPaths from './StudyPaths';

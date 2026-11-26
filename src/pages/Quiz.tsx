@@ -4,7 +4,7 @@ import BrandLogo from "../components/BrandLogo";
 import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
-import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel } from "../common";
+import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel, useSidebarOpen } from "../common";
 import { useTutorial } from "../TutorialContext";
 import { TutorialHelpButton } from "../components/TutorialHelpButton";
 import { hasPageMarkers } from "../utils/pageMarkers";
@@ -234,7 +234,7 @@ type HeaderProps = { label: string; onOpenSidebar: () => void; onHome: () => voi
 const Header = ({ label, onOpenSidebar, onHome, extra }: HeaderProps) => (
   <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-      <button type="button" className="tongkk-hover-dim" onClick={onOpenSidebar} aria-label="메뉴 열기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
+      <button type="button" className="tongkk-hover-dim" onClick={onOpenSidebar} aria-label="메뉴 열기/닫기" style={{ background: "none", border: "none", borderRadius: 8, cursor: "pointer", padding: 4 }}>
         <SidebarIcon />
       </button>
       <button type="button" className="brand-home tongkk-hover-fade" onClick={onHome}><BrandLogo /></button>
@@ -253,7 +253,7 @@ export default function Quiz() {
   const reviewQuestions = reviewState?.reviewQuestions || null;
   const hasReviewQuestions = Boolean(reviewQuestions && reviewQuestions.length > 0);
   const reviewActiveRef = useRef(hasReviewQuestions);
-  const [sidebar, setSidebar] = useState(false);
+  const [sidebar, setSidebar] = useSidebarOpen();
   // 단독 진입(사이드바)이 사라져, 대시보드 모달 핸드오프(state.course)로만 들어온다.
   const initialHandoffCourse = hasReviewQuestions ? "" : (reviewState?.course || reviewState?.selectedCourse || "");
   const [view, setView] = useState<QuizView>(hasReviewQuestions ? "quiz" : (initialHandoffCourse ? "courseDetail" : "courseList"));
@@ -1137,10 +1137,7 @@ export default function Quiz() {
       const message = reviewActiveRef.current
         ? "퀴즈 풀이 중입니다. 진행 상태가 저장되지 않습니다.\n페이지를 떠나시겠습니까?"
         : "퀴즈 풀이 중입니다. 나중에 이 과목 퀴즈 화면에서 이어서 풀 수 있습니다.\n페이지를 떠나시겠습니까?";
-      if (!window.confirm(message)) {
-        setSidebar(false);
-        return;
-      }
+      if (!window.confirm(message)) return;
     }
     navigate(pageRoutes[item]);
   };
@@ -1163,7 +1160,7 @@ export default function Quiz() {
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} extra={<TutorialHelpButton tutorialKey="quiz-setup" />} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(!sidebar)} onHome={() => navigate("/")} extra={<TutorialHelpButton tutorialKey="quiz-setup" />} />
         <div className="app-container narrow">
           <button type="button" onClick={handleCourseBack} style={{
             background: "none", border: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: 14, marginBottom: 20, padding: 0
@@ -1264,7 +1261,7 @@ export default function Quiz() {
                 padding: "12px 16px", borderRadius: 10, background: "var(--color-surface)",
                 fontSize: 13, color: "var(--color-muted)", marginBottom: 14
               }}>
-                저장된 자료가 없습니다. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
+                저장된 자료가 없습니다. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드해 주세요.
               </div>
             )}
 
@@ -1472,10 +1469,10 @@ export default function Quiz() {
             ) : (
               <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
                 {selectedMaterials.length === 0
-                  ? "자료를 선택해 페이지 범위를 지정하세요."
+                  ? "자료를 선택해 페이지 범위를 지정해 주세요."
                   : selectedRawHasPageMarkers
-                    ? "페이지를 선택하려면 자료 출처를 원본으로 변경하세요."
-                    : "페이지 정보가 없습니다. 파일을 다시 업로드하세요."}
+                    ? "페이지를 선택하려면 자료 출처를 원본으로 변경해 주세요."
+                    : "페이지 정보가 없습니다. 파일을 다시 업로드해 주세요."}
               </div>
             )}
 
@@ -1493,7 +1490,7 @@ export default function Quiz() {
 
           {!isExtracting && selectedMaterials.length === 0 && (
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--color-muted)", textAlign: "center" }}>
-              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있습니다." : "반영할 자료를 1개 이상 선택하세요."}
+              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있습니다." : "반영할 자료를 1개 이상 선택해 주세요."}
             </p>
           )}
           <button type="button" onClick={generate} disabled={!canGenerate} style={{
@@ -1678,7 +1675,7 @@ export default function Quiz() {
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
+        <Header label="퀴즈 결과" onOpenSidebar={() => setSidebar(!sidebar)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 760, margin: "40px auto", textAlign: "center" }}>
           <div style={{ textAlign: "left", marginBottom: 16 }}>
             <button type="button" onClick={handleResultBack} style={{
@@ -1890,7 +1887,7 @@ export default function Quiz() {
     return (
       <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
         {sidebarEl}
-        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")} />
+        <Header label="퀴즈 생성" onOpenSidebar={() => setSidebar(!sidebar)} onHome={() => navigate("/")} />
         <div style={{ padding: 24, maxWidth: 600, margin: "40px auto" }}>
           <Card style={{ padding: 28, textAlign: "center" }}>
             <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--color-text-secondary)" }}>표시할 퀴즈가 없습니다.</p>
@@ -1910,7 +1907,7 @@ export default function Quiz() {
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
       {examMode && <AssessmentLock />}
-      <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(true)} onHome={() => navigate("/")}
+      <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(!sidebar)} onHome={() => navigate("/")}
         extra={
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             {examMode && !reviewMode && remainingSeconds !== null && (
@@ -1977,7 +1974,7 @@ export default function Quiz() {
                 background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
                 color: currentCorrect ? CYAN : PINK, fontSize: 11, fontWeight: 850,
               }}>{currentCorrect ? "정답" : "오답"}</span>
-              <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인하세요</span>
+              <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인해 주세요</span>
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -2037,7 +2034,7 @@ export default function Quiz() {
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     disabled={reviewMode || selected !== undefined || grading}
-                    placeholder="근거와 함께 답안을 작성하세요"
+                    placeholder="근거와 함께 답안을 작성해 주세요"
                     rows={5}
                     style={{
                       flex: 1,
@@ -2058,7 +2055,7 @@ export default function Quiz() {
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     disabled={reviewMode || selected !== undefined}
-                    placeholder="정답을 입력하세요"
+                    placeholder="정답을 입력해 주세요"
                     style={{
                       flex: 1, padding: "14px 16px", borderRadius: 12, border: "1.5px solid var(--color-border-soft)",
                       background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)", fontSize: 14, color: "var(--color-text)", outline: "none"

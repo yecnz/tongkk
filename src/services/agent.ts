@@ -71,7 +71,7 @@ export async function sendAgentMessage(
     };
   } catch (err) {
     if (!signal?.aborted && err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('Agent 요청 시간 초과. 다시 시도해주세요.');
+      throw new Error('Agent 요청 시간 초과. 다시 시도해 주세요.');
     }
     throw err;
   } finally {

@@ -7,7 +7,7 @@ type Props = { item: NonNullable<LearningSession['current']>; blocked: boolean; 
 export default function LearningHelp({ item, blocked, selfCheck, onHelp, onSelfCheck }: Props) {
   return <Card className="learning-card learning-help-card">
     <details className="learning-help-disclosure">
-      <summary><span><strong>도움 받기</strong><small>힌트부터 확인하세요</small></span><span className="learning-disclosure-arrow" aria-hidden="true">⌄</span></summary>
+      <summary><span><strong>도움 받기</strong><small>힌트부터 확인해 주세요</small></span><span className="learning-disclosure-arrow" aria-hidden="true">⌄</span></summary>
       <div className="learning-help-content">
         <p className="learning-caption">도움 사용 여부가 기록됩니다.</p>
         {!item.help.hint1 ? <button type="button" className="learning-full-button" disabled={blocked} onClick={() => onHelp('hint1')}>첫 힌트</button>

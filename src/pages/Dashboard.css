@@ -24,7 +24,7 @@
   color: var(--color-on-brand);
 }
 .dashboard-action--text { background: transparent; color: var(--color-text-secondary); font-weight: 500; }
-.dashboard-course-add { min-height: 120px; border-radius: 18px; }
+.dashboard-course-add { min-height: 120px; border: 1px dashed var(--color-border); border-radius: 18px; background: var(--color-card); color: var(--color-pink); font-size: 15px; font-weight: 700; }
 .today-review-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
 .today-review-actions .dashboard-action { width: 100%; padding-inline: 8px; }
 .dashboard-action:disabled { opacity: .5; cursor: default; }
