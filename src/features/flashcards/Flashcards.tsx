@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
+import CustomSelect from '../../components/CustomSelect';
 import { fetchCourses, type CourseRecord } from '../../services/courses';
 import { loadCourseMaterialsFromServer, type CourseMaterial } from '../../services/materials';
 import { deleteFlashcard, dueFlashcards, generateFlashcards, loadFlashcards, rateFlashcard, saveFlashcard, type Flashcard, type FlashcardRating } from '../../services/flashcards';
@@ -119,8 +120,8 @@ function Workspace() {
           </>}<p className="workflow-meta">자기평가에 따른 복습 일정입니다. 개념 이해도 평가와는 별도로 기록해요.</p></section>}
     </> : mode === 'create' ? <>
       {!courses.length ? <p><Link to="/">대시보드</Link>에서 과목을 먼저 추가해주세요.</p> : <>
-        <div className="workflow-panel workflow-stack"><label className="workflow-field">과목<select value={courseId} disabled={busy} onChange={e => { if (discardDrafts()) setCourseId(e.target.value); }}>{courses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-          <label className="workflow-field">학습자료<select value={materialId} disabled={busy || materialLoading} onChange={e => { if (discardDrafts()) { setMaterialId(e.target.value); setDrafts([]); } }}><option value="">직접 입력</option>{materials.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <div className="workflow-panel workflow-stack"><label className="workflow-field">과목<CustomSelect value={courseId} disabled={busy} onChange={value => { if (discardDrafts()) setCourseId(value); }} options={courses.map(item => ({ value: item.id, label: item.name }))} aria-label="과목" /></label>
+          <label className="workflow-field">학습자료<CustomSelect value={materialId} disabled={busy || materialLoading} onChange={value => { if (discardDrafts()) { setMaterialId(value); setDrafts([]); } }} options={[{ value: '', label: '직접 입력' }, ...materials.map(item => ({ value: item.id, label: item.name }))]} aria-label="학습자료" /></label>
           {materialLoading && <p role="status">자료를 불러오는 중…</p>}
           {material && <><button type="button" className="workflow-primary" disabled={busy || material.markdown.trim().length < 20} onClick={() => { if (discardDrafts()) void action(async () => { const result = await generateFlashcards(material.markdown); setDrafts(result.cards.map(item => ({ ...item, key: crypto.randomUUID(), saved: false }))); }); }}>{busy ? '처리 중…' : '자료에서 카드 초안 만들기'}</button>
             {material.markdown.length > 60000 && <p className="workflow-muted">긴 자료는 앞부분 60,000자에서 카드를 만듭니다.</p>}</>}

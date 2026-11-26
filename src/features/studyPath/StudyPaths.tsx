@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
+import CustomSelect from '../../components/CustomSelect';
 import { fetchCourses, type CourseRecord } from '../../services/courses';
 import { loadCourseMaterialsFromServer, type CourseMaterial } from '../../services/materials';
 import { createStudyPath, listStudyPaths, moveChapter, pathProgress, readStudyPath, saveStudyPath,
@@ -152,7 +153,7 @@ function PathList() {
       <Card className="workflow-panel workflow-stack"><h2>강의자료로 코스 만들기</h2>
         <p className="workflow-muted">최대 6개 자료를 챕터로 나눕니다. AI 초안을 만든 뒤 제목·순서·포함 여부를 편집할 수 있어요.</p>
         {!courses.length && <p>먼저 <Link to="/summary">과목과 강의자료를 추가</Link>해주세요.</p>}
-        <label className="workflow-field">과목<select value={courseId} disabled={busy} onChange={e => setCourseId(e.target.value)}><option value="">과목 선택</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        <label className="workflow-field">과목<CustomSelect value={courseId} disabled={busy} onChange={setCourseId} options={[{ value: '', label: '과목 선택' }, ...courses.map(c => ({ value: c.id, label: c.name }))]} aria-label="과목" /></label>
         <label className="workflow-field">코스 이름<input value={title} maxLength={100} placeholder={courseName ? `${courseName} 학습 코스` : '예: 중간고사 1~4주차'} disabled={busy} onChange={e => setTitle(e.target.value)} /></label>
         {materialLoading ? <p role="status">자료를 불러오는 중…</p> : courseId && !materials.length ? <p>이 과목에 자료가 없습니다. <Link to="/summary">자료 추가하기</Link></p> : <fieldset disabled={busy} className="workflow-stack"><legend>코스에 넣을 자료</legend>{materials.map(m => <label key={m.id} className="workflow-toggle"><span>{m.name}{!m.markdown.trim() && ' · 추출된 본문 없음'}</span><input type="checkbox" checked={selected.includes(m.id)} disabled={!m.markdown.trim() || (!selected.includes(m.id) && selected.length >= 6)} onChange={e => setSelected(e.target.checked ? [...selected, m.id] : selected.filter(id => id !== m.id))} /></label>)}</fieldset>}
         <p className="workflow-meta">선택 {selected.length}/6개 · 원문 {chars.toLocaleString()} / 60,000자</p>

@@ -64,7 +64,7 @@
 }
 .workflow-surface a:not([class]), .workflow-link { color: var(--color-pink-deep); font-size: 13px; font-weight: 600; text-decoration: none; }
 .workflow-surface a:not([class]):hover, .workflow-link:hover { text-decoration: underline; }
-.workflow-surface :is(input:not([type]), input[type="text"], select, textarea) {
+.workflow-surface :is(input:not([type]), input[type="text"], .tongkk-select-trigger, textarea) {
   min-width: 0; max-width: 100%; min-height: 40px; padding: 10px 14px;
   border: 1px solid var(--color-border); border-radius: 10px;
   background: var(--color-card); color: var(--color-text);
@@ -73,7 +73,8 @@
 .workflow-surface .workflow-panel textarea { width: 100%; min-height: 180px; resize: vertical; line-height: 1.8; }
 .workflow-surface input::placeholder, .workflow-surface textarea::placeholder { color: var(--color-muted); }
 .workflow-field { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
-.workflow-field :is(select, input) { width: 100%; }
+.workflow-field :is(.tongkk-select-trigger, input) { width: 100%; }
+.workflow-surface .tongkk-select-trigger { justify-content: space-between; text-align: left; }
 .workflow-setting-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, 220px); align-items: center; gap: 16px; font-size: 14px; color: var(--color-text); }
 .workflow-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .workflow-form-grid .workflow-span-full { grid-column: 1 / -1; }

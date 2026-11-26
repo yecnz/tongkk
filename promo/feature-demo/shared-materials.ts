@@ -1,0 +1,17 @@
+import { sampleOriginalMarkdown, SAMPLE_SOURCE_NAME } from '../../src/sampleDemoContent';
+export type { CourseMaterial, MaterialKind } from '../../src/services/materials';
+import type { CourseMaterial } from '../../src/services/materials';
+let materials: CourseMaterial[] = [{ id: 'material-demo', name: SAMPLE_SOURCE_NAME, size: 240000, type: 'pdf', pages: 3, slides: null, markdown: sampleOriginalMarkdown, filePath: null, updatedAt: 1795593600000 }];
+export const MATERIAL_STORAGE_BUCKET = 'demo';
+export const MAX_ORIGINAL_FILE_BYTES = 50 * 1024 * 1024;
+export const invalidateMaterialsCache = () => {};
+export const invalidateSignedUrlCache = () => {};
+export const getFileMaterialId = (file: { name: string; size: number }) => `${file.name}:${file.size}`;
+export const combineMaterialsMarkdown = (items: CourseMaterial[]) => items.map(m => `# ${m.name}\n\n${m.markdown}`).join('\n\n---\n\n');
+export const loadCourseMaterialsFromServer = async () => structuredClone(materials);
+export const countCourseMaterialsFromServer = async () => materials.length;
+export const createCourseMaterialFileUrl = async () => null;
+export const uploadCourseMaterialFile = async () => null;
+export const deleteCourseMaterialFromServer = async (_course: string, id: string) => { materials = materials.filter(m => m.id !== id); };
+export const syncCourseMaterials = async (_course: string, items: CourseMaterial[]) => { materials = structuredClone(items); };
+export const saveCourseMaterials = syncCourseMaterials;

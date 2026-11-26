@@ -36,10 +36,16 @@ async function render(url = '/study-paths') {
   await act(async () => root.render(h(MemoryRouter, { initialEntries: [url] }, h(StudyPaths))));
 }
 function button(text: string) { return [...container.querySelectorAll('button')].find(b => b.textContent?.includes(text))!; }
+async function selectCourse() {
+  await act(async () => container.querySelector<HTMLButtonElement>('[role="combobox"][aria-label="과목"]')!.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === '운영체제');
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+}
 
 it('loads actual material text, enables selection and creates a persistent editable draft', async () => {
   await render();
-  await act(async () => { const select = container.querySelector('select')!; select.value = 'course-id'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await selectCourse();
   expect(mocks.materials).toHaveBeenCalledWith('운영체제', { includeMarkdown: true });
   const checkbox = container.querySelector('input[type=checkbox]') as HTMLInputElement;
   expect(checkbox.disabled).toBe(false);
@@ -54,7 +60,7 @@ it('loads actual material text, enables selection and creates a persistent edita
 it('keeps creation request identity after a lost response so retry cannot duplicate a path', async () => {
   mocks.create.mockRejectedValueOnce(new Error('응답이 유실됐어요'));
   await render();
-  await act(async () => { const select = container.querySelector('select')!; select.value = 'course-id'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await selectCourse();
   await act(async () => (container.querySelector('input[type=checkbox]') as HTMLInputElement).click());
   await act(async () => button('AI 코스 초안').click());
   const first = mocks.create.mock.calls[0][0];

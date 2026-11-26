@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
+import CustomSelect from '../../components/CustomSelect';
 import { workflowRequest } from '../../services/workflow';
 import { fetchCourses, type CourseRecord } from '../../services/courses';
 import { invalidateMaterialsCache } from '../../services/materials';
@@ -28,7 +29,7 @@ export function SourceProvider({provider}:{provider:Provider}) {
     {!data?<p role="status">연결을 확인하는 중…</p>:<>
       <div className="workflow-actions">{!data.configured?<p>서버의 {title} OAuth 앱 설정이 필요해요.</p>:<button type="button" className={connected?undefined:'workflow-primary'} disabled={busy} onClick={()=>{void connect();}}>{connected?'다른 계정으로 연결':`${title} 연결`}</button>}
       {data.connection&&data.connection.status!=='disconnected'&&<button type="button" className="workflow-danger" disabled={busy} onClick={()=>{void act(async()=>{const result=await workflowRequest<{provider_revoked:boolean}>(base+'/disconnect','POST',{revision:data.connection!.revision});setNotice(result.provider_revoked?'서비스 권한과 앱 연결을 해제했습니다.':'앱 연결을 해제했습니다. 외부 서비스의 권한 관리에서도 접근 권한을 확인해 주세요.');setDocs([]);setSearched(false);setRetry(n=>n+1);});}}>연결 해제</button>}</div>
-      {connected&&<><label className="workflow-field">저장할 과목<select value={course} onChange={e=>setCourse(e.target.value)} disabled={busy}>{courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{!courses.length&&<p>자료를 저장하려면 과목을 먼저 만들어 주세요.</p>}
+      {connected&&<><label className="workflow-field">저장할 과목<CustomSelect value={course} onChange={setCourse} disabled={busy} options={courses.map(c=>({value:c.id,label:c.name}))} aria-label="저장할 과목" /></label>{!courses.length&&<p>자료를 저장하려면 과목을 먼저 만들어 주세요.</p>}
         <form onSubmit={e=>{e.preventDefault();void search();}} className="workflow-search"><label className="workflow-field">자료 제목 검색<input placeholder="가져올 자료의 제목을 입력해 주세요" value={query} maxLength={100} onChange={e=>setQuery(e.target.value)} disabled={busy}/></label><button disabled={busy} type="submit">자료 찾기</button></form>
         {docs.map(d=><div className="workflow-subsection" key={d.id}><strong>{d.title}</strong><p className="workflow-meta">{d.modified?new Date(d.modified).toLocaleString('ko-KR'):''}</p><button type="button" disabled={busy||!course} onClick={()=>{void preview(d.id);}}>최신 본문 가져와 비교</button></div>)}
         {searched&&!docs.length&&<p>검색 결과가 없습니다. 검색어와 접근 권한을 확인해 주세요.</p>}{cursor&&<button type="button" disabled={busy} onClick={()=>{void search(true);}}>다음 자료 보기</button>}

@@ -1,6 +1,7 @@
 import LearningHistory from './LearningHistory';
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../../common';
+import CustomSelect from '../../components/CustomSelect';
 import { fetchCourses } from '../../services/courses';
 import { removeLocalDraft } from '../../services/learningSessions';
 import { useLearningSession } from './useLearningSession';
@@ -153,8 +154,8 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
       <LearningLink to="/learn" className="learning-button">학습 설정으로</LearningLink>
     </div></details>}
     {report && item && !ended && <Card className="learning-card"><h2>오류 알리기</h2>
-      <label className="learning-field">오류 유형<select aria-label="오류 유형" value={reportReason} onChange={e => setReportReason(e.target.value)}>
-        <option value="question">질문</option><option value="answer">정답</option><option value="feedback">피드백</option><option value="source">원문 근거</option></select></label>
+      <label className="learning-field">오류 유형<CustomSelect aria-label="오류 유형" value={reportReason} onChange={setReportReason}
+        options={[{ value: 'question', label: '질문' }, { value: 'answer', label: '정답' }, { value: 'feedback', label: '피드백' }, { value: 'source', label: '원문 근거' }]} /></label>
       <p><textarea aria-label="오류 설명 (선택)" maxLength={1000} value={reportText} onChange={e => setReportText(e.target.value)} /></p>
       <button type="button" className="primary" disabled={blocked} onClick={() => { void command(`items/${item.id}/report`, { reason: reportReason, description: reportText }).then(() => setReport(false)).catch(() => undefined); }}>기록하기</button>
     </Card>}

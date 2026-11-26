@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', '.claude', 'src-tauri/target', 'promo/demo.js']),
+  globalIgnores(['dist', '.claude', 'src-tauri/target', 'promo/demo.js', 'promo/features.js']),
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -44,14 +44,14 @@ export default defineConfig([
   },
   {
     // 독립 체험 번들은 컴포넌트를 내보내지 않고 직접 마운트한다.
-    files: ['promo/demo-source.tsx'],
+    files: ['promo/demo-source.tsx', 'promo/features-source.tsx', 'promo/feature-demo/*.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
     },
   },
   {
     // 빌드/검사 보조 스크립트는 Node 환경에서 돈다(예: scripts/check-inline-hex.mjs).
-    files: ['scripts/**/*.mjs', 'promo/*.mjs'],
+    files: ['scripts/**/*.mjs', 'promo/**/*.mjs'],
     languageOptions: {
       globals: globals.node,
     },

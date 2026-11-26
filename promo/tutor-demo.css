@@ -1,0 +1,38 @@
+/* Geometry, tokens and typography mirror the embedded AITutorDrawer. */
+.demo-root .demo-tutor { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: auto; padding: 20px; border: 1px solid var(--color-border-soft); background: var(--color-card); }
+.demo-tutor-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.demo-root .demo-tutor-header h3 { margin: 0; font-size: 16px; font-weight: 850; line-height: 1.5; letter-spacing: normal; color: var(--color-text-strong); }
+.demo-root .demo-tutor-restart { padding: 4px 10px; border-radius: 8px; border: 1px solid var(--color-border-soft); background: var(--color-surface); color: var(--color-text-secondary); font-size: 12px; font-weight: 800; line-height: 1.5; cursor: pointer; }
+.demo-root .demo-tutor-notice { flex-shrink: 0; margin: 0 0 10px; font-size: 11px; line-height: 1.5; color: var(--color-muted); letter-spacing: normal; }
+.demo-tutor-suggestions { flex-shrink: 0; margin-bottom: 14px; }
+.demo-tutor-label { margin-bottom: 8px; font-size: 12px; font-weight: 800; color: var(--color-muted); }
+.demo-tutor-question-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.demo-root .demo-tutor-question { padding: 7px 10px; border-radius: 999px; border: 1px solid var(--color-border-soft); background: var(--color-surface); color: var(--color-text); font-size: 12px; font-weight: 700; line-height: 1.35; cursor: pointer; text-align: left; }
+.demo-root .demo-tutor-toggle { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--color-border-soft); background: var(--color-surface); color: var(--color-text-secondary); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 850; line-height: 1.5; cursor: pointer; }
+.demo-tutor-toggle > :last-child { color: var(--color-muted); font-size: 13px; }
+.demo-tutor-toggle + .demo-tutor-question-list { margin-top: 8px; }
+.demo-tutor-chat { position: relative; flex: 1; min-height: 96px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: auto; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 820px; margin: 0 auto 14px; padding-right: 2px; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+.demo-tutor-chat:focus { outline: none; }
+.demo-tutor-chat:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: -2px; }
+.demo-tutor-empty { padding: 14px; border-radius: 12px; background: var(--color-surface); color: var(--color-muted); font-size: 13px; line-height: 1.6; }
+.demo-tutor-message { flex-shrink: 0; align-self: flex-start; max-width: 88%; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.demo-tutor-message.is-user { align-self: flex-end; }
+.demo-tutor-bubble { padding: 10px 14px; border-radius: 12px; background: var(--color-surface); color: var(--color-text); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.demo-tutor-message.is-user .demo-tutor-bubble { background: var(--color-tint-cyan); }
+.demo-root .demo-tutor-user-text { margin: 0 0 8px; line-height: 1.65; color: var(--color-text); font-size: 13px; white-space: pre-wrap; letter-spacing: normal; }
+.demo-tutor-bubble :is(h1, h2, h3, p) { letter-spacing: normal; word-break: normal; }
+.demo-tutor-bubble :is(ul, ol) { display: block; }
+.demo-tutor-bubble .katex-display { overflow-x: auto; overflow-y: hidden; padding: 3px 0; }
+.demo-tutor-prepared { display: block; margin-bottom: 8px; color: var(--color-muted); font-size: 11px; line-height: 1.5; }
+.demo-tutor-followups { display: flex; flex-direction: column; gap: 6px; }
+.demo-tutor-followups > span { font-size: 11px; font-weight: 800; color: var(--color-muted); letter-spacing: .04em; }
+.demo-tutor-followups .demo-tutor-question-list { gap: 6px; }
+.demo-root .demo-tutor-followup { padding: 6px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--color-pink) 20%, transparent); background: var(--color-tint-pink); color: var(--color-pink); font-size: 12px; font-weight: 400; line-height: 1.35; cursor: pointer; text-align: left; }
+.demo-tutor-composer { flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; width: 100%; max-width: 820px; margin: 0 auto; }
+.demo-root .demo-tutor-composer textarea { flex: 1; min-width: 0; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--color-border-soft); font-size: 13px; line-height: 20px; outline: none; resize: none; max-height: 124px; overflow-y: auto; font-family: inherit; font-weight: 400; color: var(--color-text); background: var(--color-card); }
+.demo-root .demo-tutor-composer textarea:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+.demo-root .demo-tutor-composer button { flex-shrink: 0; padding: 11px 14px; border-radius: 10px; border: none; background: var(--color-pink); color: var(--color-on-brand); font-size: 13px; line-height: 20px; font-weight: 800; cursor: pointer; }
+.demo-root .demo-tutor-composer button:disabled { cursor: default; }
+@media (max-width: 640px) {
+  .demo-root .demo-tutor { padding: 14px; }
+}

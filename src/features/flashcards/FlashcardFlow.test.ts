@@ -59,6 +59,14 @@ async function click(label: string, scope: ParentNode = container) {
   expect(button, label).toBeDefined(); await act(async () => button!.click());
 }
 async function tab(label: string) { await click(label, container.querySelector('nav[aria-label="암기 카드 보기"]')!); }
+async function select(label: string, optionLabel: string) {
+  const trigger = container.querySelector<HTMLButtonElement>(`[role="combobox"][aria-label="${label}"]`);
+  expect(trigger, label).not.toBeNull();
+  await act(async () => trigger!.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === optionLabel);
+  expect(option, optionLabel).toBeDefined();
+  await act(async () => option!.click());
+}
 async function edit(index: number, value: string) {
   await act(async () => {
     const input = container.querySelectorAll('textarea')[index];
@@ -68,7 +76,7 @@ async function edit(index: number, value: string) {
 }
 async function draft() {
   await tab('카드 만들기');
-  await act(async () => { const select = container.querySelectorAll('select')[1]; select.value = 'lecture'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await select('학습자료', '1강.pdf');
   await click('자료에서 카드 초안 만들기');
 }
 
@@ -99,7 +107,7 @@ it('recovers from failed AI generation without losing the selected material', as
   vi.mocked(fetch).mockRejectedValueOnce(new Error('일시적인 연결 실패'));
   await render(); await draft();
   expect(container.textContent).toContain('일시적인 연결 실패');
-  expect(container.querySelectorAll('select')[1].value).toBe('lecture');
+  expect(container.querySelector('[role="combobox"][aria-label="학습자료"]')?.textContent).toBe('1강.pdf');
   expect(container.querySelectorAll('textarea')).toHaveLength(0);
   await click('자료에서 카드 초안 만들기');
   expect(container.querySelector('textarea')?.value).toBe('프로세스란?');
@@ -111,7 +119,7 @@ it('keeps the reload action available after switching tabs following a failed in
   await render(); await tab('카드 만들기');
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('카드 조회 실패');
   await click('다시 불러오기');
-  expect(container.querySelector('select')?.textContent).toContain('운영체제');
+  expect(container.querySelector('[role="combobox"][aria-label="과목"]')?.textContent).toBe('운영체제');
   expect(container.textContent).not.toContain('카드 조회 실패');
 });
 
@@ -136,8 +144,8 @@ it('saves a wrong answer with its actual option text and continues to the review
 
 it('preserves an unsaved draft when cancelling material changes or page navigation', async () => {
   await render(); await draft(); const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-  await act(async () => { const select = container.querySelectorAll('select')[1]; select.value = ''; select.dispatchEvent(new Event('change', { bubbles: true })); });
-  expect(container.querySelectorAll('select')[1].value).toBe('lecture');
+  await select('학습자료', '직접 입력');
+  expect(container.querySelector('[role="combobox"][aria-label="학습자료"]')?.textContent).toBe('1강.pdf');
   expect(container.querySelector('textarea')?.value).toBe('프로세스란?');
   await act(async () => (container.querySelector('.learning-header-back') as HTMLAnchorElement).click());
   expect(container.textContent).toContain('카드 초안을 확인하고 저장');

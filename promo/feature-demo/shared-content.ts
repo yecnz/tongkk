@@ -1,0 +1,15 @@
+import { sampleQuiz, sampleSummaries, SAMPLE_TOPIC } from '../../src/sampleDemoContent';
+export const invalidateQuizSetsCache = () => {};
+export const loadQuizSetsFromServer = async () => [{ id: 'quiz-demo', title: SAMPLE_TOPIC, difficulty: '보통', questionType: '객관식', count: sampleQuiz.length, materialIds: ['material-demo'], questions: sampleQuiz, createdAt: Date.now(), updatedAt: Date.now() }];
+export const countQuizSetsFromServer = async () => 1;
+export const saveQuizSetToServer = async (_course: string, value: unknown) => value;
+export const deleteQuizSetById = async () => {};
+export const sameSummaryOptions = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+export const invalidateSummariesCache = () => {};
+export const loadSummariesFromServer = async () => sampleSummaries.map((s, i) => ({ id: `summary-demo-${i}`, title: SAMPLE_TOPIC, markdown: s.markdown, template: s.kind, materialIds: ['material-demo'], createdAt: Date.now(), updatedAt: Date.now() }));
+export const countSummariesFromServer = async () => sampleSummaries.length;
+export const deleteSummariesByMaterialId = async () => {};
+export const deleteSummaryById = async () => {};
+export const prepareSummaryIdentity = async () => ({ source_hash: 'demo', request_key: 'demo', generation_config: {} });
+export const findReusableSummary = async () => null;
+export const saveSummaryToServer = async (_course: string, value: unknown) => value;

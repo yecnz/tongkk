@@ -24,6 +24,9 @@ jobs:
         run: |
           node promo/build-demo.mjs
           node promo/test-demo.mjs
+          node promo/test-flow.mjs
+          node promo/build-features.mjs
+          node promo/test-features.mjs
       - name: Unit tests
         run: npm test
       - name: Learning workflow PostgreSQL integration

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import CustomSelect from '../../components/CustomSelect';
 import { workflowRequest, type IssueDetail } from '../../services/workflow';
 export default function QuizIssueLink({ attemptId, questionIndex }: { attemptId: string; questionIndex: number }) {
   const [concepts, setConcepts] = useState<{ id: string; title: string }[] | null>(null);
@@ -16,7 +17,8 @@ export default function QuizIssueLink({ attemptId, questionIndex }: { attemptId:
     finally { setBusy(false); }
   }
   if (issue) return <Link to={`/review?tab=issues&issueId=${issue}`}>연결한 학습 이슈 보기 →</Link>;
-  return <div>{concepts && (concepts.length ? <label>관련 개념 <select value={selected} onChange={e => setSelected(e.target.value)}><option value="">선택해 주세요</option>{concepts.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
+  return <div>{concepts && (concepts.length ? <label>관련 개념 <CustomSelect value={selected} onChange={setSelected} aria-label="관련 개념"
+    options={[{ value: '', label: '선택해 주세요' }, ...concepts.map(c => ({ value: c.id, label: c.title }))]} /></label>
     : <p>설명 학습을 완료한 뒤 개념을 연결해 주세요.</p>)}
     <button type="button" className="workflow-button" aria-busy={busy} disabled={busy || (concepts !== null && !selected)} onClick={() => { void run(); }}>{busy ? concepts === null ? '개념 불러오는 중…' : '연결 중…' : concepts === null ? '학습 이슈에 연결' : '선택한 개념에 연결'}</button>
     {concepts && <p className="workflow-muted">직접 연결한 오답은 확인 필요로 기록됩니다.</p>}{error && <p role="alert">{error}</p>}</div>;

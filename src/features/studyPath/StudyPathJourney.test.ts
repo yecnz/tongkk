@@ -118,7 +118,10 @@ async function returnToPath() {
 }
 async function create() {
   await render();
-  await act(async () => { const select = container.querySelector('select')!; select.value = 'course'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await act(async () => container.querySelector<HTMLButtonElement>('[role="combobox"][aria-label="과목"]')!.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === '운영체제');
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
   await act(async () => [...container.querySelectorAll<HTMLInputElement>('input[type=checkbox]')].forEach(c => c.click()));
   await click('AI 코스 초안 만들기');
 }

@@ -5,12 +5,25 @@ import { createRoot } from 'react-dom/client';
 import { Markdown } from 'promo:markdown';
 import QuizText from '../src/pages/quiz/QuizText';
 import { MindmapView } from '../src/components/MindmapView';
+import TutorDemo from './tutor-demo';
 import { sampleOriginalMarkdown, sampleSummaries, sampleMindmap, sampleQuiz } from '../src/sampleDemoContent';
 import 'katex/dist/katex.min.css';
 import './demo-source.css';
 
 const layoutChanged = () => { window.dispatchEvent(new CustomEvent('promo:layout')); };
 const goToStep = (index: number) => window.dispatchEvent(new CustomEvent('promo:step', { detail: { index } }));
+const tutorQuestions = [
+  '선택 정렬의 시간 복잡도는 왜 O(n²)인가요?',
+  '퀵 정렬의 최악 시간 복잡도는 왜 O(n²)인가요?',
+  '선택 정렬은 왜 안정 정렬이 아닌가요?',
+];
+function askTutor(index: number) {
+  askTutorQuestion(tutorQuestions[index]);
+}
+function askTutorQuestion(question: string) {
+  goToStep(3);
+  window.dispatchEvent(new CustomEvent('promo:tutor-question', { detail: { question } }));
+}
 
 function Original() {
   return <div className="demo-scroll" tabIndex={0} role="region" aria-label="원본 강의자료 읽기"><article className="demo-markdown"><Markdown>{sampleOriginalMarkdown}</Markdown></article></div>;
@@ -40,7 +53,7 @@ function Summary() {
     </div>
     <div id="demo-summary-content" role="tabpanel" tabIndex={0} aria-labelledby={`demo-summary-tab-${kind}`}>
       {kind === 'MINDMAP'
-        ? <div className="demo-actual-mindmap"><MindmapView data={sampleMindmap} initialExpanded /></div>
+        ? <div className="demo-actual-mindmap"><MindmapView data={sampleMindmap} initialExpanded onNodeFocus={label => askTutorQuestion(`${label} 개념을 예시로 설명해줘`)} /></div>
         : <article className="demo-markdown"><Markdown>{summary.markdown}</Markdown></article>}
     </div>
   </div>;
@@ -68,6 +81,7 @@ function Quiz() {
   const correctCount = questions.filter((question, index) => question.answerIndex === answers[index]).length;
   const score = Math.round(correctCount / questions.length * 100);
   const allAnswered = questions.every((_, index) => answers[index] !== undefined);
+  const firstWrongIndex = questions.findIndex((question, index) => answers[index] !== question.answerIndex);
 
   useEffect(() => {
     layoutChanged();
@@ -75,6 +89,21 @@ function Quiz() {
     if (scrollerRef.current) scrollerRef.current.scrollTop = 0;
     headingRef.current?.focus({ preventScroll: true });
   }, [current, result, review]);
+
+  useEffect(() => {
+    const openQuestion = (event: Event) => {
+      const index = (event as CustomEvent<{ index: number }>).detail?.index;
+      if (!Number.isInteger(index) || index < 0 || index >= questions.length) return;
+      setCurrent(index); setResult(false); setReview(false);
+    };
+    const restart = () => { setAnswers({}); setCurrent(0); setResult(false); setReview(false); };
+    window.addEventListener('promo:quiz-open', openQuestion);
+    window.addEventListener('promo:quiz-retry', restart);
+    return () => {
+      window.removeEventListener('promo:quiz-open', openQuestion);
+      window.removeEventListener('promo:quiz-retry', restart);
+    };
+  }, []);
 
   function choose(index: number) {
     if (answered) return;
@@ -98,6 +127,7 @@ function Quiz() {
         <div className="demo-result-actions">
           <button type="button" onClick={retry}>다시 풀기</button>
           <button type="button" onClick={() => { setReview(true); go(0); }}>풀이 확인</button>
+          <button type="button" onClick={() => askTutor(firstWrongIndex < 0 ? 1 : firstWrongIndex)}>AI 튜터로 복습</button>
           <button type="button" className="is-primary" onClick={() => goToStep(1)}>요약 다시 보기</button>
         </div>
       </div>
@@ -127,6 +157,7 @@ function Quiz() {
             })}
           </div>
           {answered && <div className="demo-quiz-explanation"><strong>해설:</strong> <QuizText>{q.explanation}</QuizText></div>}
+          {answered && <button type="button" className="demo-tutor-link" onClick={() => askTutor(current)}>이 문제를 튜터에게 질문하기 <span aria-hidden="true">↗</span></button>}
           <button type="button" className="demo-quiz-next" disabled={!answered}
             onClick={() => review ? setResult(true) : current < questions.length - 1 ? go(current + 1) : finish()}>
             {review ? '결과로 돌아가기' : current < questions.length - 1 ? '다음' : allAnswered ? '결과 보기' : '미응답 문제 풀기'}
@@ -142,6 +173,7 @@ const mounts = [
   ['demo-original', <Original />],
   ['demo-summary', <Summary />],
   ['demo-quiz', <Quiz />],
+  ['demo-tutor', <TutorDemo />],
 ] as const;
 for (const [id, component] of mounts) {
   const root = document.getElementById(id);

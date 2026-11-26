@@ -1,6 +1,7 @@
 import { useState, useEffect, useId, useRef, type CSSProperties } from "react";
 import { PINK, CYAN, Card } from "../common";
 import ModalDialog from "./ModalDialog";
+import CustomSelect from "./CustomSelect";
 import { loadCourseMaterialsFromServer } from "../services/materials";
 import { loadQuizSetsFromServer } from "../services/quizSets";
 import type { PacePlan } from "../services/pace";
@@ -336,7 +337,7 @@ type AddPaceModalProps = {
 
 export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalProps) => {
   const selectableDdays = [...ddays]
-    .filter(dday => Boolean(dday.id))
+    .filter((dday): dday is Dday & { id: string } => Boolean(dday.id))
     .sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const [course, setCourse] = useState(courses[0] ?? "");
   // 기본은 "연결 안 함"(14일 기준). 마감일은 과목과 무관할 수 있어 사용자가 직접 고르게 둔다.
@@ -423,6 +424,7 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
     onClose();
   };
   const fieldClass = "w-full px-3.5 py-3 rounded-[10px] border border-border bg-card text-sm text-text-strong outline-none box-border transition focus:border-cyan focus:ring-3 focus:ring-cyan/10";
+  const selectStyle: CSSProperties = { padding: "12px 14px", fontSize: 14, color: "var(--color-text-strong)" };
   const labelClass = "block mb-2 text-xs font-extrabold text-text-secondary";
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4 py-6">
@@ -457,21 +459,33 @@ export const AddPaceModal = ({ courses, ddays, onClose, onAdd }: AddPaceModalPro
             <>
               <div className="mb-4">
                 <label className={labelClass}>과목</label>
-                <select value={course} onChange={e => setCourse(e.target.value)} className={fieldClass}>
-                  {courses.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
+                <CustomSelect
+                  value={course}
+                  onChange={setCourse}
+                  options={courses.map(name => ({ value: name, label: name }))}
+                  aria-label="과목"
+                  className={fieldClass}
+                  style={selectStyle}
+                />
               </div>
               <div className="mb-4">
                 <label className={labelClass}>연결할 D-day</label>
                 {selectableDdays.length > 0 ? (
-                  <select value={ddayId} onChange={e => setDdayId(e.target.value)} className={fieldClass}>
-                    <option value="">연결 안 함</option>
-                    {selectableDdays.map(dday => {
-                      const left = getDaysLeft(dday.date);
-                      const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
-                      return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
-                    })}
-                  </select>
+                  <CustomSelect
+                    value={ddayId}
+                    onChange={setDdayId}
+                    options={[
+                      { value: "", label: "연결 안 함" },
+                      ...selectableDdays.map(dday => {
+                        const left = getDaysLeft(dday.date);
+                        const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
+                        return { value: dday.id, label: `${dday.subj} · ${label} (${dday.date})` };
+                      }),
+                    ]}
+                    aria-label="연결할 D-day"
+                    className={fieldClass}
+                    style={selectStyle}
+                  />
                 ) : (
                   <div className="rounded-[10px] border border-dashed border-border bg-slate-50 px-3.5 py-3 text-sm text-muted dark:bg-slate-800/60">
                     마감일 미설정 시 14일 기준으로 계산합니다.
@@ -574,7 +588,7 @@ type EditPaceModalProps = {
 
 export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalProps) => {
   const selectableDdays = [...ddays]
-    .filter(dday => Boolean(dday.id))
+    .filter((dday): dday is Dday & { id: string } => Boolean(dday.id))
     .sort((a, b) => getDaysLeft(a.date) - getDaysLeft(b.date));
   const isQuiz = plan.basis === "quiz";
   const unit = plan.unitLabel ?? "개";
@@ -610,14 +624,20 @@ export const EditPaceModal = ({ plan, ddays, onClose, onSave }: EditPaceModalPro
 
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>연결할 D-day</label>
-          <select value={ddayId} onChange={e => setDdayId(e.target.value)} style={inputStyle}>
-            <option value="">연결 안 함</option>
-            {selectableDdays.map(dday => {
-              const left = getDaysLeft(dday.date);
-              const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
-              return <option key={dday.id} value={dday.id}>{dday.subj} · {label} ({dday.date})</option>;
-            })}
-          </select>
+          <CustomSelect
+            value={ddayId}
+            onChange={setDdayId}
+            options={[
+              { value: "", label: "연결 안 함" },
+              ...selectableDdays.map(dday => {
+                const left = getDaysLeft(dday.date);
+                const label = left > 0 ? `D-${left}` : left === 0 ? "D-Day" : `D+${Math.abs(left)}`;
+                return { value: dday.id, label: `${dday.subj} · ${label} (${dday.date})` };
+              }),
+            ]}
+            aria-label="연결할 D-day"
+            style={inputStyle}
+          />
         </div>
 
         <div style={{ marginBottom: 14 }}>

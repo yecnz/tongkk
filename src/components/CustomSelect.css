@@ -1,0 +1,89 @@
+.tongkk-select-trigger.tongkk-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.tongkk-select-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tongkk-select-trigger > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--color-text-secondary);
+  transition: transform .15s;
+}
+.tongkk-select-trigger[aria-expanded="true"] { border-color: var(--color-cyan); }
+.tongkk-select-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.tongkk-select-trigger:focus-visible { outline: 2px solid var(--color-cyan); outline-offset: 2px; }
+.tongkk-select-trigger.tongkk-select-trigger:disabled {
+  background: var(--color-muted-surface);
+  color: var(--color-muted);
+  cursor: not-allowed;
+  opacity: .65;
+}
+.tongkk-select-placeholder { color: var(--color-muted); }
+.tongkk-select-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  visibility: hidden;
+  width: 1px;
+  max-height: 320px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card), 0 8px 24px color-mix(in srgb, var(--color-text-strong) 10%, transparent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  list-style: none;
+  text-align: left;
+}
+.tongkk-select-menu .tongkk-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.tongkk-select-option > span:first-child { min-width: 0; }
+.tongkk-select-option.is-active { background: var(--color-muted-surface); }
+.tongkk-select-option[aria-selected="true"] { color: var(--color-cyan-deep); font-weight: 600; }
+.tongkk-select-option[aria-selected="true"].is-active { background: var(--color-tint-cyan); }
+.tongkk-select-option[aria-disabled="true"] { color: var(--color-muted); cursor: not-allowed; opacity: .55; }
+.tongkk-select-check { width: 16px; flex: 0 0 16px; text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .tongkk-select-trigger > svg { transition: none; }
+}

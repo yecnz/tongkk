@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import { Card } from '../../common';
+import CustomSelect from '../../components/CustomSelect';
 import { workflowRequest } from '../../services/workflow';
 type Member = { id: string; title: string; course_name: string; material_name: string; state: string; source_changed: boolean };
 type Graph = { groups: { id: string; title: string; evidence_count: number; members: Member[] }[]; prerequisites: { source: string; target: string }[];
@@ -27,9 +28,9 @@ export default function ConceptGraph() {
       </svg></div>}
       {data.groups.length > 0 && <p className="workflow-map-hint workflow-meta">좌우로 움직여 개념과 학습 순서를 확인해 주세요.</p>}
       {!members.length ? <p>학습을 완료하면 개념이 표시됩니다.</p> : <>
-        <Card className="workflow-panel workflow-stack"><h3>개념 연결</h3><div className="workflow-form-grid"><label className="workflow-field">먼저 공부할 개념 / 같은 개념<select value={source} onChange={e=>setSource(e.target.value)}><option value="">선택</option>{members.filter(m=>!m.source_changed).map(m=><option key={m.id} value={m.id}>{names[m.id]} · {m.material_name}</option>)}</select></label>
-          <label className="workflow-field">연결 유형<select value={relation} onChange={e=>setRelation(e.target.value)}><option value="prerequisite">선수 개념 → 다음 개념</option><option value="equivalent">같은 뜻의 개념</option></select></label>
-          <label className="workflow-field workflow-span-full">연결할 개념<select value={target} onChange={e=>setTarget(e.target.value)}><option value="">선택</option>{members.filter(m=>!m.source_changed && m.id!==source).map(m=><option key={m.id} value={m.id}>{names[m.id]} · {m.material_name}</option>)}</select></label></div>
+        <Card className="workflow-panel workflow-stack"><h3>개념 연결</h3><div className="workflow-form-grid"><label className="workflow-field">먼저 공부할 개념 / 같은 개념<CustomSelect value={source} onChange={setSource} options={[{value:'',label:'선택'},...members.filter(m=>!m.source_changed).map(m=>({value:m.id,label:`${names[m.id]} · ${m.material_name}`}))]} aria-label="먼저 공부할 개념 / 같은 개념" /></label>
+          <label className="workflow-field">연결 유형<CustomSelect value={relation} onChange={setRelation} options={[{value:'prerequisite',label:'선수 개념 → 다음 개념'},{value:'equivalent',label:'같은 뜻의 개념'}]} aria-label="연결 유형" /></label>
+          <label className="workflow-field workflow-span-full">연결할 개념<CustomSelect value={target} onChange={setTarget} options={[{value:'',label:'선택'},...members.filter(m=>!m.source_changed && m.id!==source).map(m=>({value:m.id,label:`${names[m.id]} · ${m.material_name}`}))]} aria-label="연결할 개념" /></label></div>
           <button type="button" className="workflow-primary" disabled={busy||!source||!target||source===target} onClick={()=>{void connect(source,target,relation);}}>연결 저장</button></Card>
         {data.suggestions.length>0 && <Card className="workflow-panel workflow-stack"><h3>같은 개념인지 확인해 주세요</h3>{data.suggestions.map(s=><div className="workflow-item" key={`${s.source_id}:${s.target_id}`}><p>{names[s.source_id]} ↔ {names[s.target_id]}</p><button type="button" disabled={busy} onClick={()=>{void connect(s.source_id,s.target_id,'equivalent');}}>같은 개념으로 연결</button></div>)}</Card>}
         {data.groups.map(g=><Card className="workflow-panel workflow-stack" key={g.id}><h3>{g.title}</h3>{g.members.map(m=><p key={m.id}><Link to={`/stats?view=concepts&conceptId=${m.id}`}>{m.course_name} · {m.material_name} · {labels[m.state] || m.state} →</Link></p>)}</Card>)}
