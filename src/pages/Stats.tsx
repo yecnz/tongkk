@@ -1,7 +1,6 @@
 import BrandLogo from "../components/BrandLogo";
 import ConceptGraph from '../features/learningHistory/ConceptGraph';
 import ConceptHistory from '../features/learningHistory/ConceptHistory';
-import UsageOverview from "../features/learningSession/UsageOverview";
 import ReviewOverview from "../features/learningSession/ReviewOverview";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -165,7 +164,7 @@ export default function Stats() {
           </div>
         </div>
 
-        <ReviewOverview variant="stats" /><UsageOverview key={user?.id || "guest"} />
+        <ReviewOverview variant="stats" />
         <div className="stats-summary-grid">
           <SummaryCard label="연속 학습일" value={`${streak}일`} accent={PINK} note={streak > 0 ? "연속 학습 중이에요" : "오늘 기록 없음"} />
           <SummaryCard label="총 학습시간" value={formatStudyTime(minutes)} accent={CYAN} note={`${attempts.length}회 풀이 기준`} />
