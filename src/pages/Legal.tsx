@@ -4,7 +4,7 @@ import { FEEDBACK_EMAIL } from "../common";
 
 // 개인정보처리방침·이용약관. Notion Public integration과 Google OAuth 검증에 공개 URL로 등록한다.
 // 내용을 바꾸면 시행일도 같이 바꿀 것.
-const EFFECTIVE_DATE = "2026년 11월 25일";
+const EFFECTIVE_DATE = "2026년 11월 26일";
 
 type Section = { title: string; body: (string | string[])[] };
 
@@ -37,10 +37,11 @@ const PRIVACY: Section[] = [
     body: [
       "Google 캘린더(calendar.events.readonly), Notion(콘텐츠 읽기) 연동은 모두 읽기 전용이며, 사용자가 직접 '연결'을 눌렀을 때만 동작합니다.",
       [
-        "캘린더 일정은 서비스의 학습 캘린더에 함께 보여 주고 학습 계획에 반영하는 데만 사용합니다.",
+        "캘린더 일정은 서비스의 학습 캘린더에 함께 보여 주고, 사용자가 원하면 과목과 연결하는 데만 사용합니다. 캘린더 일정은 AI 처리 업체로 보내지 않습니다.",
         "Notion 문서는 사용자가 고른 문서만 불러와 강의자료처럼 요약·퀴즈·튜터 기능에 사용합니다.",
         "연동으로 받은 접근 토큰은 암호화해 저장하며, 연결을 해제하면 토큰을 폐기합니다.",
         "Google에서 받은 데이터를 광고에 사용하거나 제3자에게 판매·전달하지 않으며, 사람이 열람하지 않습니다(사용자 동의, 보안 목적, 법적 의무가 있는 경우 제외).",
+        "Google에서 받은 데이터는 범용 AI·머신러닝 모델을 개발·개선·학습시키는 데 사용하지 않습니다.",
       ],
       "Tongkk이 Google API에서 받은 정보를 사용하고 다른 앱으로 전송하는 방식은 Limited Use 요건을 포함한 Google API 서비스 사용자 데이터 정책(Google API Services User Data Policy)을 준수합니다.",
     ],
