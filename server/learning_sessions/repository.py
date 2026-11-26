@@ -1,10 +1,13 @@
 """The only production persistence path; no local/in-memory fallback."""
+import logging
 import os
 
 import httpx
 
 from config import SUPABASE_ANON_KEY, SUPABASE_URL
 from .errors import fail
+
+log = logging.getLogger(__name__)
 
 
 class WriteConflict(Exception):
@@ -42,7 +45,10 @@ class Repository:
                 fail("SOURCE_CHANGED", "원문이 변경됐습니다. 학습 범위를 다시 선택해주세요.")
             if "LS_NOT_FOUND" in message:
                 fail("NOT_FOUND", "자료 또는 학습 세션을 찾을 수 없습니다.", 404)
-            fail("DB_UNAVAILABLE", "학습 기록을 저장하지 못했습니다. DB 설정을 확인해주세요.", 503)
+            # 원인(PGRST205 표 없음, PGRST202 함수 없음 등)은 서버 로그에만 남긴다. 파라미터는 기록하지 않는다.
+            code = res.json().get("code", "") if "json" in res.headers.get("content-type", "") else ""
+            log.error("Supabase RPC %s failed: status=%s code=%s", name, res.status_code, code)
+            fail("DB_UNAVAILABLE", "학습 기록을 처리하지 못했어요. 잠시 후 다시 시도해주세요.", 503)
         # returns void 함수(source_begin 등)는 204 빈 본문을 돌려준다.
         return res.json() if res.content else None
 

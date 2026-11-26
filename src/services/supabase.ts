@@ -47,8 +47,14 @@ export const requireSupabaseUser = async () => {
   return user;
 };
 
-export const formatSupabaseError = (error: { message?: string } | null) =>
-  error?.message || 'Supabase 요청 실패';
+// PGRST205(표 없음)·PGRST202(함수 없음)는 DB 마이그레이션 누락이라 사용자에게 원문 대신 안내만 보여준다.
+export const formatSupabaseError = (error: { message?: string; code?: string } | null) => {
+  if (error?.code === 'PGRST205' || error?.code === 'PGRST202') {
+    console.error('Supabase 스키마 누락:', error.code, error.message);
+    return '학습 기록을 처리하지 못했어요. 잠시 후 다시 시도해주세요.';
+  }
+  return error?.message || 'Supabase 요청 실패';
+};
 
 export const getSupabaseAuthHeader = async (): Promise<Record<string, string>> => {
   const { data } = await supabase.auth.getSession();
