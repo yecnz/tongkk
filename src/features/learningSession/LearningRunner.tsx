@@ -49,7 +49,7 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
   }, [courseId]);
   useEffect(() => {
     beforeLeaveRef.current = async () => {
-      if (blocked) throw new Error('요청 결과를 확인한 뒤 이동하세요.');
+      if (blocked) throw new Error('요청 결과를 확인한 뒤 이동해 주세요.');
       await flushDraft.current?.();
     };
     return () => { beforeLeaveRef.current = null; };
@@ -92,28 +92,28 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
     {error && <div className="learning-notice learning-error" role="alert">{error}
       {pendingRetry && <p><button type="button" disabled={busy} onClick={() => { void retryPending().catch(() => undefined); }}>이전 요청 결과 다시 확인</button></p>}</div>}
     {session.status === 'paused' ? <Card className="learning-card learning-state"><span className="learning-state-symbol" aria-hidden="true">Ⅱ</span>
-      <h2>학습을 잠시 멈췄어요</h2><p>저장한 단계부터 이어서 시작하세요.</p>
+      <h2>학습을 잠시 멈췄어요</h2><p>저장한 단계부터 이어서 시작해 주세요.</p>
       <button type="button" className="resume" disabled={blocked} onClick={() => { void act('resume'); }}>이어서 학습 →</button></Card>
       : session.status === 'preparing' || session.status === 'failed' ? <Card className="learning-card learning-state" role="status">
         <span className={operation?.status === 'running' ? 'learning-loading-dot' : 'learning-state-symbol'} aria-hidden="true">{operation?.status === 'running' ? '' : '↻'}</span>
-        <h2>{session.status === 'failed' || operation?.status === 'expired' ? '준비하지 못했어요. 다시 시도하세요.' : '개념 준비 중'}</h2>
+        <h2>{session.status === 'failed' || operation?.status === 'expired' ? '준비하지 못했어요. 다시 시도해 주세요.' : '개념 준비 중'}</h2>
         <p>최대 {session.concept_count}개 개념을 준비해요.</p>
         {operation?.retryable && <button type="button" className="primary" disabled={blocked} onClick={() => { void command(`operations/${operation.id}/retry`).catch(() => undefined); }}>준비 다시 시도</button>}
         {operation?.status === 'running' && <p className="learning-caption">준비되면 자동으로 시작해요.</p>}
       </Card> : !ended && item && <div className="learning-grid">
         <Card className="learning-card learning-activity" role="region" aria-labelledby="learning-concept-title">
           <p className="learning-eyebrow">개념 {item.position + 1} · {stage}</p><h2 id="learning-concept-title">{item.title}</h2>
-          {reading ? <><Markdown text={item.introduction!} /><p className="learning-caption">설명을 덮고 직접 설명하세요.</p>
+          {reading ? <><Markdown text={item.introduction!} /><p className="learning-caption">설명을 덮고 직접 설명해 주세요.</p>
             <div className="learning-actions"><button type="button" className="primary" disabled={blocked} onClick={startRecall}>직접 설명하기 →</button></div></> : <>
             {item.phase === 'recall_answering' && <><Markdown text={item.question} />
               <RecallInput key={item.id} session={session} userId={userId} busy={busy} disabled={pendingRetry} flushRef={flushDraft}
                 onSave={accept} onSubmit={text => command('answers', { item_id: item.id, kind: 'recall', answer: text })} /></>}
-            {item.phase === 'recall_evaluating' && <div className="learning-notice" role="status">{item.evaluation_error ? '평가가 중단됐어요. 재평가하거나 직접 점검하세요.' : '설명 평가 중…'}</div>}
+            {item.phase === 'recall_evaluating' && <div className="learning-notice" role="status">{item.evaluation_error ? '평가가 중단됐어요. 재평가하거나 직접 점검해 주세요.' : '설명 평가 중…'}</div>}
             {item.phase !== 'recall_answering' && item.draft && !item.phase.startsWith('check') && <details className="learning-submitted"><summary>내가 제출한 설명</summary><Markdown text={item.draft} /></details>}
             {item.feedback && !item.phase.startsWith('check') && <LearningFeedback feedback={item.feedback} />}
             {item.evaluation_error && item.phase !== 'recall_evaluating' && <p role="status">평가하지 못했어요. 답변은 저장됐고 오답으로 처리하지 않았어요.</p>}
             {item.self_check && <p className="learning-caption">자기 점검은 AI 평가와 별도로 기록됩니다.</p>}
-            {item.phase === 'repair' && <div className="learning-notice">필요한 힌트를 확인하고 문제를 푸세요.</div>}
+            {item.phase === 'repair' && <div className="learning-notice">필요한 힌트를 확인하고 문제를 풀어 주세요.</div>}
             {operation?.retryable && operation.kind === 'evaluate' && <button type="button" disabled={blocked} onClick={() => { void command(`operations/${operation.id}/retry`).catch(() => undefined); }}>같은 답변 다시 평가</button>}
             {item.check && <fieldset className="learning-check" disabled={blocked || item.phase !== 'check_answering'}><legend>확인 문제</legend><Markdown text={item.check.question} />
               {item.check.options.map((option, index) => <label className={`learning-option${item.check_result?.answer_index === index ? ' is-correct' : item.check_result?.selected === index ? ' is-incorrect' : ''}`} key={index}>

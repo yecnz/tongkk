@@ -29,7 +29,7 @@ export default function LearningResume({ variant = 'dashboard' }: { variant?: 'd
     </div>
     {loading ? <p className="learning-resume-message" role="status">진행 중인 학습을 불러오는 중…</p> : error ? <div className="learning-resume-error" role="alert">{error}
       <button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button></div> : sessions.length === 0
-      ? <p className="learning-resume-message">진행 중인 학습이 없습니다.{variant === 'page' ? ' 위에서 새 학습을 시작하세요.' : ' 새 학습을 시작하세요.'}</p>
+      ? <p className="learning-resume-message">진행 중인 학습이 없습니다.{variant === 'page' ? ' 위에서 새 학습을 시작해 주세요.' : ' 새 학습을 시작해 주세요.'}</p>
       : <ul className="learning-resume-list">{sessions.slice(0, 5).map(session => <li key={session.id}>
         <Link to={`/learn/${session.id}`}><span className="learning-resume-material"><strong>{session.material_name}</strong><small>{statusLabels[session.status] || '진행 상태 확인'}</small></span>
           <span className="learning-resume-action">이어서 하기 →</span></Link></li>)}</ul>}

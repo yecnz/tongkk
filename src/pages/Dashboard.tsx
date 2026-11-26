@@ -557,7 +557,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           }}>×</button>
         </div>
         <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
-          오류나 개선 의견을 아래 이메일로 보내주세요.
+          오류나 개선 의견을 아래 이메일로 보내 주세요.
         </p>
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -860,7 +860,7 @@ export default function Dashboard() {
       eventCount ? `가까운 일정 ${eventCount}개` : "",
       reviewCount ? `복습 추천 ${reviewCount}개` : "",
     ].filter(Boolean);
-    if (parts.length === 0) return "자동으로 고른 항목이 없습니다. 반영할 항목을 선택하세요.";
+    if (parts.length === 0) return "자동으로 고른 항목이 없습니다. 반영할 항목을 선택해 주세요.";
     if (mode === "lighter") return `${parts.join("와 ")}만 가볍게 반영할게요.`;
     if (mode === "harder") return `${parts.join("와 ")}를 조금 빡세게 반영할게요.`;
     if (mode === "assignment") return `과제 중심으로 ${parts.join("와 ")}를 골라뒀어요.`;
@@ -1164,7 +1164,7 @@ export default function Dashboard() {
     if (reviewNavigating) return;
     if (!requireAuth("자료를 복습하려면 로그인이 필요해요")) return;
     if (!hasLoadedCourses) {
-      showToast("강의 목록을 불러오는 중이에요. 잠시 후 다시 눌러주세요.", "info");
+      showToast("강의 목록을 불러오는 중이에요. 잠시 후 다시 눌러 주세요.", "info");
       return;
     }
     if (!reviewCourse) {
@@ -1250,7 +1250,7 @@ export default function Dashboard() {
           { text: "⭐️ Tongkk 베타 오픈 ⭐️ ", color: "var(--color-pink-deep)" },
           "일부 기능이 불완전하거나 오류가 있을 수 있습니다. ",
           "Tongkk는 무료로 이용할 수 있습니다. ",
-          "설문 참여는 공지사항을 확인하세요."
+          "설문 참여는 공지사항을 확인해 주세요."
 ,
         ]} />
         <button type="button"
@@ -1715,7 +1715,7 @@ export default function Dashboard() {
                       background: "var(--color-card)", border: "1px solid var(--color-border-soft)",
                     }}>
                       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--color-text-secondary)" }}>
-                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인하세요.
+                        처음이라면 「{diagnosticCourse}」 쉬운 5문제로 현재 수준을 먼저 확인해 주세요.
                       </p>
                       <button
                         type="button"
@@ -1762,7 +1762,7 @@ export default function Dashboard() {
               )}
               {!canGenerateStudyPlan && (
                 <p style={{ color: "var(--color-muted)", fontSize: 13, textAlign: "center", padding: "6px 0 12px", margin: 0 }}>
-                  먼저 D-day에 과제나 일정을 추가하세요
+                  먼저 D-day에 과제나 일정을 추가해 주세요
                 </p>
               )}
               {todayPlanEntries.length === 0 ? (

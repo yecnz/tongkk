@@ -48,7 +48,7 @@ export default function Auth() {
       endRecovery(); // recovery 종료 → 아래 리다이렉트 가드가 대시보드로 이동시킨다.
       navigate('/', { replace: true });
     } catch (err) {
-      setRecoveryError(authErrorMessage(err, '비밀번호 변경에 실패했습니다. 로그인 상태를 확인하거나 새 재설정 메일을 요청하세요.'));
+      setRecoveryError(authErrorMessage(err, '비밀번호를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setSubmitting(false);
       pending.current = false;
@@ -113,7 +113,7 @@ export default function Auth() {
                   autoComplete="new-password" disabled={submitting} invalid={passwordError} describedBy={`${id}-password-hint`} />
                 <p id={`${id}-password-hint`} className="auth-signup-hint"
                   data-valid={passwordValid} role={passwordError ? 'alert' : undefined}>
-                  {passwordError ? '비밀번호를 8자 이상 입력해주세요.' : '8자 이상'}
+                  {passwordError ? '비밀번호를 8자 이상 입력해 주세요.' : '8자 이상'}
                 </p>
               </div>
               <div>
@@ -149,7 +149,7 @@ export default function Auth() {
                   로그인이 필요합니다
                 </h1>
                 <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>
-                  Tongkk를 이용하려면 로그인해주세요
+                  Tongkk를 이용하려면 로그인해 주세요
                 </p>
                 <button
                   type="button"

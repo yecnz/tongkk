@@ -48,7 +48,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "여기서 강의를 만들고 자료를 올려요",
-        body: "과목을 추가하고 강의자료를 업로드하세요.",
+        body: "과목을 추가하고 강의자료를 업로드해 주세요.",
       },
     ],
   },
@@ -61,7 +61,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "자료를 올려 시작하기",
-        body: "파일을 업로드하거나 텍스트를 붙여넣으세요.",
+        body: "파일을 업로드하거나 텍스트를 붙여넣어 주세요.",
       },
       {
         title: "요약에 반영할 자료 고르기",
@@ -69,7 +69,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
       },
       {
         title: "종류를 고르고 생성하기",
-        body: "요약 형식을 선택하고 생성하세요. 다른 화면에서도 완료 알림을 받을 수 있습니다.",
+        body: "요약 형식을 선택하고 생성해 주세요. 다른 화면에서도 완료 알림을 받을 수 있습니다.",
       },
     ],
   },
@@ -83,11 +83,11 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "만든 요약으로 학습해요",
-        body: "탭에서 원본·요약·퀴즈를 확인하세요. 본문을 드래그하면 튜터에게 질문할 수 있습니다.",
+        body: "탭에서 원본·요약·퀴즈를 확인해 주세요. 본문을 드래그하면 튜터에게 질문할 수 있습니다.",
       },
       {
         title: "퀴즈로 바로 점검해요",
-        body: "퀴즈 탭에서 문제를 생성하고 이해도를 확인하세요.",
+        body: "퀴즈 탭에서 문제를 생성하고 이해도를 확인해 주세요.",
       },
     ],
   },
@@ -101,7 +101,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "자료를 올려 퀴즈를 만들어요",
-        body: "자료를 업로드하고 퀴즈에 반영할 자료를 선택하세요.",
+        body: "자료를 업로드하고 퀴즈에 반영할 자료를 선택해 주세요.",
       },
       {
         title: "시험 모드는 실전처럼",
@@ -109,7 +109,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
       },
       {
         title: "AI가 자료를 분석해 문제를 만들어요",
-        body: "퀴즈를 생성하세요. 이전에 푼 문제는 제외됩니다.",
+        body: "퀴즈를 생성해 주세요. 이전에 푼 문제는 제외됩니다.",
       },
     ],
   },
@@ -121,7 +121,7 @@ export const TUTORIALS: Record<TutorialKey, TutorialConfig> = {
     steps: [
       {
         title: "풀이 화면 사용법",
-        body: "객관식·OX는 선택 즉시 채점되며 수정할 수 없습니다. 단답형·주관식은 제출 후 채점됩니다. 시험 모드는 종료 후 결과를 확인하세요.",
+        body: "객관식·OX는 선택 즉시 채점되며 수정할 수 없습니다. 단답형·주관식은 제출 후 채점됩니다. 시험 모드는 종료 후 결과를 확인해 주세요.",
       },
     ],
   },

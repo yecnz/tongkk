@@ -197,7 +197,7 @@ describe('login, signup and reset email UI', () => {
     await render('/auth', { modal: true });
     expect(container.querySelector('form')?.noValidate).toBe(true);
     await input(0, email); await input(1, password); await submit();
-    expect(container.querySelector('[role=alert]')?.textContent).toBe('이메일 또는 비밀번호가 맞지 않아요. 다시 확인해주세요.');
+    expect(container.querySelector('[role=alert]')?.textContent).toBe('이메일 또는 비밀번호가 맞지 않아요. 다시 확인해 주세요.');
     expect(fetch).not.toHaveBeenCalled();
   });
   it('keeps login available for retry after a network failure', async () => {
@@ -217,7 +217,8 @@ describe('login, signup and reset email UI', () => {
     expect(container.querySelector('input[type=password]')).toBeNull();
     expect(container.querySelector('form')?.noValidate).toBe(true);
     await input(0, 'student@@example.test'); await submit();
-    expect(container.querySelector('[role=alert]')?.textContent).toBe('이메일 주소를 다시 확인해주세요.');
+    expect(container.querySelector('.auth-signup-hint[role=alert]')?.textContent).toBe('올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해 주세요.');
+    expect(container.querySelector('input[type=email]')?.getAttribute('aria-invalid')).toBe('true');
     expect(auth.resetPasswordForEmail).not.toHaveBeenCalled();
     await input(0, 'ui-reset@example.test'); await submit(true);
     expect(auth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
@@ -237,8 +238,8 @@ describe('login, signup and reset email UI', () => {
       const description = element.getAttribute('aria-describedby')!;
       return document.getElementById(description)?.textContent;
     })).toEqual([
-      '올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해주세요.',
-      '비밀번호를 8자 이상 입력하세요.',
+      '올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해 주세요.',
+      '비밀번호를 8자 이상 입력해 주세요.',
       '비밀번호가 일치하지 않아요.',
     ]);
     expect(auth.signUp).not.toHaveBeenCalled();
@@ -268,7 +269,7 @@ describe('login, signup and reset email UI', () => {
   });
   it('offers signup confirmation instead of treating an unconfirmed account as a wrong password', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ detail: '이메일 인증을 완료해주세요.', error_code: 'email_not_confirmed' }), { status: 403 })));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ detail: '이메일 인증을 완료해 주세요.', error_code: 'email_not_confirmed' }), { status: 403 })));
     await render('/auth', { modal: true });
     await input(0, 'pending@example.test'); await input(1, 'password'); await submit();
     expect(container.textContent).toContain('이메일 인증');

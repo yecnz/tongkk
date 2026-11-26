@@ -52,7 +52,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const [emailTypeMismatch, setEmailTypeMismatch] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [signupAttempted, setSignupAttempted] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const [code, setCode] = useState("");
   const [codeFocus, setCodeFocus] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
@@ -72,7 +72,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const passwordValid = password.length >= 8;
   const passwordsMatch = passwordConfirmation.length > 0 && password === passwordConfirmation;
   const signupValid = emailValid && passwordValid && passwordsMatch;
-  const emailError = signupAttempted && !emailValid && '올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해주세요.';
+  const emailError = attempted && !emailValid && '올바르지 않은 이메일입니다. 이메일 형식에 맞게 입력해 주세요.';
   const kind = view === 'reset' ? 'reset' : 'signup';
   const wait = emailWaitSeconds(kind, email, now);
   // 보낸 인증번호의 남은 시간(초). 이번 창에서 보낸 적이 없으면 null.
@@ -87,7 +87,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
 
   function changeView(next: View) {
     setView(next); setError(''); setMessage(''); setPassword(''); setCode(''); setSentAt(null); setNow(Date.now());
-    setPasswordConfirmation(''); setSignupAttempted(false); setWrongCode(false);
+    setPasswordConfirmation(''); setAttempted(false); setWrongCode(false);
   }
 
   function changeEmail(event: ChangeEvent<HTMLInputElement>) {
@@ -103,8 +103,9 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
       if (expired || (sentAt !== null && Date.now() >= sentAt + CODE_TTL_MS)) { void resend(); return; }
       if (code.length !== CODE_LENGTH) return;
     }
+    if (webReset) { setAttempted(true); setError(''); if (!emailValid) return; }
     if (signingUp) {
-      setSignupAttempted(true);
+      setAttempted(true);
       setError('');
       if (!signupValid) return;
     }
@@ -114,7 +115,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     }
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail) || (webReset && emailTypeMismatch)) {
-      setError("이메일 주소를 다시 확인하세요."); return;
+      setError("이메일 주소를 다시 확인해 주세요."); return;
     }
     if (view === 'reset' && emailWaitSeconds(kind, email) > 0) return;
     pending.current = true;
@@ -122,7 +123,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     try {
       if (view === 'reset') {
         await resetPassword(trimmedEmail);
-        setMessage('재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인하세요.');
+        setMessage('재설정 메일을 요청했습니다. 가입한 이메일이라면 메일함과 스팸함을 확인해 주세요.');
       } else if (view === 'confirmation') {
         await verifySignupCode(trimmedEmail, code);
         onAuthenticated();
@@ -141,10 +142,10 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
         changeView('confirmation');
         return;
       }
-      const fallback = view === 'reset' ? '재설정 메일을 보내지 못했어요. 잠시 후 다시 시도하세요.'
-        : view === 'confirmation' ? '인증하지 못했어요. 인증번호를 확인하고 다시 시도하세요.'
-        : mode === 'signUp' ? '회원가입을 완료하지 못했어요. 입력한 정보를 확인하고 다시 시도하세요.'
-        : '로그인하지 못했어요. 입력한 정보를 확인하고 다시 시도하세요.';
+      const fallback = view === 'reset' ? '재설정 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'
+        : view === 'confirmation' ? '인증하지 못했어요. 잠시 후 다시 시도해 주세요.'
+        : mode === 'signUp' ? '회원가입을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.'
+        : '로그인하지 못했어요. 잠시 후 다시 시도해 주세요.';
       // Supabase는 틀린 번호와 만료된 번호 모두 otp_expired로 응답한다.
       if (confirming && err && typeof err === 'object' && 'code' in err && err.code === 'otp_expired') {
         setWrongCode(true);
@@ -160,7 +161,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
     if (pending.current || emailWaitSeconds(kind, email) > 0) return;
     const trimmedEmail = email.trim();
     if (!isValidAuthEmail(trimmedEmail)) {
-      setError("이메일 주소를 다시 확인하세요."); return;
+      setError("이메일 주소를 다시 확인해 주세요."); return;
     }
     pending.current = true;
     setError(''); setMessage(''); setWrongCode(false); setSubmitting(true);
@@ -169,7 +170,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
       setCode(''); setSentAt(Date.now());
       setMessage('새 인증번호를 보냈어요.');
     } catch (err) {
-      setError(authErrorMessage(err, '인증 메일을 보내지 못했어요. 잠시 후 다시 시도하세요.'));
+      setError(authErrorMessage(err, '인증 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'));
     } finally {
       pending.current = false; setSubmitting(false); setNow(Date.now());
     }
@@ -180,7 +181,7 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
   const compactCredentials = compact && view === 'credentials';
   const codeError = wrongCode && !expired;
   const confirmationNotice = error || (expired ? '인증번호가 만료되었습니다. 새 인증번호를 받아 주세요.'
-    : codeError ? '인증번호가 일치하지 않습니다. 다시 확인해주세요.' : message);
+    : codeError ? '인증번호가 일치하지 않습니다. 다시 확인해 주세요.' : message);
   const submitDisabled = submitting || (view === 'reset' && wait > 0)
     || (confirming && (expired ? wait > 0 : code.length < CODE_LENGTH));
 
@@ -201,14 +202,14 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             <h2 id={`${id}-title`}>{title}</h2>
             {confirming ? <p className="auth-confirmation-description">
               {email.trim()} 으로 {sentAt === null ? '받은 인증번호를 입력해 주세요.' : '인증번호를 보냈어요.'}<br />
-              메일이 안 보이면 스팸함을 확인하세요.
+              메일이 안 보이면 스팸함을 확인해 주세요.
             </p> : webReset ? (
               <p className="auth-recovery-description" role={message ? 'status' : undefined}>
                 {message ? <>가입한 이메일이라면 재설정 링크를 보냈어요.<br />메일이 안 보이면 스팸함을 확인해 주세요.</>
                   : '가입한 이메일로 비밀번호 재설정 링크를 보내드려요.'}
               </p>
             ) : webSignIn ? (subtitle && <p id={`${id}-description`} className="sr-only">{subtitle}</p>)
-              : !signingUp && <p>{resetting ? '가입한 이메일로 재설정 링크를 받으세요' : subtitle ?? '계정에 로그인하세요'}</p>}
+              : !signingUp && <p>{resetting ? '가입한 이메일로 재설정 링크를 받아 주세요' : subtitle ?? '계정에 로그인해 주세요'}</p>}
           </div>
           <button type="button" onClick={onClose} disabled={submitting} aria-label="닫기"
             className={compact ? 'mini-login-close' : 'auth-dialog-close'}>
@@ -225,11 +226,11 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
           </div>
           <SignupPasswordField id={`${id}-password`} label="비밀번호" value={password} onChange={setPassword}
             hint="8자 이상" valid={passwordValid} compact={compact} disabled={submitting}
-            error={signupAttempted && !passwordValid ? '비밀번호를 8자 이상 입력하세요.' : ''} />
+            error={attempted && !passwordValid ? '비밀번호를 8자 이상 입력해 주세요.' : ''} />
           <SignupPasswordField id={`${id}-password-confirmation`} label="비밀번호 확인" value={passwordConfirmation}
             onChange={setPasswordConfirmation} hint="비밀번호 일치" valid={passwordsMatch && passwordValid}
             compact={compact} disabled={submitting}
-            error={signupAttempted && !passwordsMatch ? '비밀번호가 일치하지 않아요.' : ''} />
+            error={attempted && !passwordsMatch ? '비밀번호가 일치하지 않아요.' : ''} />
         </div>}
         {webSignIn && <div className="auth-credential-fields">
           <input id={`${id}-email`} className="auth-credential-input" type="email" aria-label="이메일"
@@ -240,18 +241,22 @@ export default function LoginModal({ onClose, onAuthenticated = onClose, initial
             비밀번호를 잊으셨나요?
           </button>
         </div>}
-        {webReset && <input id={`${id}-email`} className="auth-credential-input" type="email" aria-label="이메일"
-          placeholder="이메일" autoComplete="email" required disabled={submitting} value={email} onChange={changeEmail} />}
+        {webReset && <div>
+          <input id={`${id}-email`} className="auth-credential-input" type="email" aria-label="이메일"
+            placeholder="이메일" autoComplete="email" required disabled={submitting} value={email} onChange={changeEmail}
+            aria-invalid={!!emailError} aria-describedby={emailError ? `${id}-email-error` : undefined} />
+          {emailError && <p id={`${id}-email-error`} className="auth-signup-hint" role="alert">{emailError}</p>}
+        </div>}
         {compact && !confirming && !signingUp && <div className="mini-login-field">
           <label htmlFor={`${id}-email`}>이메일</label>
           <input id={`${id}-email`} type="email" value={email} disabled={submitting} required autoComplete="email" autoFocus={compact}
-            onChange={changeEmail} placeholder="이메일을 입력하세요" />
+            onChange={changeEmail} placeholder="이메일을 입력해 주세요" />
         </div>}
         {compactCredentials && !signingUp && <div className="mini-login-field">
           <label htmlFor={`${id}-password`}>비밀번호</label>
           <input id={`${id}-password`} type="password" value={password} disabled={submitting} required
             onChange={event => setPassword(event.target.value)}
-            placeholder="비밀번호를 입력하세요" autoComplete="current-password" minLength={1} />
+            placeholder="비밀번호를 입력해 주세요" autoComplete="current-password" minLength={1} />
         </div>}
         {compactCredentials && <button type="button" className="mini-login-reset" disabled={submitting} onClick={() => changeView('reset')}>비밀번호를 잊으셨나요?</button>}
         {confirming && <>

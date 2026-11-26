@@ -1176,7 +1176,7 @@ export default function Summary() {
       pendingSummarySave.current = null;
       setActiveSummaryId(saved.id || null);
       setSummaries(previous => [saved, ...previous.filter(item => item.id !== saved.id)]);
-    } catch { setSummaryError('요약을 저장하지 못했어요. 다시 시도하세요.'); }
+    } catch { setSummaryError('요약을 저장하지 못했어요. 다시 시도해 주세요.'); }
     finally { summaryCommandRef.current = false; setIsSummarizing(false); }
   };
 
@@ -1282,7 +1282,7 @@ export default function Summary() {
               {sizeLimitNotice.names.join(", ")}
             </div>
             <p style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "var(--color-muted)" }}>
-              원본을 저장하려면 50MB 미만으로 나눠 업로드하세요.
+              원본을 저장하려면 50MB 미만으로 나눠 업로드해 주세요.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
@@ -1565,7 +1565,7 @@ export default function Summary() {
                     <textarea
                       value={textMaterialContent}
                       onChange={e => setTextMaterialContent(e.target.value)}
-                      placeholder="강의 스크립트나 노트를 붙여넣으세요..."
+                      placeholder="강의 스크립트나 노트를 붙여넣어 주세요..."
                       rows={8}
                       style={{ padding: 13, borderRadius: 10, border: `1px solid ${BORDER_COLOR}`, fontSize: 13, lineHeight: 1.6, resize: "vertical", outline: "none", fontFamily: "inherit" }}
                     />
@@ -1725,7 +1725,7 @@ export default function Summary() {
                           type="button"
                           onClick={requestBulkDeleteMaterials}
                           disabled={selectedMaterials.length === 0}
-                          title={selectedMaterials.length === 0 ? "삭제할 자료를 먼저 선택하세요" : `선택한 자료 ${selectedMaterials.length}개 삭제`}
+                          title={selectedMaterials.length === 0 ? "삭제할 자료를 먼저 선택해 주세요" : `선택한 자료 ${selectedMaterials.length}개 삭제`}
                           style={{
                             border: `1px solid ${selectedMaterials.length === 0 ? BORDER_COLOR : "color-mix(in srgb, var(--color-danger) 38%, transparent)"}`,
                             background: "var(--color-card)", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontWeight: 800,
@@ -1907,8 +1907,8 @@ export default function Summary() {
                   ) : (
                     <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
                       {selectedMaterials.length > 0
-                        ? "페이지 정보가 없습니다. 파일을 다시 업로드하세요."
-                        : "자료를 선택해 페이지 범위를 지정하세요."}
+                        ? "페이지 정보가 없습니다. 파일을 다시 업로드해 주세요."
+                        : "자료를 선택해 페이지 범위를 지정해 주세요."}
                     </div>
                   )}
 
@@ -1937,7 +1937,7 @@ export default function Summary() {
                     cursor: selectedMarkdown && !isExtracting && !isSummarizing && templatePicked ? "pointer" : "not-allowed",
                   }}
                 >
-                  {isExtracting ? "자료 분석 중..." : isSummarizing ? "요약 생성 중..." : !templatePicked ? "요약 종류를 선택하세요" : "요약 생성하기"}
+                  {isExtracting ? "자료 분석 중..." : isSummarizing ? "요약 생성 중..." : !templatePicked ? "요약 종류를 선택해 주세요" : "요약 생성하기"}
                 </button>
               )}
           </div>

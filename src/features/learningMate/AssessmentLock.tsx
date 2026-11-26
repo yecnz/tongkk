@@ -8,7 +8,7 @@ export default function AssessmentLock() {
     if (!user) return;
     let active = true;
     const send = (enabled: boolean) => workflowRequest('/learning-mate/assessment-lock', 'POST', { token: token.current, active: enabled, sequence: ++sequence.current });
-    const lock = () => { void send(true).then(() => { if (active) setError(''); }).catch(() => { if (active) setError('시험 중 학습 도움 제한을 등록하지 못했어요. 연결을 확인하세요.'); }); };
+    const lock = () => { void send(true).then(() => { if (active) setError(''); }).catch(() => { if (active) setError('시험 중 학습 도움 제한을 등록하지 못했어요. 연결을 확인해 주세요.'); }); };
     lock(); const timer = setInterval(lock, 30000);
     return () => { active = false; clearInterval(timer); void send(false).catch(() => {}); };
   }, [user]);

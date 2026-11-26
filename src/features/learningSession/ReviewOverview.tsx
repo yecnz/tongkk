@@ -26,7 +26,7 @@ export default function ReviewOverview({ variant = 'dashboard' }: { variant?: 'd
   const ratio = (correct: number, total: number) => total ? `${correct}/${total}회` : '아직 기록 없음';
   return <Card className="learning-resume" role="region" aria-label="복습 현황">
     <div className="learning-resume-heading"><div><h2>{variant === 'stats' ? '학습과 기억 유지' : variant === 'all' ? '내 복습 목록' : '오늘 복습'}</h2>
-      <p>{variant === 'stats' ? '학습 직후와 복습 결과를 비교하세요.' : '개념을 설명하고 확인 문제를 푸세요.'}</p></div>
+      <p>{variant === 'stats' ? '학습 직후와 복습 결과를 비교해 주세요.' : '개념을 설명하고 확인 문제를 풀어 주세요.'}</p></div>
       {variant !== 'all' && <Link to="/review?tab=today" className="learning-resume-start">복습 관리 →</Link>}</div>
     {error ? <div className="learning-resume-error" role="alert">{error}<button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button></div>
       : !data ? <p role="status">불러오는 중…</p> : <>
@@ -36,10 +36,10 @@ export default function ReviewOverview({ variant = 'dashboard' }: { variant?: 'd
           <details className="learning-note"><summary>기억 유지 집계 기준</summary>
             <p>예정일 이후 도움 없이 설명과 문제를 모두 제출한 기록을 집계합니다. 판단 보류와 원문이 변경된 기록은 제외합니다.</p>
           </details></>
-          : data.cards.length === 0 ? <p className="learning-resume-message">{variant === 'all' ? '완료한 학습에서 복습할 개념을 추가하세요.' : '지금 복습할 개념이 없습니다.'}</p>
+          : data.cards.length === 0 ? <p className="learning-resume-message">{variant === 'all' ? '완료한 학습에서 복습할 개념을 추가해 주세요.' : '지금 복습할 개념이 없습니다.'}</p>
             : <ul className="learning-resume-list">{data.cards.map(card => <li key={card.id}>
               <Link to={card.source_changed ? '/learn' : `/learn/review/${card.id}`}><span className="learning-resume-material"><strong>{card.title}</strong>
-                <small>{card.source_changed ? '원문 변경 · 새 학습 필요' : new Date(card.due_at).getTime() <= data.fetchedAt ? '복습 예정일 · 기억에서 다시 설명하세요' : `${new Date(card.due_at).toLocaleDateString('ko-KR')} 복습 예정`}</small></span>
+                <small>{card.source_changed ? '원문 변경 · 새 학습 필요' : new Date(card.due_at).getTime() <= data.fetchedAt ? '복습 예정일 · 기억에서 다시 설명해 주세요' : `${new Date(card.due_at).toLocaleDateString('ko-KR')} 복습 예정`}</small></span>
                 <span className="learning-resume-action">{card.source_changed ? '새 학습' : '복습하기'} →</span></Link></li>)}</ul>}
         {data.stats.changed_cards > 0 && <p className="learning-resume-message">원문이 바뀐 개념 {data.stats.changed_cards}개는 새 학습이 필요해요.</p>}
       </>}

@@ -202,14 +202,14 @@ const SettingsModal = ({
         {type === "notice" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
             <p style={{ margin: "0 0 10px" }}>Tongkk는 현재 캡스톤 시연용 MVP 단계입니다. 일부 기능이 불완전하거나 오류가 있을 수 있습니다.</p>
-            <p style={{ margin: "0 0 10px" }}>오류나 개선 의견을 보내주세요.</p>
+            <p style={{ margin: "0 0 10px" }}>오류나 개선 의견을 보내 주세요.</p>
             <p style={{ margin: 0 }}>문의 메일: tongkk.team@gmail.com</p>
           </div>
         )}
 
         {type === "contact" && (
           <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text)" }}>
-            <p style={{ margin: "0 0 12px" }}>오류 제보나 개선 요청은 팀 관리자에게 전달하세요.</p>
+            <p style={{ margin: "0 0 12px" }}>오류 제보나 개선 요청은 팀 관리자에게 전달해 주세요.</p>
             <a
               href="mailto:tongkk.team@gmail.com?subject=Tongkk%20문의"
               style={{ color: CYAN, fontWeight: 800, textDecoration: "none" }}
@@ -229,7 +229,7 @@ const SettingsModal = ({
             </p>
             {error && <div style={{ marginBottom: 12, color: "var(--color-danger)", fontSize: 12 }}>{error}</div>}
             <label style={{ display: "block", marginBottom: 6, fontSize: 12.5, fontWeight: 700, color: "var(--color-text-secondary)" }}>
-              계속하려면 <strong style={{ color: "var(--color-danger)" }}>삭제</strong>를 입력하세요
+              계속하려면 <strong style={{ color: "var(--color-danger)" }}>삭제</strong>를 입력해 주세요
             </label>
             <input
               value={confirmText}

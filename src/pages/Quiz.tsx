@@ -1289,7 +1289,7 @@ export default function Quiz() {
                 padding: "12px 16px", borderRadius: 10, background: "var(--color-surface)",
                 fontSize: 13, color: "var(--color-muted)", marginBottom: 14
               }}>
-                저장된 자료가 없습니다. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드하세요.
+                저장된 자료가 없습니다. 퀴즈를 만들려면 PDF·PPT·이미지·문서를 먼저 업로드해 주세요.
               </div>
             )}
 
@@ -1497,10 +1497,10 @@ export default function Quiz() {
             ) : (
               <div style={{ padding: "10px 12px", borderRadius: 10, background: MUTED_SURFACE, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-text-secondary)", marginBottom: 16 }}>
                 {selectedMaterials.length === 0
-                  ? "자료를 선택해 페이지 범위를 지정하세요."
+                  ? "자료를 선택해 페이지 범위를 지정해 주세요."
                   : selectedRawHasPageMarkers
-                    ? "페이지를 선택하려면 자료 출처를 원본으로 변경하세요."
-                    : "페이지 정보가 없습니다. 파일을 다시 업로드하세요."}
+                    ? "페이지를 선택하려면 자료 출처를 원본으로 변경해 주세요."
+                    : "페이지 정보가 없습니다. 파일을 다시 업로드해 주세요."}
               </div>
             )}
 
@@ -1518,7 +1518,7 @@ export default function Quiz() {
 
           {!isExtracting && selectedMaterials.length === 0 && (
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--color-muted)", textAlign: "center" }}>
-              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있습니다." : "반영할 자료를 1개 이상 선택하세요."}
+              {materials.length === 0 ? "자료를 먼저 올려야 퀴즈를 만들 수 있습니다." : "반영할 자료를 1개 이상 선택해 주세요."}
             </p>
           )}
           <button type="button" onClick={generate} disabled={!canGenerate} style={{
@@ -2001,7 +2001,7 @@ export default function Quiz() {
                 background: currentCorrect ? "var(--color-tint-cyan)" : "var(--color-tint-pink)",
                 color: currentCorrect ? CYAN : PINK, fontSize: 11, fontWeight: 850,
               }}>{currentCorrect ? "정답" : "오답"}</span>
-              <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인하세요</span>
+              <span style={{ minWidth: 0, fontSize: 12, fontWeight: 800, color: "var(--color-text-secondary)" }}>오답 확인 · 내 답과 정답을 확인해 주세요</span>
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -2061,7 +2061,7 @@ export default function Quiz() {
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     disabled={reviewMode || selected !== undefined || grading}
-                    placeholder="근거와 함께 답안을 작성하세요"
+                    placeholder="근거와 함께 답안을 작성해 주세요"
                     rows={5}
                     style={{
                       flex: 1,
@@ -2082,7 +2082,7 @@ export default function Quiz() {
                     value={typeof selected === "string" ? selected : shortAnswerInput}
                     onChange={e => setShortAnswerInput(e.target.value)}
                     disabled={reviewMode || selected !== undefined}
-                    placeholder="정답을 입력하세요"
+                    placeholder="정답을 입력해 주세요"
                     style={{
                       flex: 1, padding: "14px 16px", borderRadius: 12, border: "1.5px solid var(--color-border-soft)",
                       background: selected !== undefined ? "var(--color-surface)" : "var(--color-card)", fontSize: 14, color: "var(--color-text)", outline: "none"

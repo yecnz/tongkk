@@ -122,7 +122,7 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
       window.removeEventListener("afterprint", restoreTitle);
     };
     window.addEventListener("afterprint", restoreTitle);
-    setActionMessage("인쇄 창에서 '대상'을 'PDF로 저장'으로 선택하세요.");
+    setActionMessage("인쇄 창에서 '대상'을 'PDF로 저장'으로 선택해 주세요.");
     window.print();
   };
 
@@ -553,7 +553,7 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
                 suggestedQuestions={questions}
                 initialQuestion={!isLoading ? initialTutorQuestion : undefined}
                 pendingQuestion={tutorSelectionQuestion ?? undefined}
-                disabledReason="요약을 생성한 뒤 질문하세요"
+                disabledReason="요약을 생성한 뒤 질문해 주세요"
                 resetHistory={resetTutorHistory}
               />
             )}
@@ -589,7 +589,7 @@ export const SummaryActions = ({ template, content }: { template: SummaryTemplat
       window.removeEventListener("afterprint", restoreTitle);
     };
     window.addEventListener("afterprint", restoreTitle);
-    showToast("인쇄 창에서 '대상'을 'PDF로 저장'으로 선택하세요.", "info");
+    showToast("인쇄 창에서 '대상'을 'PDF로 저장'으로 선택해 주세요.", "info");
     window.print();
   };
 

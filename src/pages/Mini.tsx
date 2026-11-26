@@ -219,7 +219,7 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
                 {courses !== null && courses.length === 0 && !courseError ? (
                   <div className="mini-panel-empty"><p>등록된 과목이 없습니다.</p><a href="/" target="_blank">Tongkk에서 강의 추가하기 ↗</a></div>
                 ) : (
-                  <MiniSelect label="강의자료" placeholder={!course ? "먼저 과목을 선택하세요" : "강의자료 선택"} value={materialId} options={materials.map(material => ({ value: material.id, label: material.name }))} disabled={!course || materialLoading} expanded={expandedList === "material"} onToggle={() => setExpandedList(expandedList === "material" ? null : "material")} onChange={next => { setMaterialId(next); setSelectorOpen(false); setExpandedList(null); }} />
+                  <MiniSelect label="강의자료" placeholder={!course ? "먼저 과목을 선택해 주세요" : "강의자료 선택"} value={materialId} options={materials.map(material => ({ value: material.id, label: material.name }))} disabled={!course || materialLoading} expanded={expandedList === "material"} onToggle={() => setExpandedList(expandedList === "material" ? null : "material")} onChange={next => { setMaterialId(next); setSelectorOpen(false); setExpandedList(null); }} />
                 )}
                 {courseError && <div role="alert" className="mini-panel-error"><p>{courseError}</p><button type="button" className="mini-retry" onClick={() => { setCourseError(""); setCourseRetry(value => value + 1); }}>다시 시도</button></div>}
                 {materialLoading && <p className="mini-panel-status">자료를 불러오는 중…</p>}

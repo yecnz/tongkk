@@ -17,7 +17,7 @@ export default function LearningMateHost() {
     let active = true;
     async function load() {
       const courseId = scope!.courseId || (await fetchCourses()).find(c => c.name === scope!.courseName)?.id;
-      if (!courseId) throw new Error('과목을 다시 선택하세요.');
+      if (!courseId) throw new Error('과목을 다시 선택해 주세요.');
       const value = await workflowRequest<MateScope & { title: string }>(`/learning-mate/context?${new URLSearchParams({ course_id: courseId, material_id: scope!.materialId })}`);
       if (active) setContext(value);
     }
@@ -29,9 +29,9 @@ export default function LearningMateHost() {
   return <>
     <button ref={button} type="button" className="learning-mate-launch" aria-expanded={open} aria-controls="learning-mate-panel" onClick={() => setOpen(v => !v)}>학습 메이트</button>
     {open && <section id="learning-mate-panel" className="learning-mate-panel" aria-label="학습 메이트">
-      <header><div><strong>학습 메이트</strong><p>{scope ? `연결 자료: ${scope.title}` : '질문할 자료를 여세요.'}</p></div><button type="button" className="workflow-button" onClick={close} aria-label="학습 메이트 닫기">닫기</button></header>
+      <header><div><strong>학습 메이트</strong><p>{scope ? `연결 자료: ${scope.title}` : '질문할 자료를 열어 주세요.'}</p></div><button type="button" className="workflow-button" onClick={close} aria-label="학습 메이트 닫기">닫기</button></header>
       {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(n => n + 1)}>다시 연결</button></p>
-        : !scope ? <p>자료나 학습 이슈를 열고 질문하세요.</p>
+        : !scope ? <p>자료나 학습 이슈를 열고 질문해 주세요.</p>
           : !context ? <p role="status">자료를 확인하는 중…</p>
             : <div className="learning-mate-chat"><AITutorDrawer key={`${context.courseId}:${context.materialId}:${context.sourceHash}`} scope={context} contextTitle={context.title}
               materialId={context.materialId} contextMarkdown="현재 자료를 바탕으로 답변합니다." layout="embedded" fill open /></div>}
