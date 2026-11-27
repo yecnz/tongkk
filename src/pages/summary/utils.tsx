@@ -135,3 +135,25 @@ export const formatHubDate = (timestamp?: number) => {
     minute: "2-digit",
   }).format(new Date(timestamp));
 };
+
+// 자료별 '마지막에 본 요약' id를 기억해, 다음에 자료 상세로 들어올 때 그 요약을 먼저 보여준다.
+const LAST_SUMMARY_KEY = "tongkk-last-summary-by-material";
+
+export const readLastSummaryId = (materialId: string): string => {
+  try {
+    const map = JSON.parse(localStorage.getItem(LAST_SUMMARY_KEY) || "{}") as Record<string, string>;
+    return map[materialId] || "";
+  } catch {
+    return "";
+  }
+};
+
+export const writeLastSummaryId = (materialId: string, summaryId: string) => {
+  try {
+    const map = JSON.parse(localStorage.getItem(LAST_SUMMARY_KEY) || "{}") as Record<string, string>;
+    map[materialId] = summaryId;
+    localStorage.setItem(LAST_SUMMARY_KEY, JSON.stringify(map));
+  } catch {
+    /* localStorage 사용 불가 시 무시 */
+  }
+};
