@@ -37,7 +37,7 @@ function nodeText(node: ReactNode): string {
 // 코드블록 구조도, 표를 토큰 색으로 렌더한다(왼쪽 색 띠 없이 사방 중립 테두리).
 const md: Components = {
   h1: ({ children }) => <h1 style={{ margin: "0 0 14px", paddingBottom: 9, borderBottom: "2px solid var(--color-border-soft)", fontSize: 19, lineHeight: 1.35, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h1>,
-  h2: ({ children }) => <h2 id="sample-demo-title" style={{ margin: "22px 0 10px", padding: "8px 11px", borderRadius: 8, background: "var(--color-surface)", fontSize: 15.5, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
+  h2: ({ children }) => <h2 style={{ margin: "22px 0 10px", padding: "8px 11px", borderRadius: 8, background: "var(--color-surface)", fontSize: 15.5, lineHeight: 1.45, fontWeight: 850, color: "var(--color-text-strong)" }}>{children}</h2>,
   h3: ({ children }) => <h3 style={{ display: "inline-block", margin: "16px 0 7px", padding: "3px 8px", borderRadius: 6, background: "var(--color-surface)", fontSize: 13.5, lineHeight: 1.45, fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</h3>,
   p: ({ children }) => <p style={{ margin: "0 0 10px", lineHeight: 1.7, color: "var(--color-text)" }}>{children}</p>,
   strong: ({ children }) => <strong style={{ fontWeight: 800, color: "var(--color-text-strong)" }}>{children}</strong>,
@@ -165,7 +165,7 @@ export function SampleDemo({ onClose, onStart }: { onClose: () => void; onStart:
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 800, color: PINK, padding: "2px 8px", borderRadius: 999, background: "var(--color-tint-pink)" }}>예시</span>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 850, color: "var(--color-text-strong)" }}>{SAMPLE_TOPIC}</h2>
+              <h2 id="sample-demo-title" style={{ margin: 0, fontSize: 18, fontWeight: 850, color: "var(--color-text-strong)" }}>{SAMPLE_TOPIC}</h2>
             </div>
             <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--color-muted)" }}>
               샘플 자료 <strong style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>{SAMPLE_SOURCE_NAME}</strong>로 만든 예시예요. 실제로는 내 강의 자료를 올려 만들어요.
