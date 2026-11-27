@@ -36,8 +36,9 @@ const MenubarSettings = lazy(() => import("./pages/MenubarSettings"));
 const Flashcards = lazy(() => import('./features/flashcards/Flashcards'));
 const StudyPaths = lazy(() => import('./features/studyPath/StudyPaths'));
 const SourcePage = lazy(() => import('./features/sources/SourcePage'));
+const Teachers = lazy(() => import('./features/teachers/Teachers'));
 
-function AppShell() {
+function ThemeSync() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
@@ -62,6 +63,12 @@ function AppShell() {
       ignore = true;
     };
   }, [user, loading]);
+
+  return null;
+}
+
+function AppShell() {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -104,6 +111,7 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
+        <ThemeSync />
         <BrowserRouter>
           <AuthGateProvider>
             <SampleDemoProvider>
@@ -119,6 +127,7 @@ function App() {
                     </Route>
                     <Route path="/privacy" element={<Legal kind="privacy" />} />
                     <Route path="/terms" element={<Legal kind="terms" />} />
+                    <Route path="/teachers" element={<Suspense fallback={<p role="status">불러오는 중…</p>}><Teachers /></Suspense>} />
                     <Route path="/*" element={<AppShell />} />
                   </Routes>
                 </AuthCallbackBoundary>

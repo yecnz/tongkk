@@ -39,6 +39,8 @@ export function useTutorial(): TutorialApi {
 function pickAutoCandidate(pathname: string, isAuthed: boolean): { key: TutorialKey; waitForReady: boolean } | null {
   // 메뉴바 미니 창은 작아서 튜토리얼을 띄우지 않는다.
   if (pathname.startsWith("/mini")) return null;
+  // 교수자 공간은 학생용 시작 안내와 독립적으로 둘러본다.
+  if (pathname === "/teachers" || pathname.startsWith("/teachers/")) return null;
   // 비로그인 첫 방문자에게는 전역 welcome을 1회 노출(라우트 무관, 기존 OnboardingGate 대체).
   if (!isAuthed && !hasSeenTutorial("welcome", TUTORIALS.welcome.version)) {
     return { key: "welcome", waitForReady: false };

@@ -1,6 +1,7 @@
 import BrandLogo from "./components/BrandLogo";
 import { MenubarDownloadModal } from "./components/MenubarDownloadModal";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 // 피드백을 받을 팀 메일 (사이드바 하단·문의 메일 공통)
@@ -184,6 +185,19 @@ export const Sidebar = ({ active, onNav, onClose }: SidebarProps) => {
 
       {/* 하단 피드백 — mailto로 메일 작성을 띄우고, 메일 클라이언트가 없는 사용자를 위해 주소도 노출 */}
       <div style={{ marginTop: "auto", padding: "16px 20px 4px", borderTop: `1px solid ${BORDER_COLOR}` }}>
+        <Link
+          to="/teachers"
+          onClick={onClose}
+          className="tongkk-hover-row"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+            padding: "11px 14px", marginBottom: 16, borderRadius: 10,
+            border: `1px solid ${BORDER_COLOR}`, background: MUTED_SURFACE,
+            color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 600, textDecoration: "none",
+          }}
+        >
+          교수자 공간 <span aria-hidden="true">↗</span>
+        </Link>
         {/* 메뉴바 앱 받기 — 다운로드를 시작하면서 설치 안내 모달을 띄운다 */}
         <a
           href={MENUBAR_DMG_URL}
