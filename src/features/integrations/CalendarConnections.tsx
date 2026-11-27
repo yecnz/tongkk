@@ -4,6 +4,7 @@ import { Card } from '../../common';
 import CustomSelect from '../../components/CustomSelect';
 import { workflowRequest } from '../../services/workflow';
 import type { CalendarIntegration } from '../../services/calendarIntegration';
+import { goToOAuth, listenOAuthResult, openOAuthPopup } from '../../services/oauthPopup';
 export default function CalendarConnections() {
   const { user } = useAuth(); const [data, setData] = useState<CalendarIntegration | null>(null);
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
@@ -16,14 +17,19 @@ export default function CalendarConnections() {
     load(); const timer = polling ? setInterval(load, 3000) : undefined;
     return () => { active = false; clearInterval(timer); };
   }, [user, retry, polling]);
+  useEffect(() => listenOAuthResult('google-calendar', error => {
+    if (error) setError(error);
+    else { setNotice('Google Calendar가 연결되었습니다. 일정을 가져와 주세요.'); setRetry(n => n + 1); }
+  }), []);
   async function action(name: 'connect' | 'sync' | 'disconnect') {
     if (busy) return; setBusy(true); setError(''); setNotice('');
+    const popup = name === 'connect' ? openOAuthPopup() : null;
     try {
       if (name === 'connect') {
         const value = await workflowRequest<{ url: string }>('/integrations/google-calendar/connect', 'POST');
         const url = new URL(value.url);
         if (url.origin !== 'https://accounts.google.com') throw new Error('연결 주소를 확인하지 못했어요.');
-        window.location.assign(value.url);
+        goToOAuth(popup, value.url);
       } else if (name === 'sync') {
         await workflowRequest('/integrations/google-calendar/sync', 'POST');
         setNotice('일정 가져오기를 예약했어요.'); setRetry(n => n + 1);
@@ -32,7 +38,7 @@ export default function CalendarConnections() {
         setNotice(value.provider_revoked ? '연결과 캘린더 접근 권한을 해제했습니다.' : '앱 연결을 해제했습니다. Google의 접근 권한도 확인하려면 계정 권한 관리에서 해제해 주세요.');
         setRetry(n => n + 1);
       }
-    } catch (e) { setError(e instanceof Error ? e.message : '연결 상태를 변경하지 못했어요.'); }
+    } catch (e) { popup?.close(); setError(e instanceof Error ? e.message : '연결 상태를 변경하지 못했어요.'); }
     finally { setBusy(false); }
   }
   async function scheduling(enabled:boolean,minutes:number) { if(busy||!data?.connection)return;setBusy(true);setError('');try {await workflowRequest('/integrations/google-calendar/schedule','PUT',{revision:data.connection.revision,enabled,minutes});setRetry(n=>n+1);}catch(e){setError(e instanceof Error?e.message:'자동 동기화를 설정하지 못했어요.');}finally{setBusy(false);}}

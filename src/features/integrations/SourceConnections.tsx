@@ -7,6 +7,7 @@ import { workflowRequest } from '../../services/workflow';
 import { fetchCourses, type CourseRecord } from '../../services/courses';
 import { invalidateMaterialsCache } from '../../services/materials';
 import type { CalendarConnection } from '../../services/calendarIntegration';
+import { goToOAuth, listenOAuthResult, openOAuthPopup } from '../../services/oauthPopup';
 type Provider='google-drive'|'notion';
 type Draft={id:string;course_id:string;external_id:string;title:string;markdown:string;status:'ready'|'applied'|'discarded';material_id:string|null;source_modified:string;notices:string[]};
 type State={configured:boolean;connection:CalendarConnection|null;drafts:Draft[]};
@@ -17,9 +18,10 @@ export function SourceProvider({provider}:{provider:Provider}) {
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [notice,setNotice]=useState('');const [retry,setRetry]=useState(0);const [searched,setSearched]=useState(false);
   const title=provider==='google-drive'?'Google Drive':'Notion';const base=`/source-integrations/${provider}`;
   useEffect(()=>{if(!user)return;let active=true;Promise.all([workflowRequest<State>(base),fetchCourses()]).then(([d,c])=>{if(active){setData(d);setCourses(c);setCourse(previous=>previous||c[0]?.id||'');}}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[user,base,retry]);
+  useEffect(()=>listenOAuthResult(provider,error=>{if(error)setError(error);else{setNotice(`${title}가 연결되었습니다. 가져올 자료를 찾아 주세요.`);setRetry(n=>n+1);}}),[provider,title]);
   async function act(action:()=>Promise<void>) {if(busy)return;setBusy(true);setError('');setNotice('');try{await action();}catch(e){setError(e instanceof Error?e.message:'자료 서비스를 이용하지 못했어요.');}finally{setBusy(false);}}
   async function search(next=false) {await act(async()=>{const result=await workflowRequest<{documents:Document[];cursor:string|null}>(`${base}/documents?${new URLSearchParams({q:query,...(next&&cursor?{cursor}:{})})}`);setDocs(previous=>next?[...previous,...result.documents]:result.documents);setCursor(result.cursor);setSearched(true);});}
-  async function connect() {await act(async()=>{const result=await workflowRequest<{url:string}>(base+'/connect','POST');const url=new URL(result.url);if(url.origin!==(provider==='google-drive'?'https://accounts.google.com':'https://api.notion.com'))throw new Error('연결 주소를 확인하지 못했어요.');window.location.assign(result.url);});}
+  async function connect() {if(busy)return;const popup=openOAuthPopup();await act(async()=>{try{const result=await workflowRequest<{url:string}>(base+'/connect','POST');const url=new URL(result.url);if(url.origin!==(provider==='google-drive'?'https://accounts.google.com':'https://api.notion.com'))throw new Error('연결 주소를 확인하지 못했어요.');goToOAuth(popup,result.url);}catch(e){popup?.close();throw e;}});}
   async function preview(id:string) {await act(async()=>{const draft=await workflowRequest<Draft>(base+'/imports','POST',{external_id:id,course_id:course});setNotice(draft.status==='applied'?'이미 같은 내용으로 저장한 자료예요.':'가져온 내용을 검토하고 저장해 주세요.');setRetry(n=>n+1);});}
   async function action(draft:Draft,name:'apply'|'discard') {await act(async()=>{await workflowRequest(`/source-integrations/drafts/${draft.id}/actions`,'POST',{action:name});invalidateMaterialsCache(courses.find(c=>c.id===draft.course_id)?.name);setRetry(n=>n+1);setNotice(name==='apply'?'과목에 새 자료 버전으로 저장했습니다.':'초안을 폐기했어요.');});}
   if(!user)return null;

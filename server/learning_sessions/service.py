@@ -2,6 +2,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -484,6 +485,8 @@ class Service:
                         bundle["pack"], concept_for(bundle, item), attempt["answer"]), 35)
                 error = None
             except Exception as exc:
+                logging.getLogger(__name__).warning("learning %s failed (session %s): %r <- %r",
+                                                    op["kind"], session_id, exc, exc.__cause__)
                 output, metrics, error = None, getattr(exc, "metrics", {"model_id": self.generator.model}), "MODEL_FAILED"
             metrics["elapsed_ms"] = int((now() - started).total_seconds() * 1000)
             # Retry persistence of the same validated output; never repeat the model here.
