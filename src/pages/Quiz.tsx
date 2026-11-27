@@ -1464,7 +1464,7 @@ export default function Quiz() {
             </div>
 
             <label htmlFor="quiz-page-range" className="ui-field" style={{ margin: '20px 0 8px' }}>
-              반영할 페이지 <span style={{ fontWeight: 500 }}>(선택 · 비우면 전체)</span>
+              반영할 페이지
             </label>
             {selectedHasPageMarkers ? (
               <input
@@ -1486,7 +1486,7 @@ export default function Quiz() {
             )}
 
             <label htmlFor="quiz-focus" className="ui-field" style={{ marginBottom: 8 }}>
-              집중할 내용 <span style={{ fontWeight: 500 }}>(선택)</span>
+              집중할 내용
             </label>
             <textarea
               id="quiz-focus"

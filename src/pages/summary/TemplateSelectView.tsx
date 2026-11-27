@@ -25,12 +25,12 @@ export const TemplateSelectView = ({ onSelect, onBack, pageHint }: TemplateSelec
       <PageHeading title="요약 형식 선택" description="요약 범위를 입력한 뒤 형식을 선택하면 생성이 시작됩니다." />
 
       <div style={{ display: "grid", gap: 14, marginBottom: 24, maxWidth: 720 }}>
-          <TextField label="반영할 페이지" hint="선택 사항이며, 비우면 전체 자료를 요약합니다."
+          <TextField label="반영할 페이지"
             value={pageRange}
             onChange={e => setPageRange(e.target.value)}
             placeholder={pageHint ? `예: 1-5, 8  (${pageHint})` : "예: 1-5, 8"}
           />
-          <TextAreaField label="집중할 내용 (선택)"
+          <TextAreaField label="집중할 내용"
             value={focusPrompt}
             onChange={e => setFocusPrompt(e.target.value)}
             placeholder="예: 시험에 나올 핵심 정의와 공식 위주로 정리해줘"
