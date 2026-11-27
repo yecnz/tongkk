@@ -26,7 +26,7 @@ import { QuizCreateView } from "./summary/QuizCreateView";
 import { SummaryResultView } from "./summary/SummaryResultView";
 import { TemplateSelectView } from "./summary/TemplateSelectView";
 import type { MaterialDetailTab, UploadFailureKind } from "./summary/types";
-import { classifyUploadFailure, formatHubDate, summaryTypeIcon, templateLabels } from "./summary/utils";
+import { classifyUploadFailure, formatHubDate, summaryTypeIcon, templateLabels, writeLastSummaryId } from "./summary/utils";
 
 type FileKind = "pdf" | "ppt" | "img" | "file";
 
@@ -1107,6 +1107,8 @@ export default function Summary() {
           // 요약 성공 → 결과 전용 화면(summaryResult)을 건너뛰고 자료 상세의 요약 탭으로 이동한다.
           const targetMaterial = selectedMaterials[0];
           if (targetMaterial) {
+            // 상세 화면은 '마지막에 본 요약'을 먼저 고르므로, 방금 만든 요약을 기록해 둔다.
+            if (persistedSummary.id) writeLastSummaryId(targetMaterial.id, persistedSummary.id);
             setActiveMaterial(targetMaterial);
             setMaterialDetailInitialTab("summary");
             // 방금 만든 자료의 상세를 보여준 뒤 "돌아가기"는 강의 자료 목록으로.
