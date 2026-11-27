@@ -9,12 +9,14 @@ export const BACKEND_URL = (
 // FastAPI 에러 본문. HTTPException은 detail이 문자열이지만,
 // 요청 검증 에러(422)는 detail이 [{ loc, msg, type }, ...] 객체 배열로 온다.
 type ValidationErrorItem = { loc?: (string | number)[]; msg?: string; type?: string };
-type ApiErrorBody = { detail?: string | ValidationErrorItem[] };
+type ApiErrorBody = { detail?: string | ValidationErrorItem[] | { message?: unknown } };
 
 // detail이 문자열이든 검증 에러 객체 배열이든 사람이 읽을 문자열로 변환한다(없으면 null).
 // 이 변환이 없으면 객체 배열이 그대로 new Error(...)로 넘어가 "[object Object]"가 표시된다.
 function detailToMessage(detail: ApiErrorBody['detail']): string | null {
   if (typeof detail === 'string') return detail.trim() || null;
+  // 학습 API는 {error_code, message, retryable} 객체로 보낸다.
+  if (detail && !Array.isArray(detail) && typeof detail.message === 'string') return detail.message.trim() || null;
   if (Array.isArray(detail)) {
     const messages = detail
       .map(item => (typeof item?.msg === 'string' ? item.msg : null))
