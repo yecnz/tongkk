@@ -129,8 +129,8 @@ class Generator:
             if response.choices[0].finish_reason != "stop":
                 raise ValueError("Incomplete generation")
             return _parse_json_object(response.choices[0].message.content or ""), metrics
-        except (ValueError, IndexError):
-            raise GenerationError(metrics) from None
+        except (ValueError, IndexError) as exc:
+            raise GenerationError(metrics) from exc
 
     @track_generation
     async def prepare(self, pack):
@@ -152,8 +152,8 @@ class Generator:
         )
         try:
             return validate_pack(raw, pack["source_units"], pack["concept_count"]), metrics
-        except ValueError:
-            raise GenerationError(metrics) from None
+        except ValueError as exc:
+            raise GenerationError(metrics) from exc
 
     @track_generation
     async def evaluate(self, pack, concept, answer):
@@ -172,8 +172,8 @@ class Generator:
         )
         try:
             return validate_feedback(raw, concept, pack["source_units"], answer), metrics
-        except ValueError:
-            raise GenerationError(metrics) from None
+        except ValueError as exc:
+            raise GenerationError(metrics) from exc
 
     @track_generation
     async def review_question(self, pack, original, previous):
@@ -190,5 +190,5 @@ class Generator:
                 raise ValueError('Repeated question')
             validated['title'] = original['title']
             return validated, metrics
-        except ValueError:
-            raise GenerationError(metrics) from None
+        except ValueError as exc:
+            raise GenerationError(metrics) from exc

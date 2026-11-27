@@ -1,6 +1,7 @@
 import BrandLogo from "../components/BrandLogo";
 import SourceConnections from '../features/integrations/SourceConnections';
-import CalendarConnections from '../features/integrations/CalendarConnections';
+// 구글 OAuth 검증 전까지 캘린더 연결 숨김. 검증 후 아래 import와 <CalendarConnections />를 되돌리면 된다.
+// import CalendarConnections from '../features/integrations/CalendarConnections';
 import LearningPreferences from '../features/review/LearningPreferences';
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -518,7 +519,7 @@ export default function MyPage() {
         </div>
 
         {user && <div className="workflow-settings"><LearningPreferences key={user.id} />
-        <CalendarConnections key={`calendar-${user.id}`} /><SourceConnections key={`sources-${user.id}`} /></div>}
+        <SourceConnections key={`sources-${user.id}`} /></div>}
         {/* 하단: 데이터 관리 (왼) + 지원 및 정보 (오) */}
         <div className="mypage-grid">
           {/* 데이터 관리 */}
