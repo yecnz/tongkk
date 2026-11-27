@@ -1,7 +1,6 @@
 import QuizText from "./quiz/QuizText";
 import { SourceCitationContext } from '../features/sources/citationContext';
 import BrandLogo from "../components/BrandLogo";
-import AssessmentLock from '../features/learningMate/AssessmentLock';
 import { useCallback, useState, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { PINK, CYAN, CARD_BACKGROUND, PAGE_BACKGROUND, BORDER_COLOR, MUTED_SURFACE, pageRoutes, SidebarIcon, Sidebar, Card, type PageRouteLabel, useSidebarOpen } from "../common";
@@ -1906,7 +1905,6 @@ export default function Quiz() {
     <SourceCitationContext.Provider value={{ courseName: selectedCourse, materials, materialIds: reviewAttempt?.materialIds || priorQuizSets.find(item => item.id === activeQuizSetId)?.materialIds || selectedMaterialIds }}>
     <div style={{ background: PAGE_BACKGROUND, minHeight: "100vh", fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       {sidebarEl}
-      {examMode && <AssessmentLock />}
       <Header label={openedQuizTitle || `${selectedCourse} 퀴즈`} onOpenSidebar={() => setSidebar(!sidebar)} onHome={() => navigate("/")}
         extra={
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

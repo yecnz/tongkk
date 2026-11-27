@@ -13,7 +13,6 @@ import LearningFeedback from './LearningFeedback';
 import LearningHelp from './LearningHelp';
 import LearningResults from './LearningResults';
 import LearningExplanation from './LearningExplanation';
-import AssessmentLock from '../learningMate/AssessmentLock';
 
 function readIntroduction(key: string) {
   try { return sessionStorage.getItem(key) === 'read'; } catch { return false; }
@@ -106,8 +105,6 @@ export default function LearningRunner({ id, userId }: { id: string; userId: str
           <p className="learning-eyebrow">개념 {item.position + 1} · {stage}</p><h2 id="learning-concept-title">{item.title}</h2>
           {reading ? <><Markdown text={item.introduction!} /><p className="learning-caption">설명을 덮고 직접 설명해 주세요.</p>
             <div className="learning-actions"><button type="button" className="primary" disabled={blocked} onClick={startRecall}>직접 설명하기 →</button></div></> : <>
-            {/* 문제를 푸는 화면이 열려 있는 동안만 AI 튜터를 막는다(창을 닫으면 90초 뒤 풀림). */}
-            {['recall_answering', 'recall_evaluating', 'check_answering'].includes(item.phase) && <AssessmentLock />}
             {item.phase === 'recall_answering' && <><Markdown text={item.question} />
               <RecallInput key={item.id} session={session} userId={userId} busy={busy} disabled={pendingRetry} flushRef={flushDraft}
                 onSave={accept} onSubmit={text => command('answers', { item_id: item.id, kind: 'recall', answer: text })} /></>}

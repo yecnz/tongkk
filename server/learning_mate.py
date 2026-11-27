@@ -17,12 +17,6 @@ def repository():
     return Repository()
 
 
-async def ensure_help_allowed(user, repo=None):
-    repo = repo or Repository()
-    if repo.key and await repo._rpc('learning_assessment_active', {'p_user': user}):
-        fail('ASSESSMENT_ACTIVE', '답변을 제출한 뒤 질문해주세요. 학습 중에는 화면의 도움 기능을 이용해주세요.')
-
-
 def retrieve(text, query):
     terms = set(re.findall(r'[\w가-힣]{2,}', query.lower()))
     terms |= {re.sub(r'(에서|으로|은|는|이|가|을|를|와|과|의|에)$', '', term) for term in terms}
@@ -49,18 +43,6 @@ class MateRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=20)
 
 
-class AssessmentLock(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    token: UUID
-    active: bool
-    sequence: int = Field(ge=0)
-
-
-@router.post('/assessment-lock')
-async def assessment_lock(request: AssessmentLock, auth=Depends(session_user), repo=Depends(repository)):
-    return {'active': await repo._rpc('learning_assessment_lock', {'p_user': auth[0], 'p_token': str(request.token), 'p_active': request.active, 'p_sequence': request.sequence})}
-
-
 @router.get('/context')
 async def material_context(course_id: UUID, material_id: str = Query(min_length=1, max_length=1000), auth=Depends(session_user), repo=Depends(repository)):
     material = await repo.material(*auth, str(course_id), material_id)
@@ -69,7 +51,6 @@ async def material_context(course_id: UUID, material_id: str = Query(min_length=
 
 @router.post('')
 async def chat(request: MateRequest, auth=Depends(session_user), repo=Depends(repository)):
-    await ensure_help_allowed(auth[0], repo)
     material = await repo.material(*auth, str(request.course_id), request.material_id)
     if source_hash(material['markdown']) != request.source_hash:
         fail('SOURCE_CHANGED', '자료가 바뀌었어요. 자료를 다시 열어 질문해주세요.')
