@@ -1,5 +1,6 @@
 mod desktop_settings;
 mod popover_shortcut;
+mod url_policy;
 
 use desktop_settings::{LOGIN_START, SETTINGS_HEIGHT, SETTINGS_WIDTH};
 use tauri::{
@@ -117,6 +118,8 @@ pub fn run() {
             } else {
                 "https://tongkk.com/mini".parse()?
             };
+            let navigation_origin = mini_url.clone();
+            let authentication_origin = mini_url.clone();
             let window =
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(mini_url.clone()))
                     .title("Tongkk")
@@ -137,13 +140,21 @@ pub fn run() {
                          else document.addEventListener('DOMContentLoaded', markMenubar, { once: true });",
                     )
                     // target="_blank" 링크: 로그인은 이 창 안에서(세션을 앱에 남기려고), 나머지는 기본 브라우저로.
+                    .on_navigation(move |url| {
+                        if url_policy::is_app_url(url, &navigation_origin) {
+                            true
+                        } else {
+                            url_policy::open_external(url);
+                            false
+                        }
+                    })
                     .on_new_window(move |url, _| {
-                        if url.path().starts_with("/auth") {
+                        if url_policy::is_auth_url(&url, &authentication_origin) {
                             if let Some(w) = handle.get_webview_window("main") {
                                 let _ = w.navigate(url);
                             }
                         } else {
-                            let _ = std::process::Command::new("open").arg(url.as_str()).spawn();
+                            url_policy::open_external(&url);
                         }
                         NewWindowResponse::Deny
                     })
@@ -151,6 +162,7 @@ pub fn run() {
             let _ = window.set_size(LogicalSize::new(WIDTH, HEIGHT));
 
             let settings_url = mini_url.join("/mini/settings")?;
+            let settings_origin = mini_url.clone();
             WebviewWindowBuilder::new(app, "settings", WebviewUrl::External(settings_url))
                 .title("Tongkk 설정")
                 .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
@@ -166,10 +178,16 @@ pub fn run() {
                      if (document.documentElement) markSettings();
                      else document.addEventListener('DOMContentLoaded', markSettings, { once: true });",
                 )
-                .on_new_window(|url, _| {
-                    if matches!(url.scheme(), "https" | "http" | "mailto") {
-                        let _ = std::process::Command::new("open").arg(url.as_str()).spawn();
+                .on_navigation(move |url| {
+                    if url_policy::is_app_url(url, &settings_origin) {
+                        true
+                    } else {
+                        url_policy::open_external(url);
+                        false
                     }
+                })
+                .on_new_window(|url, _| {
+                    url_policy::open_external(&url);
                     NewWindowResponse::Deny
                 })
                 .build()?;

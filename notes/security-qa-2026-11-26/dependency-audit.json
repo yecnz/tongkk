@@ -1,0 +1,468 @@
+{
+  "checkedAt": "2026-11-26T08:26:12.071Z",
+  "counts": {
+    "npmNames": 571,
+    "npmVersions": 591,
+    "python": 91,
+    "cargo": 512
+  },
+  "npm": {},
+  "osv": [
+    {
+      "package": {
+        "name": "langgraph",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.2.4",
+      "vulns": [
+        {
+          "id": "GHSA-3fx2-cqw9-xr3c",
+          "modified": "2026-10-28T21:15:05.147749Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "pillow",
+        "ecosystem": "PyPI"
+      },
+      "version": "12.2.0",
+      "vulns": [
+        {
+          "id": "GHSA-22hg-r758-rrw9",
+          "modified": "2026-10-26T08:56:03.565713Z"
+        },
+        {
+          "id": "GHSA-24rc-8hj2-v98c",
+          "modified": "2026-10-29T10:55:36.262902Z"
+        },
+        {
+          "id": "GHSA-254f-3936-288h",
+          "modified": "2026-10-26T08:56:17.690706Z"
+        },
+        {
+          "id": "GHSA-27h8-gf7j-v5hc",
+          "modified": "2026-10-27T11:10:35.409737Z"
+        },
+        {
+          "id": "GHSA-332p-7hrc-92wf",
+          "modified": "2026-10-26T08:56:07.886625Z"
+        },
+        {
+          "id": "GHSA-3j72-p6qg-6xp7",
+          "modified": "2026-10-29T10:55:45.826300Z"
+        },
+        {
+          "id": "GHSA-4558-3h8r-v8xp",
+          "modified": "2026-10-27T11:10:34.006455Z"
+        },
+        {
+          "id": "GHSA-45hq-cxwh-f6vc",
+          "modified": "2026-09-10T03:50:51.372929Z"
+        },
+        {
+          "id": "GHSA-462x-pgg6-55fp",
+          "modified": "2026-10-26T08:56:01.770928Z"
+        },
+        {
+          "id": "GHSA-4rm8-3hmm-39fg",
+          "modified": "2026-10-29T10:56:07.449486Z"
+        },
+        {
+          "id": "GHSA-4rr5-89j8-mwwm",
+          "modified": "2026-10-27T11:10:49.694224Z"
+        },
+        {
+          "id": "GHSA-4x4j-2g7c-83w6",
+          "modified": "2026-09-10T03:51:10.324377Z"
+        },
+        {
+          "id": "GHSA-58r4-6rv3-gfh8",
+          "modified": "2026-10-28T11:10:53.627071Z"
+        },
+        {
+          "id": "GHSA-5x8w-8jj5-q52h",
+          "modified": "2026-10-28T11:10:48.833199Z"
+        },
+        {
+          "id": "GHSA-5x94-69rx-g8h2",
+          "modified": "2026-09-10T03:51:10.514604Z"
+        },
+        {
+          "id": "GHSA-5xm2-6676-qcp9",
+          "modified": "2026-10-26T08:56:16.789537Z"
+        },
+        {
+          "id": "GHSA-62p4-gmf7-7g93",
+          "modified": "2026-09-10T03:51:10.632149Z"
+        },
+        {
+          "id": "GHSA-654x-cwwv-5j9c",
+          "modified": "2026-10-29T10:56:00.934076Z"
+        },
+        {
+          "id": "GHSA-65qm-jvmh-6pqg",
+          "modified": "2026-10-26T08:55:49.781288Z"
+        },
+        {
+          "id": "GHSA-6r8x-57c9-28j4",
+          "modified": "2026-09-10T03:51:10.822199Z"
+        },
+        {
+          "id": "GHSA-74r2-7ff9-mjj2",
+          "modified": "2026-10-26T08:56:13.792431Z"
+        },
+        {
+          "id": "GHSA-78g4-xqwv-q3g8",
+          "modified": "2026-10-22T17:15:04.326552Z"
+        },
+        {
+          "id": "GHSA-7mwm-ghpf-9vrm",
+          "modified": "2026-10-28T11:10:35.587185Z"
+        },
+        {
+          "id": "GHSA-8g5g-8vmr-9782",
+          "modified": "2026-10-28T11:10:51.788355Z"
+        },
+        {
+          "id": "GHSA-8v84-f9pq-wr9x",
+          "modified": "2026-09-10T03:51:11.229114Z"
+        },
+        {
+          "id": "GHSA-9hw9-ch79-4vh6",
+          "modified": "2026-09-10T03:51:11.334365Z"
+        },
+        {
+          "id": "GHSA-9v9v-9qvf-h2hj",
+          "modified": "2026-10-29T10:55:35.129178Z"
+        },
+        {
+          "id": "GHSA-c6hw-5grf-ff96",
+          "modified": "2026-10-26T08:55:55.669563Z"
+        },
+        {
+          "id": "GHSA-cp9v-662q-vvx9",
+          "modified": "2026-10-28T11:10:36.014536Z"
+        },
+        {
+          "id": "GHSA-f2g6-542v-9j58",
+          "modified": "2026-10-26T08:56:13.538142Z"
+        },
+        {
+          "id": "GHSA-fc9g-5qg7-mf45",
+          "modified": "2026-10-26T08:56:06.483214Z"
+        },
+        {
+          "id": "GHSA-fj7v-r99m-22gq",
+          "modified": "2026-09-10T03:50:51.891240Z"
+        },
+        {
+          "id": "GHSA-g4qv-2jxx-769h",
+          "modified": "2026-10-29T10:55:44.091799Z"
+        },
+        {
+          "id": "GHSA-g7cr-3p24-7wf7",
+          "modified": "2026-10-29T10:56:05.933422Z"
+        },
+        {
+          "id": "GHSA-g842-9rc4-69pw",
+          "modified": "2026-10-29T10:55:56.102454Z"
+        },
+        {
+          "id": "GHSA-gg2r-wvfm-q9rx",
+          "modified": "2026-10-26T08:55:54.537605Z"
+        },
+        {
+          "id": "GHSA-j4m9-6w36-pw47",
+          "modified": "2026-10-26T08:55:43.891551Z"
+        },
+        {
+          "id": "GHSA-jg86-v3jv-hrpm",
+          "modified": "2026-10-26T08:56:08.669907Z"
+        },
+        {
+          "id": "GHSA-jjj6-mw9f-p565",
+          "modified": "2026-09-10T03:50:12.341825Z"
+        },
+        {
+          "id": "GHSA-mrfp-p49p-3hf2",
+          "modified": "2026-10-29T10:55:39.916451Z"
+        },
+        {
+          "id": "GHSA-p4wg-p73j-c528",
+          "modified": "2026-10-26T08:55:38.434240Z"
+        },
+        {
+          "id": "GHSA-p8hx-v2p6-rp84",
+          "modified": "2026-10-29T10:55:49.521326Z"
+        },
+        {
+          "id": "GHSA-pchr-8j38-3x4p",
+          "modified": "2026-10-28T11:10:41.233140Z"
+        },
+        {
+          "id": "GHSA-pg7v-jwj7-p798",
+          "modified": "2026-09-10T03:50:52.876709Z"
+        },
+        {
+          "id": "GHSA-phj9-mv4w-65pm",
+          "modified": "2026-09-10T03:51:11.734605Z"
+        },
+        {
+          "id": "GHSA-q45j-58j2-45rg",
+          "modified": "2026-10-26T08:56:08.265781Z"
+        },
+        {
+          "id": "GHSA-rfgq-q3w2-pmv2",
+          "modified": "2026-10-26T08:55:50.383984Z"
+        },
+        {
+          "id": "GHSA-v9pv-5gc8-w2m6",
+          "modified": "2026-10-29T10:55:37.663049Z"
+        },
+        {
+          "id": "GHSA-vjc4-5qp5-m44j",
+          "modified": "2026-09-10T03:50:53.107920Z"
+        },
+        {
+          "id": "GHSA-vx6w-vv9f-6gvg",
+          "modified": "2026-11-17T13:41:14.035640Z"
+        },
+        {
+          "id": "GHSA-w889-685w-c8fh",
+          "modified": "2026-10-26T08:55:37.091976Z"
+        },
+        {
+          "id": "GHSA-wqgw-9xfh-qf2g",
+          "modified": "2026-11-12T23:45:03.298534Z"
+        },
+        {
+          "id": "GHSA-xcvg-w56q-r89m",
+          "modified": "2026-11-12T23:45:03.322245Z"
+        },
+        {
+          "id": "GHSA-xgh8-jp6q-p5x8",
+          "modified": "2026-10-28T11:10:55.647541Z"
+        },
+        {
+          "id": "GHSA-xj96-63gp-2gmr",
+          "modified": "2026-09-10T03:50:53.192759Z"
+        },
+        {
+          "id": "GHSA-xvh5-g6gv-559v",
+          "modified": "2026-11-17T13:41:13.808355Z"
+        },
+        {
+          "id": "PYSEC-2026-2253",
+          "modified": "2026-07-13T07:26:49.281845Z"
+        },
+        {
+          "id": "PYSEC-2026-2254",
+          "modified": "2026-07-13T07:26:56.196935Z"
+        },
+        {
+          "id": "PYSEC-2026-2255",
+          "modified": "2026-07-13T07:26:26.726353Z"
+        },
+        {
+          "id": "PYSEC-2026-2256",
+          "modified": "2026-07-13T07:26:17.085341Z"
+        },
+        {
+          "id": "PYSEC-2026-2257",
+          "modified": "2026-07-13T07:26:48.229039Z"
+        },
+        {
+          "id": "PYSEC-2026-3451",
+          "modified": "2026-07-15T20:11:36.266805Z"
+        },
+        {
+          "id": "PYSEC-2026-3452",
+          "modified": "2026-07-15T20:11:27.953713Z"
+        },
+        {
+          "id": "PYSEC-2026-3453",
+          "modified": "2026-07-15T20:11:15.582336Z"
+        },
+        {
+          "id": "PYSEC-2026-3454",
+          "modified": "2026-07-22T11:11:36.231472Z"
+        },
+        {
+          "id": "PYSEC-2026-3493",
+          "modified": "2026-07-23T15:11:42.568996Z"
+        },
+        {
+          "id": "PYSEC-2026-3494",
+          "modified": "2026-07-23T15:11:28.382441Z"
+        },
+        {
+          "id": "PYSEC-2026-3495",
+          "modified": "2026-07-23T15:11:28.034031Z"
+        },
+        {
+          "id": "PYSEC-2026-3496",
+          "modified": "2026-07-23T15:11:20.720915Z"
+        },
+        {
+          "id": "PYSEC-2026-4326",
+          "modified": "2026-10-27T11:10:35.409737Z"
+        },
+        {
+          "id": "PYSEC-2026-4327",
+          "modified": "2026-10-27T11:10:34.006455Z"
+        },
+        {
+          "id": "PYSEC-2026-4328",
+          "modified": "2026-10-27T11:10:49.694224Z"
+        },
+        {
+          "id": "PYSEC-2026-4329",
+          "modified": "2026-10-28T11:10:53.627071Z"
+        },
+        {
+          "id": "PYSEC-2026-4330",
+          "modified": "2026-10-28T11:10:48.833199Z"
+        },
+        {
+          "id": "PYSEC-2026-4331",
+          "modified": "2026-10-28T11:10:35.587185Z"
+        },
+        {
+          "id": "PYSEC-2026-4332",
+          "modified": "2026-10-28T11:10:51.788355Z"
+        },
+        {
+          "id": "PYSEC-2026-4333",
+          "modified": "2026-10-28T11:10:36.014536Z"
+        },
+        {
+          "id": "PYSEC-2026-4334",
+          "modified": "2026-10-28T11:10:41.233140Z"
+        },
+        {
+          "id": "PYSEC-2026-4335",
+          "modified": "2026-10-28T11:10:55.647541Z"
+        },
+        {
+          "id": "PYSEC-2026-4336",
+          "modified": "2026-10-29T10:56:00.934076Z"
+        },
+        {
+          "id": "PYSEC-2026-4337",
+          "modified": "2026-10-29T10:55:49.521326Z"
+        },
+        {
+          "id": "PYSEC-2026-4338",
+          "modified": "2026-10-29T10:55:56.102454Z"
+        },
+        {
+          "id": "PYSEC-2026-4339",
+          "modified": "2026-10-29T10:55:37.663049Z"
+        },
+        {
+          "id": "PYSEC-2026-4340",
+          "modified": "2026-10-29T10:56:07.449486Z"
+        },
+        {
+          "id": "PYSEC-2026-4341",
+          "modified": "2026-10-29T10:55:45.826300Z"
+        },
+        {
+          "id": "PYSEC-2026-4342",
+          "modified": "2026-10-29T10:55:44.091799Z"
+        },
+        {
+          "id": "PYSEC-2026-4343",
+          "modified": "2026-10-29T10:55:35.129178Z"
+        },
+        {
+          "id": "PYSEC-2026-4363",
+          "modified": "2026-11-17T13:41:13.808355Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "chrono",
+        "ecosystem": "crates.io"
+      },
+      "version": "0.4.45",
+      "vulns": [
+        {
+          "id": "RUSTSEC-2026-0543",
+          "modified": "2026-11-17T10:15:02.344223Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "glib",
+        "ecosystem": "crates.io"
+      },
+      "version": "0.18.5",
+      "vulns": [
+        {
+          "id": "GHSA-wrw7-89jp-8q8g",
+          "modified": "2025-10-28T06:29:26.473225Z"
+        },
+        {
+          "id": "RUSTSEC-2024-0429",
+          "modified": "2025-10-28T06:29:26.473225Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "proc-macro-error",
+        "ecosystem": "crates.io"
+      },
+      "version": "1.0.4",
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0370",
+          "modified": "2026-06-07T20:00:03.923932Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "zbus_names",
+        "ecosystem": "crates.io"
+      },
+      "version": "4.3.5",
+      "vulns": [
+        {
+          "id": "RUSTSEC-2026-0371",
+          "modified": "2026-10-17T15:30:02.407875Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "zvariant",
+        "ecosystem": "crates.io"
+      },
+      "version": "5.15.1",
+      "vulns": [
+        {
+          "id": "RUSTSEC-2026-0370",
+          "modified": "2026-10-17T15:30:02.390032Z"
+        }
+      ]
+    },
+    {
+      "package": {
+        "name": "zvariant_derive",
+        "ecosystem": "crates.io"
+      },
+      "version": "5.15.1",
+      "vulns": [
+        {
+          "id": "RUSTSEC-2026-0372",
+          "modified": "2026-10-17T15:30:02.394812Z"
+        }
+      ]
+    }
+  ]
+}

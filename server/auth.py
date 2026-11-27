@@ -42,12 +42,19 @@ async def require_api_user(authorization: str | None = Header(default=None)):
                 },
             )
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=503, detail=f"인증 서버 확인 실패: {str(e)}") from e
+        raise HTTPException(status_code=503, detail="인증 서버에 연결할 수 없습니다.") from e
 
-    if response.status_code >= 400:
+    if response.status_code >= 500 or response.status_code == 429:
+        raise HTTPException(status_code=503, detail="인증 서버를 일시적으로 사용할 수 없습니다.")
+    if response.status_code != 200:
         raise HTTPException(status_code=401, detail="유효하지 않은 로그인입니다.")
 
-    user = response.json()
+    try:
+        user = response.json()
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail="인증 서버 응답을 확인할 수 없습니다.") from e
+    if not isinstance(user, dict) or not isinstance(user.get("id"), str) or not user["id"].strip():
+        raise HTTPException(status_code=503, detail="인증 서버 응답을 확인할 수 없습니다.")
     from usage import identify
     identify(user.get('id'))
     return user

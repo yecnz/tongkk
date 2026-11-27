@@ -34,6 +34,7 @@ import {
 import { inferWeakTopicFromQuestion } from "../services/statsHelpers";
 import { isShortAnswerCorrect } from "../services/answerMatch";
 import { saveResumePoint } from "../services/dashboardState";
+import { readPrivateSessionDraft, writePrivateSessionDraft } from "../services/privateSession";
 import {
   getFileMaterialId,
   loadCourseMaterialsFromServer,
@@ -68,6 +69,7 @@ const sourceLabels: Record<string, string> = {
 // 풀이 중 새로고침·이탈로 답안이 날아가지 않도록 진행 상태를 세션에 스냅샷한다.
 // 과목 설정 화면에서 "이어서 풀기" 배너로 복구하며, 제출(결과 진입) 시 지운다.
 type QuizDraft = {
+  userId: string;
   course: string;
   quizzes: QuizQuestion[];
   current: number;
@@ -87,11 +89,9 @@ type QuizDraft = {
 const QUIZ_DRAFT_KEY = "tongkk:quizDraft";
 const QUIZ_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-const readQuizDraft = (): QuizDraft | null => {
+const readQuizDraft = (userId?: string): QuizDraft | null => {
   try {
-    const raw = sessionStorage.getItem(QUIZ_DRAFT_KEY);
-    if (!raw) return null;
-    const draft = JSON.parse(raw) as QuizDraft;
+    const draft = readPrivateSessionDraft<QuizDraft>(QUIZ_DRAFT_KEY, userId);
     if (!draft?.course || !Array.isArray(draft.quizzes) || draft.quizzes.length === 0) return null;
     if (Date.now() - (draft.savedAt || 0) > QUIZ_DRAFT_MAX_AGE_MS) return null;
     return draft;
@@ -101,11 +101,7 @@ const readQuizDraft = (): QuizDraft | null => {
 };
 
 const writeQuizDraft = (draft: QuizDraft) => {
-  try {
-    sessionStorage.setItem(QUIZ_DRAFT_KEY, JSON.stringify(draft));
-  } catch {
-    // 저장 실패(용량 등) 시 복구만 못 할 뿐 풀이는 계속된다.
-  }
+  writePrivateSessionDraft(QUIZ_DRAFT_KEY, draft);
 };
 
 const clearQuizDraft = () => {
@@ -330,7 +326,7 @@ export default function Quiz() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
   // 이어 풀 수 있는 풀이 스냅샷(과목 설정 화면 배너로 노출).
-  const [resumableDraft, setResumableDraft] = useState<QuizDraft | null>(() => readQuizDraft());
+  const [resumableDraft, setResumableDraft] = useState<QuizDraft | null>(() => readQuizDraft(user?.id));
   // 이어풀기 직후 과목 데이터 로드가 늦게 끝나도 복원된 풀이 상태를 덮어쓰지 않게 하는 가드.
   const resumedDraftRef = useRef(false);
 
@@ -522,8 +518,9 @@ export default function Quiz() {
   // 풀이 진행 상태를 세션에 스냅샷 — 새로고침·이탈 후 "이어서 풀기"로 복구한다.
   // 오답 다시 풀기(reviewActiveRef)는 원본 문항이 오답 노트에 남아 있어 제외한다.
   useEffect(() => {
-    if (view !== "quiz" || reviewMode || reviewActiveRef.current || quizzes.length === 0 || !selectedCourse) return;
+    if (!user || view !== "quiz" || reviewMode || reviewActiveRef.current || quizzes.length === 0 || !selectedCourse) return;
     writeQuizDraft({
+      userId: user.id,
       course: selectedCourse,
       quizzes,
       current,
@@ -540,7 +537,7 @@ export default function Quiz() {
       savedAt: Date.now(),
     });
   }, [
-    view, reviewMode, quizzes, current, answers, subjectiveGrades, questionType, difficulty,
+    user, view, reviewMode, quizzes, current, answers, subjectiveGrades, questionType, difficulty,
     examMode, remainingSeconds, quizStartedAt, openedQuizTitle, activeQuizSetId, selectedMaterialIds, selectedCourse,
   ]);
 
@@ -568,7 +565,7 @@ export default function Quiz() {
   // 과목 설정 화면의 "이어서 풀기" — 스냅샷 상태를 그대로 복원해 풀이 화면으로 진입한다.
   const resumeDraft = () => {
     const draft = resumableDraft;
-    if (!draft || draft.course !== selectedCourse) return;
+    if (!draft || draft.userId !== user?.id || draft.course !== selectedCourse) return;
     resumedDraftRef.current = true;
     const safeCurrent = Math.min(Math.max(draft.current, 0), draft.quizzes.length - 1);
     setQuizzes(draft.quizzes);

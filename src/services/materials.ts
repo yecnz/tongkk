@@ -30,6 +30,7 @@ const materialsCountCache = createTtlCache<number>(30_000, SWR_STALE_TTL_MS);
 export const invalidateMaterialsCache = (course?: string) => {
   materialsCache.invalidate(course);
   materialsCountCache.invalidate(course);
+  if (course === undefined) signedUrlCache.invalidate();
 };
 
 // 원본 파일 서명 URL은 자료 상세를 열 때마다 새로 발급된다. URL이 매번 바뀌면 브라우저가
@@ -179,15 +180,20 @@ export const uploadCourseMaterialFile = async (
 export const createCourseMaterialFileUrl = async (material: CourseMaterial): Promise<string | null> => {
   if (!material.filePath) return null;
 
+  const user = await requireSupabaseUser();
+  if (!material.filePath.startsWith(`${user.id}/`)) throw new Error('이 자료에 접근할 수 없습니다.');
+
   const cached = signedUrlCache.get(material.filePath);
   if (cached) return cached;
+  const save = signedUrlCache.captureWrite(material.filePath);
 
   const { data, error } = await supabase.storage
     .from(MATERIAL_STORAGE_BUCKET)
     .createSignedUrl(material.filePath, 60 * 60);
 
   if (error) throw new Error(formatSupabaseError(error));
-  signedUrlCache.set(material.filePath, data.signedUrl);
+  if ((await requireSupabaseUser()).id !== user.id) throw new Error('로그인 계정이 변경되었습니다.');
+  save(data.signedUrl);
   return data.signedUrl;
 };
 
