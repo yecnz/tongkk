@@ -9,6 +9,7 @@ export const integrationAliases = Object.fromEntries([
   ['services/agent.ts', 'integrations-agent.ts'],
   ['services/menubarSettings.ts', 'integrations-menubar.ts'],
   ['services/appVersion.ts', 'integrations-native.ts'],
+  ['services/oauthPopup.ts', 'integrations-oauth.ts'],
 ].map(([source, replacement]) => [path.join(root, 'src', source), path.join(here, replacement)]));
 
 function replaceRequired(source, from, to, filename) {
@@ -53,12 +54,12 @@ export const integrationPlugins = [{
     }
     if (normalized.endsWith('/src/features/integrations/SourceConnections.tsx')) {
       return replaceRequired(code,
-        `const result=await workflowRequest<{url:string}>(base+'/connect','POST');const url=new URL(result.url);if(url.origin!==(provider==='google-drive'?'https://accounts.google.com':'https://api.notion.com'))throw new Error('연결 주소를 확인하지 못했어요.');window.location.assign(result.url);`,
-        `await workflowRequest(base+'/connect','POST');setNotice('예시 계정 연결을 준비했습니다. 실제 외부 계정에 연결하지 않습니다.');setRetry(n=>n+1);`, id);
+        `const popup=openOAuthPopup();await act(async()=>{try{const result=await workflowRequest<{url:string}>(base+'/connect','POST');const url=new URL(result.url);if(url.origin!==(provider==='google-drive'?'https://accounts.google.com':'https://api.notion.com'))throw new Error('연결 주소를 확인하지 못했어요.');goToOAuth(popup,result.url);}catch(e){popup?.close();throw e;}});`,
+        `await act(async()=>{await workflowRequest(base+'/connect','POST');setNotice('예시 계정 연결을 준비했습니다. 실제 외부 계정에 연결하지 않습니다.');setRetry(n=>n+1);});`, id);
     }
     if (normalized.endsWith('/src/features/integrations/CalendarConnections.tsx')) {
       const updated = replaceRequired(code,
-        `const value = await workflowRequest<{ url: string }>('/integrations/google-calendar/connect', 'POST');\n        const url = new URL(value.url);\n        if (url.origin !== 'https://accounts.google.com') throw new Error('연결 주소를 확인하지 못했어요.');\n        window.location.assign(value.url);`,
+        `const value = await workflowRequest<{ url: string }>('/integrations/google-calendar/connect', 'POST');\n        const url = new URL(value.url);\n        if (url.origin !== 'https://accounts.google.com') throw new Error('연결 주소를 확인하지 못했어요.');\n        goToOAuth(popup, value.url);`,
         `await workflowRequest('/integrations/google-calendar/connect', 'POST');\n        setNotice('예시 캘린더 계정이 연결되었습니다. 실제 Google 계정에 연결하지 않습니다.'); setRetry(n => n + 1);`, id);
       return updated.replace("setNotice('일정 가져오기를 예약했어요.');", "setNotice('예시 일정 2개를 가져왔어요. 실제 캘린더에는 접근하지 않습니다.');");
     }
