@@ -35,7 +35,7 @@ def client():
     main.app.dependency_overrides.clear()
 
 
-# ── full 사다리(/quiz): 파싱 실패=500, 형식 검증=500, RuntimeError=500 원문, 그 외=502 ──
+# ── full 사다리(/quiz): 파싱/형식/RuntimeError=500 안전한 안내문, 그 외=502 ──
 def test_quiz_parse_error_returns_500(client, monkeypatch):
     monkeypatch.setattr(main, "build_llm", lambda *a, **k: _FakeLLM(content="json 아님"))
     resp = client.post("/quiz", json={"subject": "수학", "count": 1, "markdown": "내용"})
@@ -43,14 +43,15 @@ def test_quiz_parse_error_returns_500(client, monkeypatch):
     assert "퀴즈 파싱 실패" in resp.json()["detail"]
 
 
-def test_quiz_runtime_error_passes_message_through(client, monkeypatch):
+def test_quiz_runtime_error_does_not_expose_provider_details(client, monkeypatch):
     def boom(*a, **k):
-        raise RuntimeError("키 없음")
+        raise RuntimeError("provider credential=private-secret")
 
     monkeypatch.setattr(main, "build_llm", boom)
     resp = client.post("/quiz", json={"subject": "수학", "count": 1})
     assert resp.status_code == 500
-    assert resp.json()["detail"] == "키 없음"
+    assert resp.json()["detail"] == "퀴즈 생성 중 오류가 발생했습니다."
+    assert "private-secret" not in resp.text
 
 
 def test_quiz_generic_error_returns_502(client, monkeypatch):
@@ -68,11 +69,12 @@ def test_summarize_value_error_is_502_not_500(client, monkeypatch):
     assert resp.json()["detail"] == "요약 생성 중 오류가 발생했습니다."
 
 
-def test_summarize_runtime_error_passes_message_through(client, monkeypatch):
+def test_summarize_runtime_error_does_not_expose_provider_details(client, monkeypatch):
     def boom(*a, **k):
-        raise RuntimeError("모델 설정 누락")
+        raise RuntimeError("model configuration private-secret")
 
     monkeypatch.setattr(main, "build_llm", boom)
     resp = client.post("/summarize", json={"markdown": "내용"})
     assert resp.status_code == 500
-    assert resp.json()["detail"] == "모델 설정 누락"
+    assert resp.json()["detail"] == "요약 생성 중 오류가 발생했습니다."
+    assert "private-secret" not in resp.text

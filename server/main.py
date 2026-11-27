@@ -111,6 +111,21 @@ import login_security
 app = FastAPI()
 from usage import UsageMiddleware
 app.add_middleware(UsageMiddleware)
+from request_limits import RequestBodyLimitMiddleware
+
+# Endpoint UploadFile.read limits run after multipart parsing. Enforce a total
+# wire-byte ceiling first, including chunked bodies and extra multipart files.
+_document_request_limit = max(1, _env_int("MAX_DOCUMENT_BYTES", 100 * 1024 * 1024)) + 1024 * 1024
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    default_limit=max(1, _env_int("MAX_JSON_REQUEST_BYTES", 48 * 1024 * 1024)),
+    path_limits={
+        "/auth/login": 16 * 1024,
+        "/convert": _document_request_limit,
+        "/preview/pdf": _document_request_limit,
+        "/vision/ocr": 11 * 1024 * 1024,
+    },
+)
 
 from learning_sessions.router import router as learning_sessions_router
 
@@ -314,7 +329,9 @@ def _validate_upload_content(file_bytes: bytes, suffix: str) -> None:
         from PIL import Image, UnidentifiedImageError
 
         try:
-            with Image.open(io.BytesIO(file_bytes)) as image:
+            # Select the expected decoder before parsing an untrusted upload.
+            # Checking image.format afterwards is too late for other parsers.
+            with Image.open(io.BytesIO(file_bytes), formats=[_IMAGE_FORMAT_BY_EXTENSION[suffix]]) as image:
                 actual_format = image.format
                 if image.width * image.height > MAX_IMAGE_PIXELS:
                     raise HTTPException(status_code=413, detail="이미지 해상도가 허용 한도를 초과합니다.")
@@ -439,6 +456,8 @@ def _extract_pdf_markdown_with_page_markers(file_path: str) -> str:
 
 def _parse_page_selection(spec: str) -> set[int]:
     """"1-5, 8, 10-12" 같은 입력을 페이지 번호 집합으로 변환한다."""
+    if len(spec) > 4_000:
+        raise HTTPException(status_code=400, detail="페이지 선택 입력이 너무 깁니다.")
     pages: set[int] = set()
     for part in spec.replace(" ", "").split(","):
         if not part:
@@ -451,12 +470,18 @@ def _parse_page_selection(spec: str) -> set[int]:
                 continue
             if start > end:
                 start, end = end, start
+            # Validate before expansion; a tiny range string can otherwise
+            # exhaust memory on the event loop before any LLM call is made.
+            if end - start + 1 > 10_000:
+                raise HTTPException(status_code=400, detail="한 번에 최대 10,000페이지까지 선택할 수 있습니다.")
             pages.update(range(start, end + 1))
         else:
             try:
                 pages.add(int(part))
             except ValueError:
                 continue
+        if len(pages) > 10_000:
+            raise HTTPException(status_code=400, detail="한 번에 최대 10,000페이지까지 선택할 수 있습니다.")
     return pages
 
 
@@ -632,6 +657,11 @@ def _render_pdf_pages_for_visual_analysis(file_path: str, force: bool = False) -
         #    맥락으로 함께 싣는다(작은 글씨 오독·표 행열 붕괴 완화).
         for index in selected_indexes:
             page = doc.load_page(index)
+            # PDF MediaBox/UserUnit can describe enormous pages in a tiny file.
+            # Bound the actual raster dimensions before MuPDF allocates pixels.
+            bounds = (page.rect * matrix).irect
+            if bounds.width <= 0 or bounds.height <= 0 or bounds.width * bounds.height > MAX_IMAGE_PIXELS:
+                raise ValueError("PDF 페이지 해상도가 허용 한도를 초과합니다.")
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
             page_text = (page.get_text("text") or "").strip()
             context_parts: list[str] = []
@@ -1230,7 +1260,8 @@ async def convert_document_to_pdf_preview(
                 headers={"Content-Disposition": 'inline; filename="preview.pdf"'},
             )
         except RuntimeError as e:
-            raise HTTPException(status_code=503, detail=str(e)) from e
+            logger.warning("/preview/pdf 변환 서비스 오류: %s", type(e).__name__)
+            raise HTTPException(status_code=503, detail="미리보기 변환 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.") from e
         except Exception as e:
             logger.exception("/preview/pdf 변환 실패")
             raise HTTPException(status_code=502, detail="미리보기 변환 중 오류가 발생했습니다.") from e
@@ -1283,7 +1314,7 @@ async def extract_text_with_google_vision(
                 json=payload,
             )
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=503, detail=f"Google Vision API 호출 실패: {str(e)}") from e
+        raise HTTPException(status_code=503, detail="Google Vision API에 연결할 수 없습니다.") from e
 
     try:
         data = response.json()
@@ -1291,15 +1322,14 @@ async def extract_text_with_google_vision(
         raise HTTPException(status_code=502, detail="Google Vision API 응답을 읽을 수 없습니다.") from e
 
     if response.status_code >= 400:
-        error = data.get("error") if isinstance(data, dict) else None
-        message = error.get("message") if isinstance(error, dict) else response.text
-        raise HTTPException(status_code=response.status_code, detail=f"Google Vision OCR 실패: {message}")
+        raise HTTPException(status_code=502, detail="Google Vision OCR 요청을 처리하지 못했습니다.")
 
-    result = (data.get("responses") or [{}])[0]
+    responses = data.get("responses") if isinstance(data, dict) else None
+    if not isinstance(responses, list) or not responses or not isinstance(responses[0], dict):
+        raise HTTPException(status_code=502, detail="Google Vision API 응답을 확인할 수 없습니다.")
+    result = responses[0]
     if isinstance(result, dict) and result.get("error"):
-        error = result["error"]
-        message = error.get("message") if isinstance(error, dict) else "OCR 처리 중 오류가 발생했습니다."
-        raise HTTPException(status_code=502, detail=f"Google Vision OCR 실패: {message}")
+        raise HTTPException(status_code=502, detail="Google Vision OCR 요청을 처리하지 못했습니다.")
 
     text = ""
     if isinstance(result, dict):

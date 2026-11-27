@@ -199,7 +199,7 @@ def _validate_wrong_analysis(parsed: dict[str, object]) -> dict[str, object]:
 
 
 # 6개 LLM 엔드포인트가 공유하던 try/except 사다리를 한 곳에 모은다(동작 불변).
-# - RuntimeError(키/모델 설정 누락 등) → 500 + 원문 메시지
+# - RuntimeError(키/모델 설정 누락 등) → 500 + 안전한 안내문
 # - handle_parse_errors=True(출제·채점·분석 계열): JSONDecodeError → 500 '{label} 파싱 실패',
 #   그 외 ValueError(형식 검증 실패) → 500 '{label} 응답 형식 오류'
 #   (json.JSONDecodeError가 ValueError 하위라 한 절에서 받아 isinstance로 분기)
@@ -216,12 +216,13 @@ async def _run_llm_call(
     try:
         return await run_in_threadpool(call)
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.warning("%s (%s)", log_message, type(e).__name__)
+        raise HTTPException(status_code=500, detail=fail_message) from e
     except (json.JSONDecodeError, ValueError) as e:
         if handle_parse_errors:
             if isinstance(e, json.JSONDecodeError):
-                raise HTTPException(status_code=500, detail=f"{error_label} 파싱 실패: {str(e)}") from e
-            raise HTTPException(status_code=500, detail=f"{error_label} 응답 형식 오류: {str(e)}") from e
+                raise HTTPException(status_code=500, detail=f"{error_label} 파싱 실패") from e
+            raise HTTPException(status_code=500, detail=f"{error_label} 응답 형식 오류") from e
         logger.exception(log_message)
         raise HTTPException(status_code=502, detail=fail_message) from e
     except Exception as e:

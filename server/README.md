@@ -1,5 +1,13 @@
 # 백엔드 실행 환경
 
+## 2026년 11월 26일 보안 수정 적용
+
+백엔드는 갱신된 `requirements.txt`의 버전과 해시로 다시 설치하거나 이미지를 재빌드한다. Pillow 13.0.0과 LangGraph 1.2.14 보안 패치 및 호환 LangChain Core 버전을 포함한다. Windows의 캘린더 시간대 데이터는 조건부 `tzdata` 의존성으로 설치된다.
+
+기존 DB에는 선행 마이그레이션 적용 상태를 확인한 뒤 `supabase/migrations/202611260005_reference_ownership.sql`을 적용한다. 새 설치의 `schema.sql`에도 같은 제약이 포함되어 있다. 12개 참조 소유권 제약은 `NOT VALID`로 추가되어 신규·변경 참조를 즉시 검사하면서 기존 행을 보존한다. 기존 소유권 불일치 행은 별도로 감사·수정한 뒤 해당 제약을 `VALIDATE CONSTRAINT`로 검증한다. 이 파일이 과거 잘못 연결된 행을 자동 삭제하거나 복구하지는 않는다.
+
+`npm run test:security-db`는 운영 접속 없이 격리 PostgreSQL에서 교차 사용자 참조, 정상 저장·삭제, RPC 권한과 비공개 Storage 정책을 검증한다. 전체 결과와 남은 운영 확인 사항은 `notes/security-qa-2026-11-26/README.md`에 기록했다.
+
 Python 3.12 기준. requirements.in은 직접 의존성, requirements.txt는 전이 의존성까지 버전·해시를 고정한 설치 파일이다. requirements-dev.txt는 같은 런타임 잠금을 포함한다. 지원 문서가 아닌 MarkItDown 외부 서비스·동영상 확장은 설치하지 않는다.
 
 프로젝트 루트에서 로컬 실행:
@@ -34,6 +42,8 @@ uv pip compile server/requirements-dev.in --python-version 3.12 --universal --ge
 AI 사용량은 인증된 사용자별 `/usage`에 최근 30일 집계로 제공된다. `AI_USAGE_DB`는 영속 디스크로 지정한다. 비용은 `AI_MODEL_PRICES_JSON`의 실제 응답 모델 ID별 USD/백만 토큰 단가로 계산하며 실제 청구액과 다를 수 있다. 단가·토큰 미확인은 null이며 캐시·할인·추가 과금까지 반영한 청구서는 아니다. 호출 성공·실패는 모델 호출 기준이며 HTTP 재요청과 구분한다. SDK 내부 자동 재시도는 꺼져 있다. 원문·답변·키·오류 본문은 계측 테이블에 저장하지 않는다.
 
 문서 변환 제한: `/convert`와 `/preview/pdf`의 캐시 미적중 작업이 같은 슬롯을 사용한다. `CONVERSION_MAX_CONCURRENT=1`, `CONVERSION_MAX_WAITERS=4`, `CONVERSION_WAIT_SECONDS=10`이 기본이다. 대기열 초과·시간 초과는 429와 Retry-After를 반환한다. 캐시 적중·PDF 미리보기 직접 반환은 무거운 슬롯을 사용하지 않는다. 요청 취소 후 실행 중인 외부 도구가 끝날 때까지 슬롯·임시 파일을 유지한다.
+
+요청 본문은 JSON·multipart 파싱 전 수신 바이트 수로 제한한다. 기본 JSON 한도는 `MAX_JSON_REQUEST_BYTES=50331648`(48MiB), 로그인은 16KiB, OCR은 11MiB, 문서 업로드는 `MAX_DOCUMENT_BYTES`에 multipart 여유 1MiB를 더한 크기다. Content-Length가 없거나 실제 크기보다 작아도 수신 중 상한을 넘으면 413으로 종료하고 multipart 임시 파일을 정리한다. 파일 자체 크기·형식 검증은 별도로 계속 수행한다. 페이지 선택 입력은 4,000자·합계 10,000페이지 이내로 제한한다. 운영 프록시에서도 본문 크기·요청 시간·IP별 빈도를 제한하고, AI 공급자 예산 제한을 설정한다. 사용량 집계 자체는 과금 차단 장치가 아니다.
 
 제한은 프로세스별이다. 여러 worker·컨테이너를 사용하면 전체 동시 실행 수는 각각의 제한 합계다. 전체 서버군 제한이 필요하면 별도 작업 큐가 필요하다. 컨테이너는 기본 1 worker로 실행한다. `uvicorn.error.conversion` 구조화 로그는 요청 ID·문서 종류·대기/처리 시간·상태·예외 종류만 담으며 파일명·본문은 포함하지 않는다. 로그 수집기로 평균·실패율·지연을 집계할 수 있다. LibreOffice 자체 타임아웃과 업로드 크기 제한도 계속 적용한다.
 

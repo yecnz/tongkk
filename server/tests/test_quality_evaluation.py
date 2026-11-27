@@ -16,11 +16,11 @@ def test_fixed_fixture_report_exposes_boundary_instability_and_wrong_key():
 
 
 def test_changed_expectations_fail_the_cli_and_export_report(tmp_path):
-    fixtures=copy.deepcopy(json.loads(DEFAULT_FIXTURES.read_text()))
+    fixtures=copy.deepcopy(json.loads(DEFAULT_FIXTURES.read_text(encoding='utf-8')))
     fixtures['quiz'][0]['reference_answer']=1
-    path=tmp_path/'fixtures.json';path.write_text(json.dumps(fixtures))
+    path=tmp_path/'fixtures.json';path.write_text(json.dumps(fixtures), encoding='utf-8')
     output=tmp_path/'result.json'
     script=Path(__file__).resolve().parents[1]/'scripts/evaluate_quality.py'
     result=subprocess.run([sys.executable,str(script),'--fixtures',str(path),'--output',str(output)],capture_output=True,text=True)
     assert result.returncode==1 and 'FAILED: quiz-basic' in result.stdout
-    assert json.loads(output.read_text())['failed']==1
+    assert json.loads(output.read_text(encoding='utf-8'))['failed']==1

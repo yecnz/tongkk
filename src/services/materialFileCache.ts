@@ -7,7 +7,33 @@
 //
 // 재업로드(upsert)·삭제 시에는 바이트가 달라지므로 반드시 evictMaterialFile로 비운다(materials.ts).
 
-const CACHE_NAME = 'tongkk-material-files-v1';
+const CACHE_PREFIX = 'tongkk-material-files-';
+let cacheOwner: string | null | undefined;
+let generation = 0;
+let cleanup: Promise<void> = Promise.resolve();
+const cacheName = (owner: string) => `${CACHE_PREFIX}v2:${owner}`;
+
+// Auth changes invalidate pending reads immediately. Cleanup is serialized so a
+// delayed logout cannot delete a newly signed-in user's freshly cached files.
+export function syncMaterialFileCacheUser(owner: string | null): Promise<void> {
+  if (cacheOwner === owner) return cleanup;
+  cacheOwner = owner;
+  generation++;
+  cleanup = cleanup.then(async () => {
+    if (!cacheSupported()) return;
+    const keep = owner ? cacheName(owner) : null;
+    const names = await caches.keys();
+    await Promise.all(names.filter(name => name.startsWith(CACHE_PREFIX) && name !== keep)
+      .map(name => caches.delete(name)));
+  }).catch(() => { /* Cache Storage may be unavailable. */ });
+  return cleanup;
+}
+
+function assertCurrentOwner(started: number, cacheKey?: string | null): void {
+  if (started !== generation || cacheKey && (!cacheOwner || !cacheKey.startsWith(`${cacheOwner}/`))) {
+    throw new DOMException('The material session has changed.', 'AbortError');
+  }
+}
 
 // Cache Storage 키로만 쓰는 합성 URL(절대 네트워크로 나가지 않는다). 파일 경로만 식별한다.
 const cacheKeyUrl = (cacheKey: string) => `https://material-cache.tongkk.local/${encodeURIComponent(cacheKey)}`;
@@ -23,24 +49,36 @@ export async function fetchMaterialFile(
   options: { cacheKey?: string | null; signal?: AbortSignal } = {},
 ): Promise<Blob> {
   const { cacheKey, signal } = options;
+  const started = generation;
+  assertCurrentOwner(started, cacheKey);
+  await cleanup;
+  assertCurrentOwner(started, cacheKey);
   const canCache = Boolean(cacheKey) && !url.startsWith('blob:') && cacheSupported();
 
   let cache: Cache | undefined;
   let key: string | undefined;
   if (canCache) {
     try {
-      cache = await caches.open(CACHE_NAME);
+      cache = await caches.open(cacheName(cacheOwner!));
       key = cacheKeyUrl(cacheKey as string);
       const hit = await cache.match(key);
-      if (hit) return await hit.blob();
+      if (hit) {
+        const blob = await hit.blob();
+        assertCurrentOwner(started, cacheKey);
+        return blob;
+      }
     } catch {
       // Cache Storage 접근 실패(프라이빗 모드·정책 등)는 치명적이지 않다 → 캐시 없이 그냥 받는다.
       cache = undefined;
     }
   }
 
-  const response = await fetch(url, signal ? { signal } : undefined);
+  assertCurrentOwner(started, cacheKey);
+  // Only the account-scoped Cache Storage copy may persist; the browser's
+  // independent HTTP cache cannot be cleared when this app signs out.
+  const response = await fetch(url, { cache: 'no-store', ...(signal ? { signal } : {}) });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  assertCurrentOwner(started, cacheKey);
 
   if (cache && key) {
     // 저장은 베스트에포트: 용량 초과 등으로 실패해도 본문 반환에는 지장이 없다(다음에 다시 받을 뿐).
@@ -51,14 +89,19 @@ export async function fetchMaterialFile(
     }
   }
 
-  return await response.blob();
+  const blob = await response.blob();
+  assertCurrentOwner(started, cacheKey);
+  return blob;
 }
 
 // 재업로드·삭제로 내용이 바뀐 파일의 캐시 사본을 비운다(stale 방지).
 export async function evictMaterialFile(cacheKey?: string | null): Promise<void> {
-  if (!cacheKey || !cacheSupported()) return;
+  if (!cacheKey || !cacheOwner || !cacheKey.startsWith(`${cacheOwner}/`) || !cacheSupported()) return;
+  const owner = cacheOwner;
   try {
-    const cache = await caches.open(CACHE_NAME);
+    await cleanup;
+    if (cacheOwner !== owner) return;
+    const cache = await caches.open(cacheName(owner));
     await cache.delete(cacheKeyUrl(cacheKey));
   } catch {
     /* 무시 */

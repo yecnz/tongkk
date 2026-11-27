@@ -1,0 +1,114 @@
+{
+  "date": "2026-11-26",
+  "build": "isolated temporary build with synthetic Supabase credentials",
+  "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "networkPolicy": "All external requests aborted; all /api requests fulfilled locally as 401. No real login, API, or user data.",
+  "routes": [
+    {
+      "viewport": "desktop",
+      "route": "/",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 457,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "desktop",
+      "route": "/auth",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 53,
+      "runtimeErrors": [],
+      "apiRequests": 0,
+      "invalidLoginBlockedLocally": true
+    },
+    {
+      "viewport": "desktop",
+      "route": "/teachers",
+      "title": "교수자 공간 · Tongkk",
+      "rootTextLength": 925,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "desktop",
+      "route": "/flashcards",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 41,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "desktop",
+      "route": "/study-paths",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 76,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "desktop",
+      "route": "/mini",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 47,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "mobile",
+      "route": "/",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 331,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "mobile",
+      "route": "/auth",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 53,
+      "runtimeErrors": [],
+      "apiRequests": 0,
+      "invalidLoginBlockedLocally": true
+    },
+    {
+      "viewport": "mobile",
+      "route": "/teachers",
+      "title": "교수자 공간 · Tongkk",
+      "rootTextLength": 925,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "mobile",
+      "route": "/flashcards",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 33,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "mobile",
+      "route": "/study-paths",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 68,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    },
+    {
+      "viewport": "mobile",
+      "route": "/mini",
+      "title": "Tongkk — AI 학습 도우미",
+      "rootTextLength": 47,
+      "runtimeErrors": [],
+      "apiRequests": 0
+    }
+  ],
+  "blockedOrigins": [
+    "https://cdnjs.cloudflare.com",
+    "https://cdn.jsdelivr.net",
+    "https://fonts.googleapis.com"
+  ],
+  "localAssetErrors": [],
+  "consoleErrors": [],
+  "passed": true
+}

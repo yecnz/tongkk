@@ -24,6 +24,11 @@ const CourseContext = createContext<CourseContextValue | null>(null);
 
 export function CourseProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  return <UserCourseProvider key={user?.id || 'guest'}>{children}</UserCourseProvider>;
+}
+
+function UserCourseProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [courses, setCourses] = useState<string[]>([]);
   const [courseRecords, setCourseRecords] = useState<CourseRecord[]>([]);
   const [isSyncingCourses, setIsSyncingCourses] = useState(false);

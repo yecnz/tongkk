@@ -9,6 +9,8 @@ import { BACKEND_URL } from "./services/backend";
 import { clearLearningDrafts } from "./services/learningSessions";
 import { AuthActionError, authErrorMessage, authResponseError, cleanAuthCallbackUrl, readAuthCallback } from "./services/authFlow";
 import { sendAuthEmail, startEmailCooldown } from "./services/authEmails";
+import { syncMaterialFileCacheUser } from "./services/materialFileCache";
+import { syncPrivateSessionUser } from "./services/privateSession";
 
 type AuthContextValue = {
   user: User | null;
@@ -56,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authCallbackError, setAuthCallbackError] = useState<string | null>(callback.error);
   // 직전 user id. 사용자가 바뀌면(로그아웃 → null 포함) 서비스 메모리 캐시를 전부 비워,
   // stale TTL(30분) 동안 같은 브라우저의 다음 사용자에게 이전 사용자의 과목/자료/요약/퀴즈
-  // 목록이 노출되는 것을 막는다. undefined는 '아직 모름'(앱 시작) — 첫 확인은 무효화하지 않는다.
+  // 목록이 노출되는 것을 막는다. Provider가 다시 마운트되면 첫 확인도 무효화한다.
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
@@ -65,7 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const syncCachesWithUser = (nextSession: Session | null) => {
       const nextUserId = nextSession?.user?.id ?? null;
-      if (lastUserIdRef.current !== undefined && lastUserIdRef.current !== nextUserId) {
+      void syncMaterialFileCacheUser(nextUserId);
+      syncPrivateSessionUser(nextUserId);
+      if (lastUserIdRef.current !== nextUserId) {
         if (lastUserIdRef.current) clearLearningDrafts(lastUserIdRef.current);
         invalidateCoursesCache();
         invalidateMaterialsCache();
@@ -108,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           cleanAuthCallbackUrl(window.location.href, Boolean(callback.error || callbackError || callback.isRecovery && !data.session)));
       } catch {
         if (mounted) {
+          syncCachesWithUser(null);
+          setSession(null);
           setAuthCallbackError('로그인 상태를 확인하지 못했습니다. 다시 시도해 주세요.');
           setRecoveryMode(false);
         }
