@@ -1491,9 +1491,7 @@ begin
 end; $$;
 create function public.learning_assessment_active(p_user uuid) returns boolean
 language sql stable security invoker set search_path=public,pg_catalog as $$
- select exists(select 1 from learning_sessions s join learning_session_items i on i.id=s.current_item_id and i.user_id=p_user
- where s.user_id=p_user and s.status='active' and i.phase in ('recall_answering','recall_evaluating','check_answering'))
- or exists(select 1 from learning_assessment_locks where user_id=p_user and active and expires_at>now()); $$;
+ select exists(select 1 from learning_assessment_locks where user_id=p_user and active and expires_at>now()); $$;
 alter table learning_assessment_locks enable row level security;
 revoke all on learning_assessment_locks from public,anon,authenticated;
 grant all on learning_assessment_locks to service_role;
