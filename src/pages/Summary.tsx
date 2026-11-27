@@ -1055,6 +1055,8 @@ export default function Summary() {
         let movedToDetail = false;
         setLoadingStep(`${templateLabels[template]} 형식으로 요약 작성 중...`);
         let response: { result: string; threadId: string };
+        // 결과 화면으로 먼저 이동한다: 스트리밍은 타자기 효과로, 마인드맵은 로딩 스피너로 진행 상황을 보여준다.
+        setView("summaryResult");
         if (template === "MINDMAP") {
           // 마인드맵은 JSON 출력이라 부분 렌더링이 불가능해 기존 단일 호출을 유지한다.
           response = await summarizeWithTemplate(selectedMarkdown, template, {
@@ -1063,8 +1065,6 @@ export default function Summary() {
             sourceNames: selectedMaterials.map(material => material.name),
           });
         } else {
-          // 스트리밍 경로: 결과 화면으로 먼저 이동해 생성 중인 텍스트를 타자기처럼 보여준다.
-          setView("summaryResult");
           const result = await summarizeWithTemplateStream(selectedMarkdown, template, {
             pages: opts?.pageRange,
             focusPrompt: opts?.focusPrompt,
@@ -1329,7 +1329,9 @@ export default function Summary() {
                 type="button"
                 onClick={() => {
                   setDuplicateSummaryPrompt(null);
-                  startSummaryFromSettings(true);
+                  // 업로드 설정값이 아니라 방금 요청한 템플릿·옵션 그대로 강제 생성한다(템플릿 선택 화면 경로 포함).
+                  const args = lastSummaryArgsRef.current;
+                  if (args) void handleTemplateSelect(args.template, args.opts, args.backView, true);
                 }}
                 style={{
                   padding: "9px 16px", borderRadius: 10, border: "1px solid var(--color-border-soft)",

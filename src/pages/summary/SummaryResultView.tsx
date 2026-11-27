@@ -445,7 +445,7 @@ export const SummaryResultView = ({ template, onBack, backLabel, contextTitle, r
           </div>
         )}
 
-        {isLoading && realContent ? (
+        {isLoading && realContent && template !== "MINDMAP" ? (
           // 스트리밍 생성 중: 지금까지 생성된 텍스트를 그대로 렌더링해 타자기 효과를 낸다.
           <div style={{
             background: "var(--color-card)", borderRadius: 12, padding: 28,
