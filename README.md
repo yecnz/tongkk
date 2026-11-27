@@ -1,292 +1,269 @@
-# Tongkk
+# Tongkk · 통크크
 
-대학 강의자료를 올리면 **AI가 요약·퀴즈·튜터링·학습 계획**까지 도와주는 학습 도우미 웹앱입니다.
-PDF·PPT·이미지를 Markdown으로 변환하고, 4종 템플릿 요약과 퀴즈/오답노트, 학습 캘린더와 통계를 한곳에서 제공합니다.
+**내 공부가, 내 지식이 되는 곳.** 강의자료를 바탕으로 요약하고, 질문하고, 직접 설명한 뒤 복습까지 이어가는 AI 학습 서비스입니다.
 
-- **Frontend** — React 19 + Vite 8 + TypeScript. 로그인과 사용자별 데이터는 **Supabase**(Auth/DB/Storage)가 담당합니다.
-- **Backend** — FastAPI. 강의자료 변환, 요약, AI 튜터, 퀴즈, 채점, 학습 계획 등 **AI 처리만** 담당합니다.
-- **AI** — OpenAI(GPT) 또는 Google Gemini를 선택해 사용하고, 이미지 텍스트 인식에 Tesseract / Google Vision을 사용합니다.
+[서비스 시작하기](https://tongkk.com/) · [서비스 소개·체험](https://tongkk.com/promo/) · [학습 흐름 체험](https://tongkk.com/promo/#preview) · [기능별 화면 둘러보기](https://tongkk.com/promo/#more-features)
 
-## 주요 기능
+> **자료 준비 → 요약·튜터로 이해 → 퀴즈·자기 설명으로 확인 → 복습·암기 카드 → 다음 학습 계획**
+>
+> 웹에서 공부를 이어가고, macOS 메뉴바 앱에서 오늘 할 일과 튜터를 빠르게 확인합니다.
 
-- **강의자료 변환** — PDF·PPT/PPTX·이미지 업로드 → Markdown 추출. 텍스트가 적거나 이미지가 많은 자료는 LLM 비전 분석/OCR로 손글씨·도표까지 읽어 보강합니다.
-- **AI 요약 (4종 템플릿)** — 일반 요약(`GENERAL`), 강의 노트(`LECTURE_NOTE`), 마인드맵(`MINDMAP`, 인터랙티브 트리), 치트시트(`CHEAT_SHEET`).
-- **AI 튜터** — 자료/요약 기반 멀티턴 Q&A 드로어. 템플릿별 추천 질문과 대화 기록을 자료마다 저장합니다.
-- **퀴즈 생성 & 풀이** — 객관식·OX·단답형·주관식, 난이도/문항 수 설정. 주관식은 AI가 점수·피드백으로 채점하고, 시험 모드(타이머)를 지원합니다.
-- **오답 노트** — 모든 과목의 오답을 모아 보고, 원본 퀴즈를 재구성해 다시 풀 수 있습니다.
-- **암기 카드** — 자료에서 AI 초안을 만들거나 오답을 카드로 저장합니다. 답을 떠올린 뒤 난이도를 평가하면 다음 복습 시점을 계산합니다.
-- **학습 코스** — 같은 과목의 자료 여러 개를 챕터로 묶고, 제목·순서·포함 여부를 편집한 뒤 기존 자기 설명 학습을 이어갑니다.
-- **원문 출처 바로가기** — 요약·튜터·퀴즈의 페이지 출처에서 PDF의 해당 페이지나 변환 원문을 확인합니다.
-- **학습 캘린더 & 페이스** — D-day, 할 일, 과목별 진도(페이스)를 월간 캘린더에서 함께 관리합니다. 진도 상태(뒤처짐/정상/앞섬)를 자동 계산합니다.
-- **AI 학습 계획** — D-day와 미완료 항목으로 "오늘 할 일"을 작게 쪼개 추천합니다(난이도 모드 조절).
-- **학습 통계** — 연속 학습일, 누적 학습 시간, 평균 점수 추이, 취약 주제 Top 5, 과목별 성취도.
-- **마이페이지** — 닉네임/아바타, 다크 모드, 계정·데이터 삭제.
+홍보 페이지에서는 로그인 없이 실제 앱 UI와 예시 데이터로 학습 흐름을 체험할 수 있습니다. 체험의 AI 답변·연동 결과는 준비된 예시이며, 내 자료와 학습 기록은 서비스에 로그인해 저장합니다.
 
-## 아키텍처
+## 핵심 기능
 
-```
-                 ┌──────────────────────────────┐
-   브라우저  ──▶ │  Frontend (React + Vite)     │
-                 │  - 로그인/데이터: Supabase JS │
-                 └───────────┬──────────────────┘
-                             │  (개발: /api 프록시, 운영: Vercel 리라이트)
-                             ▼
-   ┌─────────────┐   AI 처리   ┌──────────────────────────────┐
-   │  Supabase   │ ◀────────── │  Backend (FastAPI)           │
-   │ Auth/DB/    │  토큰 검증   │  /convert /summarize /agent   │
-   │ Storage     │            │  /quiz /study-plan ...        │
-   └─────────────┘            └───────────┬──────────────────┘
-                                          ▼
-                            OpenAI · Gemini · Google Vision
-```
-
-- **요청 라우팅** — 프론트는 백엔드를 `VITE_API_URL`로 직접 호출하거나, 미설정 시 `/api` 경로로 호출합니다.
-  - 개발: Vite 프록시가 `/api/*` → `http://localhost:8000` 으로 전달합니다(`vite.config.ts`).
-  - 운영: Vercel이 `/api/*` → 백엔드 서버로 리라이트합니다(`vercel.json`).
-- **인증** — 프론트는 Supabase 세션 토큰을 `Authorization: Bearer ...` 헤더로 보내고, 백엔드는 이를 Supabase `/auth/v1/user`로 검증합니다(`/health` 제외 모든 엔드포인트).
-- **데이터 소유권** — 모든 테이블은 Supabase Row Level Security로 `auth.uid()` 기준 사용자별 격리됩니다.
-
-## 기술 스택
-
-| 영역 | 사용 기술 |
+| 영역 | 할 수 있는 일 |
 | --- | --- |
-| Frontend | React 19, React Router 7, TypeScript 5.9, Vite 8, Tailwind CSS 4, react-markdown + remark-gfm |
-| 문서/PDF | pdfjs-dist(페이지 수 계산), jspdf + html2canvas(요약 PDF 내보내기) |
-| Backend | FastAPI, Uvicorn, LangGraph + LangChain(OpenAI/Gemini), MarkItDown, PyMuPDF, Pillow + pytesseract |
-| 인프라 | Supabase(Auth/Postgres/Storage), Vercel(프론트 배포) |
+| **자료 준비** | 과목별로 PDF·PPT/PPTX·DOCX·이미지·TXT/Markdown을 올리거나 텍스트를 붙여 넣습니다. 문서를 Markdown으로 변환하고 비전 분석·OCR로 이미지 속 내용을 보강합니다. 요약·퀴즈·설명 학습 초안을 함께 준비한 뒤 검토해 저장할 수 있습니다. |
+| **4가지 AI 요약** | 일반 요약, 강의 노트, 인터랙티브 마인드맵, 치트시트로 정리합니다. 페이지 범위·집중할 내용을 지정하고, 생성 결과를 복사하거나 PDF로 내보냅니다. |
+| **AI 튜터·학습 메이트** | 자료와 요약을 바탕으로 질문을 주고받습니다. 선택한 문장을 바로 질문하고 이미지를 첨부할 수 있으며, 대화 기록을 저장합니다. 학습 메이트는 다른 화면에서도 연결된 자료에 대한 질문을 이어줍니다. |
+| **퀴즈·시험 모드** | 객관식·OX·단답형·주관식 문제를 난이도·문항 수·자료 범위에 맞춰 생성합니다. 타이머, 주관식 AI 채점, 해설, 오답 분석과 다시 풀기를 제공합니다. |
+| **직접 설명하는 학습** | ‘처음 배우기’ 또는 ‘수업 후 회상’을 선택해 1~3개 개념을 자신의 말로 설명합니다. 원문 근거와 평가 기준에 따른 피드백, 힌트, 확인 문제를 거치며 설명 수정·재평가와 중단한 학습 이어하기를 지원합니다. |
+| **복습 관리** | 오늘 복습, 학습 이슈, 오답 문항을 한곳에서 확인합니다. 보완할 개념을 다시 설명하고 새 사례의 문제로 점검하며, 도움 사용 여부와 복습 기록을 남깁니다. |
+| **암기 카드** | 직접 작성하거나 자료에서 AI 초안을 만들고, 틀린 문제를 카드로 저장합니다. ‘다시·어려움·알겠음·쉬움’ 자기평가에 따라 다음 복습 일정을 정합니다. |
+| **학습 코스·연결 학습** | 같은 과목의 여러 자료를 챕터로 묶고 순서·포함 여부를 편집합니다. 개념 지도에서는 원문 근거와 저장된 관계를 바탕으로 관련 개념을 연결하고, 추천 순서에 따라 학습을 이어갑니다. |
+| **원문 근거 확인** | 요약·튜터·퀴즈에 표시된 출처에서 PDF의 해당 페이지나 변환 원문으로 이동해 내용을 확인합니다. |
+| **학습 계획·캘린더** | 시험·과제 D-day, 오늘 할 일, 과목별 진도를 관리합니다. AI가 남은 일정과 미완료 항목으로 오늘 할 일을 제안합니다. |
+| **통계·개념별 기록** | 퀴즈 풀이에 따른 점수 추이·연속 학습일·학습 시간·취약 주제·과목별 성취도를 확인하고, 개념별 설명·복습 기록과 개념 지도로 다음 공부를 찾습니다. |
 
-## 사전 준비
+암기 카드의 자기평가와 설명 학습의 수행 평가는 별도로 기록합니다. 학습 메이트 패널은 퀴즈 풀이와 설명 학습 화면에서는 숨겨집니다. 자료 자동 준비와 새 복습 문항 생성에는 [별도 학습 워커](#학습-워커)가 필요합니다.
 
-- **Node.js** 20.19+ (Vite 8 요구 사항) / npm
-- **Python** 3.10+ (개발 환경은 3.12 기준)
-- **Supabase 프로젝트** (URL, anon key)
-- **OpenAI** 그리고/또는 **Google Gemini** API 키
-- **백엔드 외부 도구**
-  - [LibreOffice](https://www.libreoffice.org/) — PPT/PPTX 미리보기를 PDF로 변환(`soffice`)
-  - [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) + 한국어/영어 언어 데이터 — 이미지 `/convert` OCR
-  - (선택) **Google Vision API** 키 — 고품질 이미지 OCR(`/vision/ocr`)
+## 외부 연동과 확장 화면
+
+### 외부 자료·일정 연결
+
+| 연동 | 구현 범위 | 현재 제공 상태 |
+| --- | --- | --- |
+| **Notion** | 허용한 페이지를 제목으로 검색 → 본문 가져오기 → 이전 본문과 비교 → 과목의 새 자료 버전으로 저장 | 마이페이지에서 연결. 서버 OAuth 설정과 사용자 접근 권한 필요 |
+| **Google Drive** | Google 문서·텍스트·Markdown·PDF·PPTX·DOCX를 읽기 전용으로 가져와 새 자료 버전으로 저장 | API·연결 컴포넌트 구현, 현재 연결 UI 미노출 |
+| **Google Calendar** | 기본 캘린더 일정 가져오기, 과목 연결, 자동 동기화 간격 설정 | 마이페이지에서 연결. 서버 OAuth 설정·사용자 접근 권한·학습 워커 필요 |
+
+외부 자료와 일정의 원본은 변경하지 않습니다. OAuth 토큰 교환·암호화·갱신은 서버에서 처리합니다. 실제 연결에 필요한 설정은 [백엔드 연동 안내](server/README.md)를 참고하세요.
+
+### macOS 메뉴바 앱
+
+메뉴바 팝오버에서 **D-day·오늘 할 일 확인과 완료 처리**, **자료별 AI 튜터 질문**을 제공합니다. 전역 단축키, Mac 로그인 시 자동 실행, 테마, 오늘 할 일·시험/과제 하루 전 알림을 설정할 수 있습니다. 알림은 앱이 실행 중일 때 동작하며, 웹 브라우저와 앱의 로그인 세션은 별도입니다.
+
+[Mac 앱 다운로드](https://github.com/yecnz/tongkk/releases/latest/download/Tongkk.dmg) · [메뉴바 화면 체험](https://tongkk.com/promo/#feature-menubar)
+
+### 교수자 공간 · 미리보기
+
+`/teachers`에서 학생별 진도·취약 개념을 살펴보고, PDF·TXT·Markdown 자료를 바탕으로 퀴즈·과제·수업 계획 초안을 만들고 편집할 수 있습니다. **현재 학생·통계는 예시 데이터이며, 자료와 초안은 해당 브라우저에만 저장됩니다.** 초안 생성은 로컬 규칙을 사용하며 실제 학생 계정이나 AI 서버와 연결되지 않습니다.
+
+## 서비스 구조
+
+```mermaid
+flowchart LR
+    Web[웹 앱 · React] -->|로그인·자료·기본 기록| DB[(Supabase Auth · DB · Storage)]
+    Mac[macOS 메뉴바 · Tauri] -->|웹 화면 로드| Web
+    Web -->|인증된 API 요청| API[FastAPI]
+    API -->|AI 생성·평가| AI[OpenAI · Gemini]
+    API -->|문서 변환·이미지 분석| Docs[MarkItDown · PyMuPDF · OCR]
+    API -->|권한 확인·학습 데이터·작업 저장| DB
+    Worker[학습 워커] <-->|작업 조회·결과 저장| DB
+    Worker -->|학습 평가·초안·복습 생성| AI
+    API -->|OAuth·외부 자료 가져오기| Sources[Notion · Google Drive]
+    API -->|연결·동기화 요청| Calendar[Google Calendar]
+    Worker -->|일정 동기화| Calendar
+```
+
+- **프론트엔드**는 Supabase로 로그인·자료·기본 기록을 관리하고, AI 처리와 학습 워크플로는 FastAPI에 요청합니다.
+- **백엔드**는 문서 변환·AI 생성 외에 학습 세션, 복습, 개념 관계, 학습 코스, 외부 연동과 서버 전용 DB 작업을 담당합니다.
+- **학습 워커**는 DB에 저장된 작업을 별도 프로세스에서 실행합니다. 활성화하면 중단된 작업의 제한적 재개와 예약 복습·동기화를 처리합니다.
+- **데이터 접근**은 사용자 JWT/RLS와 서버 전용 RPC를 사용합니다. 서버 키와 외부 서비스 토큰은 브라우저에 전달하지 않습니다.
+- **요청 경로**는 기본 `/api`입니다. 개발에서는 Vite가 `127.0.0.1:8000`으로, 운영에서는 Vercel이 `api.tongkk.com`으로 전달합니다. 외부 연동의 화면 노출 상태는 위 표를 따릅니다.
+
+### 기술 스택
+
+| 영역 | 기술 |
+| --- | --- |
+| 웹 | React 19, TypeScript 5.9, Vite 8, React Router 7, Tailwind CSS 4 |
+| 콘텐츠 표시 | react-markdown, remark-gfm, KaTeX, PDF.js, 브라우저 인쇄, jsPDF·html2canvas |
+| API·AI | Python 3.12, FastAPI, LangGraph·LangChain, OpenAI·Gemini |
+| 문서 처리 | MarkItDown, PyMuPDF, Pillow, Tesseract, LibreOffice, Google Vision |
+| 데이터·인증 | Supabase Auth·Postgres·Storage, RLS, 서버 전용 RPC |
+| 데스크톱 | Tauri 2, Rust, macOS 메뉴바·전역 단축키·알림 |
+| 검증·배포 | Vitest, pytest, PGlite, Vercel, Docker |
 
 ## 프로젝트 구조
 
-```
+```text
 tongkk/
-├─ src/                  # React 프론트엔드
-│  ├─ pages/             # 라우트별 페이지 (Dashboard, Calendar, Summary, Quiz, ReviewNotes, Stats, MyPage, Auth)
-│  ├─ components/        # 공용 컴포넌트 (AITutorDrawer, MindmapView, PlannerModals)
-│  ├─ services/          # Supabase·백엔드 호출 및 도메인 로직
-│  ├─ AuthContext.tsx    # 로그인 세션 컨텍스트
-│  ├─ CourseContext.tsx  # 과목 선택 컨텍스트
-│  ├─ ToastContext.tsx   # 토스트 알림 컨텍스트
-│  ├─ App.tsx            # 라우팅
-│  └─ main.tsx           # 진입점
-├─ server/               # FastAPI 백엔드 (AI 처리)
-│  ├─ main.py            # API 엔드포인트 / 문서 변환 / 요약·퀴즈·채점·계획
-│  ├─ agent.py           # LangGraph 학습 에이전트(AI 튜터)
-│  └─ requirements.txt
+├─ src/
+│  ├─ pages/                   # 대시보드·자료 요약·퀴즈·캘린더·통계·계정·메뉴바
+│  │  └─ summary/              # 자료 상세·요약 결과·템플릿·퀴즈 생성 화면
+│  ├─ features/
+│  │  ├─ learningSession/      # 자기 설명·피드백·확인·결과·학습 재개
+│  │  ├─ learningHistory/      # 개념별 기록·개념 지도·연결된 개념 학습
+│  │  ├─ review/               # 복습 일정·학습 이슈·설명 수정·추천
+│  │  ├─ flashcards/           # 암기 카드 생성·편집·복습
+│  │  ├─ studyPath/            # 여러 자료를 묶은 학습 코스
+│  │  ├─ preparation/          # 요약·퀴즈·설명 학습 초안 준비
+│  │  ├─ learningMate/         # 현재 자료에 연결된 학습 메이트
+│  │  ├─ sources/              # 원문·페이지 출처 보기
+│  │  ├─ integrations/         # Notion·Drive·Calendar 연결 화면과 콜백
+│  │  └─ teachers/             # 교수자 공간 미리보기·로컬 초안
+│  ├─ components/              # AI 튜터·PDF 뷰어·마인드맵·공용 UI
+│  ├─ services/                # Supabase·API 호출, 자료·퀴즈·계획 등 도메인 로직
+│  ├─ styles/                  # 학습 워크플로 공통 스타일
+│  ├─ *Context.tsx             # 인증·과목·알림·튜토리얼·샘플 체험 상태
+│  └─ App.tsx                  # 웹·학습·메뉴바·교수자 라우팅
+├─ server/
+│  ├─ main.py                  # API 구성·문서 변환·요약·튜터·퀴즈·계획
+│  ├─ learning_sessions/       # 세션 라우터·서비스·생성·스키마·DB 저장소
+│  ├─ reviews.py / review_schedule.py
+│  ├─ learning_issues.py / explanation_revisions.py
+│  ├─ concept_graph.py / concept_connections.py / concept_history.py
+│  ├─ flashcards.py / study_paths.py
+│  ├─ learning_mate.py / preparation.py
+│  ├─ workflow.py / worker.py  # 작업 예약·영속 실행·복구
+│  ├─ source_integrations.py / calendar_integration.py
+│  ├─ auth.py / login_security.py / request_limits.py
+│  ├─ usage.py / convert_cache.py / conversion_jobs.py
+│  ├─ tests/ / evaluation/     # 서버 회귀 검사·AI 품질 평가
+│  └─ Dockerfile / requirements*.txt
 ├─ supabase/
-│  └─ schema.sql         # 테이블 · RLS · 스토리지 버킷 정의
-├─ public/               # 정적 파일
-├─ vite.config.ts        # 개발 프록시(/api → :8000)
-├─ vercel.json           # 운영 배포 (SPA fallback + /api 리라이트)
-└─ package.json
+│  ├─ schema.sql               # 신규 설치용 전체 스키마·권한·스토리지
+│  └─ migrations/              # 기존 DB에 순서대로 적용할 변경
+├─ src-tauri/                  # macOS 메뉴바 앱·네이티브 설정·권한·DMG
+├─ promo/                      # 독립 홍보 페이지·실제 UI 기반 체험·배포 번들
+├─ scripts/                    # DB 검사·배포 파일 복사·화면 미리보기 도구
+├─ public/                     # 정적 리소스
+├─ docs/ / notes/              # UI 문구·설계·구현 기록·QA 자료
+├─ vite.config.ts              # 웹 빌드·개발 API 프록시
+├─ vercel.json                 # 운영 API·promo·SPA 라우팅
+└─ package.json                # 개발·빌드·검사·메뉴바 명령
 ```
 
-## 시작하기
+## 로컬 실행
 
-### 1. Supabase 설정
+### 준비
 
-Supabase 대시보드 → **SQL Editor**에서 [`supabase/schema.sql`](supabase/schema.sql)을 실행합니다.
-테이블, RLS 정책, 그리고 스토리지 버킷(`avatars` 공개 / `course-materials` 비공개)이 생성됩니다.
+- Node.js **20.19 이상**과 npm, Python **3.12**
+- Supabase 프로젝트와 OpenAI API 키. 요약·튜터·퀴즈에서는 Gemini도 선택할 수 있으며, 설명 학습·학습 코스는 OpenAI 설정이 필요합니다.
+- 문서 기능에 따라 LibreOffice(PPT 미리보기), Tesseract와 `kor+eng` 언어 데이터(OCR). Google Vision은 선택 사항입니다.
 
-이미 운영 중인 DB에는 전체 초기 스키마 대신 새 마이그레이션 [`202611220001_learning_sessions.sql`](supabase/migrations/202611220001_learning_sessions.sql)을 한 번 적용합니다. 기존 `courses`·`materials` 구조를 기준으로 신규 세션 테이블 5개와 서버 전용 함수를 추가합니다.
+**새 DB**는 Supabase SQL Editor에서 [schema.sql](supabase/schema.sql)을 실행합니다. **기존 DB**는 [migrations/](supabase/migrations/)의 미적용 파일만 파일명 시간순으로 적용합니다. 전체 스키마를 기존 DB에 다시 실행하지 않습니다.
 
-### 2. 백엔드 (FastAPI)
+### 백엔드
 
-```bash
+```sh
 cd server
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env               # 키 입력
-uvicorn main:app --reload
+source .venv/bin/activate
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+pip install --require-hashes -r requirements-dev.txt
+cp .env.example .env
+# .env에 Supabase·모델 키를 입력한 뒤 실행
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-기본 주소는 `http://localhost:8000`입니다. `GET /health`로 동작을 확인할 수 있습니다.
+[서버 상태](http://localhost:8000/health) · [로컬 API 문서](http://localhost:8000/docs)
 
-> PPT 미리보기에는 LibreOffice가, 이미지 `/convert` OCR에는 Tesseract가 시스템에 설치돼 있어야 합니다.
+### 프론트엔드
 
-### 3. 프론트엔드 (React)
+새 터미널의 프로젝트 루트에서 실행합니다.
 
-```bash
-npm install
-cp .env.example .env.local         # 키 입력
+```sh
+npm ci
+cp .env.example .env.local
+# .env.local에 Supabase URL·anon key 입력
 npm run dev
 ```
 
-기본 주소는 `http://localhost:5173`입니다.
+기본 접속 주소는 [localhost:5173](http://localhost:5173)입니다. `VITE_API_URL=/api`를 유지하면 Vite 프록시로 백엔드에 연결합니다.
 
-개발용 `.env.local`은 `VITE_API_URL=/api`로 두고 프론트·백엔드를 함께 실행합니다. Vite가 `/api` 요청을 `127.0.0.1:8000`으로 전달하므로 개발 포트가 바뀌어도 별도의 CORS 설정 없이 연결됩니다.
+### 학습 워커
 
-### 4. macOS 메뉴바 앱
+자료 자동 준비·새 복습 문항 생성·예약 작업을 사용하려면 `server/.env`에 `LEARNING_WORKER_ENABLED=true`를 설정하고, **API를 다시 시작한 뒤 별도 터미널에서 워커도 실행**합니다. 아래 명령은 macOS/Linux 기준이며, Windows에서는 WSL 또는 Docker 환경을 사용합니다.
 
-Rust 1.90 이상과 Xcode Command Line Tools가 필요합니다. 프로젝트 루트에서 실행합니다.
-
-```bash
-npm run menubar:dev
-```
-
-Tauri가 웹 개발 서버를 5173 포트에서 함께 실행합니다. 이미 5173 포트에서 개발 서버를 실행 중이면 먼저 종료합니다. 다른 포트로 자동 이동하지 않도록 고정해 앱과 서버 주소가 어긋나는 것을 방지합니다. 설정 방식은 [Tauri 개발 문서](https://v2.tauri.app/develop/)를 따릅니다.
-
-메뉴바 아이콘을 누르면 팝오버가 열립니다. 자료를 선택하고 질문하면 튜터 화면으로 이동하며, 뒤로가기 또는 Esc로 팝오버에 돌아옵니다. 튜터에서 선택 목록이 열려 있으면 Esc는 목록과 선택 패널을 먼저 닫은 뒤 팝오버로 돌아갑니다. 창 밖을 클릭하면 앱 창이 숨겨집니다.
-
-```bash
-npm run menubar:build
-```
-
-배포용 앱과 DMG는 `src-tauri/target/release/bundle/`에 생성됩니다. **배포용 앱은 `https://tongkk.com/mini`를 불러옵니다.** 로컬 웹 수정은 개발 모드에서 확인하고, 배포용 앱에 반영하려면 웹 배포를 별도로 진행해야 합니다. 앱·브라우저의 로그인 세션은 공유되지 않습니다. AI 답변까지 확인할 때는 백엔드도 실행해야 합니다.
-
-### 학습 세션
-
-자료 상세의 **직접 설명하며 학습하기**, 대시보드의 **기억에서 꺼내는 학습**, 또는 `/learn`에서 시작합니다. 자료 하나에서 기본 2개 개념을 선택해 회상 → 근거 피드백 → 원문·힌트 → 객관식 기초 확인 → 결과 순서로 진행하며, `/learn/:sessionId`에서 저장된 학습을 재개합니다.
-
-서버에 `SUPABASE_SECRET_KEY`(또는 구형 `SUPABASE_SERVICE_ROLE_KEY`)를 설정하고 위 마이그레이션을 적용해야 합니다. 키가 없으면 세션 API는 설정 안내와 503을 반환합니다. 서버 키를 `VITE_` 변수나 브라우저에 넣지 않습니다. 원문은 사용자 JWT/RLS로 읽고, 신규 세션 데이터는 서버 전용 RPC로 저장합니다. Supabase의 `service_role`에는 기존 `courses`·`materials` 조회 및 행 잠금에 필요한 권한도 있어야 합니다.
-
-준비와 자기 설명 평가에는 OpenAI를 사용합니다. `LEARNING_SESSION_MODEL`로 모델을 지정하며, 미설정 시 `OPENAI_MODEL`을 사용합니다. 기본 2개 개념은 정상 3회, 실패 복구 포함 최대 4회의 모델 요청을 허용합니다. 힌트·확인 채점은 추가 모델 호출 없이 처리합니다. 실제 원문·모델의 내용 품질은 파일럿에서 별도 검토해야 합니다.
-
-```bash
-npm run test:learning-db             # 임시 메모리 PostgreSQL: 권한·원자성·삭제 검사
+```sh
 cd server
-.venv/bin/python -m pytest -q         # 모델·DB 어댑터를 대체한 서버 테스트 포함
+source .venv/bin/activate
+python -m worker
 ```
 
-AI 작업 상태와 실행 lease는 DB에 저장하지만 실행 자체는 FastAPI 프로세스에서 수행합니다. 서버가 재시작되면 만료된 작업을 화면에서 명시적으로 재시도합니다. 영속 큐에 의한 자동 재개는 제공하지 않습니다. `LEARNING_SESSION_ENABLED=false`로 새 세션 시작을 중단해도 기존 기록 조회·진행은 유지됩니다.
+워커와 API 모두 같은 서버 전용 Supabase 키·모델 설정을 사용합니다. 기본값 `false`에서는 학습 세션 평가 등을 API 프로세스 안에서 처리하므로 서버 재시작 후 자동 실행을 보장하지 않습니다. 자동 복습은 사용자별 설정도 켜야 합니다. 컨테이너 실행과 연동 설정은 [server/README.md](server/README.md)를 참고하세요.
 
-### 암기 카드·학습 코스
+### macOS 앱·홍보 페이지
 
-대시보드와 사이드바에서 **암기 카드**(`/flashcards`), **학습 코스**(`/study-paths`)로 이동합니다.
+- **메뉴바 개발:** macOS에 Rust 1.90 이상·Xcode Command Line Tools를 준비한 뒤 `npm run menubar:dev`를 실행합니다. 웹 개발 서버는 5173 포트에 함께 실행되므로 기존 서버가 같은 포트를 쓰고 있으면 종료합니다.
+- **메뉴바 빌드:** `npm run menubar:build`. 앱·DMG는 `src-tauri/target/release/bundle/`에 생성됩니다. 배포 앱은 `https://tongkk.com/mini`를 불러오므로 웹 변경은 별도로 배포해야 합니다.
+- **홍보 페이지:** `npm run build`가 배포 파일을 `dist/promo/`로 복사합니다. 실제 UI로 만든 체험 번들 갱신·검사는 [promo/README.md](promo/README.md)를 따릅니다. 운영에서는 `/promo/`로 제공됩니다.
 
-기존 DB에 이전 마이그레이션이 적용된 상태에서 아래 파일을 순서대로 적용합니다. 신규 설치의 `schema.sql`에는 모두 포함되어 있습니다.
+## 환경 설정
 
-1. [`202611260001_flashcards.sql`](supabase/migrations/202611260001_flashcards.sql)
-2. [`202611260002_study_paths.sql`](supabase/migrations/202611260002_study_paths.sql)
-3. [`202611260003_study_toolkit_clear.sql`](supabase/migrations/202611260003_study_toolkit_clear.sql)
+전체 예시는 [프론트 환경 변수](.env.example)와 [서버 환경 변수](server/.env.example)에 있습니다.
 
-카드는 수동 작성·오답 저장·AI 초안 편집을 지원합니다. 다시/어려움/알겠음/쉬움 평가에 따라 다음 복습이 10분~365일 범위에서 정해집니다. 평가는 자기 판단이며 개념 숙련도 점수와 별도로 저장합니다. 카드 목록은 한 번에 최대 1,000개를 표시합니다.
-
-코스는 사용자당 최대 30개, 코스당 자료 최대 6개, 원문 합계 60,000자, 최대 12챕터를 지원합니다. 챕터의 원문은 12,000자 이내이며, 각 챕터에서 핵심 개념 2개를 학습합니다. 생략 없이 설명·확인 활동을 수행한 세션만 완료 진도에 반영합니다. 원문이 바뀌면 새 코스를 만들어야 합니다. 코스에는 학습 세션과 동일한 서버 전용 Supabase 키와 OpenAI 설정이 필요합니다.
-
-```bash
-npm run test:flashcards-db
-npm run test:study-paths-db
-npm run test:workflow-db
-```
-
-## 환경 변수
-
-### 프론트엔드 (`.env.local`)
-
-| 변수 | 설명 |
-| --- | --- |
-| `VITE_API_URL` | FastAPI 서버 주소. 미설정 시 `VITE_BACKEND_URL` → `/api` 프록시 순으로 폴백 |
-| `VITE_SUPABASE_URL` | Supabase Project URL (`https://...supabase.co`, `/rest/v1` 없이) |
-| `VITE_SUPABASE_ANON_KEY` | Supabase `anon public` 키 |
-
-> `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`는 필수입니다(없으면 앱이 시작 시 오류를 던집니다).
-
-### 백엔드 (`server/.env`)
-
-| 변수 | 기본값 | 설명 |
+| 위치 | 주요 변수 | 역할 |
 | --- | --- | --- |
-| `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS 허용 프론트엔드 주소 |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | — | 호출자 로그인 토큰 검증용. 운영에서 누락되면 인증 API는 503으로 중단 |
-| `SUPABASE_SECRET_KEY` | — | 학습 세션 DB 저장용 서버 키. 구형 `SUPABASE_SERVICE_ROLE_KEY`도 지원 |
-| `LEARNING_SESSION_MODEL` | `OPENAI_MODEL` | 학습 세션 준비·자기 설명 평가 모델 |
-| `LEARNING_SESSION_ENABLED` | `true` | `false`이면 새 세션 생성 중단 |
-| `LOGIN_MAX_FAILURES` | `5` | 계정별 연속 로그인 실패 허용 횟수 |
-| `LOGIN_LOCK_SECONDS` | `900` | 실패 한도 도달 후 로그인 잠금 시간(초) |
-| `LOGIN_ATTEMPTS_DB_PATH` | `server/login_attempts.sqlite3` | 로그인 실패 상태 SQLite 경로(운영에서는 영속 볼륨 권장) |
-| `LOGIN_FORWARD_CLIENT_IP` | `false` | Supabase 로그인 제한에 사용자별 IP 전달. 아래 인증 배포 설정 필요 |
-| `OPENAI_API_KEY` | — | GPT 요약/튜터/퀴즈/채점/학습 계획 |
-| `OPENAI_MODEL` | `gpt-5.4-mini` | OpenAI 모델명 |
-| `OPENAI_MAX_TOKENS` | `8192` | OpenAI 출력 토큰 한도 |
-| `GEMINI_API_KEY` | — | Gemini 요약/튜터/퀴즈/채점 |
-| `GEMINI_MODEL` | `gemini-3.1-flash-lite-preview` | Gemini 모델명 |
-| `GEMINI_MAX_OUTPUT_TOKENS` | `8192` | Gemini 출력 토큰 한도 |
-| `GOOGLE_VISION_API_KEY` | — | `/vision/ocr` 이미지 OCR |
-| `MAX_IMAGE_PIXELS` | `40000000` | 업로드 이미지 최대 픽셀 수(압축 폭탄 방어) |
-| `SUMMARY_MAX_TOKENS` | `32768` | 요약 출력 토큰 한도(장문 자료 대응) |
-| `VISUAL_ANALYSIS_MODE` | `auto` | `auto`/`always`/`off` — 자료 이미지 비전 분석 여부 |
-| `VISUAL_ANALYSIS_MODEL` | `GPT` | 비전 분석에 쓸 모델(`GPT`/`Gemini`) |
-| `VISUAL_ANALYSIS_MAX_ITEMS` | `12` | 분석할 최대 페이지/이미지 수 |
-| `VISUAL_ANALYSIS_BATCH_SIZE` | `4` | 비전 분석 배치 크기 |
-| `VISUAL_ANALYSIS_MIN_TEXT_CHARS` | `1200` | PPTX 비전 분석 트리거 텍스트 길이 임계값 |
-| `PDF_VISUAL_RENDER_DPI` | `90` | PDF 페이지 렌더링 DPI |
-| `PDF_VISUAL_TEXT_PAGE_CHARS` | `180` | 비전 분석 대상 PDF 페이지 판단 임계값 |
-| `TESSERACT_LANG` | `kor+eng` | 이미지 OCR 언어 |
-| `LIBREOFFICE_PATH` | (자동 탐색) | LibreOffice 실행 파일 경로 |
-| `PPT_PREVIEW_TIMEOUT_SECONDS` | `120` | PPT→PDF 변환 타임아웃 |
+| `.env.local` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | 브라우저의 Supabase 연결·로그인 |
+| `.env.local` | `VITE_API_URL` | 기본 `/api`. 미설정 시 `VITE_BACKEND_URL` → `/api` 순서로 사용 |
+| `server/.env` | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | 사용자 로그인 토큰 검증 |
+| `server/.env` | `SUPABASE_SECRET_KEY` | 학습·복습·코스·연동의 서버 전용 DB 작업. 구형 `SUPABASE_SERVICE_ROLE_KEY`도 지원 |
+| `server/.env` | `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL` | AI 공급자·모델 선택 |
+| `server/.env` | `LEARNING_SESSION_MODEL`, `LEARNING_SESSION_ENABLED` | 설명 학습 모델·새 세션 생성 허용 여부 |
+| `server/.env` | `LEARNING_WORKER_ENABLED` | 별도 워커 사용 여부. 기본 `false` |
+| `server/.env` | `FRONTEND_ORIGIN` | 프론트 주소·CORS·외부 연동 콜백 기준 |
+| `server/.env` | `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `INTEGRATION_ENCRYPTION_KEY` | Notion OAuth와 토큰 암호화 |
+| `server/.env` | `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET` | Google Drive 연동을 활성화할 환경의 OAuth 설정 |
+| `server/.env` | `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET` | Google Calendar 연동을 활성화할 환경의 OAuth 설정 |
+| `server/.env` | `VISUAL_ANALYSIS_*`, `GOOGLE_VISION_API_KEY` | 문서 비전 분석·이미지 OCR |
+| `server/.env` | `AI_USAGE_DB`, `LOGIN_ATTEMPTS_DB_PATH` | AI 사용량·로그인 실패 기록을 보관할 서버 로컬 DB 경로 |
 
-### 인증 배포 설정
+`SUPABASE_SECRET_KEY`와 모델 API 키, OAuth secret, 암호화 키는 **서버에만** 설정합니다. `ALLOW_NO_AUTH`는 운영에서 `false`를 유지합니다. 설명 학습용 서버 키가 없으면 해당 API는 설정 안내와 503을 반환합니다.
 
-- Supabase **Authentication → URL Configuration**에서 Site URL을 운영 프론트엔드 주소로 지정하고, Redirect URLs에 운영 주소의 `/auth`, `/auth/reset-password`를 추가한다. 개발 주소도 실제 사용하는 호스트·포트별로 추가한다(예: `http://127.0.0.1:5175/auth/reset-password`).
-- 새 재설정 메일은 `/auth/reset-password`로 돌아온다. 기존 `/auth` 또는 `/` 복구 링크도 전용 화면으로 이동한다. 복구 세션이 유효하면 새로고침 후에도 비밀번호 폼을 유지한다. 만료 링크는 안내 화면에서 메일을 다시 요청할 수 있다.
-- Confirm email이 켜져 있으면 가입 후 인증 안내와 재전송을 제공하고, 꺼져 있으면 즉시 로그인한다. 메일 발송 요청은 같은 종류·이메일에 대해 중복 실행과 60초 이내 재전송을 막는다. 실제 발송 여부·제한은 Supabase Auth/SMTP 설정을 따른다.
-- 백엔드의 로그인 횟수 제한은 비밀번호 불일치(`invalid_credentials`)만 집계한다. 이메일 미인증·인증 서버 오류·메일/요청 제한은 비밀번호 실패로 집계하지 않는다.
+<details>
+<summary>인증·비밀번호 재설정·로그인 제한 배포 설정</summary>
 
-백엔드 경유 로그인이 서버 한 대의 IP 제한을 공유하지 않도록 하려면 다음 설정을 **모두** 완료한 뒤 `LOGIN_FORWARD_CLIENT_IP=true`로 둔다.
+- Supabase **Authentication → URL Configuration**의 Site URL을 운영 프론트 주소로 지정하고 Redirect URLs에 `/auth`, `/auth/reset-password`를 등록합니다. 개발 주소도 사용하는 호스트·포트별로 추가합니다.
+- 비밀번호 재설정 메일은 `/auth/reset-password`로 돌아옵니다. 기존 `/auth`·`/` 복구 링크도 전용 화면으로 이동합니다. 만료 링크는 재발송을 요청할 수 있습니다.
+- Confirm email 설정에 따라 가입 후 인증 안내·재전송 또는 즉시 로그인을 제공합니다. 같은 종류·이메일의 메일 요청에는 60초 재전송 제한이 있습니다.
+- `/auth/login`은 기본 5회 비밀번호 실패 시 15분간 잠급니다. 미인증 이메일·인증 서버 장애·메일/요청 제한은 비밀번호 실패에 포함하지 않습니다. Supabase 공개 Auth API의 Rate Limits·CAPTCHA도 별도로 설정합니다.
 
-1. Supabase Auth에서 IP 전달(`security_sb_forwarded_for_enabled`)을 활성화한다.
-2. `server/.env`의 `SUPABASE_SECRET_KEY`에 해당 프로젝트의 서버 secret 키를 설정한다. 브라우저 환경변수에 넣지 않는다.
-3. Uvicorn의 `--proxy-headers --forwarded-allow-ips`에 실제 신뢰할 프록시 주소만 지정한다. 예: 같은 서버의 프록시라면 `--forwarded-allow-ips=127.0.0.1`. 외부에서 백엔드로 직접 전달 헤더를 위조할 수 없도록 접근 경로도 제한한다. `*`로 모든 발신자를 신뢰하지 않는다.
+`LOGIN_FORWARD_CLIENT_IP=true`를 사용할 때는 아래 설정을 모두 완료합니다.
 
-서버는 ASGI `request.client`만 사용하며 브라우저가 보낸 `X-Forwarded-For`나 `CF-Connecting-IP`를 직접 신뢰하지 않는다. IP 전달 기능은 기본적으로 꺼져 있고, 활성화했을 때 서버 키/IP가 누락되면 오류로 중단한다. [Supabase IP 전달 문서](https://supabase.com/docs/guides/auth/rate-limits#ip-address-forwarding)
+1. Supabase Auth의 IP 전달(`security_sb_forwarded_for_enabled`) 활성화
+2. 서버의 `SUPABASE_SECRET_KEY` 설정
+3. Uvicorn `--proxy-headers --forwarded-allow-ips`에 신뢰하는 프록시 주소만 지정하고, 외부 요청이 전달 헤더를 위조하지 못하도록 접근 경로 제한
 
-## API 엔드포인트
+서버는 ASGI `request.client`를 사용하며 브라우저의 전달 헤더를 직접 신뢰하지 않습니다. 자세한 운영 설정은 [백엔드 문서](server/README.md)를 참고하세요.
 
-`/health`와 `/auth/login`을 제외한 모든 엔드포인트는 Supabase 로그인 토큰(`Authorization: Bearer`)을 요구합니다.
+</details>
 
-> `/auth/login`은 계정별 실패를 서버에서 기록해 기본 5회 실패 시 15분간 잠급니다. Supabase의 공개 Auth API 자체도 보호하도록 운영 프로젝트의 **Authentication → Rate Limits**와 CAPTCHA를 함께 설정해야 합니다.
+<details>
+<summary>API·데이터 모델 빠른 안내</summary>
 
-| 메서드 | 경로 | 설명 |
-| --- | --- | --- |
-| `GET` | `/health` | 서버 상태 확인 |
-| `POST` | `/auth/login` | 비밀번호 로그인(실패 횟수 제한 후 Supabase Auth 위임) |
-| `POST` | `/convert` | PDF·PPT/PPTX·이미지 → Markdown (텍스트 추출 + 비전 분석/OCR) |
-| `POST` | `/preview/pdf` | PDF·PPT/PPTX → PDF 미리보기 바이트(PPT는 LibreOffice 변환) |
-| `POST` | `/vision/ocr` | 이미지 → Google Vision 텍스트 |
-| `POST` | `/summarize` | Markdown + 템플릿 → 요약(`result`) |
-| `POST` | `/agent` | 대화 메시지 → AI 튜터 응답(멀티턴, `thread_id`) |
-| `POST` | `/quiz` | 과목/난이도/유형 + 자료 → 퀴즈 JSON |
-| `POST` | `/quiz/grade-subjective` | 주관식 답안 채점(점수·피드백) |
-| `POST` | `/study-plan` | D-day·미완료 항목 → 오늘 할 일 |
+`/health`와 `/auth/login`을 제외한 기능 API는 Supabase 로그인 토큰을 요구합니다. 전체 요청·응답 스키마는 실행 중인 서버의 `/docs`에서 확인합니다.
 
-## 데이터 모델 (Supabase)
-
-모든 테이블은 RLS로 사용자별 격리됩니다.
-
-| 테이블 | 용도 |
+| API 묶음 | 역할 |
 | --- | --- |
-| `courses` | 과목 |
-| `materials` | 과목별 강의자료(추출된 Markdown 포함) |
-| `summaries` | 자료 기반 요약(4종 템플릿) |
-| `summary_chat_sessions` / `summary_chat_messages` | AI 튜터 대화 세션·메시지 |
-| `quiz_sets` | 생성된 퀴즈 세트 |
-| `quiz_attempts` | 퀴즈 풀이 기록(점수·취약 주제·소요 시간) |
-| `dashboard_state` | D-day·할 일·페이스 등 대시보드 상태(JSON) |
-| `profiles` | 닉네임·아바타·다크 모드·알림 설정 |
+| `/convert`, `/preview/pdf`, `/vision/ocr` | 문서 변환·PDF 미리보기·OCR |
+| `/summarize`, `/summarize/stream`, `/agent`, `/learning-mate` | 요약·스트리밍·자료 기반 대화 |
+| `/quiz`, `/quiz/grade-subjective`, `/quiz/analyze-wrong`, `/study-plan` | 출제·채점·오답 분석·학습 계획 |
+| `/learning-sessions`, `/reviews`, `/learning-issues`, `/explanation-revisions` | 설명 학습·복습·학습 이슈·설명 개선 |
+| `/learning-concepts`, `/learning-graph`, `/study-paths`, `/flashcards/generate` | 개념 기록·연결 학습·학습 코스·카드 초안 |
+| `/preparation-requests`, `/learning-workflow` | 학습 초안·예약·개인 설정·데이터 정리 |
+| `/source-integrations`, `/integrations`, `/usage` | 외부 자료·일정 연결·AI 사용량 |
 
-스토리지 버킷: `avatars`(공개), `course-materials`(비공개).
+데이터는 기본 학습 자료(`courses`, `materials`, `summaries`, `quiz_*`), 세션·개념·수행 근거(`learning_*`), 복습·설명 개선(`review_*`, `explanation_*`), 카드·코스(`study_flashcards`, `study_flashcard_reviews`, `study_paths`, `study_path_sessions`), 작업·초안(`background_jobs`, `preparation_*`), 외부 연결(`external_*`, `integration_oauth_states`)로 나뉩니다. 전체 테이블·소유권 정책·RPC는 [schema.sql](supabase/schema.sql)이 기준입니다.
 
-## 배포
+스토리지는 `avatars`(공개), `course-materials`(비공개)를 사용합니다. AI 사용량·로그인 제한·문서 캐시용 SQLite는 운영 시 영속 디스크에 둡니다.
 
-- **프론트엔드** — Vercel. `vercel.json`이 SPA 라우팅 폴백과 `/api/*` → 백엔드 서버 리라이트를 처리합니다.
-- **백엔드** — FastAPI 서버(예: AWS). Cloudflare 터널을 쓰는 경우 `*.trycloudflare.com` 출처가 CORS·Vite `allowedHosts`에 허용돼 있습니다.
+</details>
 
-## 개발 명령
+## 개발·검증 명령
 
-| 명령 | 설명 |
+| 명령 | 용도 |
 | --- | --- |
-| `npm run dev` | Vite 개발 서버 |
-| `npm run build` | 프로덕션 빌드(`dist/`) |
-| `npm run preview` | 빌드 결과 미리보기 |
-| `npm run lint` | ESLint 검사 |
+| `npm run dev` | 웹 개발 서버 |
+| `npm run build` / `npm run preview` | 웹·promo 배포 빌드 / 결과 미리보기 |
+| `npm test` / `npx tsc -b` / `npm run lint` | 프론트 테스트·타입·코드 및 UI 규칙 검사 |
+| `npm run test:learning-db` / `npm run test:workflow-db` | 학습 세션·작업 흐름의 DB 권한·상태 전이 검사 |
+| `npm run test:flashcards-db` / `npm run test:study-paths-db` | 카드·코스·연결 학습 DB 검사 |
+| `npm run test:security-db` | 참조 소유권·RPC·Storage 권한 회귀 검사 |
+| `python -m pytest -q` | 서버 테스트. `server/`의 가상환경에서 실행 |
+| `python scripts/evaluate_quality.py` | 고정 샘플 품질 회귀 검사(API 호출 없음). `server/`에서 실행, [평가 안내](server/evaluation/README.md) 참고 |
+| `npm run menubar:dev` / `npm run menubar:build` | macOS 메뉴바 앱 개발 / 빌드 |
+
+DB 검사는 자격 증명 없이 격리된 PGlite 환경에서 실행합니다. 실제 Supabase 마이그레이션 적용·모델 응답·외부 계정 연결 검증은 별도로 진행합니다.
