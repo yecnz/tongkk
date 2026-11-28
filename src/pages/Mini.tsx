@@ -68,6 +68,14 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
     return () => { ignore = true; };
   }, [course, materialRetry]);
 
+  // 메뉴바 창은 닫아도 숨겨지기만 하므로, 다시 열릴 때(focus)마다 새로 불러온다.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const refresh = () => setRefreshKey(k => k + 1);
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     let ignore = false;
@@ -79,7 +87,7 @@ function MiniScreen({ user, loading }: { user: User | null; loading: boolean }) 
       })
       .catch(error => console.warn("메뉴바 데이터 불러오기 실패", error));
     return () => { ignore = true; };
-  }, [user]);
+  }, [user, refreshKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
